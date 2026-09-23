@@ -13,18 +13,20 @@ import Sidebar from '../../components/Sidebar.astro';
 					<div class="tabs" id="tabs" role="tablist"></div>
 				</div>
 
-				<div class="subtabs-row">
-					<div class="subtabs" id="clientSubtabs" role="tablist">
-						<button class="subtab" id="subtab-desktop" aria-selected="true"
-							>Preview Desktop</button
-						>
-						<button class="subtab" id="subtab-mobile" aria-selected="false">Preview Mobile</button>
-						<button class="subtab" id="subtab-conditions" aria-selected="false">Conditions</button>
-					</div>
-					<div class="preview-theme" id="previewTheme" role="tablist" aria-label="Preview color scheme">
-						<button class="theme-btn" id="theme-light" aria-pressed="true">☀ Light</button>
-						<button class="theme-btn" id="theme-dark" aria-pressed="false">☾ Dark</button>
-					</div>
+				<div class="subtabs" id="clientSubtabs" role="tablist">
+					<button class="subtab" id="subtab-desktop-light" aria-selected="true"
+						>Preview Desktop <span class="subtab-theme">☀ Light</span></button
+					>
+					<button class="subtab" id="subtab-desktop-dark" aria-selected="false"
+						>Preview Desktop <span class="subtab-theme">☾ Dark</span></button
+					>
+					<button class="subtab" id="subtab-mobile-light" aria-selected="false"
+						>Preview Mobile <span class="subtab-theme">☀ Light</span></button
+					>
+					<button class="subtab" id="subtab-mobile-dark" aria-selected="false"
+						>Preview Mobile <span class="subtab-theme">☾ Dark</span></button
+					>
+					<button class="subtab" id="subtab-conditions" aria-selected="false">Conditions</button>
 				</div>
 
 				<div class="content">
@@ -346,12 +348,11 @@ import Sidebar from '../../components/Sidebar.astro';
 			var els = {
 				tabs: document.getElementById('tabs'),
 				clientSubtabs: document.getElementById('clientSubtabs'),
-				subtabDesktop: document.getElementById('subtab-desktop'),
-				subtabMobile: document.getElementById('subtab-mobile'),
+				subtabDesktopLight: document.getElementById('subtab-desktop-light'),
+				subtabDesktopDark: document.getElementById('subtab-desktop-dark'),
+				subtabMobileLight: document.getElementById('subtab-mobile-light'),
+				subtabMobileDark: document.getElementById('subtab-mobile-dark'),
 				subtabConditions: document.getElementById('subtab-conditions'),
-				previewTheme: document.getElementById('previewTheme'),
-				themeLight: document.getElementById('theme-light'),
-				themeDark: document.getElementById('theme-dark'),
 				sampleBtn: document.getElementById('sampleBtn'),
 				applyBtn: document.getElementById('applyBtn'),
 				source: document.getElementById('source'),
@@ -363,8 +364,7 @@ import Sidebar from '../../components/Sidebar.astro';
 
 			var HTML_TAB_ID = '__html__';
 			var activeClientId = CLIENTS[0].id;
-			var activeSubtab = 'desktop';
-			var activePreviewTheme = 'light';
+			var activeSubtab = 'desktop-light';
 			var rawHtml = SAMPLE_HTML;
 
 			function extractDarkMediaBlocks(css: string) {
@@ -447,14 +447,16 @@ import Sidebar from '../../components/Sidebar.astro';
 
 			function setSubtab(name: string) {
 				activeSubtab = name;
-				els.subtabDesktop!.setAttribute('aria-selected', String(name === 'desktop'));
-				els.subtabMobile!.setAttribute('aria-selected', String(name === 'mobile'));
+				els.subtabDesktopLight!.setAttribute('aria-selected', String(name === 'desktop-light'));
+				els.subtabDesktopDark!.setAttribute('aria-selected', String(name === 'desktop-dark'));
+				els.subtabMobileLight!.setAttribute('aria-selected', String(name === 'mobile-light'));
+				els.subtabMobileDark!.setAttribute('aria-selected', String(name === 'mobile-dark'));
 				els.subtabConditions!.setAttribute('aria-selected', String(name === 'conditions'));
 				(els.viewHtml as HTMLElement).style.display = 'none';
 				(els.viewPreview as HTMLElement).style.display = name === 'conditions' ? 'none' : '';
 				(els.viewConditions as HTMLElement).style.display = name === 'conditions' ? '' : 'none';
 				if (name !== 'conditions') {
-					(els.preview as HTMLIFrameElement).className = name === 'mobile' ? 'mobile' : 'desktop';
+					(els.preview as HTMLIFrameElement).className = name.indexOf('mobile') === 0 ? 'mobile' : 'desktop';
 				}
 				render();
 			}
@@ -539,22 +541,15 @@ import Sidebar from '../../components/Sidebar.astro';
 			}
 
 			function render() {
-				(els.previewTheme as HTMLElement).style.display = activeSubtab === 'conditions' ? 'none' : '';
 				if (activeSubtab === 'conditions') {
 					renderConditions();
 					return;
 				}
+				var theme = activeSubtab.indexOf('dark') !== -1 ? 'dark' : 'light';
 				var transformed = transformForClient(rawHtml, activeClientId);
-				transformed = applyColorScheme(transformed, activePreviewTheme);
-				(els.preview as HTMLIFrameElement).style.colorScheme = activePreviewTheme;
+				transformed = applyColorScheme(transformed, theme);
+				(els.preview as HTMLIFrameElement).style.colorScheme = theme;
 				(els.preview as HTMLIFrameElement).srcdoc = transformed;
-			}
-
-			function setPreviewTheme(theme: string) {
-				activePreviewTheme = theme;
-				els.themeLight!.setAttribute('aria-pressed', String(theme === 'light'));
-				els.themeDark!.setAttribute('aria-pressed', String(theme === 'dark'));
-				render();
 			}
 
 			els.sampleBtn!.addEventListener('click', function () {
@@ -566,20 +561,20 @@ import Sidebar from '../../components/Sidebar.astro';
 				rawHtml = (els.source as HTMLTextAreaElement).value;
 				render();
 			});
-			els.subtabDesktop!.addEventListener('click', function () {
-				setSubtab('desktop');
+			els.subtabDesktopLight!.addEventListener('click', function () {
+				setSubtab('desktop-light');
 			});
-			els.subtabMobile!.addEventListener('click', function () {
-				setSubtab('mobile');
+			els.subtabDesktopDark!.addEventListener('click', function () {
+				setSubtab('desktop-dark');
+			});
+			els.subtabMobileLight!.addEventListener('click', function () {
+				setSubtab('mobile-light');
+			});
+			els.subtabMobileDark!.addEventListener('click', function () {
+				setSubtab('mobile-dark');
 			});
 			els.subtabConditions!.addEventListener('click', function () {
 				setSubtab('conditions');
-			});
-			els.themeLight!.addEventListener('click', function () {
-				setPreviewTheme('light');
-			});
-			els.themeDark!.addEventListener('click', function () {
-				setPreviewTheme('dark');
 			});
 
 			buildTabs();
@@ -686,38 +681,16 @@ import Sidebar from '../../components/Sidebar.astro';
 		font-size: 11.5px;
 		line-height: 1.5;
 	}
-	.subtabs-row {
-		display: flex;
-		align-items: flex-end;
-		justify-content: space-between;
-		gap: 8px;
-		flex-wrap: wrap;
-	}
 	.subtabs {
 		display: flex;
 		gap: 4px;
+		flex-wrap: wrap;
 	}
-	.preview-theme {
-		display: flex;
-		gap: 4px;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		padding: 3px;
-	}
-	.theme-btn {
-		border: none;
-		background: transparent;
-		color: var(--ink-soft);
-		font-family: inherit;
-		font-size: 12px;
-		font-weight: 600;
-		padding: 5px 10px;
-		border-radius: 6px;
-	}
-	.theme-btn[aria-pressed='true'] {
-		background: var(--accent);
-		color: var(--accent-strong);
+	.subtab-theme {
+		font-size: 11px;
+		font-weight: 500;
+		opacity: 0.75;
+		margin-left: 2px;
 	}
 	.subtab {
 		border: 1px solid var(--border);
