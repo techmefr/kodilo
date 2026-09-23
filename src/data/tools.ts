@@ -87,6 +87,16 @@ export const categories: Category[] = [
 				name: 'Gradient Generator',
 				description: 'Generate CSS gradients with a live preview.',
 			},
+			{
+				slug: 'css-grid-generator',
+				name: 'CSS Grid Generator',
+				description: 'Build a CSS grid layout visually and copy the code.',
+			},
+			{
+				slug: 'flexbox-generator',
+				name: 'Flexbox Generator',
+				description: 'Build a CSS flexbox layout visually and copy the code.',
+			},
 		],
 	},
 	{
@@ -244,6 +254,16 @@ export const categories: Category[] = [
 				slug: 'bip39-generator',
 				name: 'BIP39 Generator',
 				description: 'Generate a BIP39 mnemonic seed phrase.',
+			},
+			{
+				slug: 'xor-cipher',
+				name: 'XOR Cipher',
+				description: 'Encrypt or decrypt text/bytes with a repeating XOR key.',
+			},
+			{
+				slug: 'checksum-calculator',
+				name: 'Checksum Calculator',
+				description: 'Compute a CRC32 or other checksum for text or a file.',
 			},
 		],
 	},
@@ -478,6 +498,60 @@ export const categories: Category[] = [
 				slug: 'regex-cheatsheet',
 				name: 'Regex Cheatsheet',
 				description: 'Quick reference for common regular expression syntax.',
+			},
+			{
+				slug: 'rest-api-tester',
+				name: 'REST API Tester',
+				description: 'Send a request and inspect the response, no app install needed.',
+			},
+			{
+				slug: 'docker-cheatsheet',
+				name: 'Docker Cheatsheet',
+				description: 'Quick reference for common Docker commands.',
+			},
+			{
+				slug: 'git-cheatsheet',
+				name: 'Git Cheatsheet',
+				description: 'Quick reference for common Git commands.',
+			},
+			{
+				slug: 'npm-cheatsheet',
+				name: 'NPM Cheatsheet',
+				description: 'Quick reference for common npm/pnpm/yarn commands.',
+			},
+		],
+	},
+	{
+		name: 'Calculators',
+		icon: 'calculator',
+		blurb: 'Bases, currency, units',
+		tools: [
+			{
+				slug: 'developer-calculator',
+				name: 'Developer Calculator',
+				description: 'A calculator with hex, octal and binary modes.',
+			},
+			{
+				slug: 'currency-converter',
+				name: 'Currency Converter',
+				description: 'Convert between currencies.',
+			},
+			{
+				slug: 'unit-converter',
+				name: 'Unit Converter',
+				description: 'Convert length, weight, speed and other units.',
+			},
+		],
+	},
+	{
+		name: 'Productivity',
+		icon: 'timer',
+		blurb: 'Stay focused while you build',
+		tools: [
+			{
+				slug: 'pomodoro-timer',
+				name: 'Pomodoro Timer',
+				description: 'A simple focus timer with work/break intervals.',
 			},
 		],
 	},

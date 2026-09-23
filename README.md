@@ -30,6 +30,8 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - CSS Formatter & Minifier
 - Box Shadow Generator
 - Gradient Generator
+- CSS Grid Generator
+- Flexbox Generator
 
 **Markdown**
 - Markdown to HTML
@@ -64,6 +66,8 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - RSA Key Pair Generator
 - Text Encryption
 - BIP39 Generator
+- XOR Cipher
+- Checksum Calculator
 
 **Generators**
 - UUID Generator
@@ -115,13 +119,26 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - MIME Types
 - Chmod Calculator
 - Regex Cheatsheet
+- REST API Tester
+- Docker Cheatsheet
+- Git Cheatsheet
+- NPM Cheatsheet
+
+**Calculators**
+- Developer Calculator
+- Currency Converter
+- Unit Converter
+
+**Productivity**
+- Pomodoro Timer
 
 **Testing** — not started
 **Design** — not started
 
-Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools), [devbench.site](https://devbench.site/),
-[OpenFormatter](https://openformatter.com/tools) and other no-signup dev tool
-collections — kodilo picks a subset and adds its own (Inbox Tester).
+Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools),
+[it-tools.tech](https://it-tools.tech/) (its live deployment), [devbench.site](https://devbench.site/),
+[OpenFormatter](https://openformatter.com/tools), [productivite.loan-thomas.com](https://productivite.loan-thomas.com/)
+and [CyberChef](https://github.com/gchq/CyberChef) — kodilo picks a subset and adds its own (Inbox Tester).
 
 ## Stack
 
