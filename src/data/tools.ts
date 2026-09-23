@@ -2,6 +2,8 @@ export interface Tool {
 	slug: string;
 	name: string;
 	description: string;
+	/** Whether the tool has an actual page built for it yet. */
+	built?: boolean;
 }
 
 export interface Category {
@@ -18,6 +20,7 @@ export const categories: Category[] = [
 				name: 'Inbox Tester',
 				description:
 					'Paste an HTML email, pick a client tab, see the render and which CSS features it supports.',
+				built: true,
 			},
 		],
 	},
@@ -74,10 +77,35 @@ export const categories: Category[] = [
 				name: 'Gradient Generator',
 				description: 'Generate CSS gradients with a live preview.',
 			},
+		],
+	},
+	{
+		name: 'Markdown',
+		tools: [
+			{
+				slug: 'markdown-to-html',
+				name: 'Markdown to HTML',
+				description: 'Convert Markdown to HTML.',
+			},
+			{
+				slug: 'markdown-previewer',
+				name: 'Markdown Previewer',
+				description: 'Write Markdown and preview the rendered result live.',
+			},
+		],
+	},
+	{
+		name: 'SEO',
+		tools: [
 			{
 				slug: 'meta-tag-generator',
 				name: 'Meta Tag Generator',
-				description: 'Generate HTML meta and Open Graph tags.',
+				description: 'Generate HTML meta tags.',
+			},
+			{
+				slug: 'open-graph-generator',
+				name: 'Open Graph Generator',
+				description: 'Generate Open Graph tags for link previews.',
 			},
 		],
 	},
@@ -123,6 +151,16 @@ export const categories: Category[] = [
 				slug: 'text-to-nato-alphabet',
 				name: 'Text to NATO Alphabet',
 				description: 'Spell out text using the NATO phonetic alphabet.',
+			},
+			{
+				slug: 'text-statistics',
+				name: 'Text Statistics',
+				description: 'Reading time, sentence count and other text metrics.',
+			},
+			{
+				slug: 'numeronym-generator',
+				name: 'Numeronym Generator',
+				description: 'Generate numeronyms like i18n or a11y from a word.',
 			},
 		],
 	},
@@ -174,6 +212,21 @@ export const categories: Category[] = [
 				name: 'Token Generator',
 				description: 'Generate random tokens with a custom charset and length.',
 			},
+			{
+				slug: 'rsa-key-pair-generator',
+				name: 'RSA Key Pair Generator',
+				description: 'Generate an RSA public/private key pair.',
+			},
+			{
+				slug: 'text-encryption',
+				name: 'Text Encryption',
+				description: 'Encrypt and decrypt text with AES and a passphrase.',
+			},
+			{
+				slug: 'bip39-generator',
+				name: 'BIP39 Generator',
+				description: 'Generate a BIP39 mnemonic seed phrase.',
+			},
 		],
 	},
 	{
@@ -198,6 +251,11 @@ export const categories: Category[] = [
 				slug: 'qr-code-generator',
 				name: 'QR Code Generator',
 				description: 'Generate QR codes from text or URLs.',
+			},
+			{
+				slug: 'wifi-qr-code-generator',
+				name: 'WiFi QR Code Generator',
+				description: 'Generate a QR code that connects to a WiFi network.',
 			},
 			{
 				slug: 'crontab-generator',
@@ -245,6 +303,26 @@ export const categories: Category[] = [
 				description: 'Calculate subnet ranges, masks and host counts.',
 			},
 			{
+				slug: 'ipv4-range-expander',
+				name: 'IPv4 Range Expander',
+				description: 'Expand an IPv4 range or CIDR into individual addresses.',
+			},
+			{
+				slug: 'ipv6-ula-generator',
+				name: 'IPv6 ULA Generator',
+				description: 'Generate a unique local IPv6 address prefix.',
+			},
+			{
+				slug: 'mac-address-generator',
+				name: 'MAC Address Generator',
+				description: 'Generate random MAC addresses.',
+			},
+			{
+				slug: 'mac-address-lookup',
+				name: 'MAC Address Lookup',
+				description: 'Look up the vendor for a MAC address.',
+			},
+			{
 				slug: 'user-agent-parser',
 				name: 'User Agent Parser',
 				description: 'Parse a User-Agent string into browser, engine and OS.',
@@ -253,6 +331,121 @@ export const categories: Category[] = [
 				slug: 'http-status-codes',
 				name: 'HTTP Status Codes',
 				description: 'Look up the meaning of an HTTP status code.',
+			},
+			{
+				slug: 'phone-parser',
+				name: 'Phone Parser & Formatter',
+				description: 'Parse and format international phone numbers.',
+			},
+		],
+	},
+	{
+		name: 'Validators',
+		tools: [
+			{
+				slug: 'email-validator',
+				name: 'Email Validator',
+				description: 'Validate email address syntax.',
+			},
+			{
+				slug: 'credit-card-validator',
+				name: 'Credit Card Validator',
+				description: 'Validate a credit card number with the Luhn check.',
+			},
+			{
+				slug: 'iban-validator',
+				name: 'IBAN Validator & Parser',
+				description: 'Validate an IBAN and break it down by country/bank/account.',
+			},
+		],
+	},
+	{
+		name: 'Images',
+		tools: [
+			{
+				slug: 'image-resizer',
+				name: 'Image Resizer',
+				description: 'Resize images entirely in the browser.',
+			},
+			{
+				slug: 'image-compressor',
+				name: 'Image Compressor',
+				description: 'Compress images without uploading them anywhere.',
+			},
+			{
+				slug: 'png-to-jpg',
+				name: 'PNG to JPG Converter',
+				description: 'Convert PNG images to JPG.',
+			},
+			{
+				slug: 'image-to-base64',
+				name: 'Image to Base64',
+				description: 'Convert an image to a Base64 data URI.',
+			},
+		],
+	},
+	{
+		name: 'PDF',
+		tools: [
+			{
+				slug: 'pdf-merge',
+				name: 'PDF Merge',
+				description: 'Combine multiple PDFs into one.',
+			},
+			{
+				slug: 'pdf-split',
+				name: 'PDF Split',
+				description: 'Extract pages from a PDF.',
+			},
+			{
+				slug: 'pdf-compress',
+				name: 'PDF Compress',
+				description: 'Reduce PDF file size.',
+			},
+			{
+				slug: 'pdf-to-jpg',
+				name: 'PDF to JPG',
+				description: 'Convert PDF pages to JPG images.',
+			},
+			{
+				slug: 'jpg-to-pdf',
+				name: 'JPG to PDF',
+				description: 'Convert JPG images to a PDF.',
+			},
+		],
+	},
+	{
+		name: 'Dev Utilities',
+		tools: [
+			{
+				slug: 'sql-prettify',
+				name: 'SQL Prettify',
+				description: 'Format SQL queries.',
+			},
+			{
+				slug: 'math-evaluator',
+				name: 'Math Evaluator',
+				description: 'Evaluate a math expression on the fly.',
+			},
+			{
+				slug: 'docker-run-to-compose',
+				name: 'Docker Run to Compose Converter',
+				description: 'Convert a docker run command to a docker-compose.yml.',
+			},
+			{
+				slug: 'mime-types',
+				name: 'MIME Types',
+				description: 'Look up the MIME type for a file extension.',
+			},
+			{
+				slug: 'chmod-calculator',
+				name: 'Chmod Calculator',
+				description: 'Compute and explain Unix file permission values.',
+			},
+			{
+				slug: 'regex-cheatsheet',
+				name: 'Regex Cheatsheet',
+				description: 'Quick reference for common regular expression syntax.',
 			},
 		],
 	},
@@ -267,3 +460,8 @@ export const categories: Category[] = [
 ];
 
 export const allTools: Tool[] = categories.flatMap((c) => c.tools);
+
+/** Categories filtered down to tools that actually have a page built. */
+export const builtCategories: Category[] = categories
+	.map((c) => ({ ...c, tools: c.tools.filter((t) => t.built) }))
+	.filter((c) => c.tools.length > 0);
