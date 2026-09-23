@@ -14,6 +14,40 @@ Live at **https://techmefr.github.io/kodilo/**
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
 
+## Roadmap
+
+Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
+
+**JSON**
+- JSON Formatter & Validator
+- JSON to YAML
+- JSON to CSV
+
+**HTML / CSS**
+- HTML Formatter
+- CSS Formatter & Minifier
+- Box Shadow Generator
+- Gradient Generator
+
+**Text**
+- Regex Tester
+- Diff Checker
+- Case Converter
+- Word Counter
+
+**Encoding**
+- Base64 Encoder & Decoder
+- JWT Decoder
+- URL Encoder & Decoder
+
+**Generators**
+- UUID Generator
+- Password Generator
+- QR Code Generator
+
+**Testing** — not started
+**Design** — not started
+
 ## Stack
 
 - [Astro](https://astro.build) (static output)
