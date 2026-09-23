@@ -1,0 +1,91 @@
+---
+import { categories } from '../data/tools';
+
+interface Props {
+	activeSlug?: string;
+}
+
+const { activeSlug } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<nav class="sidebar">
+	<a class="brand" href={base}>kodilo</a>
+	{
+		categories.map((category) => (
+			<div class="sidebar-cat">
+				<h2>{category.name}</h2>
+				{category.tools.length === 0 ? (
+					<span class="sidebar-tool placeholder">Add a tool&hellip;</span>
+				) : (
+					category.tools.map((tool) => (
+						<a
+							class="sidebar-tool"
+							href={`${base}tools/${tool.slug}/`}
+							aria-current={tool.slug === activeSlug ? 'true' : undefined}
+						>
+							{tool.name}
+						</a>
+					))
+				)}
+			</div>
+		))
+	}
+</nav>
+
+<style>
+	.sidebar {
+		width: 220px;
+		flex-shrink: 0;
+		border-right: 1px solid var(--border);
+		padding: 20px 12px;
+		position: sticky;
+		top: 0;
+		align-self: flex-start;
+		height: 100vh;
+		overflow-y: auto;
+	}
+	.brand {
+		display: block;
+		font-size: 15px;
+		font-weight: 700;
+		margin: 0 0 16px;
+		padding: 0 8px;
+		letter-spacing: -0.01em;
+		color: var(--ink);
+		text-decoration: none;
+	}
+	.sidebar-cat {
+		margin-bottom: 16px;
+	}
+	.sidebar-cat h2 {
+		font-size: 11px;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--ink-soft);
+		margin: 0 0 4px;
+		padding: 0 8px;
+	}
+	.sidebar-tool {
+		display: block;
+		width: 100%;
+		text-align: left;
+		border: none;
+		background: transparent;
+		color: var(--ink-soft);
+		font-size: 13.5px;
+		font-weight: 500;
+		padding: 7px 8px;
+		border-radius: 7px;
+		text-decoration: none;
+		box-sizing: border-box;
+	}
+	.sidebar-tool[aria-current='true'] {
+		background: var(--accent);
+		color: var(--accent-ink);
+		font-weight: 600;
+	}
+	.sidebar-tool.placeholder {
+		opacity: 0.55;
+	}
+</style>
