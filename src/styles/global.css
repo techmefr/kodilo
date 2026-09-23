@@ -1,12 +1,13 @@
 :root {
-	--bg: #f7f7f5;
+	--bg: #f7f6f9;
 	--surface: #ffffff;
-	--surface-2: #f0f0ee;
-	--border: #e2e2df;
-	--ink: #1c1c1a;
-	--ink-soft: #6b6b66;
-	--accent: #eef0ff;
-	--accent-ink: #3730d8;
+	--surface-2: #f0eef6;
+	--border: #e2dff0;
+	--ink: #201c2e;
+	--ink-soft: #6f6b85;
+	--accent: #ede9fe;
+	--accent-strong: #6d4fe0;
+	--accent-ink: #ffffff;
 	--warn: #92400e;
 	--warn-bg: #fef3c7;
 	--ok: #166534;
@@ -14,44 +15,45 @@
 	--partial: #92400e;
 	--partial-bg: #fef3c7;
 	--mono: 'JetBrains Mono', ui-monospace, monospace;
-	--sans:
-		'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
-		--bg: #17171a;
-		--surface: #202024;
-		--surface-2: #26262b;
-		--border: #34343a;
-		--ink: #f0f0ee;
-		--ink-soft: #a3a3a0;
-		--accent: #2a2a5c;
-		--accent-ink: #b6bcff;
-		--warn: #fbbf24;
-		--warn-bg: #423318;
-		--ok: #4ade80;
-		--ok-bg: #15321f;
-		--partial: #fbbf24;
-		--partial-bg: #423318;
+		--bg: #282a36;
+		--surface: #21222c;
+		--surface-2: #343746;
+		--border: #44475a;
+		--ink: #f8f8f2;
+		--ink-soft: #a9adc1;
+		--accent: #44475a;
+		--accent-strong: #bd93f9;
+		--accent-ink: #282a36;
+		--warn: #ffb86c;
+		--warn-bg: #4a3a26;
+		--ok: #50fa7b;
+		--ok-bg: #1e3a29;
+		--partial: #f1fa8c;
+		--partial-bg: #46461f;
 	}
 }
 
 :root[data-theme='dark'] {
-	--bg: #17171a;
-	--surface: #202024;
-	--surface-2: #26262b;
-	--border: #34343a;
-	--ink: #f0f0ee;
-	--ink-soft: #a3a3a0;
-	--accent: #2a2a5c;
-	--accent-ink: #b6bcff;
-	--warn: #fbbf24;
-	--warn-bg: #423318;
-	--ok: #4ade80;
-	--ok-bg: #15321f;
-	--partial: #fbbf24;
-	--partial-bg: #423318;
+	--bg: #282a36;
+	--surface: #21222c;
+	--surface-2: #343746;
+	--border: #44475a;
+	--ink: #f8f8f2;
+	--ink-soft: #a9adc1;
+	--accent: #44475a;
+	--accent-strong: #bd93f9;
+	--accent-ink: #282a36;
+	--warn: #ffb86c;
+	--warn-bg: #4a3a26;
+	--ok: #50fa7b;
+	--ok-bg: #1e3a29;
+	--partial: #f1fa8c;
+	--partial-bg: #46461f;
 }
 
 * {
