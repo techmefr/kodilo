@@ -22,31 +22,62 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - JSON Formatter & Validator
 - JSON to YAML
 - JSON to CSV
+- JSON Diff
+- JSON Viewer
 
 **HTML / CSS**
 - HTML Formatter
 - CSS Formatter & Minifier
 - Box Shadow Generator
 - Gradient Generator
+- Meta Tag Generator
 
 **Text**
 - Regex Tester
 - Diff Checker
 - Case Converter
 - Word Counter
+- Slugify
+- Lorem Ipsum Generator
+- Text to Binary
+- Text to NATO Alphabet
 
-**Encoding**
+**Encoding & Security**
 - Base64 Encoder & Decoder
 - JWT Decoder
 - URL Encoder & Decoder
+- HTML Entities
+- Hash Text
+- HMAC Generator
+- Bcrypt
+- Basic Auth Generator
+- Token Generator
 
 **Generators**
 - UUID Generator
+- ULID Generator
 - Password Generator
 - QR Code Generator
+- Crontab Generator
+
+**Converters**
+- Date/Time Converter
+- Color Converter
+- Integer Base Converter
+- Roman Numeral Converter
+- Temperature Converter
+
+**Network**
+- IPv4 Subnet Calculator
+- User Agent Parser
+- HTTP Status Codes
 
 **Testing** — not started
 **Design** — not started
+
+Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools), [devbench.site](https://devbench.site/),
+[OpenFormatter](https://openformatter.com/tools) and other no-signup dev tool
+collections — kodilo picks a subset and adds its own (Inbox Tester).
 
 ## Stack
 
