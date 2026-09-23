@@ -30,7 +30,14 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - CSS Formatter & Minifier
 - Box Shadow Generator
 - Gradient Generator
+
+**Markdown**
+- Markdown to HTML
+- Markdown Previewer
+
+**SEO**
 - Meta Tag Generator
+- Open Graph Generator
 
 **Text**
 - Regex Tester
@@ -41,6 +48,8 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Lorem Ipsum Generator
 - Text to Binary
 - Text to NATO Alphabet
+- Text Statistics
+- Numeronym Generator
 
 **Encoding & Security**
 - Base64 Encoder & Decoder
@@ -52,12 +61,16 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Bcrypt
 - Basic Auth Generator
 - Token Generator
+- RSA Key Pair Generator
+- Text Encryption
+- BIP39 Generator
 
 **Generators**
 - UUID Generator
 - ULID Generator
 - Password Generator
 - QR Code Generator
+- WiFi QR Code Generator
 - Crontab Generator
 
 **Converters**
@@ -69,8 +82,39 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 
 **Network**
 - IPv4 Subnet Calculator
+- IPv4 Range Expander
+- IPv6 ULA Generator
+- MAC Address Generator
+- MAC Address Lookup
 - User Agent Parser
 - HTTP Status Codes
+- Phone Parser & Formatter
+
+**Validators**
+- Email Validator
+- Credit Card Validator
+- IBAN Validator & Parser
+
+**Images**
+- Image Resizer
+- Image Compressor
+- PNG to JPG Converter
+- Image to Base64
+
+**PDF**
+- PDF Merge
+- PDF Split
+- PDF Compress
+- PDF to JPG
+- JPG to PDF
+
+**Dev Utilities**
+- SQL Prettify
+- Math Evaluator
+- Docker Run to Compose Converter
+- MIME Types
+- Chmod Calculator
+- Regex Cheatsheet
 
 **Testing** — not started
 **Design** — not started
@@ -105,7 +149,9 @@ Node version is pinned via `.nvmrc` (`lts/*`).
 1. Add the tool's metadata to `src/data/tools.ts` (under an existing or new category).
 2. Create `src/pages/tools/<slug>.astro` using `src/layouts/Base.astro` and
    `src/components/Sidebar.astro` for the shared shell.
-3. Keep it dependency-free and client-side — no sign-up, no server, no tracking.
+3. Keep it client-side and dependency-free where practical — a small, well-maintained
+   library (e.g. for PDF or image manipulation) is fine when a tool genuinely needs one.
+   No sign-up, no server, no tracking either way.
 
 ## License
 
