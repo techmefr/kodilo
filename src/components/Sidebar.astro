@@ -7,31 +7,53 @@ interface Props {
 
 const { activeSlug } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+
+const iconModules = import.meta.glob('/node_modules/lucide-static/icons/*.svg', {
+	query: '?raw',
+	import: 'default',
+	eager: true,
+}) as Record<string, string>;
+
+function icon(name: string): string {
+	const mod = iconModules[`/node_modules/lucide-static/icons/${name}.svg`];
+	return mod ?? '';
+}
 ---
 
-<nav class="sidebar">
+<nav class="sidebar" transition:name="sidebar">
 	<a class="brand" href={base}>kodilo</a>
 	{
-		categories.map((category) => (
-			<div class="sidebar-cat">
-				<h2>{category.name}</h2>
-				{category.tools.map((tool) => (
-					<a
-						class="sidebar-tool"
-						href={`${base}tools/${tool.slug}/`}
-						aria-current={tool.slug === activeSlug ? 'true' : undefined}
-					>
-						{tool.name}
-					</a>
-				))}
-			</div>
-		))
+		categories.map((category) => {
+			const isActive = category.tools.some((t) => t.slug === activeSlug);
+			return (
+				<details class="cat" open={isActive}>
+					<summary>
+						<span class="cat-icon" set:html={icon(category.icon)} />
+						<span class="cat-text">
+							<span class="cat-name">{category.name}</span>
+							<span class="cat-blurb">{category.blurb}</span>
+						</span>
+					</summary>
+					<div class="cat-tools">
+						{category.tools.map((tool) => (
+							<a
+								class="sidebar-tool"
+								href={`${base}tools/${tool.slug}/`}
+								aria-current={tool.slug === activeSlug ? 'true' : undefined}
+							>
+								{tool.name}
+							</a>
+						))}
+					</div>
+				</details>
+			);
+		})
 	}
 </nav>
 
 <style>
 	.sidebar {
-		width: 220px;
+		width: 240px;
 		flex-shrink: 0;
 		border-right: 1px solid var(--border);
 		padding: 20px 12px;
@@ -51,16 +73,59 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 		color: var(--ink);
 		text-decoration: none;
 	}
-	.sidebar-cat {
-		margin-bottom: 16px;
+	.cat {
+		margin-bottom: 2px;
+		border-radius: 8px;
 	}
-	.sidebar-cat h2 {
-		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
+	.cat summary {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		list-style: none;
+		cursor: pointer;
+		padding: 7px 8px;
+		border-radius: 8px;
+		user-select: none;
+	}
+	.cat summary::-webkit-details-marker {
+		display: none;
+	}
+	.cat summary:hover {
+		background: var(--surface-2);
+	}
+	.cat-icon {
+		display: flex;
+		flex-shrink: 0;
 		color: var(--ink-soft);
-		margin: 0 0 4px;
-		padding: 0 8px;
+	}
+	.cat-icon :global(svg) {
+		width: 16px;
+		height: 16px;
+	}
+	.cat-text {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.cat-name {
+		font-size: 12.5px;
+		font-weight: 700;
+		color: var(--ink);
+	}
+	.cat-blurb {
+		font-size: 11px;
+		color: var(--ink-soft);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.cat[open] > summary .cat-blurb {
+		display: none;
+	}
+	.cat-tools {
+		display: flex;
+		flex-direction: column;
+		padding: 2px 0 6px 30px;
 	}
 	.sidebar-tool {
 		display: block;
@@ -69,9 +134,9 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 		border: none;
 		background: transparent;
 		color: var(--ink-soft);
-		font-size: 13.5px;
+		font-size: 13px;
 		font-weight: 500;
-		padding: 7px 8px;
+		padding: 6px 8px;
 		border-radius: 7px;
 		text-decoration: none;
 		box-sizing: border-box;

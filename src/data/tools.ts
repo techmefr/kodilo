@@ -8,12 +8,18 @@ export interface Tool {
 
 export interface Category {
 	name: string;
+	/** lucide-static icon filename, without the .svg extension. */
+	icon: string;
+	/** Short blurb shown in the collapsed accordion header, distinct from the tool names. */
+	blurb: string;
 	tools: Tool[];
 }
 
 export const categories: Category[] = [
 	{
 		name: 'Email',
+		icon: 'mail',
+		blurb: 'Preview and test outgoing HTML email',
 		tools: [
 			{
 				slug: 'inbox-tester',
@@ -26,6 +32,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'JSON',
+		icon: 'braces',
+		blurb: 'Format, validate, diff, convert',
 		tools: [
 			{
 				slug: 'json-formatter',
@@ -56,6 +64,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'HTML / CSS',
+		icon: 'code',
+		blurb: 'Beautify, minify, generate',
 		tools: [
 			{
 				slug: 'html-formatter',
@@ -81,6 +91,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'Markdown',
+		icon: 'file-text',
+		blurb: 'Write, preview, convert',
 		tools: [
 			{
 				slug: 'markdown-to-html',
@@ -96,6 +108,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'SEO',
+		icon: 'search',
+		blurb: 'Meta tags for link previews',
 		tools: [
 			{
 				slug: 'meta-tag-generator',
@@ -111,6 +125,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'Text',
+		icon: 'type',
+		blurb: 'Case, diff, count, encode',
 		tools: [
 			{
 				slug: 'regex-tester',
@@ -166,6 +182,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'Encoding & Security',
+		icon: 'lock',
+		blurb: 'Hash, sign, encrypt, decode',
 		tools: [
 			{
 				slug: 'base64',
@@ -231,6 +249,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'Generators',
+		icon: 'wand-2',
+		blurb: 'IDs, passwords, QR, cron',
 		tools: [
 			{
 				slug: 'uuid-generator',
@@ -266,6 +286,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'Converters',
+		icon: 'repeat',
+		blurb: 'Dates, colors, bases, units',
 		tools: [
 			{
 				slug: 'date-time-converter',
@@ -296,6 +318,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'Network',
+		icon: 'network',
+		blurb: 'IPs, MACs, user agents, status codes',
 		tools: [
 			{
 				slug: 'ipv4-subnet-calculator',
@@ -341,6 +365,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'Validators',
+		icon: 'list-checks',
+		blurb: 'Emails, cards, IBANs',
 		tools: [
 			{
 				slug: 'email-validator',
@@ -361,6 +387,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'Images',
+		icon: 'image',
+		blurb: 'Resize, compress, convert',
 		tools: [
 			{
 				slug: 'image-resizer',
@@ -386,6 +414,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'PDF',
+		icon: 'file-text',
+		blurb: 'Merge, split, compress, convert',
 		tools: [
 			{
 				slug: 'pdf-merge',
@@ -416,6 +446,8 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'Dev Utilities',
+		icon: 'wrench',
+		blurb: 'SQL, cron, chmod, MIME',
 		tools: [
 			{
 				slug: 'sql-prettify',
@@ -451,10 +483,14 @@ export const categories: Category[] = [
 	},
 	{
 		name: 'Testing',
+		icon: 'test-tube-2',
+		blurb: 'Coming soon',
 		tools: [],
 	},
 	{
 		name: 'Design',
+		icon: 'palette',
+		blurb: 'Coming soon',
 		tools: [],
 	},
 ];

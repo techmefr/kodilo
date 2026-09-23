@@ -12,7 +12,8 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^7.3.4"
+    "astro": "^7.3.4",
+    "lucide-static": "^1.47.0"
   },
   "allowScripts": {
     "esbuild": true
