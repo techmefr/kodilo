@@ -11,14 +11,22 @@ import ToolShell from '../../components/ToolShell.astro';
 		<div class="chips" id="cb-presets"></div>
 	</div>
 	<div class="cb-layout">
-		<svg class="cb-graph" id="cb-graph" viewBox="-20 -120 340 560" role="img" aria-label="Easing curve">
+		<svg class="cb-graph" id="cb-graph" viewBox="-20 -120 340 560" role="group" aria-label="Easing curve">
 			<rect x="0" y="0" width="300" height="300" class="cb-box"></rect>
 			<line x1="0" y1="300" x2="300" y2="0" class="cb-diag"></line>
 			<line id="cb-l1" class="cb-arm"></line>
 			<line id="cb-l2" class="cb-arm"></line>
 			<path id="cb-path" class="cb-curve"></path>
-			<circle id="cb-h1" r="10" class="cb-handle" tabindex="0" aria-label="First control point"></circle>
-			<circle id="cb-h2" r="10" class="cb-handle two" tabindex="0" aria-label="Second control point"></circle>
+			<circle id="cb-h1" r="10" class="cb-handle" tabindex="0" role="button" aria-roledescription="draggable point" aria-label="First control point"></circle>
+			<circle
+				id="cb-h2"
+				r="10"
+				class="cb-handle two"
+				tabindex="0"
+				role="button"
+				aria-roledescription="draggable point"
+				aria-label="Second control point"
+			></circle>
 		</svg>
 		<div class="cb-side">
 			<section class="panel">
