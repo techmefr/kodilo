@@ -17,19 +17,19 @@ import Header from '../../components/Header.astro';
 				</div>
 
 				<div class="subtabs" id="clientSubtabs" role="tablist">
-					<button class="subtab" id="subtab-desktop-light" aria-selected="true">
+					<button class="subtab" role="tab" id="subtab-desktop-light" aria-selected="true">
 						Preview Desktop <span class="subtab-theme">☀ Light</span>
 					</button>
-					<button class="subtab" id="subtab-desktop-dark" aria-selected="false">
+					<button class="subtab" role="tab" id="subtab-desktop-dark" aria-selected="false">
 						Preview Desktop <span class="subtab-theme">☾ Dark</span>
 					</button>
-					<button class="subtab" id="subtab-mobile-light" aria-selected="false">
+					<button class="subtab" role="tab" id="subtab-mobile-light" aria-selected="false">
 						Preview Mobile <span class="subtab-theme">☀ Light</span>
 					</button>
-					<button class="subtab" id="subtab-mobile-dark" aria-selected="false">
+					<button class="subtab" role="tab" id="subtab-mobile-dark" aria-selected="false">
 						Preview Mobile <span class="subtab-theme">☾ Dark</span>
 					</button>
-					<button class="subtab" id="subtab-conditions" aria-selected="false">
+					<button class="subtab" role="tab" id="subtab-conditions" aria-selected="false">
 						Conditions
 					</button>
 				</div>
@@ -44,7 +44,7 @@ import Header from '../../components/Header.astro';
 					<div id="viewHtml" style="display:none;padding:12px;">
 						<textarea id="source" spellcheck="false"></textarea>
 						<div style="margin-top:8px;display:flex;gap:8px;">
-							<button id="applyBtn" style="background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600;">
+							<button id="applyBtn" style="background:var(--accent-strong);color:var(--accent-ink);border-color:transparent;font-weight:600;">
 								Apply
 							</button>
 							<button id="sampleBtn">Load sample</button>
@@ -626,7 +626,7 @@ import Header from '../../components/Header.astro';
 		cursor: pointer;
 	}
 	.tabs :global(.tab[aria-selected='true']) {
-		background: var(--accent);
+		background: var(--accent-strong);
 		color: var(--accent-ink);
 	}
 	.tabs :global(.tab.group-end) {
@@ -654,7 +654,7 @@ import Header from '../../components/Header.astro';
 	}
 	:global(button:focus-visible),
 	.subtab:focus-visible {
-		outline: 2px solid var(--accent);
+		outline: 2px solid var(--accent-strong);
 		outline-offset: 2px;
 	}
 	textarea {
@@ -678,7 +678,6 @@ import Header from '../../components/Header.astro';
 	.subtab-theme {
 		font-size: 11px;
 		font-weight: 500;
-		opacity: 0.75;
 		margin-left: 2px;
 	}
 	.subtab {
@@ -806,6 +805,6 @@ import Header from '../../components/Header.astro';
 		padding-top: 2px;
 	}
 	footer a {
-		color: var(--accent);
+		color: var(--accent-strong);
 	}
 </style>

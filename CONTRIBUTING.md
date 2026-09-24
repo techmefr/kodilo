@@ -25,11 +25,13 @@ npm run format:check
 npm run lint
 npm run check
 npm run build
+npm run budget
 npm run test:install
 npm test
+npm run test:a11y
 ```
 
-`npm test` runs Playwright: every tool page is loaded on desktop, mobile and dark mode, and must render with no console error and no horizontal scroll. Add a functional test in `tests/tools.spec.ts` when your tool computes something with a known answer.
+`npm test` runs Playwright: every tool page is loaded on desktop, mobile and dark mode, and must render with no console error and no horizontal scroll. Every page is also audited with axe for WCAG 2.1 AA, in light and dark mode. `npm run budget` fails when a bundle grows past its size limit. Add a functional test in `tests/tools.spec.ts` when your tool computes something with a known answer.
 
 ## Adding a tool
 

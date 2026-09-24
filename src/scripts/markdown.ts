@@ -59,7 +59,11 @@ export function markdown(src: string): string {
 			j++;
 			while (j < lines.length && lines[j].trim() && !/^\s*([-*+]|\d+[.)])\s/.test(lines[j]) && !isBlockStart(lines[j].trim())) body += ` ${lines[j++].trim()}`;
 			const task = body.match(/^\[([ xX])\]\s+(.*)$/);
-			items.push(task ? `<li class="task"><input type="checkbox" disabled${task[1] !== ' ' ? ' checked' : ''} /> ${inline(task[2])}` : `<li>${inline(body)}`);
+			items.push(
+				task
+					? `<li class="task"><input type="checkbox" aria-label="Task" disabled${task[1] !== ' ' ? ' checked' : ''} /> ${inline(task[2])}`
+					: `<li>${inline(body)}`,
+			);
 			while (j < lines.length && !lines[j].trim() && /^\s*([-*+]|\d+[.)])\s/.test(lines[j + 1] ?? '') && lines[j + 1].match(/^\s*/)![0].length >= indent) j++;
 		}
 		const tag = ordered ? 'ol' : 'ul';

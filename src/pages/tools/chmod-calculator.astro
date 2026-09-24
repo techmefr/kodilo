@@ -22,7 +22,9 @@ const perms = [
 		<table class="chmod-grid">
 			<thead>
 				<tr>
-					<th></th>
+					<th>
+						<span class="sr-only">Who</span>
+					</th>
 					{perms.map(([, label, value]) => (
 						<th>
 							{label} · {value}

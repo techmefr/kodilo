@@ -23,15 +23,26 @@ b827.eb12.3456
 <script>
 	import { byId, onPage } from '../../scripts/ui';
 
-	type Registry = { vendors: string[]; prefixes: Record<string, number> };
-	let registry: Promise<Registry> | null = null;
-	const load = () => (registry ??= import('../../data/oui.json').then((m) => m.default as Registry));
+	const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+	const shards = new Map<string, Record<string, string> | null>();
+	const pending = new Map<string, Promise<void>>();
+	const load = (shard: string) => {
+		if (!pending.has(shard))
+			pending.set(
+				shard,
+				fetch(`${base}oui/${shard}.json`)
+					.then((r) => (r.ok ? r.json() : null))
+					.catch(() => null)
+					.then((d) => void shards.set(shard, d)),
+			);
+		return pending.get(shard)!;
+	};
 
 	onPage('ml-tool', () => {
 		const input = byId<HTMLTextAreaElement>('ml-in');
-		let db: Registry = { vendors: [], prefixes: {} };
 
 		const render = () => {
+			const missing = new Set<string>();
 			const lines = input.value
 				.split('\n')
 				.map((l) => l.trim())
@@ -51,7 +62,15 @@ b827.eb12.3456
 					}
 					const first = parseInt(hex.slice(0, 2), 16);
 					const flags = [first & 1 ? 'Multicast' : 'Unicast', first & 2 ? 'Locally administered' : 'Globally unique'];
-					const entry = db.vendors[db.prefixes[hex.slice(0, 6)]];
+					const shard = hex.slice(0, 3);
+					if (!shards.has(shard)) {
+						missing.add(shard);
+						b.textContent = 'Looking up…';
+						s.textContent = flags.join(' · ');
+						return li;
+					}
+					const table = shards.get(shard) ?? {};
+					const entry = [9, 7, 6].map((n) => table[hex.slice(3, n)]).find(Boolean);
 					if (entry) {
 						const [name, country] = entry.split('\t');
 						b.textContent = name;
@@ -64,15 +83,14 @@ b827.eb12.3456
 					return li;
 				}),
 			);
+			if (missing.size) Promise.all([...missing].map(load)).then(render);
 		};
 
 		input.addEventListener('input', render);
-		load()
-			.then((d) => {
-				db = d;
-				byId('ml-note').textContent = `${Object.keys(d.prefixes).length.toLocaleString('en-US')} vendor prefixes from the IEEE registry.`;
-				render();
-			})
+		render();
+		fetch(`${base}oui/count.json`)
+			.then((r) => r.json())
+			.then((n: number) => (byId('ml-note').textContent = `${n.toLocaleString('en-US')} vendor prefixes from the IEEE registry.`))
 			.catch(() => (byId('ml-note').textContent = 'The vendor registry could not be loaded. Reload the page.'));
 	});
 </script>
@@ -113,7 +131,7 @@ b827.eb12.3456
 		color: var(--ink-soft);
 	}
 	.ml-list :global(li[data-kind='bad'] b) {
-		color: #dc2626;
+		color: var(--bad);
 	}
 	.ml-list :global(li[data-kind='none'] b) {
 		color: var(--ink-soft);

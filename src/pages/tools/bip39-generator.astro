@@ -137,7 +137,7 @@ import ToolShell from '../../components/ToolShell.astro';
 		font-size: 14px;
 	}
 	.bp-grid :global(li.bad) {
-		color: #dc2626;
+		color: var(--bad);
 		text-decoration: underline wavy;
 	}
 	.bp-out {
@@ -152,9 +152,9 @@ import ToolShell from '../../components/ToolShell.astro';
 		letter-spacing: 0;
 	}
 	.bp-status[data-ok='true'] {
-		color: #16a34a;
+		color: var(--ok);
 	}
 	.bp-status[data-ok='false'] {
-		color: #dc2626;
+		color: var(--bad);
 	}
 </style>

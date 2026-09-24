@@ -102,3 +102,76 @@ test('tool pages carry seo and social metadata', async ({ page }) => {
 	await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /og-image\.png$/);
 	expect(await page.locator('meta[name=description]').getAttribute('content')).not.toBe('');
 });
+
+test('mac lookup resolves long MA-S prefixes', async ({ page }) => {
+	await page.goto('tools/mac-address-lookup/');
+	await page.locator('#ml-in').fill('00:1B:C5:00:01:23');
+	await expect(page.locator('#ml-list li b').first()).toHaveText('Converging Systems Inc.');
+});
+
+test('subnet calculator gives the /24 range', async ({ page }) => {
+	await page.goto('tools/ipv4-subnet-calculator/');
+	await page.locator('#sub-in').fill('10.0.0.130/25');
+	await expect(page.locator('#sub-list')).toContainText('10.0.0.128');
+	await expect(page.locator('#sub-list')).toContainText('10.0.0.255');
+	await expect(page.locator('#sub-list')).toContainText('126');
+});
+
+test('url encoder escapes reserved characters', async ({ page }) => {
+	await page.goto('tools/url-encoder/');
+	await page.locator('#url-in').fill('a b&c=d/é');
+	await expect(page.locator('#url-out')).toContainText('a%20b%26c%3Dd%2F%C3%A9');
+});
+
+test('roman numerals convert both ways', async ({ page }) => {
+	await page.goto('tools/roman-numeral-converter/');
+	await page.locator('#roman-num').fill('1994');
+	await expect(page.locator('#roman-rom')).toHaveValue('MCMXCIV');
+});
+
+test('slugify strips accents and punctuation', async ({ page }) => {
+	await page.goto('tools/slugify/');
+	await page.locator('#slug-in').fill('Crème Brûlée: the Recipe!');
+	await expect(page.locator('#slug-out')).toHaveText('creme-brulee-the-recipe');
+});
+
+test('hmac matches the sha-256 reference vector', async ({ page }) => {
+	await page.goto('tools/hmac-generator/');
+	await page.locator('#hmac-key').fill('key');
+	await page.locator('#hmac-msg').fill('The quick brown fox jumps over the lazy dog');
+	await expect(page.locator('#hmac-out')).toHaveText('f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8');
+});
+
+test('semver range matches a version', async ({ page }) => {
+	await page.goto('tools/semver-calculator/');
+	await page.locator('#sv-range').fill('^1.4.2');
+	await page.locator('#sv-version').fill('2.0.0');
+	await expect(page.locator('#sv-version-note')).toContainText('Outside the range');
+});
+
+test('chmod converts octal to symbolic', async ({ page }) => {
+	await page.goto('tools/chmod-calculator/');
+	await page.locator('#chmod-octal').fill('640');
+	await expect(page.locator('#chmod-symbolic')).toContainText('rw-r-----');
+});
+
+test('cron explains a schedule', async ({ page }) => {
+	await page.goto('tools/crontab-generator/');
+	await page.locator('#cron-in').fill('0 12 * * 1');
+	await expect(page.locator('#cron-human')).toContainText(/12:00/);
+	await expect(page.locator('#cron-human')).toContainText(/Monday/);
+});
+
+test('byte size converts between si and iec', async ({ page }) => {
+	await page.goto('tools/byte-size-converter/');
+	await page.locator('#bytes-in').fill('1 GiB');
+	await expect(page.locator('#bytes-si')).toContainText('1.07');
+	await expect(page.locator('#bytes-iec')).toContainText('1,024');
+});
+
+test('case converter produces snake and camel case', async ({ page }) => {
+	await page.goto('tools/case-converter/');
+	await page.locator('#case-in').fill('hello big world');
+	await expect(page.locator('#case-list')).toContainText('hello_big_world');
+	await expect(page.locator('#case-list')).toContainText('helloBigWorld');
+});

@@ -13,9 +13,11 @@ export default defineConfig({
 		trace: 'retain-on-failure',
 	},
 	projects: [
-		{ name: 'desktop', use: { ...devices['Desktop Chrome'] } },
+		{ name: 'desktop', use: { ...devices['Desktop Chrome'] }, testMatch: /smoke|tools/ },
 		{ name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /smoke/ },
 		{ name: 'dark', use: { ...devices['Desktop Chrome'], colorScheme: 'dark' }, testMatch: /smoke/ },
+		{ name: 'a11y', use: { ...devices['Desktop Chrome'] }, testMatch: /a11y/ },
+		{ name: 'a11y-dark', use: { ...devices['Desktop Chrome'], colorScheme: 'dark' }, testMatch: /a11y/ },
 	],
 	webServer: {
 		command: `npx astro preview --port ${port}`,
