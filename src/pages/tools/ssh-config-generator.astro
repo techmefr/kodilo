@@ -1,0 +1,79 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="ssh-config-generator"
+	title="SSH Config Generator"
+	description="Host blocks for ~/.ssh/config with jump hosts, identity files, port forwarding and keep-alive."
+>
+	<div class="fields" id="ssh-tool">
+		<div class="field"><label for="ssh-alias">Alias</label><input id="ssh-alias" spellcheck="false" value="prod-db" /></div>
+		<div class="field"><label for="ssh-host">HostName</label><input id="ssh-host" spellcheck="false" value="10.0.4.12" /></div>
+		<div class="field"><label for="ssh-user">User</label><input id="ssh-user" spellcheck="false" value="deploy" /></div>
+		<div class="field"><label for="ssh-port">Port</label><input id="ssh-port" inputmode="numeric" value="22" /></div>
+		<div class="field"><label for="ssh-key">IdentityFile</label><input id="ssh-key" spellcheck="false" value="~/.ssh/id_ed25519" /></div>
+		<div class="field"><label for="ssh-jump">ProxyJump</label><input id="ssh-jump" spellcheck="false" value="bastion" /></div>
+		<div class="field"><label for="ssh-local">LocalForward</label><input id="ssh-local" spellcheck="false" value="5433 localhost:5432" /></div>
+		<div class="field"><label for="ssh-alive">ServerAliveInterval (s)</label><input id="ssh-alive" inputmode="numeric" value="60" /></div>
+	</div>
+	<div class="toolbar">
+		<label class="check"><input type="checkbox" id="ssh-only" checked /> IdentitiesOnly</label>
+		<label class="check"><input type="checkbox" id="ssh-agent" /> ForwardAgent</label>
+		<label class="check"><input type="checkbox" id="ssh-mux" /> Connection sharing</label>
+		<label class="check"><input type="checkbox" id="ssh-keychain" /> macOS keychain</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>~/.ssh/config</span>
+			<button class="btn" id="ssh-copy">Copy</button>
+		</div>
+		<pre class="out" id="ssh-out"></pre>
+	</section>
+	<p class="ssh-usage" id="ssh-usage"></p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	onPage('ssh-tool', () => {
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const on = (id: string) => byId<HTMLInputElement>(id).checked;
+
+		const render = () => {
+			const alias = val('ssh-alias') || 'server';
+			const opts: [string, string][] = [
+				['HostName', val('ssh-host')],
+				['User', val('ssh-user')],
+				['Port', val('ssh-port') !== '22' ? val('ssh-port') : ''],
+				['IdentityFile', val('ssh-key')],
+				['IdentitiesOnly', on('ssh-only') && val('ssh-key') ? 'yes' : ''],
+				['ProxyJump', val('ssh-jump')],
+				['LocalForward', val('ssh-local')],
+				['ForwardAgent', on('ssh-agent') ? 'yes' : ''],
+				['ServerAliveInterval', val('ssh-alive')],
+				['ServerAliveCountMax', val('ssh-alive') ? '3' : ''],
+				['ControlMaster', on('ssh-mux') ? 'auto' : ''],
+				['ControlPath', on('ssh-mux') ? '~/.ssh/cm-%r@%h:%p' : ''],
+				['ControlPersist', on('ssh-mux') ? '10m' : ''],
+				['AddKeysToAgent', on('ssh-keychain') ? 'yes' : ''],
+				['UseKeychain', on('ssh-keychain') ? 'yes' : ''],
+			];
+			byId('ssh-out').textContent = [`Host ${alias}`, ...opts.filter(([, v]) => v).map(([k, v]) => `  ${k} ${v}`)].join('\n');
+			const fwd = val('ssh-local').split(/\s+/)[0];
+			byId('ssh-usage').textContent = `Connect with: ssh ${alias}${fwd ? ` · then reach the tunnel on localhost:${fwd}` : ''}${val('ssh-jump') ? ` · goes through ${val('ssh-jump')}, which needs its own Host block` : ''}.`;
+		};
+
+		document.querySelectorAll('#ssh-tool input, .toolbar input').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('ssh-copy'), () => byId('ssh-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.ssh-usage {
+		margin: 0;
+		font-size: 14px;
+		color: var(--ink-soft);
+	}
+</style>

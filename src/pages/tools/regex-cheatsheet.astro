@@ -1,0 +1,127 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sections: [string, [string, string][]][] = [
+	['Characters', [['.', 'Any character except newline'], ['\\d \\D', 'Digit / not a digit'], ['\\w \\W', 'Word character [A-Za-z0-9_] / not'], ['\\s \\S', 'Whitespace / not'], ['\\t \\n \\r', 'Tab, newline, carriage return'], ['\\u00e9', 'Unicode code point'], ['\\p{L}', 'Any letter, any script (needs u flag)'], ['\\.', 'A literal dot']]],
+	['Sets', [['[abc]', 'a, b or c'], ['[^abc]', 'Anything but a, b or c'], ['[a-z0-9]', 'Ranges'], ['[\\w.-]', 'Word character, dot or dash']]],
+	['Anchors', [['^ $', 'Start / end of input (of line with m)'], ['\\b \\B', 'Word boundary / not a boundary']]],
+	['Quantifiers', [['* + ?', '0 or more, 1 or more, 0 or 1'], ['{3} {2,} {2,5}', 'Exactly, at least, between'], ['*? +? ??', 'Lazy: as few as possible']]],
+	['Groups', [['(abc)', 'Capture group, $1 in replacements'], ['(?:abc)', 'Group without capturing'], ['(?<name>abc)', 'Named group, $<name>'], ['\\1 \\k<name>', 'Backreference'], ['a|b', 'a or b']]],
+	['Lookaround', [['(?=abc)', 'Followed by abc'], ['(?!abc)', 'Not followed by abc'], ['(?<=abc)', 'Preceded by abc'], ['(?<!abc)', 'Not preceded by abc']]],
+	['Flags', [['g', 'Every match, not only the first'], ['i', 'Case insensitive'], ['m', '^ and $ match per line'], ['s', '. also matches newlines'], ['u', 'Unicode mode'], ['v', 'Unicode sets, set operations'], ['y', 'Sticky: match at lastIndex only'], ['d', 'Match indices']]],
+	['Recipes', [['^[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+$', 'Simple email'], ['^\\d{4}-\\d{2}-\\d{2}$', 'ISO date'], ['^#?([\\da-f]{3}|[\\da-f]{6})$', 'Hex color (with i)'], ['^(\\d{1,3}\\.){3}\\d{1,3}$', 'IPv4 shape'], ['^[a-z0-9]+(?:-[a-z0-9]+)*$', 'Slug'], ['\\s+', 'Runs of whitespace'], ['^(?=.*\\d)(?=.*[a-z]).{8,}$', 'Password: 8+, a digit and a letter']]],
+];
+---
+
+<ToolShell slug="regex-cheatsheet" title="Regex Cheatsheet" description="JavaScript regular expression syntax at a glance. Filter it, click any token to copy it.">
+	<div class="toolbar" id="rc-tool">
+		<input class="rc-search" id="rc-q" type="search" placeholder="lookahead, digit, flag…" aria-label="Filter the cheatsheet" />
+	</div>
+	<div class="rc-grid">
+		{
+			sections.map(([title, rows]) => (
+				<section class="panel rc-section">
+					<div class="panel-head">{title}</div>
+					<ul>
+						{rows.map(([token, meaning]) => (
+							<li>
+								<button data-copy={token}>
+									<code>{token}</code>
+									<span>{meaning}</span>
+								</button>
+							</li>
+						))}
+					</ul>
+				</section>
+			))
+		}
+	</div>
+	<p class="rc-more">Want to try one? Open the <a href={`${import.meta.env.BASE_URL.replace(/\/?$/, '/')}tools/regex-tester/`}>Regex Tester</a>.</p>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	onPage('rc-tool', () => {
+		const q = byId<HTMLInputElement>('rc-q');
+
+		q.addEventListener('input', () => {
+			const term = q.value.trim().toLowerCase();
+			document.querySelectorAll<HTMLElement>('.rc-section').forEach((section) => {
+				let any = false;
+				section.querySelectorAll<HTMLElement>('li').forEach((li) => {
+					const hit = !term || li.textContent!.toLowerCase().includes(term) || section.querySelector('.panel-head')!.textContent!.toLowerCase().includes(term);
+					li.hidden = !hit;
+					any ||= hit;
+				});
+				section.hidden = !any;
+			});
+		});
+
+		document.querySelectorAll<HTMLButtonElement>('.rc-section button').forEach((b) =>
+			b.addEventListener('click', () => {
+				navigator.clipboard.writeText(b.dataset.copy!);
+				const span = b.querySelector('span')!;
+				const text = span.textContent;
+				span.textContent = 'Copied';
+				setTimeout(() => (span.textContent = text), 1200);
+			})
+		);
+	});
+</script>
+
+<style>
+	.rc-search {
+		flex: 1 1 240px;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 8px 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font: inherit;
+	}
+	.rc-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: 14px;
+		align-items: start;
+	}
+	.rc-section ul {
+		list-style: none;
+		margin: 0;
+		padding: 4px 0;
+	}
+	.rc-section button {
+		width: 100%;
+		display: grid;
+		grid-template-columns: minmax(90px, auto) 1fr;
+		gap: 12px;
+		text-align: left;
+		background: none;
+		border: 0;
+		padding: 7px 14px;
+		color: var(--ink);
+		font: inherit;
+		font-size: 13px;
+		cursor: pointer;
+	}
+	.rc-section button:hover {
+		background: var(--surface-2);
+	}
+	.rc-section code {
+		font-family: var(--mono);
+		font-weight: 700;
+		color: var(--accent-strong);
+		overflow-wrap: anywhere;
+	}
+	.rc-section span {
+		color: var(--ink-soft);
+	}
+	.rc-more {
+		margin: 0;
+		font-size: 14px;
+	}
+	.rc-more a {
+		color: var(--accent-strong);
+	}
+</style>

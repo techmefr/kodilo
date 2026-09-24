@@ -1,0 +1,115 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="text-statistics"
+	title="Text Statistics"
+	description="Reading and speaking time, sentence length, lexical diversity, readability and the most frequent words."
+>
+	<section class="panel" id="ts-tool">
+		<div class="panel-head">Text</div>
+		<textarea id="ts-in" spellcheck="false" aria-label="Text to analyse">Good tools stay out of the way. They open instantly, work offline and never ask you to sign up. You paste something, you get an answer, and you move on with your day.
+
+Most of the time, that is all a developer needs. A quick conversion, a sanity check, a value to copy. The best tool is the one you forget you used.</textarea>
+	</section>
+	<div class="stats" id="ts-stats"></div>
+	<section class="panel">
+		<div class="panel-head">Most frequent words</div>
+		<ul class="ts-words" id="ts-words"></ul>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const STOP = new Set('a an and are as at be but by for from has have i in is it its of on or that the this to was were will with you your we they them our not no so do if all one can'.split(' '));
+
+	const syllables = (word: string) => {
+		const w = word.toLowerCase().replace(/[^a-z]/g, '');
+		if (w.length <= 3) return 1;
+		return Math.max(1, (w.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '').replace(/^y/, '').match(/[aeiouy]{1,2}/g) ?? []).length);
+	};
+
+	const minutes = (m: number) => (m < 1 ? `${Math.max(1, Math.round(m * 60))} s` : `${Math.floor(m)} min ${Math.round((m % 1) * 60)} s`);
+
+	onPage('ts-tool', () => {
+		const input = byId<HTMLTextAreaElement>('ts-in');
+
+		const render = () => {
+			const text = input.value;
+			const seg = new Intl.Segmenter('en', { granularity: 'word' });
+			const words = [...seg.segment(text)].filter((s) => s.isWordLike).map((s) => s.segment);
+			const sentences = [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)].filter((s) => s.segment.trim()).length;
+			const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim()).length;
+			const syl = words.reduce((a, w) => a + syllables(w), 0);
+			const unique = new Set(words.map((w) => w.toLowerCase()));
+			const flesch = words.length && sentences ? 206.835 - 1.015 * (words.length / sentences) - 84.6 * (syl / words.length) : 0;
+			const level = flesch >= 80 ? 'Easy' : flesch >= 60 ? 'Plain' : flesch >= 40 ? 'Fairly hard' : 'Hard';
+			const stats: [string, string][] = [
+				['Words', words.length.toLocaleString('en')],
+				['Sentences', String(sentences)],
+				['Paragraphs', String(paragraphs)],
+				['Reading time', minutes(words.length / 238)],
+				['Speaking time', minutes(words.length / 140)],
+				['Words per sentence', sentences ? (words.length / sentences).toFixed(1) : '0'],
+				['Avg word length', words.length ? (words.join('').length / words.length).toFixed(1) : '0'],
+				['Unique words', `${unique.size} · ${words.length ? Math.round((unique.size / words.length) * 100) : 0}%`],
+				['Flesch reading ease', words.length ? `${Math.round(flesch)} · ${level}` : '—'],
+			];
+			byId('ts-stats').replaceChildren(
+				...stats.map(([label, value]) => {
+					const el = document.createElement('div');
+					el.className = 'stat';
+					el.innerHTML = '<b></b><span></span>';
+					el.querySelector('b')!.textContent = value;
+					el.querySelector('span')!.textContent = label;
+					return el;
+				})
+			);
+			const freq = new Map<string, number>();
+			words.map((w) => w.toLowerCase()).filter((w) => !STOP.has(w) && w.length > 1).forEach((w) => freq.set(w, (freq.get(w) ?? 0) + 1));
+			const top = [...freq].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12);
+			const max = top[0]?.[1] ?? 1;
+			byId('ts-words').replaceChildren(
+				...top.map(([word, n]) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<span></span><i></i><b></b>';
+					li.querySelector('span')!.textContent = word;
+					(li.querySelector('i') as HTMLElement).style.width = `${(n / max) * 100}%`;
+					li.querySelector('b')!.textContent = String(n);
+					return li;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		render();
+	});
+</script>
+
+<style>
+	.ts-words {
+		list-style: none;
+		margin: 0;
+		padding: 10px 14px;
+		display: grid;
+		gap: 6px;
+	}
+	.ts-words :global(li) {
+		display: grid;
+		grid-template-columns: 120px 1fr 32px;
+		gap: 10px;
+		align-items: center;
+		font-size: 13px;
+	}
+	.ts-words :global(i) {
+		height: 8px;
+		border-radius: 4px;
+		background: var(--accent-strong);
+	}
+	.ts-words :global(b) {
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+	}
+</style>

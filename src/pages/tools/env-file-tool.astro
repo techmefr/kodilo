@@ -1,0 +1,152 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="env-file-tool"
+	title=".env File Tool"
+	description="Validate a .env file, compare it with .env.example, and convert it to JSON, docker -e flags, Compose or a Kubernetes Secret."
+>
+	<div class="grid-2" id="env-tool">
+		<section class="panel">
+			<div class="panel-head">.env</div>
+			<textarea id="env-in" spellcheck="false" aria-label=".env content">APP_NAME="My App"
+APP_ENV=production
+APP_DEBUG=false
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_PASSWORD='s3cr3t with spaces'
+export REDIS_URL=redis://localhost:6379
+DB_PORT=5433
+bad line here</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">.env.example (optional)</div>
+			<textarea id="env-example" spellcheck="false" aria-label=".env.example content">APP_NAME=
+APP_ENV=
+APP_DEBUG=
+DB_HOST=
+DB_PORT=
+DB_PASSWORD=
+MAIL_HOST=</textarea>
+		</section>
+	</div>
+	<ul class="env-issues" id="env-issues"></ul>
+	<section class="panel">
+		<div class="panel-head">
+			<div class="seg" id="env-format">
+				<button data-value="json" aria-pressed="true">JSON</button>
+				<button data-value="docker">docker -e</button>
+				<button data-value="compose">Compose</button>
+				<button data-value="k8s">K8s Secret</button>
+				<button data-value="clean">Clean .env</button>
+			</div>
+			<button class="btn" id="env-copy">Copy</button>
+		</div>
+		<pre class="out" id="env-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Issue = [string, string];
+
+	function parse(text: string) {
+		const vars = new Map<string, string>();
+		const issues: Issue[] = [];
+		text.split('\n').forEach((raw, i) => {
+			const line = raw.trim();
+			if (!line || line.startsWith('#')) return;
+			const m = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+			if (!m) {
+				issues.push(['warn', `Line ${i + 1}: not a KEY=value pair`]);
+				return;
+			}
+			let value = m[2];
+			const q = value[0];
+			if ((q === '"' || q === "'") && value.endsWith(q) && value.length > 1) {
+				value = value.slice(1, -1);
+				if (q === '"') value = value.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+			} else {
+				value = value.replace(/\s+#.*$/, '');
+				if (/\s/.test(value)) issues.push(['partial', `Line ${i + 1}: ${m[1]} has spaces without quotes`]);
+			}
+			if (vars.has(m[1])) issues.push(['partial', `Line ${i + 1}: ${m[1]} is defined twice, the last value wins`]);
+			vars.set(m[1], value);
+		});
+		return { vars, issues };
+	}
+
+	const b64 = (s: string) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+	const shell = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+
+	onPage('env-tool', () => {
+		const input = byId<HTMLTextAreaElement>('env-in');
+		const example = byId<HTMLTextAreaElement>('env-example');
+		let format = 'json';
+
+		const render = () => {
+			const { vars, issues } = parse(input.value);
+			if (example.value.trim()) {
+				const ex = parse(example.value).vars;
+				[...ex.keys()].filter((k) => !vars.has(k)).forEach((k) => issues.push(['warn', `Missing from .env: ${k}`]));
+				[...vars.keys()].filter((k) => !ex.has(k)).forEach((k) => issues.push(['partial', `Not in .env.example: ${k}`]));
+			}
+			[...vars].filter(([, v]) => v === '').forEach(([k]) => issues.push(['partial', `${k} is empty`]));
+			if (!issues.length) issues.push(['ok', `${vars.size} variables, no issues`]);
+			byId('env-issues').replaceChildren(
+				...issues.map(([level, text]) => {
+					const li = document.createElement('li');
+					li.className = `env-${level}`;
+					li.textContent = text;
+					return li;
+				})
+			);
+			const entries = [...vars];
+			const out: Record<string, () => string> = {
+				json: () => JSON.stringify(Object.fromEntries(entries), null, 2),
+				docker: () => `docker run \\\n${entries.map(([k, v]) => `  -e ${k}=${shell(v)} \\`).join('\n')}\n  image`,
+				compose: () => `services:\n  app:\n    environment:\n${entries.map(([k, v]) => `      ${k}: ${JSON.stringify(v)}`).join('\n')}`,
+				k8s: () => `apiVersion: v1\nkind: Secret\nmetadata:\n  name: app-env\ntype: Opaque\ndata:\n${entries.map(([k, v]) => `  ${k}: ${b64(v)}`).join('\n')}`,
+				clean: () => entries.map(([k, v]) => `${k}=${/[\s#"'$]/.test(v) || v === '' ? JSON.stringify(v) : v}`).join('\n'),
+			};
+			byId('env-out').textContent = out[format]();
+		};
+
+		segmented(byId('env-format'), (v) => ((format = v), render()));
+		[input, example].forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('env-copy'), () => byId('env-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.env-issues {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.env-issues :global(li) {
+		padding: 5px 10px;
+		border-radius: 999px;
+		font-size: 13px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+	}
+	.env-issues :global(.env-warn) {
+		color: var(--warn);
+		border-color: var(--warn);
+	}
+	.env-issues :global(.env-partial) {
+		color: var(--ink);
+		border-color: var(--partial);
+	}
+	.env-issues :global(.env-ok) {
+		color: var(--ok);
+		border-color: var(--ok);
+	}
+</style>

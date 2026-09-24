@@ -1,0 +1,121 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="xor-cipher"
+	title="XOR Cipher"
+	description="XOR text or bytes with a repeating key. Input and output as text, hex or Base64. Running it twice gives the original back."
+>
+	<div class="toolbar" id="xor-tool">
+		<label class="check">Key <input class="xor-key" id="xor-key" spellcheck="false" value="kodilo" /></label>
+		<div class="seg" id="xor-keyfmt">
+			<button data-value="text" aria-pressed="true">Key text</button>
+			<button data-value="hex">Key hex</button>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">
+				<span>Input</span>
+				<div class="seg" id="xor-infmt">
+					<button data-value="text" aria-pressed="true">Text</button>
+					<button data-value="hex">Hex</button>
+					<button data-value="base64">Base64</button>
+				</div>
+			</div>
+			<textarea id="xor-in" spellcheck="false" aria-label="Input">Hello, XOR!</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<div class="seg" id="xor-outfmt">
+					<button data-value="hex" aria-pressed="true">Hex</button>
+					<button data-value="base64">Base64</button>
+					<button data-value="text">Text</button>
+				</div>
+				<button class="btn" id="xor-copy">Copy</button>
+			</div>
+			<pre class="out" id="xor-out"></pre>
+		</section>
+	</div>
+	<div class="toolbar"><button class="btn" id="xor-swap">Use output as input</button></div>
+	<p class="error" id="xor-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { encodeBytes } from '../../scripts/crypto';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	function decode(text: string, fmt: string): Uint8Array {
+		if (fmt === 'text') return new TextEncoder().encode(text);
+		if (fmt === 'hex') {
+			const clean = text.replace(/\s|0x/gi, '');
+			if (!/^([0-9a-f]{2})*$/i.test(clean)) throw new Error('Hex must contain pairs of 0-9 and a-f.');
+			return new Uint8Array(clean.match(/../g)?.map((h) => parseInt(h, 16)) ?? []);
+		}
+		try {
+			return Uint8Array.from(atob(text.replace(/\s/g, '')), (c) => c.charCodeAt(0));
+		} catch {
+			throw new Error('Invalid Base64.');
+		}
+	}
+
+	onPage('xor-tool', () => {
+		const key = byId<HTMLInputElement>('xor-key');
+		const input = byId<HTMLTextAreaElement>('xor-in');
+		const out = byId('xor-out');
+		const error = byId('xor-error');
+		let keyFmt = 'text';
+		let inFmt = 'text';
+		let outFmt = 'hex';
+
+		const render = () => {
+			try {
+				const k = decode(key.value, keyFmt);
+				if (!k.length) throw new Error('The key cannot be empty.');
+				const data = decode(input.value, inFmt);
+				const result = data.map((b, i) => b ^ k[i % k.length]);
+				out.textContent = outFmt === 'text' ? new TextDecoder().decode(result) : outFmt === 'hex' ? encodeBytes(result, 'hex') : encodeBytes(result, 'base64');
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+				out.textContent = '';
+			}
+		};
+
+		const setSeg = (id: string, value: string) =>
+			document.querySelectorAll<HTMLButtonElement>(`#${id} button`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === value)));
+
+		segmented(byId('xor-keyfmt'), (v) => ((keyFmt = v), render()));
+		segmented(byId('xor-infmt'), (v) => ((inFmt = v), render()));
+		segmented(byId('xor-outfmt'), (v) => ((outFmt = v), render()));
+		[key, input].forEach((el) => el.addEventListener('input', render));
+		byId('xor-swap').addEventListener('click', () => {
+			input.value = out.textContent ?? '';
+			inFmt = outFmt;
+			outFmt = 'text';
+			setSeg('xor-infmt', inFmt);
+			setSeg('xor-outfmt', outFmt);
+			render();
+		});
+		copyButton(byId('xor-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.xor-key {
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 6px 10px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: var(--mono);
+		width: 200px;
+	}
+	#xor-out {
+		overflow-wrap: anywhere;
+		white-space: pre-wrap;
+	}
+</style>

@@ -1,0 +1,83 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="mac-address-generator"
+	title="MAC Address Generator"
+	description="Random MAC addresses: locally administered or with a vendor prefix, in any separator and case."
+>
+	<div class="toolbar" id="mac-tool">
+		<label class="check">How many <input class="num" id="mac-count" type="number" min="1" max="500" value="10" /></label>
+		<label class="check">Prefix <input class="mac-prefix" id="mac-prefix" spellcheck="false" placeholder="00:1A:2B" /></label>
+		<div class="seg" id="mac-sep">
+			<button data-value=":" aria-pressed="true">aa:bb</button>
+			<button data-value="-">aa-bb</button>
+			<button data-value=".">aabb.ccdd</button>
+			<button data-value="">aabbcc</button>
+		</div>
+		<div class="seg" id="mac-case">
+			<button data-value="upper" aria-pressed="true">ABC</button>
+			<button data-value="lower">abc</button>
+		</div>
+		<label class="check"><input type="checkbox" id="mac-local" checked /> Locally administered, unicast</label>
+	</div>
+	<p class="error" id="mac-error" hidden></p>
+	<section class="panel">
+		<div class="panel-head">
+			<button class="btn" id="mac-new">Regenerate</button>
+			<button class="btn" id="mac-copy">Copy</button>
+		</div>
+		<pre class="out" id="mac-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('mac-tool', () => {
+		const count = byId<HTMLInputElement>('mac-count');
+		const prefix = byId<HTMLInputElement>('mac-prefix');
+		const local = byId<HTMLInputElement>('mac-local');
+		let sep = ':';
+		let upper = true;
+
+		const render = () => {
+			const p = prefix.value.replace(/[^0-9a-f]/gi, '');
+			const bad = p.length > 10 || p.length % 2 === 1 || /[^0-9a-f:.\-\s]/i.test(prefix.value);
+			byId('mac-error').hidden = !bad;
+			byId('mac-error').textContent = 'The prefix must be whole hex bytes, up to 5 of them.';
+			if (bad) return;
+			local.disabled = p.length > 0;
+			const n = Math.min(500, Math.max(1, Number(count.value) || 1));
+			const lines = Array.from({ length: n }, () => {
+				const bytes = crypto.getRandomValues(new Uint8Array(6));
+				for (let i = 0; i < p.length / 2; i++) bytes[i] = parseInt(p.slice(i * 2, i * 2 + 2), 16);
+				if (!p.length && local.checked) bytes[0] = (bytes[0] & 0xfc) | 0x02;
+				const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+				const cased = upper ? hex.toUpperCase() : hex;
+				return sep === '.' ? cased.match(/.{4}/g)!.join('.') : cased.match(/../g)!.join(sep);
+			});
+			byId('mac-out').textContent = lines.join('\n');
+		};
+
+		segmented(byId('mac-sep'), (v) => ((sep = v), render()));
+		segmented(byId('mac-case'), (v) => ((upper = v === 'upper'), render()));
+		[count, prefix, local].forEach((el) => el.addEventListener('input', render));
+		byId('mac-new').addEventListener('click', render);
+		copyButton(byId('mac-copy'), () => byId('mac-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.mac-prefix {
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 6px 10px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: var(--mono);
+		width: 130px;
+	}
+</style>
