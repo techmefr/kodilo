@@ -1,0 +1,102 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="bcrypt" title="Bcrypt" description="Hash a password with bcrypt and check a password against an existing hash. Everything runs in your browser.">
+	<div class="fields" id="bc-tool">
+		<div class="field">
+			<label for="bc-pass">Password</label>
+			<input id="bc-pass" spellcheck="false" value="correct horse battery staple" />
+		</div>
+		<div class="field">
+			<label for="bc-cost">Cost factor <b id="bc-cost-value">10</b></label>
+			<input id="bc-cost" type="range" min="4" max="14" value="10" />
+			<span class="field-note" id="bc-time"></span>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Hash</span>
+			<span class="bc-actions"><button class="btn" id="bc-again">New salt</button><button class="btn" id="bc-copy">Copy</button></span>
+		</div>
+		<pre class="out bc-out" id="bc-out"></pre>
+	</section>
+	<div class="fields">
+		<div class="field wide" id="bc-verify-field">
+			<label for="bc-verify">Check the password against a hash</label>
+			<input id="bc-verify" spellcheck="false" placeholder="$2b$10$..." />
+			<span class="field-note" id="bc-verify-note"></span>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import bcrypt from 'bcryptjs';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	onPage('bc-tool', () => {
+		const pass = byId<HTMLInputElement>('bc-pass');
+		const cost = byId<HTMLInputElement>('bc-cost');
+		const out = byId('bc-out');
+		const verify = byId<HTMLInputElement>('bc-verify');
+		let timer: number | undefined;
+		let run = 0;
+
+		const check = async () => {
+			const field = byId('bc-verify-field');
+			const note = byId('bc-verify-note');
+			const hash = verify.value.trim();
+			if (!hash) {
+				field.classList.remove('invalid');
+				note.textContent = '';
+				return;
+			}
+			if (!/^\$2[abxy]?\$\d{2}\$[./A-Za-z0-9]{53}$/.test(hash)) {
+				field.classList.add('invalid');
+				note.textContent = 'This does not look like a bcrypt hash.';
+				return;
+			}
+			const ok = await bcrypt.compare(pass.value, hash);
+			field.classList.toggle('invalid', !ok);
+			note.textContent = ok ? '✓ The password matches this hash' : '✕ The password does not match';
+		};
+
+		const render = async () => {
+			const current = ++run;
+			byId('bc-cost-value').textContent = cost.value;
+			out.textContent = 'Hashing…';
+			const start = performance.now();
+			const hash = await bcrypt.hash(pass.value, Number(cost.value));
+			if (current !== run) return;
+			out.textContent = hash;
+			byId('bc-time').textContent = `${2 ** Number(cost.value)} rounds, took ${Math.round(performance.now() - start)} ms here`;
+			if (!verify.value) verify.placeholder = hash;
+			check();
+		};
+		const schedule = () => {
+			clearTimeout(timer);
+			timer = window.setTimeout(render, 250);
+		};
+
+		pass.addEventListener('input', schedule);
+		cost.addEventListener('input', schedule);
+		verify.addEventListener('input', check);
+		byId('bc-again').addEventListener('click', render);
+		copyButton(byId('bc-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.bc-out {
+		min-height: auto !important;
+		word-break: break-all;
+	}
+	.bc-actions {
+		display: flex;
+		gap: 8px;
+	}
+	#bc-cost {
+		accent-color: var(--accent-strong);
+	}
+</style>

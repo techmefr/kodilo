@@ -1,0 +1,147 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="jpg-to-pdf" title="JPG to PDF" description="Put JPG or PNG images into one PDF, one image per page. Choose the page size and margins. Nothing is uploaded.">
+	<label class="drop" id="jp-tool">
+		<input type="file" id="jp-file" accept="image/jpeg,image/png" multiple hidden />
+		<span>Drop images here or click to choose. A sample image is loaded.</span>
+	</label>
+	<div class="toolbar">
+		<div class="seg" id="jp-size" aria-label="Page size">
+			<button data-value="fit" aria-pressed="false">Fit image</button>
+			<button data-value="a4" aria-pressed="true">A4</button>
+			<button data-value="letter" aria-pressed="false">Letter</button>
+		</div>
+		<div class="seg" id="jp-margin" aria-label="Margin">
+			<button data-value="0" aria-pressed="false">No margin</button>
+			<button data-value="28" aria-pressed="true">Small</button>
+			<button data-value="56" aria-pressed="false">Large</button>
+		</div>
+	</div>
+	<ul class="jp-grid" id="jp-list"></ul>
+	<div class="toolbar">
+		<button class="btn primary" id="jp-go">Create PDF</button>
+		<span class="field-note" id="jp-note"></span>
+	</div>
+</ToolShell>
+
+<script>
+	import { PDFDocument } from 'pdf-lib';
+	import { downloadBytes, dropZone, humanBytes, moveItem } from '../../scripts/pdf';
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	type Item = { name: string; bytes: Uint8Array; png: boolean; url: string };
+	const SIZES: Record<string, [number, number]> = { a4: [595.28, 841.89], letter: [612, 792] };
+
+	function sample(): Promise<Item> {
+		const c = document.createElement('canvas');
+		c.width = 1200;
+		c.height = 800;
+		const g = c.getContext('2d')!;
+		const grad = g.createLinearGradient(0, 0, 1200, 800);
+		grad.addColorStop(0, '#6366f1');
+		grad.addColorStop(1, '#06b6d4');
+		g.fillStyle = grad;
+		g.fillRect(0, 0, 1200, 800);
+		g.fillStyle = '#fff';
+		g.font = 'bold 90px system-ui, sans-serif';
+		g.fillText('Sample image', 80, 420);
+		return new Promise((res) =>
+			c.toBlob(async (b) => res({ name: 'sample.jpg', bytes: new Uint8Array(await b!.arrayBuffer()), png: false, url: URL.createObjectURL(b!) }), 'image/jpeg', 0.9)
+		);
+	}
+
+	onPage('jp-tool', () => {
+		const items: Item[] = [];
+		let size = 'a4';
+		let margin = 28;
+
+		const paint = () => {
+			byId('jp-list').replaceChildren(
+				...items.map((it, i) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<img alt="" /><span></span><div><button class="btn" aria-label="Move left">←</button><button class="btn" aria-label="Move right">→</button><button class="btn" aria-label="Remove">✕</button></div>';
+					li.querySelector('img')!.src = it.url;
+					li.querySelector('span')!.textContent = `${i + 1}. ${it.name}`;
+					const [l, r, rm] = li.querySelectorAll('button');
+					l.addEventListener('click', () => (moveItem(items, i, i - 1), paint()));
+					r.addEventListener('click', () => (moveItem(items, i, i + 1), paint()));
+					rm.addEventListener('click', () => (items.splice(i, 1), paint()));
+					return li;
+				})
+			);
+			byId('jp-note').textContent = items.length ? `${items.length} page${items.length > 1 ? 's' : ''}, ${humanBytes(items.reduce((a, it) => a + it.bytes.length, 0))} of images` : 'Add at least one image.';
+			byId<HTMLButtonElement>('jp-go').disabled = !items.length;
+		};
+
+		dropZone(byId('jp-tool'), byId<HTMLInputElement>('jp-file'), async (files) => {
+			for (const f of files.filter((f) => /image\/(jpeg|png)/.test(f.type))) {
+				items.push({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()), png: f.type === 'image/png', url: URL.createObjectURL(f) });
+			}
+			paint();
+		});
+		segmented(byId('jp-size'), (v) => (size = v));
+		segmented(byId('jp-margin'), (v) => (margin = Number(v)));
+
+		byId('jp-go').addEventListener('click', async () => {
+			const doc = await PDFDocument.create();
+			for (const it of items) {
+				const img = it.png ? await doc.embedPng(it.bytes) : await doc.embedJpg(it.bytes);
+				if (size === 'fit') {
+					const page = doc.addPage([img.width + margin * 2, img.height + margin * 2]);
+					page.drawImage(img, { x: margin, y: margin, width: img.width, height: img.height });
+					continue;
+				}
+				let [w, h] = SIZES[size];
+				if (img.width > img.height) [w, h] = [h, w];
+				const scale = Math.min((w - margin * 2) / img.width, (h - margin * 2) / img.height);
+				const page = doc.addPage([w, h]);
+				page.drawImage(img, { x: (w - img.width * scale) / 2, y: (h - img.height * scale) / 2, width: img.width * scale, height: img.height * scale });
+			}
+			downloadBytes(await doc.save(), 'images.pdf');
+		});
+
+		sample().then((s) => {
+			items.push(s);
+			paint();
+		});
+	});
+</script>
+
+<style>
+	.jp-grid {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+		gap: 10px;
+	}
+	.jp-grid :global(li) {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 8px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+	}
+	.jp-grid :global(img) {
+		width: 100%;
+		aspect-ratio: 3 / 4;
+		object-fit: contain;
+		background: var(--surface-2);
+		border-radius: 8px;
+	}
+	.jp-grid :global(span) {
+		font-size: 12.5px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.jp-grid :global(div) {
+		display: flex;
+		gap: 4px;
+	}
+</style>

@@ -1,0 +1,124 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="pdf-merge" title="PDF Merge" description="Combine several PDFs into one. Reorder them, then download the result. Files never leave your browser.">
+	<label class="drop" id="pm-tool">
+		<input type="file" id="pm-file" accept="application/pdf" multiple hidden />
+		<span>Drop PDFs here or click to choose. Two sample PDFs are loaded.</span>
+	</label>
+	<ul class="file-list" id="pm-list"></ul>
+	<div class="toolbar">
+		<button class="btn primary" id="pm-go">Merge and download</button>
+		<span class="field-note" id="pm-note"></span>
+	</div>
+	<p class="error" id="pm-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+	import { downloadBytes, dropZone, humanBytes, moveItem } from '../../scripts/pdf';
+	import { byId, onPage } from '../../scripts/ui';
+
+	type Item = { name: string; bytes: Uint8Array; pages: number };
+
+	async function samplePdf(title: string, pages: number): Promise<Uint8Array> {
+		const doc = await PDFDocument.create();
+		const font = await doc.embedFont(StandardFonts.HelveticaBold);
+		for (let i = 1; i <= pages; i++) {
+			const page = doc.addPage([595, 842]);
+			page.drawText(`${title}, page ${i}`, { x: 60, y: 760, size: 28, font, color: rgb(0.2, 0.3, 0.8) });
+		}
+		return doc.save();
+	}
+
+	onPage('pm-tool', () => {
+		const items: Item[] = [];
+		const list = byId('pm-list');
+		const error = byId('pm-error');
+
+		const paint = () => {
+			list.replaceChildren(
+				...items.map((it, i) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<div><b></b><span></span></div><button class="btn" aria-label="Move up">↑</button><button class="btn" aria-label="Move down">↓</button><button class="btn" aria-label="Remove">✕</button>';
+					li.querySelector('b')!.textContent = it.name;
+					li.querySelector('span')!.textContent = `${it.pages} page${it.pages > 1 ? 's' : ''} · ${humanBytes(it.bytes.length)}`;
+					const [up, down, rm] = li.querySelectorAll('button');
+					up.addEventListener('click', () => (moveItem(items, i, i - 1), paint()));
+					down.addEventListener('click', () => (moveItem(items, i, i + 1), paint()));
+					rm.addEventListener('click', () => (items.splice(i, 1), paint()));
+					return li;
+				})
+			);
+			const total = items.reduce((a, it) => a + it.pages, 0);
+			byId('pm-note').textContent = items.length ? `${items.length} files, ${total} pages` : 'Add at least two PDFs.';
+			byId<HTMLButtonElement>('pm-go').disabled = items.length < 2;
+		};
+
+		const add = async (files: File[]) => {
+			error.hidden = true;
+			for (const f of files) {
+				try {
+					const bytes = new Uint8Array(await f.arrayBuffer());
+					const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+					items.push({ name: f.name, bytes, pages: doc.getPageCount() });
+				} catch {
+					error.hidden = false;
+					error.textContent = `${f.name} could not be read as a PDF.`;
+				}
+			}
+			paint();
+		};
+
+		dropZone(byId('pm-tool'), byId<HTMLInputElement>('pm-file'), add);
+		byId('pm-go').addEventListener('click', async () => {
+			const out = await PDFDocument.create();
+			for (const it of items) {
+				const src = await PDFDocument.load(it.bytes, { ignoreEncryption: true });
+				(await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
+			}
+			downloadBytes(await out.save(), 'merged.pdf');
+		});
+
+		Promise.all([samplePdf('Report', 2), samplePdf('Appendix', 1)]).then(([a, b]) => {
+			items.push({ name: 'sample-report.pdf', bytes: a, pages: 2 }, { name: 'sample-appendix.pdf', bytes: b, pages: 1 });
+			paint();
+		});
+	});
+</script>
+
+<style>
+	.file-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.file-list :global(li) {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 10px 12px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+	}
+	.file-list :global(div) {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.file-list :global(b) {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.file-list :global(span) {
+		font-size: 12.5px;
+		color: var(--ink-soft);
+	}
+</style>

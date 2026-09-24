@@ -1,0 +1,168 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="currency-converter" title="Currency Converter" description="Convert between 30 currencies with the daily reference rates published by the European Central Bank.">
+	<div class="cc-row" id="cc-tool">
+		<div class="field">
+			<label for="cc-amount">Amount</label>
+			<input id="cc-amount" inputmode="decimal" value="100" />
+		</div>
+		<div class="field">
+			<label for="cc-from">From</label>
+			<select id="cc-from"></select>
+		</div>
+		<button class="btn cc-swap" id="cc-swap" aria-label="Swap currencies">⇄</button>
+		<div class="field">
+			<label for="cc-to">To</label>
+			<select id="cc-to"></select>
+		</div>
+	</div>
+	<section class="panel cc-result">
+		<b id="cc-out">…</b>
+		<span id="cc-rate"></span>
+	</section>
+	<p class="error" id="cc-error" hidden></p>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="cc-table-title">Other currencies</span>
+			<button class="btn" id="cc-copy">Copy</button>
+		</div>
+		<ul class="cc-table" id="cc-table"></ul>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	let cache: { date: string; rates: Record<string, number> } | null = null;
+
+	async function loadRates() {
+		if (cache) return cache;
+		const res = await fetch('https://api.frankfurter.dev/v1/latest?base=EUR');
+		const data = await res.json();
+		cache = { date: data.date, rates: { EUR: 1, ...data.rates } };
+		return cache;
+	}
+
+	onPage('cc-tool', () => {
+		const amount = byId<HTMLInputElement>('cc-amount');
+		const from = byId<HTMLSelectElement>('cc-from');
+		const to = byId<HTMLSelectElement>('cc-to');
+		const names = new Intl.DisplayNames(['en'], { type: 'currency' });
+		let rates: Record<string, number> = {};
+		let date = '';
+
+		const fmt = (v: number, c: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency: c, maximumFractionDigits: v < 1 ? 4 : 2 }).format(v);
+
+		const render = () => {
+			if (!rates[from.value] || !rates[to.value]) return;
+			const n = Number(amount.value.replace(/[\s,]/g, '')) || 0;
+			const rate = rates[to.value] / rates[from.value];
+			byId('cc-out').textContent = `${fmt(n, from.value)} = ${fmt(n * rate, to.value)}`;
+			byId('cc-rate').textContent = `1 ${from.value} = ${rate.toFixed(6)} ${to.value} · ECB rate of ${date}`;
+			byId('cc-table-title').textContent = `${fmt(n, from.value)} in other currencies`;
+			byId('cc-table').replaceChildren(
+				...Object.keys(rates)
+					.filter((c) => c !== from.value)
+					.map((c) => {
+						const li = document.createElement('li');
+						li.innerHTML = '<span></span><b></b>';
+						li.querySelector('span')!.textContent = `${c} · ${names.of(c)}`;
+						li.querySelector('b')!.textContent = fmt((n * rates[c]) / rates[from.value], c);
+						return li;
+					})
+			);
+		};
+
+		loadRates()
+			.then((r) => {
+				rates = r.rates;
+				date = r.date;
+				const codes = Object.keys(rates).sort();
+				for (const sel of [from, to]) sel.replaceChildren(...codes.map((c) => new Option(`${c} · ${names.of(c)}`, c)));
+				from.value = 'EUR';
+				to.value = 'USD';
+				render();
+			})
+			.catch(() => {
+				const e = byId('cc-error');
+				e.hidden = false;
+				e.textContent = 'The exchange rates could not be loaded. Check your connection and reload the page.';
+				byId('cc-out').textContent = '—';
+			});
+
+		amount.addEventListener('input', render);
+		from.addEventListener('change', render);
+		to.addEventListener('change', render);
+		byId('cc-swap').addEventListener('click', () => {
+			[from.value, to.value] = [to.value, from.value];
+			render();
+		});
+		copyButton(byId('cc-copy'), () => byId('cc-out').textContent ?? '');
+	});
+</script>
+
+<style>
+	.cc-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr auto 1fr;
+		gap: 10px;
+		align-items: center;
+	}
+	.cc-swap {
+		font-size: 18px;
+	}
+	.cc-result {
+		padding: 18px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.cc-result b {
+		font-size: 28px;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+		overflow-wrap: anywhere;
+	}
+	.cc-result span {
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.cc-table {
+		list-style: none;
+		margin: 0;
+		padding: 4px 14px 10px;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+		gap: 0 20px;
+	}
+	.cc-table :global(li) {
+		display: flex;
+		justify-content: space-between;
+		gap: 10px;
+		padding: 7px 0;
+		border-bottom: 1px solid var(--border);
+		font-size: 13.5px;
+	}
+	.cc-table :global(span) {
+		color: var(--ink-soft);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.cc-table :global(b) {
+		font-variant-numeric: tabular-nums;
+	}
+	@media (max-width: 640px) {
+		.cc-row {
+			grid-template-columns: 1fr 1fr;
+		}
+		.cc-row .field:first-child {
+			grid-column: 1 / -1;
+		}
+		.cc-swap {
+			display: none;
+		}
+	}
+</style>

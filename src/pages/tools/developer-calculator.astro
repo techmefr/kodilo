@@ -1,0 +1,269 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="developer-calculator" title="Developer Calculator" description="Integer maths in hex, decimal, octal and binary with bitwise operators and a clickable bit grid. Uses 64-bit or smaller word sizes.">
+	<div class="toolbar" id="dc-tool">
+		<div class="seg" id="dc-width" aria-label="Word size">
+			<button data-value="8" aria-pressed="false">8-bit</button>
+			<button data-value="16" aria-pressed="false">16-bit</button>
+			<button data-value="32" aria-pressed="true">32-bit</button>
+			<button data-value="64" aria-pressed="false">64-bit</button>
+		</div>
+		<label class="check"><input type="checkbox" id="dc-signed" checked /> Signed</label>
+	</div>
+	<div class="fields">
+		<div class="field wide" id="dc-field">
+			<label for="dc-expr">Expression</label>
+			<input id="dc-expr" spellcheck="false" autocomplete="off" value="(0xFF00 | 0b1010) >> 4" />
+			<span class="field-note" id="dc-note">Operators: + - * / % &amp; | ^ ~ &lt;&lt; &gt;&gt; ( ). Prefixes: 0x hex, 0o octal, 0b binary.</span>
+		</div>
+	</div>
+	<ul class="dc-bases" id="dc-bases"></ul>
+	<section class="panel">
+		<div class="panel-head">Bits, click one to flip it</div>
+		<div class="dc-bits" id="dc-bits"></div>
+	</section>
+	<div class="dc-keys" id="dc-keys"></div>
+</ToolShell>
+
+<script>
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	type Tok = { t: 'n'; v: bigint } | { t: 'o'; v: string };
+	const BIN: Record<string, [number, (a: bigint, b: bigint) => bigint]> = {
+		'|': [1, (a, b) => a | b],
+		'^': [2, (a, b) => a ^ b],
+		'&': [3, (a, b) => a & b],
+		'<<': [4, (a, b) => a << b],
+		'>>': [4, (a, b) => a >> b],
+		'+': [5, (a, b) => a + b],
+		'-': [5, (a, b) => a - b],
+		'*': [6, (a, b) => a * b],
+		'/': [6, (a, b) => {
+			if (b === 0n) throw new Error('Division by zero');
+			return a / b;
+		}],
+		'%': [6, (a, b) => {
+			if (b === 0n) throw new Error('Division by zero');
+			return a % b;
+		}],
+	};
+
+	function tokenize(s: string): Tok[] {
+		const out: Tok[] = [];
+		const re = /\s*(0x[0-9a-f_]+|0o[0-7_]+|0b[01_]+|\d[\d_]*|<<|>>|[-+*/%&|^~()])/iy;
+		let m: RegExpExecArray | null;
+		let i = 0;
+		while (i < s.length) {
+			if (!s.slice(i).trim()) break;
+			re.lastIndex = i;
+			m = re.exec(s);
+			if (!m) throw new Error(`Unexpected "${s.slice(i).trim()[0]}"`);
+			const x = m[1];
+			out.push(/^\d|^0[xob]/i.test(x) ? { t: 'n', v: BigInt(x.replace(/_/g, '')) } : { t: 'o', v: x });
+			i = re.lastIndex;
+		}
+		return out;
+	}
+
+	function evaluate(src: string): bigint {
+		const toks = tokenize(src);
+		let p = 0;
+		const unary = (): bigint => {
+			const k = toks[p];
+			if (!k) throw new Error('Expression ends too early');
+			if (k.t === 'o' && (k.v === '-' || k.v === '~' || k.v === '+')) {
+				p++;
+				const v = unary();
+				return k.v === '-' ? -v : k.v === '~' ? ~v : v;
+			}
+			if (k.t === 'o' && k.v === '(') {
+				p++;
+				const v = expr(0);
+				const c = toks[p++];
+				if (!c || c.v !== ')') throw new Error('Missing )');
+				return v;
+			}
+			if (k.t === 'n') {
+				p++;
+				return k.v;
+			}
+			throw new Error(`Unexpected "${k.v}"`);
+		};
+		const expr = (min: number): bigint => {
+			let left = unary();
+			for (;;) {
+				const k = toks[p];
+				if (!k || k.t !== 'o' || !BIN[k.v] || BIN[k.v][0] <= min) return left;
+				p++;
+				left = BIN[k.v][1](left, expr(BIN[k.v][0]));
+			}
+		};
+		const v = expr(0);
+		if (p < toks.length) throw new Error(`Unexpected "${(toks[p] as Tok).v}"`);
+		return v;
+	}
+
+	onPage('dc-tool', () => {
+		const expr = byId<HTMLInputElement>('dc-expr');
+		const signed = byId<HTMLInputElement>('dc-signed');
+		let width = 32;
+		let value = 0n;
+
+		const paint = () => {
+			const u = BigInt.asUintN(width, value);
+			const shown = signed.checked ? BigInt.asIntN(width, value) : u;
+			const bin = u.toString(2).padStart(width, '0');
+			const rows: [string, string][] = [
+				['HEX', u.toString(16).toUpperCase().padStart(width / 4, '0').replace(/(?=(.{4})+$)/g, ' ').trim()],
+				['DEC', shown.toLocaleString('en-US')],
+				['OCT', u.toString(8)],
+				['BIN', bin.replace(/(?=(.{4})+$)/g, ' ').trim()],
+			];
+			byId('dc-bases').replaceChildren(
+				...rows.map(([k, v]) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<b></b><code></code>';
+					li.querySelector('b')!.textContent = k;
+					li.querySelector('code')!.textContent = v;
+					li.title = 'Click to copy';
+					li.addEventListener('click', () => {
+						navigator.clipboard.writeText(v.replace(/[ ,]/g, ''));
+						li.classList.add('copied');
+						setTimeout(() => li.classList.remove('copied'), 900);
+					});
+					return li;
+				})
+			);
+			const bits = byId('dc-bits');
+			bits.replaceChildren(
+				...[...bin].map((b, i) => {
+					const bit = document.createElement('button');
+					const pos = width - 1 - i;
+					bit.textContent = b;
+					bit.dataset.on = b;
+					bit.title = `bit ${pos}`;
+					if (pos % 4 === 0) bit.classList.add('nib');
+					bit.addEventListener('click', () => {
+						value = BigInt.asUintN(width, u ^ (1n << BigInt(pos)));
+						expr.value = '0x' + value.toString(16).toUpperCase();
+						paint();
+					});
+					return bit;
+				})
+			);
+		};
+
+		const render = () => {
+			const field = byId('dc-field');
+			try {
+				value = expr.value.trim() ? evaluate(expr.value) : 0n;
+				field.classList.remove('invalid');
+				byId('dc-note').textContent = 'Operators: + - * / % & | ^ ~ << >> ( ). Prefixes: 0x hex, 0o octal, 0b binary.';
+				paint();
+			} catch (e) {
+				field.classList.add('invalid');
+				byId('dc-note').textContent = (e as Error).message;
+			}
+		};
+
+		const keys = ['A', 'B', 'C', 'D', 'E', 'F', '0x', '0b', '&', '|', '^', '~', '<<', '>>', '(', ')', 'C'];
+		byId('dc-keys').replaceChildren(
+			...keys.map((k, i) => {
+				const b = document.createElement('button');
+				b.className = 'btn';
+				b.textContent = i === keys.length - 1 ? 'Clear' : k;
+				b.addEventListener('click', () => {
+					if (i === keys.length - 1) expr.value = '';
+					else {
+						const s = expr.selectionStart ?? expr.value.length;
+						const ins = /^[&|^<>]/.test(k) ? ` ${k} ` : k;
+						expr.value = expr.value.slice(0, s) + ins + expr.value.slice(expr.selectionEnd ?? s);
+						expr.setSelectionRange(s + ins.length, s + ins.length);
+					}
+					expr.focus();
+					render();
+				});
+				return b;
+			})
+		);
+
+		segmented(byId('dc-width'), (v) => {
+			width = Number(v);
+			paint();
+		});
+		signed.addEventListener('change', paint);
+		expr.addEventListener('input', render);
+		render();
+	});
+</script>
+
+<style>
+	.dc-bases {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.dc-bases :global(li) {
+		display: grid;
+		grid-template-columns: 48px 1fr;
+		align-items: center;
+		gap: 12px;
+		padding: 10px 14px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		cursor: pointer;
+	}
+	.dc-bases :global(li:hover),
+	.dc-bases :global(li.copied) {
+		border-color: var(--accent-strong);
+	}
+	.dc-bases :global(b) {
+		font-size: 12px;
+		color: var(--ink-soft);
+		letter-spacing: 0.06em;
+	}
+	.dc-bases :global(code) {
+		font-family: var(--mono);
+		font-size: 18px;
+		overflow-wrap: anywhere;
+		font-variant-numeric: tabular-nums;
+	}
+	.dc-bits {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 3px;
+		padding: 12px 14px;
+	}
+	.dc-bits :global(button) {
+		width: 26px;
+		height: 30px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--surface-2);
+		color: var(--ink-soft);
+		font-family: var(--mono);
+		cursor: pointer;
+	}
+	.dc-bits :global(button.nib) {
+		margin-right: 8px;
+	}
+	.dc-bits :global(button[data-on='1']) {
+		background: var(--accent-strong);
+		border-color: var(--accent-strong);
+		color: #fff;
+	}
+	.dc-keys {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+		gap: 6px;
+	}
+	.dc-keys :global(.btn) {
+		font-family: var(--mono);
+	}
+</style>

@@ -1,0 +1,151 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="phone-parser" title="Phone Parser & Formatter" description="Check a phone number and get it in E.164, international, national and tel: formats, with its country and line type.">
+	<div class="fields" id="pp-tool">
+		<div class="field">
+			<label for="pp-num">Phone number</label>
+			<input id="pp-num" spellcheck="false" value="06 12 34 56 78" />
+			<span class="field-note" id="pp-note"></span>
+		</div>
+		<div class="field">
+			<label for="pp-country">Default country, for numbers without +code</label>
+			<select id="pp-country"></select>
+		</div>
+	</div>
+	<div class="stats">
+		<div class="stat"><b id="pp-valid">—</b><span>Validity</span></div>
+		<div class="stat"><b id="pp-cc">—</b><span>Country</span></div>
+		<div class="stat"><b id="pp-type">—</b><span>Line type</span></div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">Formats</div>
+		<ul class="pp-list" id="pp-list"></ul>
+	</section>
+</ToolShell>
+
+<script>
+	import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
+	import { byId, onPage } from '../../scripts/ui';
+
+	const TYPES: Record<string, string> = {
+		MOBILE: 'Mobile',
+		FIXED_LINE: 'Landline',
+		FIXED_LINE_OR_MOBILE: 'Landline or mobile',
+		TOLL_FREE: 'Toll free',
+		PREMIUM_RATE: 'Premium rate',
+		SHARED_COST: 'Shared cost',
+		VOIP: 'VoIP',
+		PERSONAL_NUMBER: 'Personal',
+		PAGER: 'Pager',
+		UAN: 'Company number',
+		VOICEMAIL: 'Voicemail',
+	};
+
+	onPage('pp-tool', () => {
+		const num = byId<HTMLInputElement>('pp-num');
+		const country = byId<HTMLSelectElement>('pp-country');
+		const names = new Intl.DisplayNames(['en'], { type: 'region' });
+		const countryName = (c: string) => names.of(c) ?? c;
+		country.replaceChildren(
+			...getCountries()
+				.map((c) => [c, countryName(c)] as const)
+				.sort((a, b) => a[1].localeCompare(b[1]))
+				.map(([c, n]) => new Option(`${n} (+${getCountryCallingCode(c)})`, c, false, c === 'FR'))
+		);
+
+		const render = () => {
+			const list = byId('pp-list');
+			const p = parsePhoneNumberFromString(num.value, country.value as CountryCode);
+			const valid = byId('pp-valid');
+			if (!p) {
+				valid.textContent = '✕ Not a number';
+				valid.dataset.ok = 'false';
+				byId('pp-cc').textContent = byId('pp-type').textContent = '—';
+				byId('pp-note').textContent = 'Type at least a few digits.';
+				list.replaceChildren();
+				return;
+			}
+			const ok = p.isValid();
+			valid.textContent = ok ? '✓ Valid' : p.isPossible() ? '~ Possible' : '✕ Invalid';
+			valid.dataset.ok = String(ok);
+			byId('pp-cc').textContent = p.country ? `${countryName(p.country)} +${p.countryCallingCode}` : `+${p.countryCallingCode}`;
+			byId('pp-type').textContent = TYPES[p.getType() ?? ''] ?? 'Unknown';
+			byId('pp-note').textContent = ok ? '' : 'The digits do not match a real numbering plan for this country.';
+			const rows: [string, string][] = [
+				['E.164', p.number],
+				['International', p.formatInternational()],
+				['National', p.formatNational()],
+				['RFC 3966 link', p.getURI()],
+			];
+			list.replaceChildren(
+				...rows.map(([k, v]) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<span></span><code></code><button class="btn">Copy</button>';
+					li.querySelector('span')!.textContent = k;
+					li.querySelector('code')!.textContent = v;
+					const btn = li.querySelector('button')!;
+					btn.addEventListener('click', async () => {
+						await navigator.clipboard.writeText(v);
+						btn.textContent = 'Copied';
+						btn.classList.add('copied');
+						setTimeout(() => {
+							btn.textContent = 'Copy';
+							btn.classList.remove('copied');
+						}, 1200);
+					});
+					return li;
+				})
+			);
+		};
+
+		num.addEventListener('input', render);
+		country.addEventListener('change', render);
+		render();
+	});
+</script>
+
+<style>
+	.pp-list {
+		list-style: none;
+		margin: 0;
+		padding: 4px 14px 10px;
+		display: flex;
+		flex-direction: column;
+	}
+	.pp-list :global(li) {
+		display: grid;
+		grid-template-columns: 130px 1fr auto;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 0;
+		border-bottom: 1px solid var(--border);
+	}
+	.pp-list :global(li:last-child) {
+		border-bottom: 0;
+	}
+	.pp-list :global(span) {
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.pp-list :global(code) {
+		font-family: var(--mono);
+		font-size: 15px;
+		overflow-wrap: anywhere;
+	}
+	#pp-valid[data-ok='true'] {
+		color: #16a34a;
+	}
+	#pp-valid[data-ok='false'] {
+		color: #dc2626;
+	}
+	@media (max-width: 520px) {
+		.pp-list :global(li) {
+			grid-template-columns: 1fr auto;
+		}
+		.pp-list :global(span) {
+			grid-column: 1 / -1;
+		}
+	}
+</style>
