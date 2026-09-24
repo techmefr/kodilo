@@ -46,7 +46,7 @@ import Header from '../../components/Header.astro';
 						<textarea id="source" spellcheck="false"></textarea>
 						<div style="margin-top:8px;display:flex;gap:8px;">
 							<button id="applyBtn" style="background:var(--accent-strong);color:var(--accent-ink);border-color:transparent;font-weight:600;">
-								Apply
+								Preview
 							</button>
 							<button id="sampleBtn">Load sample</button>
 						</div>
@@ -382,6 +382,7 @@ import Header from '../../components/Header.astro';
 
 			const HTML_TAB_ID = '__html__';
 			let activeClientId = CLIENTS[0].id;
+			let lastClientId = CLIENTS[0].id;
 			let activeSubtab = 'desktop-light';
 			let rawHtml = SAMPLE_HTML;
 
@@ -470,7 +471,11 @@ import Header from '../../components/Header.astro';
 						},
 					);
 				let out = html.replace(/style=(["'])([\s\S]*?)\1/gi, (_m, q: string, css: string) => `style=${q}${declarations(css)}${q}`);
-				out = out.replace(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi, (_m, attrs: string, css: string) => `<style${attrs}>${declarations(css)}</style>`);
+				const rules = (css: string) =>
+					css.replace(/([^{}]+)\{([^{}]*)\}/g, (rule: string, selector: string, body: string) =>
+						/\[data-ogs[cb]\]/i.test(selector) ? rule : `${selector}{${declarations(body)}}`,
+					);
+				out = out.replace(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi, (_m, attrs: string, css: string) => `<style${attrs}>${rules(css)}</style>`);
 				out = out.replace(/\bbgcolor=(["'])([^"']+)\1/gi, (_m, q: string, value: string) => `bgcolor=${q}${swap(value, true)}${q}`);
 				const base = '<style>html,body{background-color:#1f1f1f;color:#e8e8e8}</style>';
 				return /<head[^>]*>/i.test(out) ? out.replace(/<head[^>]*>/i, (h) => h + base) : base + out;
@@ -480,7 +485,8 @@ import Header from '../../components/Header.astro';
 				if (theme !== 'dark') return applyDarkMedia(html, false);
 				const mode = CLIENTS.find((c) => c.id === clientId)?.dark ?? 'media';
 				if (mode === 'media') return applyDarkMedia(html, true);
-				return forceDark(applyDarkMedia(html, false), mode);
+				const dark = forceDark(applyDarkMedia(html, false), mode);
+				return clientId === 'outlook-com' ? dark.replace(/<body\b/i, '<body data-ogsc data-ogsb') : dark;
 			}
 
 			function stripMediaBlocks(html: string) {
@@ -508,6 +514,7 @@ import Header from '../../components/Header.astro';
 
 			function selectTab(id: string) {
 				activeClientId = id;
+				if (id !== HTML_TAB_ID) lastClientId = id;
 				Array.prototype.forEach.call(els.tabs!.children, function (el: HTMLElement) {
 					el.setAttribute('aria-selected', String(el.dataset.tabId === id));
 				});
@@ -614,9 +621,15 @@ import Header from '../../components/Header.astro';
 				const theme = activeSubtab.indexOf('dark') !== -1 ? 'dark' : 'light';
 				let transformed = transformForClient(rawHtml, activeClientId);
 				transformed = applyColorScheme(transformed, theme, activeClientId);
+				const notes: string[] = [];
+				if (activeSubtab.indexOf('mobile') === 0 && activeClientId === 'outlook-desktop')
+					notes.push(
+						'Outlook Desktop ignores @media queries, so this is the fixed desktop layout squeezed into a phone width. It has no mobile version: the Outlook phone apps render like Outlook.com.',
+					);
+				if (theme === 'dark') notes.push(DARK_NOTES[CLIENTS.find((c) => c.id === activeClientId)?.dark ?? 'media']);
 				const note = document.getElementById('darkNote')!;
-				note.hidden = theme !== 'dark';
-				note.textContent = DARK_NOTES[CLIENTS.find((c) => c.id === activeClientId)?.dark ?? 'media'];
+				note.hidden = !notes.length;
+				note.textContent = notes.join(' ');
 				(els.preview as HTMLIFrameElement).style.colorScheme = theme;
 				(els.preview as HTMLIFrameElement).srcdoc = transformed;
 			}
@@ -628,7 +641,10 @@ import Header from '../../components/Header.astro';
 			});
 			els.applyBtn!.addEventListener('click', function () {
 				rawHtml = (els.source as HTMLTextAreaElement).value;
-				render();
+				selectTab(lastClientId);
+			});
+			els.source!.addEventListener('input', function () {
+				rawHtml = (els.source as HTMLTextAreaElement).value;
 			});
 			els.subtabDesktopLight!.addEventListener('click', function () {
 				setSubtab('desktop-light');
