@@ -7,7 +7,7 @@ Live at **https://techmefr.github.io/kodilo/**
 ## What's in here
 
 - **Inbox Tester** (`/tools/inbox-tester/`) — paste an HTML email, preview how it
-  renders across Outlook Desktop, Outlook.com, Gmail, Apple Mail and Thunderbird
+  renders across Outlook Desktop, Outlook.com, Gmail, Yahoo Mail, Apple Mail and Thunderbird
   (client CSS-support quirks are simulated, not pixel-perfect), and check a
   caniemail-style support grid for common CSS features.
 - **JSON Formatter** — JSON and JSON Lines (per-line errors, array ↔ JSONL conversion), format (2/4 spaces, tab), minify, sort keys, errors with line and column.

@@ -176,7 +176,7 @@ test('case converter produces snake and camel case', async ({ page }) => {
 	await expect(page.locator('#case-list')).toContainText('helloBigWorld');
 });
 
-for (const client of ['outlook-desktop', 'outlook-com', 'gmail', 'apple-mail', 'thunderbird']) {
+for (const client of ['outlook-desktop', 'outlook-com', 'gmail', 'yahoo', 'apple-mail', 'thunderbird']) {
 	test(`inbox tester renders ${client} in dark mode`, async ({ page }) => {
 		await page.goto('tools/inbox-tester/');
 		await page.locator(`[data-tab-id="${client}"]`).click();
