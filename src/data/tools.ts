@@ -284,7 +284,7 @@ export const categories: Category[] = [
 				description: 'Encrypt and decrypt text with AES and a passphrase.',
 			},
 			{
-				slug: 'bip39-generator',
+				slug: 'bip39-generator', icon: 'sprout', built: true,
 				name: 'BIP39 Generator',
 				description: 'Generate a BIP39 mnemonic seed phrase.',
 			},
@@ -410,7 +410,7 @@ export const categories: Category[] = [
 				description: 'Generate random MAC addresses.',
 			},
 			{
-				slug: 'mac-address-lookup',
+				slug: 'mac-address-lookup', icon: 'router', built: true,
 				name: 'MAC Address Lookup',
 				description: 'Look up the vendor for a MAC address.',
 			},
@@ -500,17 +500,17 @@ export const categories: Category[] = [
 				description: 'Combine multiple PDFs into one.',
 			},
 			{
-				slug: 'pdf-split',
+				slug: 'pdf-split', icon: 'scissors', built: true,
 				name: 'PDF Split',
 				description: 'Extract pages from a PDF.',
 			},
 			{
-				slug: 'pdf-compress',
+				slug: 'pdf-compress', icon: 'file-down', built: true,
 				name: 'PDF Compress',
 				description: 'Reduce PDF file size.',
 			},
 			{
-				slug: 'pdf-to-jpg',
+				slug: 'pdf-to-jpg', icon: 'images', built: true,
 				name: 'PDF to JPG',
 				description: 'Convert PDF pages to JPG images.',
 			},
@@ -669,7 +669,7 @@ export const categories: Category[] = [
 				description: 'Content-Security-Policy, HSTS, Permissions-Policy and friends, for Nginx, Apache or a meta tag.',
 			},
 			{
-				slug: 'x509-certificate-decoder',
+				slug: 'x509-certificate-decoder', icon: 'badge-check', built: true,
 				name: 'X.509 Certificate Decoder',
 				description: 'Paste a PEM certificate: subject, issuer, SANs, validity, fingerprints.',
 			},

@@ -1,0 +1,134 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="bip39-generator" title="BIP39 Generator" description="Generate or check a BIP39 mnemonic and see its entropy and seed. For testing and learning only: never type a real wallet phrase into a website.">
+	<div class="toolbar" id="bp-tool">
+		<div class="seg" id="bp-words" aria-label="Words">
+			<button data-value="128" aria-pressed="true">12 words</button>
+			<button data-value="160" aria-pressed="false">15</button>
+			<button data-value="192" aria-pressed="false">18</button>
+			<button data-value="224" aria-pressed="false">21</button>
+			<button data-value="256" aria-pressed="false">24</button>
+		</div>
+		<button class="btn primary" id="bp-new">Generate</button>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Mnemonic <span class="bp-status" id="bp-status"></span></span>
+			<button class="btn" id="bp-copy">Copy</button>
+		</div>
+		<textarea id="bp-phrase" spellcheck="false" aria-label="Mnemonic"></textarea>
+		<ol class="bp-grid" id="bp-grid"></ol>
+	</section>
+	<div class="fields">
+		<div class="field wide">
+			<label for="bp-pass">Optional passphrase (the "25th word")</label>
+			<input id="bp-pass" spellcheck="false" />
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">Entropy (hex)</div>
+		<pre class="out bp-out" id="bp-entropy"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Seed, PBKDF2-HMAC-SHA512 (hex)</span>
+			<button class="btn" id="bp-seed-copy">Copy</button>
+		</div>
+		<pre class="out bp-out" id="bp-seed"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { generateMnemonic, mnemonicToEntropy, mnemonicToSeed, validateMnemonic } from '@scure/bip39';
+	import { wordlist } from '@scure/bip39/wordlists/english.js';
+	import { encodeBytes } from '../../scripts/crypto';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('bp-tool', () => {
+		const phrase = byId<HTMLTextAreaElement>('bp-phrase');
+		const pass = byId<HTMLInputElement>('bp-pass');
+		let strength = 128;
+		let run = 0;
+
+		const render = async () => {
+			const current = ++run;
+			const words = phrase.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+			const norm = words.join(' ');
+			const status = byId('bp-status');
+			byId('bp-grid').replaceChildren(
+				...words.map((w) => {
+					const li = document.createElement('li');
+					li.textContent = w;
+					if (!wordlist.includes(w)) li.className = 'bad';
+					return li;
+				})
+			);
+			if (!validateMnemonic(norm, wordlist)) {
+				const unknown = words.filter((w) => !wordlist.includes(w));
+				status.textContent = unknown.length ? `✕ Not in the word list: ${unknown.join(', ')}` : ![12, 15, 18, 21, 24].includes(words.length) ? `✕ ${words.length} words, needs 12 to 24` : '✕ Bad checksum';
+				status.dataset.ok = 'false';
+				byId('bp-entropy').textContent = byId('bp-seed').textContent = '';
+				return;
+			}
+			status.textContent = '✓ Valid';
+			status.dataset.ok = 'true';
+			byId('bp-entropy').textContent = encodeBytes(mnemonicToEntropy(norm, wordlist), 'hex');
+			const seed = await mnemonicToSeed(norm, pass.value);
+			if (current === run) byId('bp-seed').textContent = encodeBytes(seed, 'hex');
+		};
+
+		const fresh = () => {
+			phrase.value = generateMnemonic(wordlist, strength);
+			render();
+		};
+
+		segmented(byId('bp-words'), (v) => {
+			strength = Number(v);
+			fresh();
+		});
+		byId('bp-new').addEventListener('click', fresh);
+		phrase.addEventListener('input', render);
+		pass.addEventListener('input', render);
+		copyButton(byId('bp-copy'), () => phrase.value.trim());
+		copyButton(byId('bp-seed-copy'), () => byId('bp-seed').textContent ?? '');
+		fresh();
+	});
+</script>
+
+<style>
+	#bp-phrase {
+		min-height: 70px;
+	}
+	.bp-grid {
+		margin: 0;
+		padding: 4px 14px 14px 40px;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+		gap: 6px 24px;
+		font-family: var(--mono);
+		font-size: 14px;
+	}
+	.bp-grid :global(li.bad) {
+		color: #dc2626;
+		text-decoration: underline wavy;
+	}
+	.bp-out {
+		min-height: auto !important;
+		word-break: break-all;
+		white-space: pre-wrap;
+	}
+	.bp-status {
+		font-size: 12px;
+		font-weight: 700;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+	.bp-status[data-ok='true'] {
+		color: #16a34a;
+	}
+	.bp-status[data-ok='false'] {
+		color: #dc2626;
+	}
+</style>

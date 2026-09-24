@@ -12,12 +12,17 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@peculiar/x509": "^2.1.0",
+    "@scure/bip39": "^2.4.0",
     "astro": "^7.3.4",
     "bcryptjs": "^3.0.3",
     "libphonenumber-js": "^1.13.14",
     "lucide-static": "^1.47.0",
+    "oui-data": "^2.1.28",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289",
     "qrcode": "^1.5.4",
+    "reflect-metadata": "^0.2.2",
     "yaml": "^2.9.1"
   },
   "allowScripts": {

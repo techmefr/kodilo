@@ -1,0 +1,176 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="pdf-split" title="PDF Split" description="Pull pages out of a PDF: pick a range like 1-3, 5, or split every page into its own file. Nothing is uploaded.">
+	<label class="drop" id="ps-tool">
+		<input type="file" id="ps-file" accept="application/pdf" hidden />
+		<span id="ps-drop">Drop a PDF here or click to choose. A 6-page sample is loaded.</span>
+	</label>
+	<div class="toolbar">
+		<div class="seg" id="ps-mode" aria-label="Mode">
+			<button data-value="range" aria-pressed="true">Extract pages</button>
+			<button data-value="each" aria-pressed="false">One file per page</button>
+		</div>
+	</div>
+	<div class="fields">
+		<div class="field wide" id="ps-field">
+			<label for="ps-range">Pages</label>
+			<input id="ps-range" spellcheck="false" value="1-3, 5" />
+			<span class="field-note" id="ps-note"></span>
+		</div>
+	</div>
+	<div class="ps-thumbs" id="ps-thumbs"></div>
+	<div class="toolbar">
+		<button class="btn primary" id="ps-go">Download</button>
+	</div>
+	<p class="error" id="ps-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { PDFDocument } from 'pdf-lib';
+	import { downloadBytes, dropZone, humanBytes } from '../../scripts/pdf';
+	import { samplePdf } from '../../scripts/pdf-sample';
+	import { openPdf, renderPage } from '../../scripts/pdfjs';
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	function parseRange(s: string, max: number): number[] {
+		const out: number[] = [];
+		for (const part of s.split(',').map((p) => p.trim()).filter(Boolean)) {
+			const m = part.match(/^(\d+)?\s*-\s*(\d+)?$|^(\d+)$/);
+			if (!m) throw new Error(`"${part}" is not a page or a range`);
+			const a = Number(m[3] ?? m[1] ?? 1);
+			const b = Number(m[3] ?? m[2] ?? max);
+			if (a < 1 || b > max || a > b) throw new Error(`${part} is outside 1-${max}`);
+			for (let i = a; i <= b; i++) if (!out.includes(i)) out.push(i);
+		}
+		return out;
+	}
+
+	onPage('ps-tool', () => {
+		const range = byId<HTMLInputElement>('ps-range');
+		let bytes: Uint8Array | null = null;
+		let name = 'sample';
+		let count = 0;
+		let mode = 'range';
+		let pages: number[] = [];
+
+		const select = () => {
+			const field = byId('ps-field');
+			try {
+				pages = mode === 'each' ? Array.from({ length: count }, (_, i) => i + 1) : parseRange(range.value, count);
+				field.classList.remove('invalid');
+				byId('ps-note').textContent = mode === 'each' ? `${count} files, one page each` : `${pages.length} of ${count} pages into one PDF`;
+			} catch (e) {
+				pages = [];
+				field.classList.add('invalid');
+				byId('ps-note').textContent = (e as Error).message;
+			}
+			range.disabled = mode === 'each';
+			byId('ps-thumbs').querySelectorAll<HTMLElement>('figure').forEach((f, i) => {
+				f.dataset.on = String(pages.includes(i + 1));
+			});
+			byId<HTMLButtonElement>('ps-go').disabled = !pages.length;
+		};
+
+		const load = async (b: Uint8Array, n: string) => {
+			const error = byId('ps-error');
+			try {
+				const pdf = await openPdf(b);
+				bytes = b;
+				name = n.replace(/\.pdf$/i, '');
+				count = pdf.numPages;
+				error.hidden = true;
+				byId('ps-drop').textContent = `${n} · ${count} pages · ${humanBytes(b.length)}. Drop another PDF to replace it.`;
+				const thumbs = byId('ps-thumbs');
+				thumbs.replaceChildren();
+				for (let i = 1; i <= Math.min(count, 60); i++) {
+					const fig = document.createElement('figure');
+					const canvas = await renderPage(pdf, i, 0.25);
+					fig.append(canvas);
+					const cap = document.createElement('figcaption');
+					cap.textContent = String(i);
+					fig.append(cap);
+					fig.addEventListener('click', () => {
+						if (mode !== 'range') return;
+						const set = new Set(pages);
+						set.has(i) ? set.delete(i) : set.add(i);
+						range.value = compress([...set].sort((a, b) => a - b));
+						select();
+					});
+					thumbs.append(fig);
+				}
+				select();
+			} catch {
+				error.hidden = false;
+				error.textContent = `${n} could not be read as a PDF.`;
+			}
+		};
+
+		const compress = (list: number[]) => {
+			const parts: string[] = [];
+			for (let i = 0; i < list.length; i++) {
+				let j = i;
+				while (list[j + 1] === list[j] + 1) j++;
+				parts.push(j > i ? `${list[i]}-${list[j]}` : String(list[i]));
+				i = j;
+			}
+			return parts.join(', ');
+		};
+
+		dropZone(byId('ps-tool'), byId<HTMLInputElement>('ps-file'), async (files) => {
+			if (files[0]) load(new Uint8Array(await files[0].arrayBuffer()), files[0].name);
+		});
+		segmented(byId('ps-mode'), (v) => {
+			mode = v;
+			select();
+		});
+		range.addEventListener('input', select);
+		byId('ps-go').addEventListener('click', async () => {
+			if (!bytes) return;
+			const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+			const groups = mode === 'each' ? pages.map((p) => [p]) : [pages];
+			for (const g of groups) {
+				const out = await PDFDocument.create();
+				(await out.copyPages(src, g.map((p) => p - 1))).forEach((p) => out.addPage(p));
+				downloadBytes(await out.save(), mode === 'each' ? `${name}-page-${g[0]}.pdf` : `${name}-pages.pdf`);
+			}
+		});
+
+		samplePdf(6).then((b) => load(b, 'sample.pdf'));
+	});
+</script>
+
+<style>
+	.ps-thumbs {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+		gap: 10px;
+	}
+	.ps-thumbs :global(figure) {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+		padding: 6px;
+		border: 2px solid var(--border);
+		border-radius: 10px;
+		background: var(--surface);
+		cursor: pointer;
+		opacity: 0.5;
+	}
+	.ps-thumbs :global(figure[data-on='true']) {
+		border-color: var(--accent-strong);
+		opacity: 1;
+	}
+	.ps-thumbs :global(canvas) {
+		width: 100%;
+		height: auto;
+		border-radius: 4px;
+	}
+	.ps-thumbs :global(figcaption) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+</style>
