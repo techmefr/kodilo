@@ -1,0 +1,82 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="base64"
+	title="Base64"
+	description="Encode and decode Base64, UTF-8 safe, with an optional URL-safe alphabet."
+>
+	<div class="toolbar" id="b64-tool">
+		<div class="seg" id="b64-mode" aria-label="Direction">
+			<button data-value="encode" aria-pressed="true">Encode</button>
+			<button data-value="decode" aria-pressed="false">Decode</button>
+		</div>
+		<label class="check"><input type="checkbox" id="b64-url" /> URL-safe</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head" id="b64-in-label">Text</div>
+			<textarea id="b64-in" spellcheck="false" aria-labelledby="b64-in-label">Hello, kodilo ✨</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="b64-out-label">Base64</span>
+				<button class="btn" id="b64-copy">Copy</button>
+			</div>
+			<pre class="out" id="b64-out"></pre>
+		</section>
+	</div>
+	<div class="error" id="b64-error" hidden></div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	function encode(text: string, urlSafe: boolean): string {
+		const bytes = new TextEncoder().encode(text);
+		let binary = '';
+		bytes.forEach((b) => (binary += String.fromCharCode(b)));
+		const b64 = btoa(binary);
+		return urlSafe ? b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : b64;
+	}
+
+	function decode(b64: string): string {
+		let normalized = b64.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
+		while (normalized.length % 4) normalized += '=';
+		const binary = atob(normalized);
+		const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+		return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+	}
+
+	onPage('b64-tool', () => {
+		const input = byId<HTMLTextAreaElement>('b64-in');
+		const output = byId('b64-out');
+		const error = byId('b64-error');
+		const urlSafe = byId<HTMLInputElement>('b64-url');
+		let mode = 'encode';
+
+		const render = () => {
+			byId('b64-in-label').textContent = mode === 'encode' ? 'Text' : 'Base64';
+			byId('b64-out-label').textContent = mode === 'encode' ? 'Base64' : 'Text';
+			try {
+				output.textContent = mode === 'encode' ? encode(input.value, urlSafe.checked) : decode(input.value);
+				error.hidden = true;
+			} catch {
+				output.textContent = '';
+				error.textContent = 'This is not valid Base64 (or it does not decode to UTF-8 text).';
+				error.hidden = false;
+			}
+		};
+
+		segmented(byId('b64-mode'), (value) => {
+			if (value !== mode && output.textContent && error.hidden) input.value = output.textContent;
+			mode = value;
+			render();
+		});
+		input.addEventListener('input', render);
+		urlSafe.addEventListener('change', render);
+		copyButton(byId('b64-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

@@ -1,0 +1,97 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="json-formatter"
+	title="JSON Formatter"
+	description="Format, minify and validate JSON. Everything updates as you type."
+>
+	<div class="toolbar" id="json-tool">
+		<div class="seg" id="json-indent" aria-label="Indentation">
+			<button data-value="2" aria-pressed="true">2 spaces</button>
+			<button data-value="4" aria-pressed="false">4 spaces</button>
+			<button data-value="tab" aria-pressed="false">Tab</button>
+			<button data-value="min" aria-pressed="false">Minify</button>
+		</div>
+		<label class="check"><input type="checkbox" id="json-sort" /> Sort keys</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="json-in" spellcheck="false" aria-label="JSON input"
+				>{`{"name":"kodilo","tools":["json","base64"],"free":true,"meta":{"account":null,"version":1}}`}</textarea
+			>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="json-status">Output</span>
+				<button class="btn" id="json-copy">Copy</button>
+			</div>
+			<pre class="out" id="json-out"></pre>
+		</section>
+	</div>
+	<div class="error" id="json-error" hidden></div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	function sortKeys(value: unknown): unknown {
+		if (Array.isArray(value)) return value.map(sortKeys);
+		if (value && typeof value === 'object') {
+			return Object.fromEntries(
+				Object.keys(value)
+					.sort()
+					.map((key) => [key, sortKeys((value as Record<string, unknown>)[key])])
+			);
+		}
+		return value;
+	}
+
+	function locate(text: string, message: string): string {
+		const match = message.match(/position (\d+)/);
+		if (!match || /line \d+/.test(message)) return message;
+		const before = text.slice(0, Number(match[1])).split('\n');
+		return `${message} (line ${before.length}, column ${before[before.length - 1].length + 1})`;
+	}
+
+	onPage('json-tool', () => {
+		const input = byId<HTMLTextAreaElement>('json-in');
+		const output = byId('json-out');
+		const error = byId('json-error');
+		const status = byId('json-status');
+		const sort = byId<HTMLInputElement>('json-sort');
+		let indent = '2';
+
+		const render = () => {
+			if (!input.value.trim()) {
+				output.textContent = '';
+				error.hidden = true;
+				status.textContent = 'Output';
+				return;
+			}
+			try {
+				let parsed = JSON.parse(input.value);
+				if (sort.checked) parsed = sortKeys(parsed);
+				const space = indent === 'min' ? undefined : indent === 'tab' ? '\t' : Number(indent);
+				output.textContent = JSON.stringify(parsed, null, space);
+				error.hidden = true;
+				status.textContent = 'Valid JSON';
+			} catch (e) {
+				error.textContent = locate(input.value, (e as Error).message);
+				error.hidden = false;
+				status.textContent = 'Invalid JSON';
+			}
+		};
+
+		segmented(byId('json-indent'), (value) => {
+			indent = value;
+			render();
+		});
+		input.addEventListener('input', render);
+		sort.addEventListener('change', render);
+		copyButton(byId('json-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

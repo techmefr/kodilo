@@ -10,6 +10,11 @@ Live at **https://techmefr.github.io/kodilo/**
   renders across Outlook Desktop, Outlook.com, Gmail, Apple Mail and Thunderbird
   (client CSS-support quirks are simulated, not pixel-perfect), and check a
   caniemail-style support grid for common CSS features.
+- **JSON Formatter** — format (2/4 spaces, tab), minify, sort keys, errors with line and column.
+- **Base64** — UTF-8 safe encode/decode, URL-safe alphabet.
+- **URL Encoder** — component or full-URL encode/decode, plus a breakdown of every URL part.
+- **UUID Generator** — v4 or time-ordered v7, bulk up to 1000, uppercase, no hyphens.
+- **Case Converter** — every case at once (camel, Pascal, snake, CONSTANT, kebab, dot, path, title…), click to copy.
 - More tools land as separate categories in the sidebar — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -19,7 +24,6 @@ No sign-up, no account, no tracking. Every tool runs entirely client-side.
 Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 
 **JSON**
-- JSON Formatter & Validator
 - JSON to YAML
 - JSON to CSV
 - JSON Diff
@@ -44,7 +48,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **Text**
 - Regex Tester
 - Diff Checker
-- Case Converter
 - Word Counter
 - Slugify
 - Lorem Ipsum Generator
@@ -54,9 +57,7 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Numeronym Generator
 
 **Encoding & Security**
-- Base64 Encoder & Decoder
 - JWT Decoder
-- URL Encoder & Decoder
 - HTML Entities
 - Hash Text
 - HMAC Generator
@@ -70,7 +71,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Checksum Calculator
 
 **Generators**
-- UUID Generator
 - ULID Generator
 - Password Generator
 - QR Code Generator
@@ -164,8 +164,9 @@ Node version is pinned via `.nvmrc` (`lts/*`).
 ## Adding a tool
 
 1. Add the tool's metadata to `src/data/tools.ts` (under an existing or new category).
-2. Create `src/pages/tools/<slug>.astro` using `src/layouts/Base.astro` and
-   `src/components/Sidebar.astro` for the shared shell.
+2. Create `src/pages/tools/<slug>.astro` wrapped in `src/components/ToolShell.astro`,
+   reuse the shared `.panel`/`.seg`/`.btn` classes and the helpers in `src/scripts/ui.ts`
+   (`onPage` so the tool re-initialises after client-side navigation), and set `built: true`.
 3. Keep it client-side and dependency-free where practical — a small, well-maintained
    library (e.g. for PDF or image manipulation) is fine when a tool genuinely needs one.
    No sign-up, no server, no tracking either way.

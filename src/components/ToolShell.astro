@@ -1,0 +1,53 @@
+---
+import Base from '../layouts/Base.astro';
+import Sidebar from './Sidebar.astro';
+
+interface Props {
+	slug: string;
+	title: string;
+	description: string;
+}
+
+const { slug, title, description } = Astro.props;
+---
+
+<Base title={`${title} — kodilo`}>
+	<div class="shell">
+		<Sidebar activeSlug={slug} />
+		<main class="tool">
+			<header class="tool-head">
+				<h1>{title}</h1>
+				<p>{description}</p>
+			</header>
+			<slot />
+		</main>
+	</div>
+</Base>
+
+<style>
+	.shell {
+		display: flex;
+		min-height: 100vh;
+	}
+	.tool {
+		flex: 1;
+		min-width: 0;
+		max-width: 960px;
+		margin: 0 auto;
+		padding: 32px 24px 48px;
+		display: flex;
+		flex-direction: column;
+		gap: 20px;
+	}
+	.tool-head h1 {
+		margin: 0;
+		font-size: 26px;
+		font-weight: 800;
+		letter-spacing: -0.02em;
+	}
+	.tool-head p {
+		margin: 4px 0 0;
+		color: var(--ink-soft);
+		font-size: 14px;
+	}
+</style>

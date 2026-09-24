@@ -181,8 +181,8 @@ import Sidebar from '../../components/Sidebar.astro';
 </html>
 `;
 
-		(function () {
-			'use strict';
+		document.addEventListener('astro:page-load', function () {
+			if (!document.getElementById('preview')) return;
 
 			var CLIENTS = [
 				{ id: 'outlook-desktop', name: 'Outlook Desktop', engine: 'Word rendering engine', group: 'outlook' },
@@ -579,7 +579,7 @@ import Sidebar from '../../components/Sidebar.astro';
 
 			buildTabs();
 			render();
-		})();
+		});
 	</script>
 </Base>
 
