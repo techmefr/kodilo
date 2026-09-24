@@ -1,0 +1,107 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const urls = `/
+/pricing
+/blog
+/blog/launch-week
+/blog/how-we-cut-build-times
+/docs/getting-started
+/contact`;
+---
+
+<ToolShell slug="sitemap-generator" title="Sitemap Generator" description="Turn a list of pages into a valid sitemap.xml with last-modified dates, change frequency and priority. Paths or full URLs both work.">
+	<div class="fields" id="sm-tool">
+		<div class="field"><label for="sm-base">Site URL</label><input id="sm-base" value="https://example.com" spellcheck="false" /></div>
+		<div class="field"><label for="sm-date">Last modified</label><input id="sm-date" type="date" /></div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="sm-freq" aria-label="Change frequency">
+			<button data-value="" aria-pressed="false">No changefreq</button>
+			<button data-value="daily" aria-pressed="false">daily</button>
+			<button data-value="weekly" aria-pressed="true">weekly</button>
+			<button data-value="monthly" aria-pressed="false">monthly</button>
+		</div>
+		<label class="check"><input type="checkbox" id="sm-priority" checked /> Priority by depth</label>
+		<label class="check"><input type="checkbox" id="sm-slash" /> Trailing slash</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Pages, one per line</div>
+			<textarea id="sm-in" spellcheck="false" aria-label="Pages">{urls}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="sm-count">sitemap.xml</span>
+				<span class="sm-actions"><button class="btn" id="sm-dl">Download</button><button class="btn" id="sm-copy">Copy</button></span>
+			</div>
+			<pre class="out" id="sm-out"></pre>
+		</section>
+	</div>
+	<p class="error" id="sm-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { saveBlob } from '../../scripts/files';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&apos;').replace(/"/g, '&quot;');
+
+	onPage('sm-tool', () => {
+		const base = byId<HTMLInputElement>('sm-base');
+		const date = byId<HTMLInputElement>('sm-date');
+		const input = byId<HTMLTextAreaElement>('sm-in');
+		const priority = byId<HTMLInputElement>('sm-priority');
+		const slash = byId<HTMLInputElement>('sm-slash');
+		const error = byId('sm-error');
+		let freq = 'weekly';
+		date.value = new Date().toISOString().slice(0, 10);
+
+		const xml = () => {
+			const bad: string[] = [];
+			const seen = new Set<string>();
+			const rows: string[] = [];
+			for (const line of input.value.split('\n').map((l) => l.trim()).filter(Boolean)) {
+				let u: URL;
+				try {
+					u = new URL(line, base.value.replace(/\/?$/, '/'));
+				} catch {
+					bad.push(line);
+					continue;
+				}
+				if (slash.checked && !/\.[a-z0-9]+$/i.test(u.pathname) && !u.pathname.endsWith('/')) u.pathname += '/';
+				if (!slash.checked && u.pathname !== '/' && u.pathname.endsWith('/')) u.pathname = u.pathname.replace(/\/+$/, '');
+				if (seen.has(u.href)) continue;
+				seen.add(u.href);
+				const depth = u.pathname.split('/').filter(Boolean).length;
+				const tags = [`    <loc>${esc(u.href)}</loc>`];
+				if (date.value) tags.push(`    <lastmod>${date.value}</lastmod>`);
+				if (freq) tags.push(`    <changefreq>${freq}</changefreq>`);
+				if (priority.checked) tags.push(`    <priority>${Math.max(0.3, 1 - depth * 0.2).toFixed(1)}</priority>`);
+				rows.push(`  <url>\n${tags.join('\n')}\n  </url>`);
+			}
+			error.hidden = !bad.length;
+			error.textContent = bad.length ? `Skipped lines that are not URLs: ${bad.join(', ')}` : '';
+			byId('sm-count').textContent = `sitemap.xml · ${rows.length} URL${rows.length === 1 ? '' : 's'}${rows.length > 50000 ? ' · over the 50,000 limit, split it' : ''}`;
+			return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${rows.join('\n')}\n</urlset>\n`;
+		};
+
+		const render = () => (byId('sm-out').textContent = xml());
+		segmented(byId('sm-freq'), (v) => ((freq = v), render()));
+		[base, date, input].forEach((el) => el.addEventListener('input', render));
+		[priority, slash].forEach((el) => el.addEventListener('change', render));
+		byId('sm-dl').addEventListener('click', () => saveBlob(new Blob([xml()], { type: 'application/xml' }), 'sitemap.xml'));
+		copyButton(byId('sm-copy'), xml);
+		render();
+	});
+</script>
+
+<style>
+	#sm-in {
+		min-height: 300px;
+	}
+	.sm-actions {
+		display: flex;
+		gap: 8px;
+	}
+</style>

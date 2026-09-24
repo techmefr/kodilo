@@ -1,0 +1,178 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="keycode-info" title="Keyboard Event Info" description="Press any key to see event.key, event.code, the legacy keyCode, modifiers and location, ready to paste into a keyboard handler.">
+	<div class="kc-stage" id="kc-tool" tabindex="0" aria-label="Press a key">
+		<span class="kc-hint" id="kc-hint">Press any key</span>
+		<b class="kc-key" id="kc-key">Enter</b>
+		<div class="kc-mods" id="kc-mods"></div>
+	</div>
+	<div class="kc-grid" id="kc-grid"></div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Handler</span>
+			<button class="btn" id="kc-copy">Copy</button>
+		</div>
+		<pre class="out" id="kc-code"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">History</div>
+		<ul class="kc-history" id="kc-history"></ul>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Info = { key: string; code: string; keyCode: number; which: number; location: number; ctrl: boolean; shift: boolean; alt: boolean; meta: boolean; repeat: boolean };
+	const LOCATIONS = ['Standard', 'Left', 'Right', 'Numpad'];
+
+	onPage('kc-tool', () => {
+		const stage = byId('kc-tool');
+		const history: Info[] = [];
+
+		const show = (e: Info) => {
+			byId('kc-hint').textContent = 'Last key';
+			byId('kc-key').textContent = e.key === ' ' ? 'Space' : e.key;
+			byId('kc-mods').replaceChildren(
+				...(['ctrl', 'shift', 'alt', 'meta'] as const).map((m) => {
+					const s = document.createElement('span');
+					s.textContent = { ctrl: 'Ctrl', shift: 'Shift', alt: 'Alt / Option', meta: 'Meta / ⌘' }[m];
+					s.dataset.on = String(e[m]);
+					return s;
+				})
+			);
+			const cells: [string, string][] = [
+				['event.key', JSON.stringify(e.key)],
+				['event.code', JSON.stringify(e.code)],
+				['event.keyCode', `${e.keyCode} (deprecated)`],
+				['event.which', `${e.which} (deprecated)`],
+				['event.location', `${e.location} · ${LOCATIONS[e.location] ?? ''}`],
+				['event.repeat', String(e.repeat)],
+			];
+			byId('kc-grid').replaceChildren(
+				...cells.map(([k, v]) => {
+					const d = document.createElement('button');
+					d.className = 'kc-cell';
+					d.innerHTML = '<span></span><code></code>';
+					d.querySelector('span')!.textContent = k;
+					d.querySelector('code')!.textContent = v;
+					d.addEventListener('click', () => navigator.clipboard.writeText(v.split(' ')[0]));
+					return d;
+				})
+			);
+			const mods = [e.ctrl && 'e.ctrlKey', e.shift && 'e.shiftKey', e.alt && 'e.altKey', e.meta && 'e.metaKey'].filter(Boolean);
+			const cond = [`e.key === ${JSON.stringify(e.key)}`, ...mods].join(' && ');
+			byId('kc-code').textContent = `document.addEventListener('keydown', (e) => {\n  if (${cond}) {\n    e.preventDefault();\n  }\n});`;
+			history.unshift(e);
+			history.length = Math.min(history.length, 12);
+			byId('kc-history').replaceChildren(
+				...history.map((h) => {
+					const li = document.createElement('li');
+					li.textContent = `${[h.ctrl && 'Ctrl', h.shift && 'Shift', h.alt && 'Alt', h.meta && 'Meta'].filter(Boolean).concat(h.key === ' ' ? 'Space' : h.key).join(' + ')}  ·  ${h.code}  ·  ${h.keyCode}`;
+					return li;
+				})
+			);
+		};
+
+		const onKey = (e: KeyboardEvent) => {
+			if (!document.getElementById('kc-tool')) return document.removeEventListener('keydown', onKey);
+			if (e.target instanceof Element && e.target.closest('input, textarea, dialog')) return;
+			if (!['Tab', 'F5', 'F12'].includes(e.key) && !(e.metaKey && e.key.toLowerCase() === 'k') && !(e.ctrlKey && e.key.toLowerCase() === 'k')) e.preventDefault();
+			show({ key: e.key, code: e.code, keyCode: e.keyCode, which: e.which, location: e.location, ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, meta: e.metaKey, repeat: e.repeat });
+		};
+		document.addEventListener('keydown', onKey);
+		copyButton(byId('kc-copy'), () => byId('kc-code').textContent ?? '');
+		stage.focus();
+		show({ key: 'Enter', code: 'Enter', keyCode: 13, which: 13, location: 0, ctrl: false, shift: false, alt: false, meta: false, repeat: false });
+		history.length = 0;
+		byId('kc-history').textContent = '';
+		byId('kc-hint').textContent = 'Press any key (example shown)';
+	});
+</script>
+
+<style>
+	.kc-stage {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 10px;
+		padding: 28px 16px;
+		border: 2px dashed var(--border);
+		border-radius: 18px;
+		background: var(--surface);
+		outline: none;
+	}
+	.kc-stage:focus-visible {
+		border-color: var(--accent-strong);
+	}
+	.kc-hint {
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.kc-key {
+		font-size: 56px;
+		font-weight: 800;
+		font-family: var(--mono);
+		overflow-wrap: anywhere;
+		text-align: center;
+	}
+	.kc-mods {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		justify-content: center;
+	}
+	.kc-mods :global(span) {
+		font-size: 12px;
+		padding: 3px 10px;
+		border-radius: 999px;
+		border: 1px solid var(--border);
+		color: var(--ink-soft);
+	}
+	.kc-mods :global(span[data-on='true']) {
+		background: var(--accent-strong);
+		border-color: var(--accent-strong);
+		color: #fff;
+	}
+	.kc-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+		gap: 8px;
+	}
+	.kc-grid :global(.kc-cell) {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 4px;
+		padding: 10px 14px;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font: inherit;
+		cursor: pointer;
+		text-align: left;
+	}
+	.kc-grid :global(span) {
+		font-size: 12px;
+		color: var(--ink-soft);
+		font-family: var(--mono);
+	}
+	.kc-grid :global(code) {
+		font-family: var(--mono);
+		font-size: 17px;
+	}
+	.kc-history {
+		list-style: none;
+		margin: 0;
+		padding: 8px 14px 12px;
+		font-family: var(--mono);
+		font-size: 13px;
+		color: var(--ink-soft);
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+</style>

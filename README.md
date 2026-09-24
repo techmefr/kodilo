@@ -137,6 +137,12 @@ Live at **https://techmefr.github.io/kodilo/**
 - **TOTP / 2FA Generator** (`/tools/totp-generator/`) — live codes, check a code, otpauth URI and QR
 - **JWT Generator** (`/tools/jwt-generator/`) — HS256/HS512/RS256/ES256, expiry, key pairs, verify
 - **CSP Generator** (`/tools/csp-generator/`) — presets, per-directive fields, warnings, header/meta/Nginx/Apache
+- **robots.txt Generator** (`/tools/robots-txt-generator/`) — rules per crawler, AI bot blocking, path tester
+- **Sitemap Generator** (`/tools/sitemap-generator/`) — paths or URLs, lastmod, changefreq, priority by depth
+- **Redirect Generator** (`/tools/redirect-generator/`) — Nginx, .htaccess, Netlify, Vercel and Caddy with wildcards
+- **Unicode Inspector** (`/tools/unicode-inspector/`) — code points, UTF-8 bytes, escapes, invisible characters
+- **Keyboard Event Info** (`/tools/keycode-info/`) — key, code, keyCode, modifiers and a handler snippet
+- **Aspect Ratio Calculator** (`/tools/aspect-ratio-calculator/`) — ratio, resize, common formats and CSS
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.

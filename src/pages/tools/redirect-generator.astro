@@ -1,0 +1,130 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const rules = `/old-page /new-page
+/blog/2019/* /archive/2019/:splat
+/docs /docs/getting-started 302
+/pricing.html https://shop.example.com/pricing`;
+---
+
+<ToolShell slug="redirect-generator" title="Redirect Generator" description="Write redirects once as old and new paths, and get the rules for Nginx, Apache .htaccess, Netlify, Vercel and Caddy. Wildcards with * are supported.">
+	<div class="toolbar" id="rd-tool">
+		<div class="seg" id="rd-target" aria-label="Server">
+			<button data-value="nginx" aria-pressed="true">Nginx</button>
+			<button data-value="apache" aria-pressed="false">Apache .htaccess</button>
+			<button data-value="netlify" aria-pressed="false">Netlify</button>
+			<button data-value="vercel" aria-pressed="false">Vercel</button>
+			<button data-value="caddy" aria-pressed="false">Caddy</button>
+		</div>
+		<label class="check"><input type="checkbox" id="rd-www" /> Force https and no www</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Rules: old new [301|302|307|308]</div>
+			<textarea id="rd-in" spellcheck="false" aria-label="Redirect rules">{rules}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="rd-file">nginx.conf</span>
+				<button class="btn" id="rd-copy">Copy</button>
+			</div>
+			<pre class="out" id="rd-out"></pre>
+		</section>
+	</div>
+	<p class="field-note">A trailing * matches the rest of the path; :splat in the target reuses it. 301 is the default: permanent, cached by browsers.</p>
+	<p class="error" id="rd-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Rule = { from: string; to: string; code: number; wild: boolean };
+	const FILES: Record<string, string> = { nginx: 'nginx.conf (inside server {})', apache: '.htaccess', netlify: '_redirects', vercel: 'vercel.json', caddy: 'Caddyfile' };
+	const reEsc = (s: string) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+
+	function parse(src: string) {
+		const rules: Rule[] = [];
+		const bad: number[] = [];
+		src.split('\n').forEach((line, i) => {
+			const t = line.trim();
+			if (!t || t.startsWith('#')) return;
+			const [from, to, c] = t.split(/\s+/);
+			const code = c ? Number(c) : 301;
+			if (!from?.startsWith('/') || !to || ![301, 302, 307, 308].includes(code)) return bad.push(i + 1);
+			rules.push({ from: from.replace(/\*$/, ''), to, code, wild: from.endsWith('*') });
+		});
+		return { rules, bad };
+	}
+
+	const OUT: Record<string, (r: Rule[], www: boolean) => string> = {
+		nginx: (r, www) =>
+			[
+				www ? 'if ($host ~* ^www\\.(.+)$) {\n    return 301 https://$1$request_uri;\n}' : '',
+				...r.map((x) =>
+					x.wild
+						? `location ~ ^${reEsc(x.from)}(.*)$ {\n    return ${x.code} ${x.to.replace(':splat', '$1')};\n}`
+						: `location = ${x.from} {\n    return ${x.code} ${x.to};\n}`
+				),
+			]
+				.filter(Boolean)
+				.join('\n\n'),
+		apache: (r, www) =>
+			[
+				'RewriteEngine On',
+				www ? 'RewriteCond %{HTTPS} off [OR]\nRewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]\nRewriteCond %{HTTP_HOST} ^(?:www\\.)?(.+)$ [NC]\nRewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]' : '',
+				...r.map((x) => `RewriteRule ^${reEsc(x.from.slice(1))}${x.wild ? '(.*)' : ''}$ ${x.to.replace(':splat', '$1')} [L,R=${x.code}]`),
+			]
+				.filter(Boolean)
+				.join('\n'),
+		netlify: (r, www) =>
+			[www ? 'http://www.example.com/* https://example.com/:splat 301!\nhttps://www.example.com/* https://example.com/:splat 301!' : '', ...r.map((x) => `${x.from}${x.wild ? '*' : ''}  ${x.to}  ${x.code}`)].filter(Boolean).join('\n'),
+		vercel: (r) =>
+			JSON.stringify(
+				{
+					redirects: r.map((x) => ({
+						source: x.wild ? `${x.from.replace(/\/$/, '')}/:path*` : x.from,
+						destination: x.to.replace(':splat', ':path*'),
+						...(x.code === 301 || x.code === 308 ? { permanent: true } : x.code === 302 || x.code === 307 ? { permanent: false } : {}),
+					})),
+				},
+				null,
+				2
+			),
+		caddy: (r, www) =>
+			[
+				www ? 'www.example.com {\n    redir https://example.com{uri} permanent\n}\n' : '',
+				'example.com {',
+				...r.map((x) => (x.wild ? `    redir ${x.from}* ${x.to.replace(':splat', '{http.request.uri.path.0}')} ${x.code}` : `    redir ${x.from} ${x.to} ${x.code}`)),
+				'}',
+			]
+				.filter(Boolean)
+				.join('\n'),
+	};
+
+	onPage('rd-tool', () => {
+		const input = byId<HTMLTextAreaElement>('rd-in');
+		const www = byId<HTMLInputElement>('rd-www');
+		const error = byId('rd-error');
+		let target = 'nginx';
+
+		const render = () => {
+			const { rules, bad } = parse(input.value);
+			byId('rd-out').textContent = OUT[target](rules, www.checked);
+			byId('rd-file').textContent = FILES[target];
+			error.hidden = !bad.length;
+			error.textContent = bad.length ? `Line ${bad.join(', ')}: use "/old /new" with an optional 301, 302, 307 or 308.` : '';
+		};
+
+		segmented(byId('rd-target'), (v) => ((target = v), render()));
+		input.addEventListener('input', render);
+		www.addEventListener('change', render);
+		copyButton(byId('rd-copy'), () => byId('rd-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#rd-in {
+		min-height: 260px;
+	}
+</style>
