@@ -2,15 +2,12 @@ export interface Tool {
 	slug: string;
 	name: string;
 	description: string;
-	/** Whether the tool has an actual page built for it yet. */
 	built?: boolean;
 }
 
 export interface Category {
 	name: string;
-	/** lucide-static icon filename, without the .svg extension. */
 	icon: string;
-	/** Short blurb shown in the collapsed accordion header, distinct from the tool names. */
 	blurb: string;
 	tools: Tool[];
 }
@@ -576,7 +573,6 @@ export const categories: Category[] = [
 
 export const allTools: Tool[] = categories.flatMap((c) => c.tools);
 
-/** Categories filtered down to tools that actually have a page built. */
 export const builtCategories: Category[] = categories
 	.map((c) => ({ ...c, tools: c.tools.filter((t) => t.built) }))
 	.filter((c) => c.tools.length > 0);
