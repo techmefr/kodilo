@@ -23,12 +23,13 @@ b827.eb12.3456
 <script>
 	import { byId, onPage } from '../../scripts/ui';
 
-	let registry: Promise<Record<string, string>> | null = null;
-	const load = () => (registry ??= import('oui-data').then((m) => m.default as Record<string, string>));
+	type Registry = { vendors: string[]; prefixes: Record<string, number> };
+	let registry: Promise<Registry> | null = null;
+	const load = () => (registry ??= import('../../data/oui.json').then((m) => m.default as Registry));
 
 	onPage('ml-tool', () => {
 		const input = byId<HTMLTextAreaElement>('ml-in');
-		let db: Record<string, string> = {};
+		let db: Registry = { vendors: [], prefixes: {} };
 
 		const render = () => {
 			const lines = input.value
@@ -50,11 +51,11 @@ b827.eb12.3456
 					}
 					const first = parseInt(hex.slice(0, 2), 16);
 					const flags = [first & 1 ? 'Multicast' : 'Unicast', first & 2 ? 'Locally administered' : 'Globally unique'];
-					const entry = db[hex.slice(0, 6)];
+					const entry = db.vendors[db.prefixes[hex.slice(0, 6)]];
 					if (entry) {
-						const [name, ...rest] = entry.split('\n');
+						const [name, country] = entry.split('\t');
 						b.textContent = name;
-						s.textContent = `${rest.at(-1) ?? ''} · ${flags.join(' · ')}`;
+						s.textContent = [country, ...flags].filter(Boolean).join(' · ');
 					} else {
 						b.textContent = first & 2 ? 'Random or virtual address' : 'Unknown vendor';
 						s.textContent = first & 2 ? `${flags.join(' · ')}. Phones, VMs and containers make these up, so there is no vendor.` : flags.join(' · ');
@@ -69,7 +70,7 @@ b827.eb12.3456
 		load()
 			.then((d) => {
 				db = d;
-				byId('ml-note').textContent = `${Object.keys(d).length.toLocaleString('en-US')} vendor prefixes from the IEEE registry.`;
+				byId('ml-note').textContent = `${Object.keys(d.prefixes).length.toLocaleString('en-US')} vendor prefixes from the IEEE registry.`;
 				render();
 			})
 			.catch(() => (byId('ml-note').textContent = 'The vendor registry could not be loaded. Reload the page.'));

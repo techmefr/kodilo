@@ -72,3 +72,19 @@ test('search palette opens a tool', async ({ page }) => {
 	await page.keyboard.press('Enter');
 	await expect(page.locator('main h1')).toHaveText('JWT Decoder');
 });
+
+test('mac lookup finds the vendor and country', async ({ page }) => {
+	await page.goto('tools/mac-address-lookup/');
+	await page.locator('#ml-in').fill('3C:22:FB:12:34:56');
+	await expect(page.locator('#ml-list li b').first()).toHaveText('Apple, Inc.');
+	await expect(page.locator('#ml-list li span').first()).toContainText('United States');
+});
+
+test('avif option only shows when the browser can encode it', async ({ page }) => {
+	await page.goto('tools/webp-avif-converter/');
+	const canEncode = await page.evaluate(() => {
+		const c = document.createElement('canvas');
+		return c.toDataURL('image/avif').startsWith('data:image/avif');
+	});
+	await expect(page.locator('#wa-format [data-value="image/avif"]')).toBeVisible({ visible: canEncode });
+});
