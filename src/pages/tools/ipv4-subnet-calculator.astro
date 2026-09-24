@@ -1,0 +1,138 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="ipv4-subnet-calculator"
+	title="IPv4 Subnet Calculator"
+	description="Enter an address with a CIDR prefix. Network, broadcast, host range, masks and more."
+>
+	<div class="fields" id="sub-tool">
+		<div class="field wide" id="sub-field">
+			<label for="sub-in">Address / prefix</label>
+			<input id="sub-in" spellcheck="false" value="192.168.1.42/24" />
+			<span class="field-note" id="sub-note"></span>
+		</div>
+	</div>
+	<div class="toolbar">
+		<label class="check sub-prefix"
+			>Prefix <input type="range" id="sub-range" min="0" max="32" value="24" /> <b id="sub-range-value">/24</b></label
+		>
+	</div>
+	<ul class="sub-list" id="sub-list"></ul>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const toIp = (n: number) => [24, 16, 8, 0].map((s) => (n >>> s) & 255).join('.');
+	const toBin = (n: number) => (n >>> 0).toString(2).padStart(32, '0').replace(/(.{8})(?!$)/g, '$1.');
+
+	function parseIp(text: string): number | null {
+		const parts = text.split('.');
+		if (parts.length !== 4 || parts.some((p) => !/^\d{1,3}$/.test(p) || Number(p) > 255)) return null;
+		return parts.reduce((acc, p) => ((acc << 8) | Number(p)) >>> 0, 0);
+	}
+
+	function kind(ip: number): string {
+		const [a, b] = [ip >>> 24, (ip >>> 16) & 255];
+		if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return 'Private (RFC 1918)';
+		if (a === 127) return 'Loopback';
+		if (a === 169 && b === 254) return 'Link-local';
+		if (a === 100 && b >= 64 && b <= 127) return 'Carrier-grade NAT';
+		if (a >= 224 && a <= 239) return 'Multicast';
+		if (a >= 240) return 'Reserved';
+		return 'Public';
+	}
+
+	onPage('sub-tool', () => {
+		const input = byId<HTMLInputElement>('sub-in');
+		const range = byId<HTMLInputElement>('sub-range');
+
+		const render = () => {
+			const [ipText, prefixText = '32'] = input.value.trim().split('/');
+			const ip = parseIp(ipText);
+			const prefix = Number(prefixText);
+			const invalid = ip === null || !/^\d{1,2}$/.test(prefixText) || prefix > 32;
+			byId('sub-field').classList.toggle('invalid', invalid);
+			byId('sub-note').textContent = invalid ? 'Use the form 10.0.0.1/16 (prefix 0 to 32).' : '';
+			if (invalid) return;
+			range.value = String(prefix);
+			byId('sub-range-value').textContent = `/${prefix}`;
+			const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+			const network = (ip! & mask) >>> 0;
+			const broadcast = (network | ~mask) >>> 0;
+			const total = 2 ** (32 - prefix);
+			const usable = prefix >= 31 ? total : total - 2;
+			const first = prefix >= 31 ? network : network + 1;
+			const last = prefix >= 31 ? broadcast : broadcast - 1;
+			const rows: [string, string][] = [
+				['Network', `${toIp(network)}/${prefix}`],
+				['Broadcast', prefix >= 31 ? '— (point-to-point)' : toIp(broadcast)],
+				['Usable hosts', `${toIp(first)} – ${toIp(last)}`],
+				['Host count', `${usable.toLocaleString('en')} usable · ${total.toLocaleString('en')} total`],
+				['Netmask', toIp(mask)],
+				['Wildcard', toIp(~mask >>> 0)],
+				['Type', kind(ip!)],
+				['Address in binary', toBin(ip!)],
+				['Mask in binary', toBin(mask)],
+			];
+			byId('sub-list').replaceChildren(
+				...rows.map(([label, value]) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<span></span><code></code>';
+					li.querySelector('span')!.textContent = label;
+					li.querySelector('code')!.textContent = value;
+					return li;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		range.addEventListener('input', () => {
+			input.value = `${input.value.split('/')[0]}/${range.value}`;
+			render();
+		});
+		render();
+	});
+</script>
+
+<style>
+	.sub-prefix input {
+		width: 260px;
+		accent-color: var(--accent-strong);
+	}
+	.sub-prefix b {
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+	}
+	.sub-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		overflow: hidden;
+	}
+	.sub-list :global(li) {
+		display: grid;
+		grid-template-columns: 170px 1fr;
+		gap: 12px;
+		padding: 11px 14px;
+		border-bottom: 1px solid var(--border);
+		font-size: 14px;
+	}
+	.sub-list :global(li:last-child) {
+		border-bottom: 0;
+	}
+	.sub-list :global(span) {
+		color: var(--ink-soft);
+		font-weight: 600;
+		font-size: 13px;
+	}
+	.sub-list :global(code) {
+		font-family: var(--mono);
+		overflow-wrap: anywhere;
+	}
+</style>

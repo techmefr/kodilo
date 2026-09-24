@@ -1,0 +1,185 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="date-time-converter"
+	title="Date & Time Converter"
+	description="Paste a Unix timestamp (seconds or milliseconds), an ISO date or almost any date string. Every format appears, in any time zone."
+>
+	<div class="fields" id="dt-tool">
+		<div class="field wide" id="dt-field">
+			<label for="dt-in">Date or timestamp</label>
+			<input id="dt-in" spellcheck="false" />
+			<span class="field-note" id="dt-note"></span>
+		</div>
+	</div>
+	<div class="toolbar">
+		<button class="btn primary" id="dt-now">Now</button>
+		<label class="check"
+			>Time zone
+			<select class="num dt-zone" id="dt-zone" aria-label="Time zone"></select>
+		</label>
+	</div>
+	<ul class="dt-list" id="dt-list"></ul>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	function parse(raw: string): { date: Date; detected: string } | null {
+		const value = raw.trim();
+		if (!value) return null;
+		if (/^-?\d+(\.\d+)?$/.test(value)) {
+			const n = Number(value);
+			const digits = value.replace(/^-/, '').split('.')[0].length;
+			if (digits >= 16) return { date: new Date(n / 1000), detected: 'Unix timestamp in microseconds' };
+			if (digits >= 12) return { date: new Date(n), detected: 'Unix timestamp in milliseconds' };
+			return { date: new Date(n * 1000), detected: 'Unix timestamp in seconds' };
+		}
+		const date = new Date(value);
+		return Number.isNaN(date.getTime()) ? null : { date, detected: 'Date string' };
+	}
+
+	function isoWeek(date: Date): number {
+		const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+		d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+		const start = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+		return Math.ceil(((d.getTime() - start.getTime()) / 86400000 + 1) / 7);
+	}
+
+	function relative(date: Date): string {
+		const seconds = (date.getTime() - Date.now()) / 1000;
+		const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+		const units: [Intl.RelativeTimeFormatUnit, number][] = [
+			['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1],
+		];
+		const [unit, size] = units.find(([, s]) => Math.abs(seconds) >= s) ?? units[units.length - 1];
+		return rtf.format(Math.round(seconds / size), unit);
+	}
+
+	function inZone(date: Date, zone: string): string {
+		const parts = Object.fromEntries(
+			new Intl.DateTimeFormat('en-CA', {
+				timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZoneName: 'longOffset',
+			}).formatToParts(date).map((p) => [p.type, p.value])
+		);
+		const offset = parts.timeZoneName.replace('GMT', '') || '+00:00';
+		return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}${offset}`;
+	}
+
+	onPage('dt-tool', () => {
+		const input = byId<HTMLInputElement>('dt-in');
+		const zone = byId<HTMLSelectElement>('dt-zone');
+		const list = byId('dt-list');
+		const local = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		const zones = ['UTC', local, ...Intl.supportedValuesOf('timeZone').filter((z) => z !== local && z !== 'UTC')];
+		zone.replaceChildren(...zones.map((z) => new Option(z === local ? `${z} (yours)` : z, z)));
+		zone.value = local;
+
+		const render = () => {
+			const parsed = parse(input.value);
+			byId('dt-field').classList.toggle('invalid', !parsed && input.value.trim() !== '');
+			byId('dt-note').textContent = parsed ? `Read as: ${parsed.detected}` : input.value.trim() ? 'Could not read this date.' : '';
+			if (!parsed) {
+				list.replaceChildren();
+				return;
+			}
+			const { date } = parsed;
+			const start = Date.UTC(date.getUTCFullYear(), 0, 0);
+			const rows: [string, string][] = [
+				[`ISO 8601 · ${zone.value}`, inZone(date, zone.value)],
+				['ISO 8601 · UTC', date.toISOString()],
+				['Unix seconds', String(Math.floor(date.getTime() / 1000))],
+				['Unix milliseconds', String(date.getTime())],
+				['RFC 7231 (HTTP)', date.toUTCString()],
+				['Human', new Intl.DateTimeFormat('en-GB', { dateStyle: 'full', timeStyle: 'long', timeZone: zone.value }).format(date)],
+				['Relative', relative(date)],
+				['ISO week · day of year', `W${String(isoWeek(date)).padStart(2, '0')} · day ${Math.floor((date.getTime() - start) / 86400000)}`],
+			];
+			list.replaceChildren(
+				...rows.map(([label, value]) => {
+					const li = document.createElement('li');
+					const button = document.createElement('button');
+					button.innerHTML = '<span class="dt-label"></span><code></code><span class="dt-hint">Copy</span>';
+					button.querySelector('.dt-label')!.textContent = label;
+					button.querySelector('code')!.textContent = value;
+					button.addEventListener('click', async () => {
+						await navigator.clipboard.writeText(value);
+						button.querySelector('.dt-hint')!.textContent = 'Copied';
+						setTimeout(() => (button.querySelector('.dt-hint')!.textContent = 'Copy'), 1200);
+					});
+					li.append(button);
+					return li;
+				})
+			);
+		};
+
+		const now = () => {
+			input.value = String(Math.floor(Date.now() / 1000));
+			render();
+		};
+
+		input.addEventListener('input', render);
+		zone.addEventListener('change', render);
+		byId('dt-now').addEventListener('click', now);
+		now();
+	});
+</script>
+
+<style>
+	.dt-zone {
+		width: 240px;
+	}
+	.dt-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		overflow: hidden;
+	}
+	.dt-list :global(li + li) {
+		border-top: 1px solid var(--border);
+	}
+	.dt-list :global(button) {
+		display: grid;
+		grid-template-columns: 200px 1fr auto;
+		gap: 12px;
+		align-items: center;
+		width: 100%;
+		padding: 12px 14px;
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.dt-list :global(button:hover) {
+		background: var(--surface-2);
+	}
+	.dt-list :global(.dt-label) {
+		font-size: 12.5px;
+		font-weight: 600;
+		color: var(--ink-soft);
+	}
+	.dt-list :global(code) {
+		font-family: var(--mono);
+		font-size: 13.5px;
+		overflow-wrap: anywhere;
+	}
+	.dt-list :global(.dt-hint) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	@media (max-width: 600px) {
+		.dt-list :global(button) {
+			grid-template-columns: 1fr auto;
+		}
+		.dt-list :global(code) {
+			grid-column: 1;
+		}
+	}
+</style>

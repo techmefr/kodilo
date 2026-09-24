@@ -45,6 +45,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'json-to-csv',
+				built: true,
 				name: 'JSON to CSV',
 				description: 'Convert JSON arrays to CSV.',
 			},
@@ -77,11 +78,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'box-shadow-generator',
+				built: true,
 				name: 'Box Shadow Generator',
 				description: 'Generate CSS box-shadow values with a live preview.',
 			},
 			{
 				slug: 'gradient-generator',
+				built: true,
 				name: 'Gradient Generator',
 				description: 'Generate CSS gradients with a live preview.',
 			},
@@ -138,6 +141,7 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'regex-tester',
+				built: true,
 				name: 'Regex Tester',
 				description: 'Test regular expressions against sample text.',
 			},
@@ -327,11 +331,13 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'date-time-converter',
+				built: true,
 				name: 'Date/Time Converter',
 				description: 'Convert between timestamps, ISO dates and time zones.',
 			},
 			{
 				slug: 'color-converter',
+				built: true,
 				name: 'Color Converter',
 				description: 'Convert colors between HEX, RGB, HSL and more.',
 			},
@@ -362,6 +368,7 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'ipv4-subnet-calculator',
+				built: true,
 				name: 'IPv4 Subnet Calculator',
 				description: 'Calculate subnet ranges, masks and host counts.',
 			},
@@ -410,6 +417,7 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'email-validator',
+				built: true,
 				name: 'Email Validator',
 				description: 'Validate email address syntax.',
 			},
@@ -421,6 +429,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'iban-validator',
+				built: true,
 				name: 'IBAN Validator & Parser',
 				description: 'Validate an IBAN and break it down by country/bank/account.',
 			},
@@ -448,6 +457,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'image-to-base64',
+				built: true,
 				name: 'Image to Base64',
 				description: 'Convert an image to a Base64 data URI.',
 			},
@@ -540,6 +550,113 @@ export const categories: Category[] = [
 				slug: 'npm-cheatsheet',
 				name: 'NPM Cheatsheet',
 				description: 'Quick reference for common npm/pnpm/yarn commands.',
+			},
+		],
+	},
+	{
+		name: 'DevOps & Sysadmin',
+		icon: 'server',
+		blurb: 'Servers, containers, uptime, config',
+		tools: [
+			{
+				slug: 'uptime-sla-calculator',
+				name: 'Uptime / SLA Calculator',
+				description: 'Turn 99.9% into allowed downtime per day, month and year, and back.',
+			},
+			{
+				slug: 'byte-size-converter',
+				name: 'Byte Size Converter',
+				description: 'B, KB, KiB, MB, MiB, GB, GiB, TB, TiB: decimal and binary units side by side.',
+			},
+			{
+				slug: 'transfer-time-calculator',
+				name: 'Transfer Time Calculator',
+				description: 'How long a file takes to move over a given bandwidth, and the bandwidth a deadline needs.',
+			},
+			{
+				slug: 'kubernetes-resource-units',
+				name: 'Kubernetes Resource Units',
+				description: 'CPU millicores and memory quantities (Mi, Gi, M, G) converted and explained.',
+			},
+			{
+				slug: 'kubernetes-manifest-generator',
+				name: 'Kubernetes Manifest Generator',
+				description: 'Deployment, Service and Ingress YAML from a short form.',
+			},
+			{
+				slug: 'env-file-tool',
+				name: '.env Tool',
+				description: 'Validate, diff and convert .env files to JSON, docker -e flags or a Kubernetes Secret.',
+			},
+			{
+				slug: 'yaml-validator',
+				name: 'YAML Validator & Formatter',
+				description: 'Validate YAML with line-precise errors, format it, convert it to JSON.',
+			},
+			{
+				slug: 'nginx-config-generator',
+				name: 'Nginx Config Generator',
+				description: 'Reverse proxy, static site, SPA fallback, HTTPS redirect and gzip in a few clicks.',
+			},
+			{
+				slug: 'systemd-unit-generator',
+				name: 'systemd Unit Generator',
+				description: 'Service and timer units with restart policy, user, environment and hardening options.',
+			},
+			{
+				slug: 'ssh-config-generator',
+				name: 'SSH Config Generator',
+				description: 'Host blocks for ~/.ssh/config with jump hosts, identity files and port forwarding.',
+			},
+			{
+				slug: 'htpasswd-generator',
+				name: 'htpasswd Generator',
+				description: 'bcrypt or SHA entries for Nginx and Apache basic auth.',
+			},
+			{
+				slug: 'dns-record-builder',
+				name: 'DNS Record Builder',
+				description: 'SPF, DMARC, CAA and MX records built and explained, ready to paste.',
+			},
+			{
+				slug: 'security-headers-builder',
+				name: 'Security Headers Builder',
+				description: 'Content-Security-Policy, HSTS, Permissions-Policy and friends, for Nginx, Apache or a meta tag.',
+			},
+			{
+				slug: 'x509-certificate-decoder',
+				name: 'X.509 Certificate Decoder',
+				description: 'Paste a PEM certificate: subject, issuer, SANs, validity, fingerprints.',
+			},
+			{
+				slug: 'semver-calculator',
+				name: 'SemVer Calculator',
+				description: 'Compare versions and test ranges like ^1.2.0, ~2.3 or >=1 <2.',
+			},
+			{
+				slug: 'gitignore-generator',
+				name: '.gitignore Generator',
+				description: 'Combine templates for languages, frameworks, editors and operating systems.',
+			},
+			{
+				slug: 'json-log-viewer',
+				name: 'JSON Log Viewer',
+				description: 'Paste structured logs, filter by level and field, read them as a table.',
+			},
+			{
+				slug: 'curl-converter',
+				name: 'curl Converter',
+				description: 'Turn a curl command into fetch, axios, Python requests or HTTPie.',
+			},
+			{
+				slug: 'well-known-ports',
+				name: 'Well-Known Ports',
+				description: 'Searchable reference of common TCP and UDP ports and the services behind them.',
+			},
+			{
+				slug: 'linux-signals-exit-codes',
+				name: 'Linux Signals & Exit Codes',
+				description: 'What SIGTERM, SIGKILL or exit code 137 actually mean.',
 			},
 		],
 	},

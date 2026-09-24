@@ -1,0 +1,188 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="gradient-generator"
+	title="Gradient Generator"
+	description="Linear, radial or conic gradients with as many color stops as you like."
+>
+	<div class="gr-stage" id="gr-tool"></div>
+	<div class="toolbar">
+		<div class="seg" id="gr-type" aria-label="Type">
+			<button data-value="linear" aria-pressed="true">Linear</button>
+			<button data-value="radial" aria-pressed="false">Radial</button>
+			<button data-value="conic" aria-pressed="false">Conic</button>
+		</div>
+		<label class="check gr-angle" id="gr-angle-wrap"
+			>Angle <input type="range" id="gr-angle" min="0" max="360" value="135" /> <b id="gr-angle-value">135°</b></label
+		>
+		<label class="check"><input type="checkbox" id="gr-repeat" /> Repeating</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Color stops</span>
+			<button class="btn" id="gr-add">+ Stop</button>
+		</div>
+		<ul class="gr-stops" id="gr-stops"></ul>
+	</section>
+	<div class="chips" id="gr-presets">
+		<button data-stops="#bd93f9 0,#ff79c6 100">Dracula</button>
+		<button data-stops="#ff9a8b 0,#ff6a88 55,#ff99ac 100">Sunset</button>
+		<button data-stops="#0f2027 0,#203a43 50,#2c5364 100">Deep sea</button>
+		<button data-stops="#43e97b 0,#38f9d7 100">Mint</button>
+		<button data-stops="#fa709a 0,#fee140 100">Peach</button>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="gr-copy">Copy</button>
+		</div>
+		<pre class="out gr-css" id="gr-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Stop = { color: string; at: number };
+
+	onPage('gr-tool', () => {
+		let stops: Stop[] = [
+			{ color: '#bd93f9', at: 0 },
+			{ color: '#ff79c6', at: 100 },
+		];
+		let type = 'linear';
+		const angle = byId<HTMLInputElement>('gr-angle');
+		const repeat = byId<HTMLInputElement>('gr-repeat');
+
+		const value = () => {
+			const list = [...stops].sort((a, b) => a.at - b.at).map((s) => `${s.color} ${s.at}%`).join(', ');
+			const prefix = repeat.checked ? 'repeating-' : '';
+			if (type === 'linear') return `${prefix}linear-gradient(${angle.value}deg, ${list})`;
+			if (type === 'conic') return `${prefix}conic-gradient(from ${angle.value}deg, ${list})`;
+			return `${prefix}radial-gradient(circle, ${list})`;
+		};
+
+		const paint = () => {
+			byId('gr-angle-value').textContent = `${angle.value}°`;
+			byId('gr-angle-wrap').hidden = type === 'radial';
+			const css = value();
+			byId('gr-tool').style.background = css;
+			byId('gr-css').textContent = `background: ${css};`;
+		};
+
+		const renderStops = () => {
+			byId('gr-stops').replaceChildren(
+				...stops.map((stop, i) => {
+					const li = document.createElement('li');
+					const color = document.createElement('input');
+					color.type = 'color';
+					color.value = stop.color;
+					color.setAttribute('aria-label', `Stop ${i + 1} color`);
+					color.addEventListener('input', () => {
+						stop.color = color.value;
+						paint();
+					});
+					const at = document.createElement('input');
+					at.type = 'range';
+					at.min = '0';
+					at.max = '100';
+					at.value = String(stop.at);
+					at.setAttribute('aria-label', `Stop ${i + 1} position`);
+					const label = document.createElement('b');
+					label.textContent = `${stop.at}%`;
+					at.addEventListener('input', () => {
+						stop.at = Number(at.value);
+						label.textContent = `${stop.at}%`;
+						paint();
+					});
+					const remove = document.createElement('button');
+					remove.className = 'btn';
+					remove.textContent = 'Remove';
+					remove.disabled = stops.length <= 2;
+					remove.addEventListener('click', () => {
+						stops.splice(i, 1);
+						renderStops();
+					});
+					li.append(color, at, label, remove);
+					return li;
+				})
+			);
+			paint();
+		};
+
+		segmented(byId('gr-type'), (v) => {
+			type = v;
+			paint();
+		});
+		angle.addEventListener('input', paint);
+		repeat.addEventListener('change', paint);
+		byId('gr-add').addEventListener('click', () => {
+			stops.push({ color: '#8be9fd', at: 50 });
+			renderStops();
+		});
+		document.querySelectorAll<HTMLButtonElement>('#gr-presets button').forEach((button) =>
+			button.addEventListener('click', () => {
+				stops = button.dataset.stops!.split(',').map((s) => {
+					const [color, at] = s.split(' ');
+					return { color, at: Number(at) };
+				});
+				renderStops();
+			})
+		);
+		copyButton(byId('gr-copy'), () => byId('gr-css').textContent ?? '');
+		renderStops();
+	});
+</script>
+
+<style>
+	.gr-stage {
+		min-height: 240px;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+	}
+	.gr-angle input {
+		width: 200px;
+		accent-color: var(--accent-strong);
+	}
+	.gr-angle b {
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+		min-width: 4ch;
+	}
+	.gr-stops {
+		list-style: none;
+		margin: 0;
+		padding: 6px 14px;
+	}
+	.gr-stops :global(li) {
+		display: grid;
+		grid-template-columns: 48px 1fr 48px auto;
+		gap: 12px;
+		align-items: center;
+		padding: 6px 0;
+	}
+	.gr-stops :global(input[type='color']) {
+		width: 44px;
+		height: 30px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: transparent;
+	}
+	.gr-stops :global(input[type='range']) {
+		accent-color: var(--accent-strong);
+	}
+	.gr-stops :global(b) {
+		font-size: 13px;
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+	.gr-stops :global(.btn:disabled) {
+		opacity: 0.4;
+		cursor: default;
+	}
+	.gr-css {
+		min-height: auto !important;
+	}
+</style>

@@ -1,0 +1,252 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="color-converter"
+	title="Color Converter"
+	description="Type any CSS color — hex, rgb, hsl, oklch or a name. Get every format and its contrast on white and black."
+>
+	<div class="color-top" id="color-tool">
+		<label class="swatch" id="color-swatch">
+			<input type="color" id="color-picker" aria-label="Pick a color" />
+		</label>
+		<div class="fields color-input">
+			<div class="field wide" id="color-field">
+				<label for="color-in">Color</label>
+				<input id="color-in" spellcheck="false" value="#bd93f9" />
+				<span class="field-note" id="color-note"></span>
+			</div>
+		</div>
+	</div>
+	<ul class="color-list" id="color-list"></ul>
+	<div class="contrast" id="color-contrast"></div>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	type RGB = { r: number; g: number; b: number; a: number };
+
+	function readColor(value: string): RGB | null {
+		if (!value.trim() || !CSS.supports('color', value)) return null;
+		const canvas = document.createElement('canvas');
+		canvas.width = canvas.height = 1;
+		const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+		ctx.clearRect(0, 0, 1, 1);
+		ctx.fillStyle = value;
+		ctx.fillRect(0, 0, 1, 1);
+		const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+		return { r, g, b, a: Math.round((a / 255) * 100) / 100 };
+	}
+
+	const round = (n: number, d = 0) => Math.round(n * 10 ** d) / 10 ** d;
+	const hex = (n: number) => n.toString(16).padStart(2, '0');
+
+	function toHsl({ r, g, b }: RGB) {
+		const [rn, gn, bn] = [r, g, b].map((v) => v / 255);
+		const max = Math.max(rn, gn, bn);
+		const min = Math.min(rn, gn, bn);
+		const l = (max + min) / 2;
+		const d = max - min;
+		let h = 0;
+		if (d) {
+			if (max === rn) h = ((gn - bn) / d) % 6;
+			else if (max === gn) h = (bn - rn) / d + 2;
+			else h = (rn - gn) / d + 4;
+		}
+		const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+		return { h: round((h * 60 + 360) % 360), s: round(s * 100), l: round(l * 100), max, min };
+	}
+
+	function toOklch({ r, g, b }: RGB) {
+		const lin = (v: number) => {
+			const c = v / 255;
+			return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+		};
+		const [lr, lg, lb] = [lin(r), lin(g), lin(b)];
+		const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+		const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+		const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+		const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
+		const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+		const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+		const C = Math.sqrt(A * A + B * B);
+		const H = C < 0.0001 ? 0 : (Math.atan2(B, A) * 180) / Math.PI;
+		return { L: round(L * 100, 1), C: round(C, 3), H: round((H + 360) % 360, 1) };
+	}
+
+	function luminance({ r, g, b }: RGB) {
+		const [lr, lg, lb] = [r, g, b].map((v) => {
+			const c = v / 255;
+			return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+		});
+		return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+	}
+
+	onPage('color-tool', () => {
+		const input = byId<HTMLInputElement>('color-in');
+		const picker = byId<HTMLInputElement>('color-picker');
+
+		const render = () => {
+			const c = readColor(input.value);
+			byId('color-field').classList.toggle('invalid', !c && input.value.trim() !== '');
+			byId('color-note').textContent = c ? '' : input.value.trim() ? 'Not a CSS color.' : '';
+			if (!c) return;
+			const alpha = c.a < 1;
+			const hsl = toHsl(c);
+			const ok = toOklch(c);
+			const hwbW = round(hsl.min * 100);
+			const hwbB = round((1 - hsl.max) * 100);
+			const k = 1 - hsl.max;
+			const cmyk = k === 1 ? [0, 0, 0, 100] : [c.r, c.g, c.b].map((v) => round(((1 - v / 255 - k) / (1 - k)) * 100)).concat(round(k * 100));
+			const a = alpha ? ` / ${c.a}` : '';
+			const rows: [string, string][] = [
+				['HEX', `#${hex(c.r)}${hex(c.g)}${hex(c.b)}${alpha ? hex(Math.round(c.a * 255)) : ''}`],
+				['RGB', `rgb(${c.r} ${c.g} ${c.b}${a})`],
+				['HSL', `hsl(${hsl.h} ${hsl.s}% ${hsl.l}%${a})`],
+				['HWB', `hwb(${hsl.h} ${hwbW}% ${hwbB}%${a})`],
+				['OKLCH', `oklch(${ok.L}% ${ok.C} ${ok.H}${a})`],
+				['CMYK', `cmyk(${cmyk.map((v) => `${v}%`).join(' ')})`],
+			];
+			const solid = `#${hex(c.r)}${hex(c.g)}${hex(c.b)}`;
+			byId('color-swatch').style.background = input.value;
+			picker.value = solid;
+			byId('color-list').replaceChildren(
+				...rows.map(([label, value]) => {
+					const li = document.createElement('li');
+					const button = document.createElement('button');
+					button.innerHTML = '<span class="cl-label"></span><code></code><span class="cl-hint">Copy</span>';
+					button.querySelector('.cl-label')!.textContent = label;
+					button.querySelector('code')!.textContent = value;
+					button.addEventListener('click', async () => {
+						await navigator.clipboard.writeText(value);
+						button.querySelector('.cl-hint')!.textContent = 'Copied';
+						setTimeout(() => (button.querySelector('.cl-hint')!.textContent = 'Copy'), 1200);
+					});
+					li.append(button);
+					return li;
+				})
+			);
+			const lum = luminance(c);
+			byId('color-contrast').replaceChildren(
+				...[
+					['#ffffff', 'on white', 1],
+					['#000000', 'on black', 0],
+				].map(([bg, label, bgLum]) => {
+					const ratio = round((Math.max(lum, bgLum as number) + 0.05) / (Math.min(lum, bgLum as number) + 0.05), 2);
+					const card = document.createElement('div');
+					card.className = 'contrast-card';
+					card.style.background = bg as string;
+					card.style.color = solid;
+					card.innerHTML = '<b>Aa</b><span class="ratio"></span><span class="badges"></span>';
+					card.querySelector('.ratio')!.textContent = `${ratio}:1 ${label}`;
+					card.querySelector('.badges')!.textContent = [
+						ratio >= 4.5 ? 'AA ✓' : 'AA ✕',
+						ratio >= 7 ? 'AAA ✓' : 'AAA ✕',
+						ratio >= 3 ? 'Large ✓' : 'Large ✕',
+					].join('  ');
+					return card;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		picker.addEventListener('input', () => {
+			input.value = picker.value;
+			render();
+		});
+		render();
+	});
+</script>
+
+<style>
+	.color-top {
+		display: flex;
+		gap: 14px;
+		align-items: stretch;
+	}
+	.swatch {
+		position: relative;
+		flex: 0 0 96px;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+		cursor: pointer;
+		background-image: conic-gradient(#ccc 25%, #fff 0 50%, #ccc 0 75%, #fff 0);
+	}
+	.swatch input {
+		position: absolute;
+		inset: 0;
+		opacity: 0;
+		cursor: pointer;
+	}
+	.color-input {
+		flex: 1;
+	}
+	.color-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		overflow: hidden;
+	}
+	.color-list :global(li + li) {
+		border-top: 1px solid var(--border);
+	}
+	.color-list :global(button) {
+		display: grid;
+		grid-template-columns: 70px 1fr auto;
+		gap: 12px;
+		align-items: center;
+		width: 100%;
+		padding: 12px 14px;
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.color-list :global(button:hover) {
+		background: var(--surface-2);
+	}
+	.color-list :global(.cl-label) {
+		font-size: 12.5px;
+		font-weight: 700;
+		color: var(--ink-soft);
+	}
+	.color-list :global(code) {
+		font-family: var(--mono);
+		font-size: 13.5px;
+		overflow-wrap: anywhere;
+	}
+	.color-list :global(.cl-hint) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.contrast {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 12px;
+	}
+	.contrast :global(.contrast-card) {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 16px;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+	}
+	.contrast :global(.contrast-card b) {
+		font-size: 30px;
+		font-weight: 800;
+	}
+	.contrast :global(.ratio),
+	.contrast :global(.badges) {
+		font-size: 13px;
+		font-weight: 600;
+		font-family: var(--mono);
+	}
+</style>

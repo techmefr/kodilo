@@ -1,0 +1,174 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="image-to-base64"
+	title="Image to Base64"
+	description="Drop, pick or paste an image. Get a data URI, raw Base64, CSS, HTML or Markdown snippet."
+>
+	<label class="drop" id="img-tool">
+		<input type="file" id="img-file" accept="image/*" />
+		<span id="img-drop-label">Drop an image here, click to choose, or paste with ⌘V / Ctrl+V</span>
+	</label>
+	<div class="img-result" id="img-result" hidden>
+		<div class="img-preview"><img id="img-preview" alt="Selected image preview" /></div>
+		<div class="stats" id="img-stats"></div>
+	</div>
+	<div class="toolbar" id="img-formats-bar" hidden>
+		<div class="seg" id="img-format" aria-label="Output">
+			<button data-value="uri" aria-pressed="true">Data URI</button>
+			<button data-value="raw" aria-pressed="false">Base64</button>
+			<button data-value="css" aria-pressed="false">CSS</button>
+			<button data-value="html" aria-pressed="false">HTML</button>
+			<button data-value="md" aria-pressed="false">Markdown</button>
+		</div>
+	</div>
+	<section class="panel" id="img-out-panel" hidden>
+		<div class="panel-head">
+			<span id="img-size-note">Output</span>
+			<button class="btn" id="img-copy">Copy</button>
+		</div>
+		<pre class="out img-out" id="img-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	let pasteHandler: ((e: ClipboardEvent) => void) | null = null;
+	document.addEventListener('paste', (e) => {
+		if (document.getElementById('img-tool')) pasteHandler?.(e);
+	});
+
+	const bytes = (n: number) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(2)} MB`);
+
+	onPage('img-tool', () => {
+		const file = byId<HTMLInputElement>('img-file');
+		const preview = byId<HTMLImageElement>('img-preview');
+		let uri = '';
+		let name = 'image';
+		let format = 'uri';
+
+		const show = () => {
+			const raw = uri.slice(uri.indexOf(',') + 1);
+			const outputs: Record<string, string> = {
+				uri,
+				raw,
+				css: `background-image: url("${uri}");`,
+				html: `<img src="${uri}" alt="${name}" />`,
+				md: `![${name}](${uri})`,
+			};
+			byId('img-out').textContent = outputs[format];
+			byId('img-size-note').textContent = `${bytes(outputs[format].length)} of text`;
+		};
+
+		const load = (blob: File) => {
+			if (!blob.type.startsWith('image/')) {
+				byId('img-drop-label').textContent = `${blob.name} is not an image. Try a PNG, JPG, SVG, GIF or WebP.`;
+				return;
+			}
+			name = blob.name.replace(/\.[^.]+$/, '') || 'image';
+			const reader = new FileReader();
+			reader.onload = () => {
+				uri = String(reader.result);
+				preview.src = uri;
+				preview.onload = () => {
+					const stats: [string, string][] = [
+						['Type', blob.type],
+						['File size', bytes(blob.size)],
+						['Dimensions', `${preview.naturalWidth} × ${preview.naturalHeight}`],
+						['Base64 overhead', `+${Math.round((uri.length / blob.size - 1) * 100)}%`],
+					];
+					byId('img-stats').replaceChildren(
+						...stats.map(([label, value]) => {
+							const el = document.createElement('div');
+							el.className = 'stat';
+							el.innerHTML = '<b></b><span></span>';
+							el.querySelector('b')!.textContent = value;
+							el.querySelector('span')!.textContent = label;
+							return el;
+						})
+					);
+				};
+				byId('img-drop-label').textContent = `${blob.name} · drop or paste another image to replace it`;
+				['img-result', 'img-formats-bar', 'img-out-panel'].forEach((id) => (byId(id).hidden = false));
+				show();
+			};
+			reader.readAsDataURL(blob);
+		};
+
+		file.addEventListener('change', () => file.files?.[0] && load(file.files[0]));
+		pasteHandler = (e) => {
+			const item = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
+			if (item) load(item);
+		};
+		segmented(byId('img-format'), (value) => {
+			format = value;
+			show();
+		});
+		copyButton(byId('img-copy'), () => byId('img-out').textContent ?? '');
+	});
+</script>
+
+<style>
+	.drop {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		min-height: 160px;
+		padding: 16px;
+		border: 2px dashed var(--border);
+		border-radius: 14px;
+		background: var(--surface);
+		color: var(--ink-soft);
+		font-size: 14px;
+		cursor: pointer;
+		position: relative;
+	}
+	.drop:hover,
+	.drop:focus-within {
+		border-color: var(--accent-strong);
+		color: var(--ink);
+	}
+	.drop input {
+		position: absolute;
+		inset: 0;
+		opacity: 0;
+		cursor: pointer;
+	}
+	.img-result {
+		display: grid;
+		grid-template-columns: minmax(0, 240px) 1fr;
+		gap: 14px;
+		align-items: start;
+	}
+	.img-preview {
+		border-radius: 14px;
+		border: 1px solid var(--border);
+		background-image: conic-gradient(var(--surface-2) 25%, var(--surface) 0 50%, var(--surface-2) 0 75%, var(--surface) 0);
+		background-size: 16px 16px;
+		padding: 10px;
+	}
+	.img-preview img {
+		display: block;
+		max-width: 100%;
+		max-height: 220px;
+		margin: 0 auto;
+	}
+	.img-out {
+		max-height: 260px;
+		overflow-y: auto;
+		font-size: 11.5px !important;
+	}
+	.stats :global(.stat b) {
+		font-size: 16px;
+		overflow-wrap: anywhere;
+	}
+	@media (max-width: 600px) {
+		.img-result {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>
