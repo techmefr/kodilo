@@ -88,3 +88,17 @@ test('avif option only shows when the browser can encode it', async ({ page }) =
 	});
 	await expect(page.locator('#wa-format [data-value="image/avif"]')).toBeVisible({ visible: canEncode });
 });
+
+test('unknown pages show the 404 page with suggestions', async ({ page }) => {
+	const response = await page.goto('tools/jwt-decode/');
+	expect(response?.status()).toBe(404);
+	await expect(page.locator('h1')).toHaveText('This page does not exist');
+	await expect(page.locator('#nf-list a').first()).toHaveText('JWT Decoder');
+});
+
+test('tool pages carry seo and social metadata', async ({ page }) => {
+	await page.goto('tools/base64/');
+	await expect(page.locator('link[rel=canonical]')).toHaveAttribute('href', 'https://techmefr.github.io/kodilo/tools/base64/');
+	await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /og-image\.png$/);
+	expect(await page.locator('meta[name=description]').getAttribute('content')).not.toBe('');
+});
