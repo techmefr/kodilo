@@ -1,0 +1,172 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = 'Café naïve — “smart quotes”​ zero-width here, a non‑breaking hyphen, 👩🏽‍💻 and Ⅻ';
+---
+
+<ToolShell slug="unicode-inspector" title="Unicode Inspector" description="See every character in a string with its code point, name category, UTF-8 bytes and escapes. Invisible and look-alike characters are flagged.">
+	<section class="panel" id="un-tool">
+		<div class="panel-head">
+			<span>Text</span>
+			<button class="btn" id="un-clean">Remove invisible characters</button>
+		</div>
+		<textarea id="un-in" spellcheck="false" aria-label="Text">{sample}</textarea>
+	</section>
+	<div class="stats">
+		<div class="stat"><b id="un-graphemes">—</b><span>Visible characters</span></div>
+		<div class="stat"><b id="un-points">—</b><span>Code points</span></div>
+		<div class="stat"><b id="un-utf16">—</b><span>UTF-16 units (JS length)</span></div>
+		<div class="stat"><b id="un-bytes">—</b><span>UTF-8 bytes</span></div>
+		<div class="stat"><b id="un-hidden">—</b><span>Invisible or unusual</span></div>
+	</div>
+	<div class="un-table-wrap">
+		<table class="un-table">
+			<thead><tr><th>Char</th><th>Code point</th><th>Category</th><th>UTF-8</th><th>JS / JSON</th><th>HTML</th></tr></thead>
+			<tbody id="un-rows"></tbody>
+		</table>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const NAMES: Record<number, string> = {
+		0x20: 'Space',
+		0xa0: 'No-break space',
+		0x200b: 'Zero width space',
+		0x200c: 'Zero width non-joiner',
+		0x200d: 'Zero width joiner',
+		0x2060: 'Word joiner',
+		0xfeff: 'Byte order mark',
+		0x00ad: 'Soft hyphen',
+		0x2011: 'Non-breaking hyphen',
+		0x2013: 'En dash',
+		0x2014: 'Em dash',
+		0x2018: 'Left single quote',
+		0x2019: 'Right single quote',
+		0x201c: 'Left double quote',
+		0x201d: 'Right double quote',
+		0x2026: 'Ellipsis',
+		0x202f: 'Narrow no-break space',
+		0x2009: 'Thin space',
+		0x200e: 'Left-to-right mark',
+		0x200f: 'Right-to-left mark',
+		0x202e: 'Right-to-left override',
+		0x09: 'Tab',
+		0x0a: 'Line feed',
+		0x0d: 'Carriage return',
+	};
+	const INVISIBLE = new Set([0x200b, 0x200c, 0x200e, 0x200f, 0x2060, 0xfeff, 0x00ad, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069]);
+	const UNUSUAL = new Set([0xa0, 0x2011, 0x202f, 0x2009, 0x200d, 0x2018, 0x2019, 0x201c, 0x201d]);
+
+	function category(ch: string): string {
+		const tests: [RegExp, string][] = [
+			[/\p{Lu}/u, 'Uppercase letter'],
+			[/\p{Ll}/u, 'Lowercase letter'],
+			[/\p{L}/u, 'Letter'],
+			[/\p{Nd}/u, 'Digit'],
+			[/\p{N}/u, 'Number'],
+			[/\p{Extended_Pictographic}/u, 'Emoji'],
+			[/\p{Emoji_Modifier}/u, 'Emoji skin tone'],
+			[/\p{M}/u, 'Combining mark'],
+			[/\p{Zs}/u, 'Space'],
+			[/\p{P}/u, 'Punctuation'],
+			[/\p{S}/u, 'Symbol'],
+			[/\p{Cf}/u, 'Format (invisible)'],
+			[/\p{Cc}/u, 'Control'],
+		];
+		return tests.find(([re]) => re.test(ch))?.[1] ?? 'Other';
+	}
+
+	onPage('un-tool', () => {
+		const input = byId<HTMLTextAreaElement>('un-in');
+
+		const render = () => {
+			const text = input.value;
+			const points = [...text];
+			const seg = new Intl.Segmenter('en', { granularity: 'grapheme' });
+			byId('un-graphemes').textContent = String([...seg.segment(text)].length);
+			byId('un-points').textContent = String(points.length);
+			byId('un-utf16').textContent = String(text.length);
+			byId('un-bytes').textContent = String(new TextEncoder().encode(text).length);
+			let hidden = 0;
+			byId('un-rows').replaceChildren(
+				...points.slice(0, 2000).map((ch) => {
+					const cp = ch.codePointAt(0)!;
+					const tr = document.createElement('tr');
+					const flag = INVISIBLE.has(cp) ? 'invisible' : UNUSUAL.has(cp) ? 'unusual' : cp > 0x7f && /\p{L}/u.test(ch) && /[Ѐ-ӿͰ-Ͽ]/.test(ch) ? 'lookalike' : '';
+					if (flag) hidden++;
+					if (flag) tr.dataset.flag = flag;
+					const hex = cp.toString(16).toUpperCase().padStart(4, '0');
+					const utf8 = [...new TextEncoder().encode(ch)].map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+					const js = cp > 0xffff ? `\\u{${hex}}` : `\\u${hex}`;
+					const cells = [/\p{C}|\p{Z}/u.test(ch) ? '·' : ch, `U+${hex}${NAMES[cp] ? ` ${NAMES[cp]}` : ''}`, category(ch) + (flag ? ` · ${flag}` : ''), utf8, js, `&#x${hex};`];
+					cells.forEach((c, i) => {
+						const td = document.createElement('td');
+						td.textContent = c;
+						if (i === 0) td.className = 'un-char';
+						tr.append(td);
+					});
+					return tr;
+				})
+			);
+			byId('un-hidden').textContent = String(hidden);
+		};
+
+		byId('un-clean').addEventListener('click', () => {
+			input.value = [...input.value]
+				.filter((c) => !INVISIBLE.has(c.codePointAt(0)!))
+				.join('')
+				.replace(/[   ]/g, ' ')
+				.replace(/‑/g, '-');
+			render();
+		});
+		input.addEventListener('input', render);
+		render();
+	});
+</script>
+
+<style>
+	#un-in {
+		min-height: 100px;
+		font-size: 18px;
+	}
+	.un-table-wrap {
+		overflow-x: auto;
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		background: var(--surface);
+	}
+	.un-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 13.5px;
+	}
+	.un-table th,
+	.un-table :global(td) {
+		text-align: left;
+		padding: 7px 12px;
+		border-bottom: 1px solid var(--border);
+		white-space: nowrap;
+	}
+	.un-table th {
+		font-size: 12px;
+		color: var(--ink-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.un-table :global(td) {
+		font-family: var(--mono);
+	}
+	.un-table :global(.un-char) {
+		font-size: 20px;
+		font-family: inherit;
+	}
+	.un-table :global(tr[data-flag='invisible']) {
+		background: color-mix(in srgb, #dc2626 12%, transparent);
+	}
+	.un-table :global(tr[data-flag='unusual']),
+	.un-table :global(tr[data-flag='lookalike']) {
+		background: color-mix(in srgb, #d97706 12%, transparent);
+	}
+</style>
