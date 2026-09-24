@@ -76,11 +76,12 @@ const sample = JSON.stringify(
 		const details = document.createElement('details');
 		details.open = true;
 		const summary = document.createElement('summary');
+		summary.className = 'jv-label';
+		summary.dataset.path = path;
 		const count = document.createElement('span');
 		count.className = 'jv-count';
 		count.textContent = Array.isArray(value) ? `[${entries.length}]` : `{${entries.length}}`;
-		label.append(count);
-		summary.append(label);
+		summary.append(...label.childNodes, count);
 		details.append(summary);
 		const children = document.createElement('div');
 		children.className = 'jv-children';
@@ -111,7 +112,7 @@ const sample = JSON.stringify(
 		tree.addEventListener('click', (e) => {
 			const label = (e.target as HTMLElement).closest<HTMLElement>('.jv-label');
 			if (!label) return;
-			if (label.closest('summary') && (e.target as HTMLElement).closest('.jv-count')) return;
+			if (label.tagName === 'SUMMARY' && (e.target as HTMLElement).closest('.jv-count')) return;
 			e.preventDefault();
 			navigator.clipboard.writeText(label.dataset.path!);
 			byId('jv-path').textContent = `Copied ${label.dataset.path}`;
@@ -176,13 +177,13 @@ const sample = JSON.stringify(
 	}
 	.jv-tree :global(.jv-boolean),
 	.jv-tree :global(.jv-null) {
-		color: #ff79c6;
+		color: var(--tint-1);
 	}
 	.jv-tree :global(.jv-count) {
 		color: var(--ink-soft);
 	}
 	.jv-tree :global(.jv-hit > .jv-label),
-	.jv-tree :global(.jv-hit > details > summary > .jv-label) {
+	.jv-tree :global(.jv-hit > details > summary.jv-label) {
 		background: var(--accent);
 		outline: 1px solid var(--accent-strong);
 	}

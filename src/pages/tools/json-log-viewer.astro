@@ -39,7 +39,7 @@ const sample = [
 		<input class="log-search" id="log-q" type="search" placeholder="Filter: text or field=value" aria-label="Filter logs" />
 	</div>
 	<p class="log-count" id="log-count"></p>
-	<div class="log-wrap">
+	<div class="log-wrap" tabindex="0">
 		<table class="log-table">
 			<thead>
 				<tr>
@@ -218,7 +218,7 @@ const sample = [
 		text-transform: uppercase;
 	}
 	.log-table :global(.log-error .log-level) {
-		color: #e5484d;
+		color: var(--bad);
 	}
 	.log-table :global(.log-warn .log-level) {
 		color: var(--warn);
@@ -230,6 +230,7 @@ const sample = [
 		color: var(--ink-soft);
 	}
 	.log-table :global(.log-bad) {
-		opacity: 0.6;
+		color: var(--ink-soft);
+		font-style: italic;
 	}
 </style>

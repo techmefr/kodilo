@@ -161,10 +161,10 @@ const data = JSON.stringify({ id: 12, email: 'not-an-email', age: 16, tags: ['a'
 		min-height: 320px;
 	}
 	#js-status[data-ok='true'] {
-		color: #16a34a;
+		color: var(--ok);
 	}
 	#js-status[data-ok='false'] {
-		color: #dc2626;
+		color: var(--bad);
 	}
 	.js-list {
 		list-style: none;
@@ -188,9 +188,9 @@ const data = JSON.stringify({ id: 12, email: 'not-an-email', age: 16, tags: ['a'
 		overflow-wrap: anywhere;
 	}
 	.js-list :global(li[data-kind='bad'] span) {
-		color: #dc2626;
+		color: var(--bad);
 	}
 	.js-list :global(li[data-kind='ok'] span) {
-		color: #16a34a;
+		color: var(--ok);
 	}
 </style>

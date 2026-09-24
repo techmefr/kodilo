@@ -40,7 +40,7 @@ const sample = 'Café naïve — “smart quotes”​ zero-width here, a non‑
 			<span>Invisible or unusual</span>
 		</div>
 	</div>
-	<div class="un-table-wrap">
+	<div class="un-table-wrap" tabindex="0">
 		<table class="un-table">
 			<thead>
 				<tr>
@@ -200,10 +200,10 @@ const sample = 'Café naïve — “smart quotes”​ zero-width here, a non‑
 		font-family: inherit;
 	}
 	.un-table :global(tr[data-flag='invisible']) {
-		background: color-mix(in srgb, #dc2626 12%, transparent);
+		background: color-mix(in srgb, var(--bad) 12%, transparent);
 	}
 	.un-table :global(tr[data-flag='unusual']),
 	.un-table :global(tr[data-flag='lookalike']) {
-		background: color-mix(in srgb, #d97706 12%, transparent);
+		background: color-mix(in srgb, var(--warn) 12%, transparent);
 	}
 </style>

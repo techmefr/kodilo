@@ -148,10 +148,10 @@ import ToolShell from '../../components/ToolShell.astro';
 		overflow-wrap: anywhere;
 	}
 	#pp-valid[data-ok='true'] {
-		color: #16a34a;
+		color: var(--ok);
 	}
 	#pp-valid[data-ok='false'] {
-		color: #dc2626;
+		color: var(--bad);
 	}
 	@media (max-width: 520px) {
 		.pp-list :global(li) {
