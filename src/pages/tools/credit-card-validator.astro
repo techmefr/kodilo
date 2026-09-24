@@ -1,0 +1,121 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const samples = [
+	['Visa', '4242 4242 4242 4242'],
+	['Mastercard', '5555 5555 5555 4444'],
+	['Amex', '3782 822463 10005'],
+	['Discover', '6011 1111 1111 1117'],
+	['Invalid', '4242 4242 4242 4241'],
+];
+---
+
+<ToolShell
+	slug="credit-card-validator"
+	title="Credit Card Validator"
+	description="Luhn checksum and network detection for test card numbers. Everything stays in your browser."
+>
+	<div class="fields" id="cc-tool">
+		<div class="field wide" id="cc-field">
+			<label for="cc-in">Card number</label>
+			<input id="cc-in" inputmode="numeric" autocomplete="off" spellcheck="false" value="4242 4242 4242 4242" />
+			<span class="field-note" id="cc-note"></span>
+		</div>
+	</div>
+	<div class="stats" id="cc-stats"></div>
+	<div class="chips" id="cc-samples">
+		{samples.map(([label, number]) => <button data-number={number}>{label} test card</button>)}
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const NETWORKS: [string, RegExp, number[], number[]][] = [
+		['American Express', /^3[47]/, [15], [4, 6, 5]],
+		['Diners Club', /^3(0[0-5]|[68])/, [14, 16], [4, 6, 4]],
+		['JCB', /^35(2[89]|[3-8])/, [16, 17, 18, 19], [4, 4, 4, 4]],
+		['Discover', /^(6011|65|64[4-9]|622)/, [16, 19], [4, 4, 4, 4]],
+		['Mastercard', /^(5[1-5]|2(2[2-9]|[3-6]|7[01]|720))/, [16], [4, 4, 4, 4]],
+		['UnionPay', /^62/, [16, 17, 18, 19], [4, 4, 4, 4]],
+		['Maestro', /^(5[06-9]|6)/, [12, 13, 14, 15, 16, 17, 18, 19], [4, 4, 4, 4]],
+		['Visa', /^4/, [13, 16, 19], [4, 4, 4, 4]],
+	];
+
+	function luhn(digits: string): boolean {
+		let sum = 0;
+		[...digits].reverse().forEach((d, i) => {
+			let n = Number(d);
+			if (i % 2) {
+				n *= 2;
+				if (n > 9) n -= 9;
+			}
+			sum += n;
+		});
+		return digits.length > 0 && sum % 10 === 0;
+	}
+
+	onPage('cc-tool', () => {
+		const input = byId<HTMLInputElement>('cc-in');
+
+		const render = () => {
+			const digits = input.value.replace(/\D/g, '');
+			const network = NETWORKS.find(([, re]) => re.test(digits));
+			const groups = network?.[3] ?? [4, 4, 4, 4];
+			const lengthOk = network ? network[2].includes(digits.length) : digits.length >= 12 && digits.length <= 19;
+			const valid = luhn(digits) && lengthOk;
+
+			let pos = 0;
+			const formatted: string[] = [];
+			for (const size of [...groups, 19]) {
+				if (pos >= digits.length) break;
+				formatted.push(digits.slice(pos, pos + size));
+				pos += size;
+			}
+			if (document.activeElement !== input) input.value = formatted.join(' ');
+
+			byId('cc-field').classList.toggle('invalid', digits.length > 0 && !valid);
+			byId('cc-note').textContent = !digits
+				? ''
+				: valid
+					? '✓ Passes the Luhn check'
+					: !lengthOk
+						? `✕ ${digits.length} digits is not a valid length${network ? ` for ${network[0]}` : ''}`
+						: '✕ Fails the Luhn checksum';
+
+			const stats: [string, string][] = [
+				['Network', network?.[0] ?? '—'],
+				['Digits', String(digits.length)],
+				['Luhn', digits ? (luhn(digits) ? 'Pass' : 'Fail') : '—'],
+				['Formatted', formatted.join(' ') || '—'],
+			];
+			byId('cc-stats').replaceChildren(
+				...stats.map(([label, value]) => {
+					const el = document.createElement('div');
+					el.className = 'stat';
+					el.innerHTML = '<b></b><span></span>';
+					el.querySelector('b')!.textContent = value;
+					el.querySelector('span')!.textContent = label;
+					return el;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		input.addEventListener('blur', render);
+		document.querySelectorAll<HTMLButtonElement>('#cc-samples button').forEach((button) =>
+			button.addEventListener('click', () => {
+				input.value = button.dataset.number!;
+				render();
+			})
+		);
+		render();
+	});
+</script>
+
+<style>
+	.stats :global(.stat b) {
+		font-size: 17px;
+		overflow-wrap: anywhere;
+	}
+</style>

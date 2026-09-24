@@ -27,6 +27,16 @@ Live at **https://techmefr.github.io/kodilo/**
 - **Roman Numerals** — both ways with strict validation and a breakdown.
 - **Temperature** — Celsius, Fahrenheit, Kelvin and Rankine, with presets.
 - **Integer Base Converter** — bases 2 to 36, arbitrary precision, negatives.
+- **Hash** — MD5, SHA-1, SHA-256, SHA-384 and SHA-512 of text or a file, hex or Base64.
+- **HMAC Generator** — SHA-1/256/384/512 signatures with a compare field for webhook checks.
+- **Password Generator** — unbiased crypto randomness, character sets, look-alike exclusion, entropy meter.
+- **Token Generator** — alphanumeric, hex or base64url tokens with optional prefix, in bulk.
+- **ULID Generator** — monotonic ULIDs in bulk, and timestamp decoding.
+- **JWT Decoder** — header and payload, iat/nbf/exp as readable dates with expiry status, alg:none warning.
+- **Basic Auth** — build the Authorization header and curl command, or decode one.
+- **Chmod Calculator** — permission grid, octal, symbolic, setuid/setgid/sticky, common presets.
+- **HTTP Status Codes** — searchable and filterable by class.
+- **Credit Card Validator** — Luhn check, network detection, formatting, test card numbers.
 - More tools land as separate categories in the sidebar — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -63,12 +73,7 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Text Statistics
 
 **Encoding & Security**
-- JWT Decoder
-- Hash Text
-- HMAC Generator
 - Bcrypt
-- Basic Auth Generator
-- Token Generator
 - RSA Key Pair Generator
 - Text Encryption
 - BIP39 Generator
@@ -76,8 +81,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Checksum Calculator
 
 **Generators**
-- ULID Generator
-- Password Generator
 - QR Code Generator
 - WiFi QR Code Generator
 - Crontab Generator
@@ -93,12 +96,10 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - MAC Address Generator
 - MAC Address Lookup
 - User Agent Parser
-- HTTP Status Codes
 - Phone Parser & Formatter
 
 **Validators**
 - Email Validator
-- Credit Card Validator
 - IBAN Validator & Parser
 
 **Images**
@@ -119,7 +120,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Math Evaluator
 - Docker Run to Compose Converter
 - MIME Types
-- Chmod Calculator
 - Regex Cheatsheet
 - REST API Tester
 - Docker Cheatsheet

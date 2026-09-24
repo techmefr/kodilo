@@ -208,6 +208,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'jwt-decoder',
+				built: true,
 				name: 'JWT Decoder',
 				description: 'Decode and inspect JWT tokens.',
 			},
@@ -225,11 +226,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'hash-text',
+				built: true,
 				name: 'Hash Text',
 				description: 'Generate MD5, SHA-1, SHA-256 and other hashes.',
 			},
 			{
 				slug: 'hmac-generator',
+				built: true,
 				name: 'HMAC Generator',
 				description: 'Generate an HMAC signature for a message and key.',
 			},
@@ -240,11 +243,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'basic-auth-generator',
+				built: true,
 				name: 'Basic Auth Generator',
 				description: 'Generate an HTTP Basic Authentication header.',
 			},
 			{
 				slug: 'token-generator',
+				built: true,
 				name: 'Token Generator',
 				description: 'Generate random tokens with a custom charset and length.',
 			},
@@ -288,11 +293,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'ulid-generator',
+				built: true,
 				name: 'ULID Generator',
 				description: 'Generate ULIDs (sortable unique identifiers).',
 			},
 			{
 				slug: 'password-generator',
+				built: true,
 				name: 'Password Generator',
 				description: 'Generate secure random passwords.',
 			},
@@ -385,6 +392,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'http-status-codes',
+				built: true,
 				name: 'HTTP Status Codes',
 				description: 'Look up the meaning of an HTTP status code.',
 			},
@@ -407,6 +415,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'credit-card-validator',
+				built: true,
 				name: 'Credit Card Validator',
 				description: 'Validate a credit card number with the Luhn check.',
 			},
@@ -503,6 +512,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'chmod-calculator',
+				built: true,
 				name: 'Chmod Calculator',
 				description: 'Compute and explain Unix file permission values.',
 			},

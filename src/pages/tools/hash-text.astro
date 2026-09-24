@@ -1,0 +1,173 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="hash-text"
+	title="Hash"
+	description="MD5, SHA-1, SHA-256, SHA-384 and SHA-512 of text or a file, all at once. Nothing leaves your browser."
+>
+	<div class="toolbar" id="hash-tool">
+		<div class="seg" id="hash-source" aria-label="Source">
+			<button data-value="text" aria-pressed="true">Text</button>
+			<button data-value="file" aria-pressed="false">File</button>
+		</div>
+		<div class="seg" id="hash-enc" aria-label="Encoding">
+			<button data-value="hex" aria-pressed="true">Hex</button>
+			<button data-value="base64" aria-pressed="false">Base64</button>
+		</div>
+		<label class="check"><input type="checkbox" id="hash-upper" /> Uppercase</label>
+	</div>
+	<section class="panel" id="hash-text-panel">
+		<div class="panel-head">Text</div>
+		<textarea id="hash-in" spellcheck="false" aria-label="Text to hash">kodilo</textarea>
+	</section>
+	<label class="drop" id="hash-file-panel" hidden>
+		<input type="file" id="hash-file" />
+		<span id="hash-file-label">Drop a file here or click to choose one</span>
+	</label>
+	<ul class="digests" id="hash-list"></ul>
+</ToolShell>
+
+<script>
+	import { encodeBytes, md5, type Encoding } from '../../scripts/crypto';
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	const ALGORITHMS = ['MD5', 'SHA-1', 'SHA-256', 'SHA-384', 'SHA-512'];
+
+	onPage('hash-tool', () => {
+		const input = byId<HTMLTextAreaElement>('hash-in');
+		const file = byId<HTMLInputElement>('hash-file');
+		const upper = byId<HTMLInputElement>('hash-upper');
+		const list = byId('hash-list');
+		let source = 'text';
+		let encoding: Encoding = 'hex';
+		let bytes = new Uint8Array();
+		let run = 0;
+
+		const render = async () => {
+			const current = ++run;
+			const digests = await Promise.all(
+				ALGORITHMS.map(async (name) =>
+					name === 'MD5' ? md5(bytes) : new Uint8Array(await crypto.subtle.digest(name, bytes))
+				)
+			);
+			if (current !== run) return;
+			list.replaceChildren(
+				...digests.map((digest, i) => {
+					let value = encodeBytes(digest, encoding);
+					if (upper.checked && encoding === 'hex') value = value.toUpperCase();
+					const li = document.createElement('li');
+					const button = document.createElement('button');
+					button.className = 'digest';
+					button.innerHTML = '<span class="algo"></span><code></code><span class="hint">Copy</span>';
+					button.querySelector('.algo')!.textContent = ALGORITHMS[i];
+					button.querySelector('code')!.textContent = value;
+					button.addEventListener('click', async () => {
+						await navigator.clipboard.writeText(value);
+						button.querySelector('.hint')!.textContent = 'Copied';
+						setTimeout(() => (button.querySelector('.hint')!.textContent = 'Copy'), 1200);
+					});
+					li.append(button);
+					return li;
+				})
+			);
+		};
+
+		const fromText = () => {
+			bytes = new TextEncoder().encode(input.value);
+			render();
+		};
+
+		segmented(byId('hash-source'), (value) => {
+			source = value;
+			byId('hash-text-panel').hidden = source !== 'text';
+			byId('hash-file-panel').hidden = source !== 'file';
+			if (source === 'text') fromText();
+		});
+		segmented(byId('hash-enc'), (value) => {
+			encoding = value as Encoding;
+			render();
+		});
+		upper.addEventListener('change', render);
+		input.addEventListener('input', fromText);
+		file.addEventListener('change', async () => {
+			const chosen = file.files?.[0];
+			if (!chosen) return;
+			byId('hash-file-label').textContent = `${chosen.name} · ${chosen.size.toLocaleString()} bytes`;
+			bytes = new Uint8Array(await chosen.arrayBuffer());
+			render();
+		});
+		fromText();
+	});
+</script>
+
+<style>
+	.drop {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 140px;
+		border: 2px dashed var(--border);
+		border-radius: 14px;
+		background: var(--surface);
+		color: var(--ink-soft);
+		font-size: 14px;
+		cursor: pointer;
+		position: relative;
+	}
+	.drop:hover,
+	.drop:focus-within {
+		border-color: var(--accent-strong);
+		color: var(--ink);
+	}
+	.drop input {
+		position: absolute;
+		inset: 0;
+		opacity: 0;
+		cursor: pointer;
+	}
+	.digests {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		overflow: hidden;
+	}
+	.digests :global(li + li) {
+		border-top: 1px solid var(--border);
+	}
+	.digests :global(.digest) {
+		display: grid;
+		grid-template-columns: 80px 1fr auto;
+		gap: 12px;
+		align-items: center;
+		width: 100%;
+		padding: 12px 14px;
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.digests :global(.digest:hover) {
+		background: var(--surface-2);
+	}
+	.digests :global(.algo) {
+		font-size: 12.5px;
+		font-weight: 700;
+		color: var(--ink-soft);
+	}
+	.digests :global(code) {
+		font-family: var(--mono);
+		font-size: 12.5px;
+		word-break: break-all;
+	}
+	.digests :global(.hint) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+</style>

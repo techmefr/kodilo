@@ -1,0 +1,113 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="hmac-generator"
+	title="HMAC Generator"
+	description="Sign a message with a secret key. Handy for checking webhook signatures."
+>
+	<div class="toolbar" id="hmac-tool">
+		<div class="seg" id="hmac-algo" aria-label="Algorithm">
+			<button data-value="SHA-1" aria-pressed="false">SHA-1</button>
+			<button data-value="SHA-256" aria-pressed="true">SHA-256</button>
+			<button data-value="SHA-384" aria-pressed="false">SHA-384</button>
+			<button data-value="SHA-512" aria-pressed="false">SHA-512</button>
+		</div>
+		<div class="seg" id="hmac-enc" aria-label="Encoding">
+			<button data-value="hex" aria-pressed="true">Hex</button>
+			<button data-value="base64" aria-pressed="false">Base64</button>
+		</div>
+	</div>
+	<div class="fields">
+		<div class="field wide">
+			<label for="hmac-key">Secret key</label>
+			<input id="hmac-key" spellcheck="false" value="whsec_example_secret" />
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">Message</div>
+		<textarea id="hmac-msg" spellcheck="false" aria-label="Message">{`{"event":"order.shipped","id":48213}`}</textarea>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Signature</span>
+			<button class="btn" id="hmac-copy">Copy</button>
+		</div>
+		<pre class="out hmac-out" id="hmac-out"></pre>
+	</section>
+	<div class="fields">
+		<div class="field wide" id="hmac-verify-field">
+			<label for="hmac-verify">Compare with an expected signature</label>
+			<input id="hmac-verify" spellcheck="false" placeholder="Paste the signature you received" />
+			<span class="field-note" id="hmac-verify-note"></span>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { encodeBytes, type Encoding } from '../../scripts/crypto';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('hmac-tool', () => {
+		const key = byId<HTMLInputElement>('hmac-key');
+		const msg = byId<HTMLTextAreaElement>('hmac-msg');
+		const out = byId('hmac-out');
+		const verify = byId<HTMLInputElement>('hmac-verify');
+		let algo = 'SHA-256';
+		let encoding: Encoding = 'hex';
+		let run = 0;
+
+		const compare = () => {
+			const expected = verify.value.trim().replace(/^sha\d+=/i, '');
+			const field = byId('hmac-verify-field');
+			const note = byId('hmac-verify-note');
+			if (!expected) {
+				field.classList.remove('invalid');
+				note.textContent = '';
+				return;
+			}
+			const match = expected.toLowerCase() === (out.textContent ?? '').toLowerCase();
+			field.classList.toggle('invalid', !match);
+			note.textContent = match ? '✓ Signatures match' : '✕ Signatures differ';
+		};
+
+		const render = async () => {
+			const current = ++run;
+			const encoder = new TextEncoder();
+			const cryptoKey = await crypto.subtle.importKey(
+				'raw',
+				encoder.encode(key.value),
+				{ name: 'HMAC', hash: algo },
+				false,
+				['sign']
+			);
+			const signature = new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(msg.value)));
+			if (current !== run) return;
+			out.textContent = key.value ? encodeBytes(signature, encoding) : '';
+			compare();
+		};
+
+		segmented(byId('hmac-algo'), (value) => {
+			algo = value;
+			render();
+		});
+		segmented(byId('hmac-enc'), (value) => {
+			encoding = value as Encoding;
+			render();
+		});
+		[key, msg].forEach((el) => el.addEventListener('input', render));
+		verify.addEventListener('input', compare);
+		copyButton(byId('hmac-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.hmac-out {
+		min-height: auto !important;
+	}
+	#hmac-msg {
+		min-height: 120px;
+	}
+</style>
