@@ -23,9 +23,9 @@ import ToolShell from '../../components/ToolShell.astro';
 				<span id="pomo-round"></span>
 			</div>
 		</div>
-		<div class="pomo-progress" role="progressbar" aria-label="Session progress" aria-valuemin="0" aria-valuemax="100" id="pomo-progress">
+		<div class="pomo-progress" role="progressbar" aria-label="Time left" aria-valuemin="0" aria-valuemax="100" id="pomo-progress">
 			<div class="pomo-fill" id="pomo-fill"></div>
-			<span id="pomo-pct">0%</span>
+			<span id="pomo-pct">100% left</span>
 		</div>
 		<div class="toolbar pomo-actions">
 			<button class="btn primary" id="pomo-start">Start</button>
@@ -76,14 +76,14 @@ import ToolShell from '../../components/ToolShell.astro';
 			const c = 2 * Math.PI * 54;
 			const bar = byId('pomo-bar');
 			bar.style.strokeDasharray = String(c);
-			const progress = Math.min(1, Math.max(0, 1 - remaining / total));
+			const progress = Math.min(1, Math.max(0, remaining / total));
 			bar.style.strokeDashoffset = String(c * (1 - progress));
 			bar.classList.toggle('pomo-break', phase !== 'focus');
 			const fill = byId('pomo-fill');
 			fill.style.width = `${progress * 100}%`;
 			fill.classList.toggle('pomo-break', phase !== 'focus');
-			byId('pomo-pct').textContent = `${Math.floor(progress * 100)}%`;
-			byId('pomo-progress').setAttribute('aria-valuenow', String(Math.floor(progress * 100)));
+			byId('pomo-pct').textContent = `${Math.ceil(progress * 100)}% left`;
+			byId('pomo-progress').setAttribute('aria-valuenow', String(Math.ceil(progress * 100)));
 			document.title = running() ? `${text} · ${LABELS[phase]}` : baseTitle;
 			byId('pomo-start').textContent = running() ? 'Pause' : remaining < total ? 'Resume' : 'Start';
 			byId('pomo-done').textContent = `${done} focus session${done === 1 ? '' : 's'} completed in this session.`;
