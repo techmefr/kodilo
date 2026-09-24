@@ -1,0 +1,127 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="meta-tag-generator"
+	title="Meta Tag Generator"
+	description="Title, description, canonical, robots, theme color and icons for the head of your page, with a search result preview."
+>
+	<div class="fields" id="mt-tool">
+		<div class="field wide"><label for="mt-title">Title</label><input id="mt-title" value="kodilo — Free developer tools, no sign-up" /><span class="field-note" id="mt-title-note"></span></div>
+		<div class="field wide"><label for="mt-desc">Description</label><input id="mt-desc" value="A collection of open-source tools for developers. Everything runs in your browser, nothing is uploaded." /><span class="field-note" id="mt-desc-note"></span></div>
+		<div class="field"><label for="mt-url">Canonical URL</label><input id="mt-url" spellcheck="false" value="https://techmefr.github.io/kodilo/" /></div>
+		<div class="field"><label for="mt-author">Author</label><input id="mt-author" value="" placeholder="Jane Doe" /></div>
+		<div class="field"><label for="mt-lang">Language</label><input id="mt-lang" spellcheck="false" value="en" /></div>
+		<div class="field"><label for="mt-color">Theme color</label><input id="mt-color" spellcheck="false" value="#6d4fe0" /></div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="mt-robots">
+			<button data-value="index, follow" aria-pressed="true">index, follow</button>
+			<button data-value="noindex, follow">noindex</button>
+			<button data-value="noindex, nofollow">noindex, nofollow</button>
+		</div>
+		<label class="check"><input type="checkbox" id="mt-icons" checked /> Icons</label>
+	</div>
+	<section class="panel mt-serp">
+		<div class="panel-head">Search result preview</div>
+		<div class="mt-serp-body">
+			<span id="mt-p-url"></span>
+			<b id="mt-p-title"></b>
+			<p id="mt-p-desc"></p>
+		</div>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>HTML</span>
+			<button class="btn" id="mt-copy">Copy</button>
+		</div>
+		<pre class="out" id="mt-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+	const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+	onPage('mt-tool', () => {
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		let robots = 'index, follow';
+
+		const render = () => {
+			const title = val('mt-title');
+			const desc = val('mt-desc');
+			const note = (id: string, len: number, min: number, max: number) => {
+				byId(id).textContent = `${len} characters · aim for ${min}–${max}`;
+				byId(id).parentElement!.classList.toggle('invalid', len > max || len < min);
+			};
+			note('mt-title-note', title.length, 30, 60);
+			note('mt-desc-note', desc.length, 70, 160);
+			const url = val('mt-url');
+			const lines = [
+				'<meta charset="utf-8" />',
+				'<meta name="viewport" content="width=device-width, initial-scale=1" />',
+				`<title>${esc(title)}</title>`,
+				`<meta name="description" content="${esc(desc)}" />`,
+				...(url ? [`<link rel="canonical" href="${esc(url)}" />`] : []),
+				`<meta name="robots" content="${robots}" />`,
+				...(val('mt-author') ? [`<meta name="author" content="${esc(val('mt-author'))}" />`] : []),
+				...(val('mt-color') ? [`<meta name="theme-color" content="${esc(val('mt-color'))}" />`] : []),
+				...(byId<HTMLInputElement>('mt-icons').checked
+					? ['<link rel="icon" href="/favicon.ico" sizes="32x32" />', '<link rel="icon" href="/icon.svg" type="image/svg+xml" />', '<link rel="apple-touch-icon" href="/apple-touch-icon.png" />', '<link rel="manifest" href="/manifest.webmanifest" />']
+					: []),
+			];
+			byId('mt-out').textContent = `<html lang="${esc(val('mt-lang') || 'en')}">\n<head>\n${lines.map((l) => `  ${l}`).join('\n')}\n</head>`;
+			let host = url;
+			try {
+				const u = new URL(url);
+				host = `${u.hostname}${u.pathname.replace(/\/$/, '').split('/').filter(Boolean).map((p) => ` › ${p}`).join('')}`;
+			} catch {}
+			byId('mt-p-url').textContent = host;
+			byId('mt-p-title').textContent = cut(title, 60);
+			byId('mt-p-desc').textContent = cut(desc, 160);
+		};
+
+		segmented(byId('mt-robots'), (v) => ((robots = v), render()));
+		document.querySelectorAll('#mt-tool input, #mt-icons').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('mt-copy'), () => byId('mt-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.mt-serp-body {
+		padding: 14px 18px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-family: Arial, sans-serif;
+	}
+	.mt-serp-body span {
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.mt-serp-body b {
+		font-size: 19px;
+		font-weight: 400;
+		color: #1a0dab;
+	}
+	:global([data-theme='dark']) .mt-serp-body b {
+		color: #99c3ff;
+	}
+	@media (prefers-color-scheme: dark) {
+		:global(:root:not([data-theme='light'])) .mt-serp-body b {
+			color: #99c3ff;
+		}
+	}
+	.mt-serp-body p {
+		margin: 0;
+		font-size: 14px;
+		line-height: 1.5;
+	}
+	.mt-serp .panel-head {
+		font-family: var(--sans);
+	}
+</style>

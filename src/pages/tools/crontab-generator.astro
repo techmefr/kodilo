@@ -1,0 +1,200 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const presets = [
+	['Every minute', '* * * * *'],
+	['Every 5 minutes', '*/5 * * * *'],
+	['Hourly', '0 * * * *'],
+	['Daily at 3:00', '0 3 * * *'],
+	['Weekdays at 9:00', '0 9 * * 1-5'],
+	['Sundays at midnight', '0 0 * * 0'],
+	['1st of the month', '0 0 1 * *'],
+];
+---
+
+<ToolShell
+	slug="crontab-generator"
+	title="Crontab Generator"
+	description="Write or pick a cron expression, read it in plain English and see the next runs in your time zone."
+>
+	<div class="fields" id="cron-tool">
+		<div class="field wide" id="cron-field">
+			<label for="cron-in">Expression · minute hour day month weekday</label>
+			<input id="cron-in" spellcheck="false" value="*/15 9-17 * * 1-5" />
+			<span class="field-note" id="cron-note"></span>
+		</div>
+	</div>
+	<div class="chips" id="cron-presets">
+		{presets.map(([label, expr]) => <button data-expr={expr}>{label}</button>)}
+	</div>
+	<section class="panel cron-human">
+		<p id="cron-human"></p>
+	</section>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Next 8 runs</div>
+			<ol class="cron-runs" id="cron-runs"></ol>
+		</section>
+		<section class="panel">
+			<div class="panel-head">Syntax</div>
+			<ul class="cron-help">
+				<li><code>*</code> any value</li>
+				<li><code>5</code> exactly 5</li>
+				<li><code>1-5</code> a range</li>
+				<li><code>1,15</code> a list</li>
+				<li><code>*/10</code> every 10</li>
+				<li><code>@daily @hourly @weekly @monthly @yearly</code> shortcuts</li>
+				<li>Weekdays: 0 or 7 is Sunday, or MON–SUN. Months: 1–12 or JAN–DEC.</li>
+			</ul>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const MACROS: Record<string, string> = { '@yearly': '0 0 1 1 *', '@annually': '0 0 1 1 *', '@monthly': '0 0 1 * *', '@weekly': '0 0 * * 0', '@daily': '0 0 * * *', '@midnight': '0 0 * * *', '@hourly': '0 * * * *' };
+	const NAMES = [[], [], [], ['', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'], ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']];
+	const RANGES: [number, number][] = [[0, 59], [0, 23], [1, 31], [1, 12], [0, 7]];
+	const LABELS = ['minute', 'hour', 'day of month', 'month', 'day of week'];
+	const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+	const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+	function field(text: string, i: number): Set<number> {
+		const [min, max] = RANGES[i];
+		const out = new Set<number>();
+		for (const part of text.toUpperCase().split(',')) {
+			const m = part.match(/^(\*|[\dA-Z]+(?:-[\dA-Z]+)?)(?:\/(\d+))?$/);
+			if (!m) throw new Error(`Invalid ${LABELS[i]}: ${part}`);
+			const num = (s: string) => {
+				const n = NAMES[i].indexOf(s);
+				const v = n >= 0 && s.length === 3 ? n : Number(s);
+				if (!Number.isInteger(v) || v < min || v > max) throw new Error(`${LABELS[i]} must be ${min}–${max}, got ${s}`);
+				return v;
+			};
+			const [a, b] = m[1] === '*' ? [min, max] : m[1].includes('-') ? m[1].split('-').map(num) : [num(m[1]), m[2] ? max : num(m[1])];
+			const step = m[2] ? Number(m[2]) : 1;
+			if (!step) throw new Error('Step cannot be 0');
+			for (let v = a; v <= b; v += step) out.add(i === 4 && v === 7 ? 0 : v);
+		}
+		return out;
+	}
+
+	function describePart(text: string, i: number): string {
+		if (text === '*') return '';
+		const name = (v: string) => (i === 3 ? MONTHS[+v] ?? v : i === 4 ? DAYS[+v] ?? v : v);
+		return text
+			.split(',')
+			.map((p) => {
+				const [range, step] = p.split('/');
+				const r = range === '*' ? `every ${LABELS[i]}` : range.includes('-') ? `${range.split('-').map(name).join(' through ')}` : name(range);
+				return step ? `every ${step} ${LABELS[i]}s${range !== '*' ? ` from ${r}` : ''}` : r;
+			})
+			.join(', ');
+	}
+
+	function human(parts: string[]): string {
+		const [mi, h, dom, mon, dow] = parts;
+		let time: string;
+		if (/^\d+$/.test(mi) && /^\d+$/.test(h)) time = `At ${h.padStart(2, '0')}:${mi.padStart(2, '0')}`;
+		else {
+			const m = mi === '*' ? 'Every minute' : mi.includes('/') || mi.includes(',') || mi.includes('-') ? mi.startsWith('*/') ? `Every ${mi.slice(2)} minutes` : `At minutes ${describePart(mi, 0)}` : `At minute ${mi}`;
+			time = h === '*' ? m : `${m}, ${/^\d+$/.test(h) ? `during hour ${h}` : `hours ${describePart(h, 1)}`}`;
+		}
+		const extra = [
+			dom !== '*' ? `on day ${describePart(dom, 2)} of the month` : '',
+			mon !== '*' ? `in ${describePart(mon, 3)}` : '',
+			dow !== '*' ? `${dom !== '*' ? 'or ' : ''}on ${describePart(dow, 4)}` : '',
+		].filter(Boolean);
+		return `${time}${extra.length ? `, ${extra.join(', ')}` : ''}.`;
+	}
+
+	onPage('cron-tool', () => {
+		const input = byId<HTMLInputElement>('cron-in');
+
+		const render = () => {
+			const raw = input.value.trim();
+			const expr = MACROS[raw.toLowerCase()] ?? raw;
+			const parts = expr.split(/\s+/);
+			try {
+				if (parts.length !== 5) throw new Error('A cron expression has 5 fields.');
+				const sets = parts.map(field);
+				byId('cron-field').classList.remove('invalid');
+				byId('cron-note').textContent = raw !== expr ? `= ${expr}` : '';
+				byId('cron-human').textContent = human(parts.map((p) => p.toUpperCase().replace(/[A-Z]{3}/g, (n) => String(Math.max(NAMES[3].indexOf(n), NAMES[4].indexOf(n))))));
+				const runs: Date[] = [];
+				const d = new Date();
+				d.setSeconds(0, 0);
+				d.setMinutes(d.getMinutes() + 1);
+				const domAny = parts[2] === '*';
+				const dowAny = parts[4] === '*';
+				for (let i = 0; i < 600000 && runs.length < 8; i++) {
+					const dayOk = domAny && dowAny ? true : domAny ? sets[4].has(d.getDay()) : dowAny ? sets[2].has(d.getDate()) : sets[2].has(d.getDate()) || sets[4].has(d.getDay());
+					if (!sets[3].has(d.getMonth() + 1) || !dayOk) {
+						d.setDate(d.getDate() + 1);
+						d.setHours(0, 0);
+						continue;
+					}
+					if (!sets[1].has(d.getHours())) {
+						d.setHours(d.getHours() + 1, 0);
+						continue;
+					}
+					if (sets[0].has(d.getMinutes())) runs.push(new Date(d));
+					d.setMinutes(d.getMinutes() + 1);
+				}
+				const fmt = new Intl.DateTimeFormat('en', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+				byId('cron-runs').replaceChildren(
+					...runs.map((r) => {
+						const li = document.createElement('li');
+						li.textContent = fmt.format(r);
+						return li;
+					})
+				);
+			} catch (e) {
+				byId('cron-field').classList.add('invalid');
+				byId('cron-note').textContent = (e as Error).message;
+				byId('cron-human').textContent = '—';
+				byId('cron-runs').replaceChildren();
+			}
+			document.querySelectorAll<HTMLButtonElement>('#cron-presets button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.expr === raw)));
+		};
+
+		input.addEventListener('input', render);
+		document.querySelectorAll<HTMLButtonElement>('#cron-presets button').forEach((b) =>
+			b.addEventListener('click', () => {
+				input.value = b.dataset.expr!;
+				render();
+			})
+		);
+		render();
+	});
+</script>
+
+<style>
+	.cron-human p {
+		margin: 0;
+		padding: 16px 18px;
+		font-size: 18px;
+		font-weight: 700;
+	}
+	.cron-runs {
+		margin: 0;
+		padding: 10px 14px 10px 36px;
+		font-family: var(--mono);
+		font-size: 13px;
+		display: grid;
+		gap: 6px;
+	}
+	.cron-help {
+		margin: 0;
+		padding: 10px 14px 10px 30px;
+		font-size: 13px;
+		display: grid;
+		gap: 6px;
+	}
+	.cron-help code {
+		font-family: var(--mono);
+		font-weight: 700;
+		color: var(--accent-strong);
+	}
+</style>
