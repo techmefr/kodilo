@@ -1,0 +1,164 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+<svg xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns="http://www.w3.org/2000/svg" width="64.000000" height="64.000000" viewBox="0 0 64.000000 64.000000" version="1.1" id="svg8" inkscape:version="1.3">
+  <metadata id="metadata5"><dc:title>Leaf</dc:title></metadata>
+  <defs id="defs2"/>
+  <g id="layer1" inkscape:label="Layer 1" transform="translate(0.000000,0.000000)">
+    <path style="fill:#16a34a;fill-opacity:1;stroke:none;stroke-width:1.00000000" d="M 12.000000,52.000000 C 12.000000,28.000000 28.000000,12.000000 52.000000,12.000000 C 52.000000,36.000000 36.000000,52.000000 12.000000,52.000000 Z" id="path10"/>
+    <path style="fill:none;stroke:#14532d;stroke-width:3.000000;stroke-linecap:round" d="M 12.000000,52.000000 L 40.000000,24.000000" id="path12"/>
+  </g>
+</svg>`;
+---
+
+<ToolShell slug="svg-optimizer" title="SVG Optimizer" description="Shrink SVG files with SVGO in your browser: remove editor metadata, round numbers, merge paths. Compare the size and the result side by side.">
+	<div class="toolbar" id="so-tool">
+		<label class="check">Precision <input class="num" id="so-precision" type="number" min="0" max="8" value="2" /></label>
+		<label class="check"><input type="checkbox" id="so-multipass" checked /> Multipass</label>
+		<label class="check"><input type="checkbox" id="so-viewbox" checked /> Keep viewBox</label>
+		<label class="check"><input type="checkbox" id="so-ids" /> Keep IDs</label>
+		<label class="check"><input type="checkbox" id="so-pretty" /> Pretty print</label>
+		<label class="btn so-file">Open .svg<input type="file" id="so-file" accept=".svg,image/svg+xml" hidden /></label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Original</div>
+			<textarea id="so-in" spellcheck="false" aria-label="SVG input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Optimized</span>
+				<span class="so-actions"><button class="btn" id="so-dl">Download</button><button class="btn" id="so-copy">Copy</button></span>
+			</div>
+			<pre class="out" id="so-out"></pre>
+		</section>
+	</div>
+	<p class="error" id="so-error" hidden></p>
+	<div class="stats">
+		<div class="stat"><b id="so-before">—</b><span>Original</span></div>
+		<div class="stat"><b id="so-after">—</b><span>Optimized</span></div>
+		<div class="stat"><b id="so-saved">—</b><span>Saved</span></div>
+		<div class="stat"><b id="so-gzip">—</b><span>Optimized, gzipped</span></div>
+	</div>
+	<div class="so-compare">
+		<figure><div class="so-img" id="so-img-a"></div><figcaption>Original</figcaption></figure>
+		<figure><div class="so-img" id="so-img-b"></div><figcaption>Optimized</figcaption></figure>
+	</div>
+</ToolShell>
+
+<script>
+	import { gzipSync } from 'fflate';
+	import { optimize } from 'svgo/browser';
+	import { saveBlob } from '../../scripts/files';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
+	const img = (svg: string) => {
+		const i = document.createElement('img');
+		i.alt = '';
+		i.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+		return i;
+	};
+
+	onPage('so-tool', () => {
+		const input = byId<HTMLTextAreaElement>('so-in');
+		const out = byId('so-out');
+		const error = byId('so-error');
+		const precision = byId<HTMLInputElement>('so-precision');
+		const multipass = byId<HTMLInputElement>('so-multipass');
+		const viewbox = byId<HTMLInputElement>('so-viewbox');
+		const ids = byId<HTMLInputElement>('so-ids');
+		const pretty = byId<HTMLInputElement>('so-pretty');
+		let name = 'image';
+
+		const render = () => {
+			const overrides: Record<string, false> = {};
+			if (viewbox.checked) overrides.removeViewBox = false;
+			if (ids.checked) overrides.cleanupIds = false;
+			try {
+				const res = optimize(input.value, {
+					multipass: multipass.checked,
+					floatPrecision: Math.min(8, Math.max(0, Number(precision.value) || 0)),
+					js2svg: { pretty: pretty.checked, indent: 2 },
+					plugins: [{ name: 'preset-default', params: { overrides } }, 'removeDimensions'].filter((p) => p !== 'removeDimensions' || viewbox.checked) as never,
+				});
+				out.textContent = res.data;
+				error.hidden = true;
+				const a = new TextEncoder().encode(input.value).length;
+				const b = new TextEncoder().encode(res.data).length;
+				byId('so-before').textContent = kb(a);
+				byId('so-after').textContent = kb(b);
+				byId('so-saved').textContent = `${Math.max(0, Math.round((1 - b / a) * 100))}%`;
+				byId('so-gzip').textContent = kb(gzipSync(new TextEncoder().encode(res.data)).length);
+				byId('so-img-a').replaceChildren(img(input.value));
+				byId('so-img-b').replaceChildren(img(res.data));
+			} catch (e) {
+				error.hidden = false;
+				error.textContent = `This SVG could not be parsed: ${(e as Error).message.split('\n')[0]}`;
+				out.textContent = '';
+			}
+		};
+
+		byId<HTMLInputElement>('so-file').addEventListener('change', async (e) => {
+			const f = (e.target as HTMLInputElement).files?.[0];
+			if (!f) return;
+			name = f.name.replace(/\.svg$/i, '');
+			input.value = await f.text();
+			render();
+		});
+		[input, precision].forEach((el) => el.addEventListener('input', render));
+		[multipass, viewbox, ids, pretty].forEach((el) => el.addEventListener('change', render));
+		byId('so-dl').addEventListener('click', () => saveBlob(new Blob([out.textContent ?? ''], { type: 'image/svg+xml' }), `${name}.min.svg`));
+		copyButton(byId('so-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#so-in {
+		min-height: 320px;
+	}
+	#so-out {
+		white-space: pre-wrap;
+		word-break: break-all;
+	}
+	.so-actions {
+		display: flex;
+		gap: 8px;
+	}
+	.so-file {
+		cursor: pointer;
+	}
+	.so-compare {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 12px;
+	}
+	.so-compare figure {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+	}
+	.so-img {
+		display: grid;
+		place-items: center;
+		width: 100%;
+		height: 180px;
+		border-radius: 12px;
+		border: 1px solid var(--border);
+		background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 16px 16px;
+	}
+	.so-img :global(img) {
+		max-width: 80%;
+		max-height: 150px;
+		width: 120px;
+	}
+	.so-compare figcaption {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+</style>

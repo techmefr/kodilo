@@ -1,0 +1,203 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="image-color-palette" title="Image Color Palette" description="Extract the dominant colors of an image, with their share of the picture. Click a color to copy it, or export the palette as CSS variables.">
+	<label class="drop" id="ip-tool">
+		<input type="file" id="ip-file" accept="image/*" hidden />
+		<span id="ip-drop">Drop an image here or click to choose. A sample is loaded.</span>
+	</label>
+	<div class="toolbar">
+		<div class="seg" id="ip-count" aria-label="Colors">
+			<button data-value="5" aria-pressed="false">5</button>
+			<button data-value="8" aria-pressed="true">8</button>
+			<button data-value="12" aria-pressed="false">12</button>
+		</div>
+		<div class="seg" id="ip-format" aria-label="Format">
+			<button data-value="hex" aria-pressed="true">HEX</button>
+			<button data-value="rgb" aria-pressed="false">RGB</button>
+			<button data-value="hsl" aria-pressed="false">HSL</button>
+		</div>
+	</div>
+	<div class="ip-layout">
+		<img id="ip-img" alt="Selected image" />
+		<ul class="ip-list" id="ip-list"></ul>
+	</div>
+	<div class="ip-bar" id="ip-bar" aria-hidden="true"></div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS variables</span>
+			<button class="btn" id="ip-copy">Copy</button>
+		</div>
+		<pre class="out" id="ip-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { fileZone, loadImageFile, sampleCanvas } from '../../scripts/files';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type C = { rgb: [number, number, number]; share: number };
+
+	function kmeans(px: number[][], k: number): C[] {
+		let centers = px.filter((_, i) => i % Math.max(1, Math.floor(px.length / k)) === 0).slice(0, k);
+		let groups: number[][][] = [];
+		for (let it = 0; it < 12; it++) {
+			groups = centers.map(() => []);
+			for (const p of px) {
+				let best = 0;
+				let d = Infinity;
+				centers.forEach((c, i) => {
+					const x = (p[0] - c[0]) ** 2 * 0.3 + (p[1] - c[1]) ** 2 * 0.59 + (p[2] - c[2]) ** 2 * 0.11;
+					if (x < d) ((d = x), (best = i));
+				});
+				groups[best].push(p);
+			}
+			centers = groups.map((g, i) => (g.length ? [0, 1, 2].map((j) => g.reduce((a, p) => a + p[j], 0) / g.length) : centers[i]));
+		}
+		return centers
+			.map((c, i) => ({ rgb: c.map(Math.round) as [number, number, number], share: groups[i].length / px.length }))
+			.filter((c) => c.share > 0)
+			.sort((a, b) => b.share - a.share);
+	}
+
+	const hex = ([r, g, b]: number[]) => '#' + [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('');
+	function hsl([r, g, b]: number[]) {
+		const [R, G, B] = [r / 255, g / 255, b / 255];
+		const max = Math.max(R, G, B);
+		const min = Math.min(R, G, B);
+		const l = (max + min) / 2;
+		const d = max - min;
+		const s = d ? (l > 0.5 ? d / (2 - max - min) : d / (max + min)) : 0;
+		const h = !d ? 0 : max === R ? (G - B) / d + (G < B ? 6 : 0) : max === G ? (B - R) / d + 2 : (R - G) / d + 4;
+		return `hsl(${Math.round(h * 60)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
+	}
+
+	onPage('ip-tool', () => {
+		const img = byId<HTMLImageElement>('ip-img');
+		let k = 8;
+		let format = 'hex';
+		let colors: C[] = [];
+
+		const fmt = (c: C) => (format === 'hex' ? hex(c.rgb) : format === 'rgb' ? `rgb(${c.rgb.join(' ')})` : hsl(c.rgb));
+
+		const paint = () => {
+			byId('ip-list').replaceChildren(
+				...colors.map((c) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<i></i><code></code><span></span>';
+					(li.querySelector('i') as HTMLElement).style.background = hex(c.rgb);
+					li.querySelector('code')!.textContent = fmt(c);
+					li.querySelector('span')!.textContent = `${(c.share * 100).toFixed(1)}%`;
+					li.title = 'Click to copy';
+					li.addEventListener('click', async () => {
+						await navigator.clipboard.writeText(fmt(c));
+						li.querySelector('span')!.textContent = 'Copied';
+						setTimeout(() => (li.querySelector('span')!.textContent = `${(c.share * 100).toFixed(1)}%`), 1000);
+					});
+					return li;
+				})
+			);
+			byId('ip-bar').replaceChildren(
+				...colors.map((c) => {
+					const s = document.createElement('i');
+					s.style.background = hex(c.rgb);
+					s.style.flexGrow = String(c.share);
+					return s;
+				})
+			);
+			byId('ip-css').textContent = `:root {\n${colors.map((c, i) => `  --palette-${i + 1}: ${fmt(c)};`).join('\n')}\n}`;
+		};
+
+		const analyze = () => {
+			if (!img.naturalWidth) return;
+			const scale = Math.min(1, 160 / Math.max(img.naturalWidth, img.naturalHeight));
+			const c = document.createElement('canvas');
+			c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+			c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+			const g = c.getContext('2d', { willReadFrequently: true })!;
+			g.drawImage(img, 0, 0, c.width, c.height);
+			const d = g.getImageData(0, 0, c.width, c.height).data;
+			const px: number[][] = [];
+			for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 128) px.push([d[i], d[i + 1], d[i + 2]]);
+			colors = kmeans(px, k);
+			paint();
+		};
+
+		img.addEventListener('load', analyze);
+		fileZone(byId('ip-tool'), byId<HTMLInputElement>('ip-file'), async (files) => {
+			const f = files.find((x) => x.type.startsWith('image/'));
+			if (!f) return;
+			byId('ip-drop').textContent = `${f.name}. Drop another image to replace it.`;
+			img.src = (await loadImageFile(f)).src;
+		});
+		segmented(byId('ip-count'), (v) => ((k = Number(v)), analyze()));
+		segmented(byId('ip-format'), (v) => ((format = v), paint()));
+		copyButton(byId('ip-copy'), () => byId('ip-css').textContent ?? '');
+		img.src = sampleCanvas(900, 600).toDataURL('image/png');
+	});
+</script>
+
+<style>
+	.ip-layout {
+		display: grid;
+		grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+		gap: 16px;
+		align-items: start;
+	}
+	@media (max-width: 720px) {
+		.ip-layout {
+			grid-template-columns: 1fr;
+		}
+	}
+	#ip-img {
+		width: 100%;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+	}
+	.ip-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.ip-list :global(li) {
+		display: grid;
+		grid-template-columns: 36px 1fr auto;
+		align-items: center;
+		gap: 10px;
+		padding: 6px 10px 6px 6px;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		background: var(--surface);
+		cursor: pointer;
+	}
+	.ip-list :global(li:hover) {
+		border-color: var(--accent-strong);
+	}
+	.ip-list :global(i) {
+		width: 36px;
+		height: 28px;
+		border-radius: 6px;
+	}
+	.ip-list :global(code) {
+		font-family: var(--mono);
+		font-size: 14px;
+	}
+	.ip-list :global(span) {
+		font-size: 12px;
+		color: var(--ink-soft);
+		font-variant-numeric: tabular-nums;
+	}
+	.ip-bar {
+		display: flex;
+		height: 34px;
+		border-radius: 10px;
+		overflow: hidden;
+	}
+	.ip-bar :global(i) {
+		flex-basis: 0;
+	}
+</style>

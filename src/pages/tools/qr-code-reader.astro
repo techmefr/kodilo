@@ -1,0 +1,203 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="qr-code-reader" title="QR Code Reader" description="Read a QR code from an image, a screenshot you paste, or your camera. See what it contains before you open it.">
+	<div class="toolbar" id="qr-tool">
+		<button class="btn primary" id="qr-cam">Use camera</button>
+		<span class="field-note">You can also paste a screenshot with Ctrl V / ⌘ V.</span>
+	</div>
+	<label class="drop" id="qr-drop">
+		<input type="file" id="qr-file" accept="image/*" hidden />
+		<span id="qr-drop-label">Drop an image with a QR code here or click to choose. A sample is loaded.</span>
+	</label>
+	<div class="qr-view">
+		<video id="qr-video" playsinline muted hidden></video>
+		<canvas id="qr-canvas" aria-label="Scanned image"></canvas>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="qr-kind">Content</span>
+			<span class="qr-actions"><a class="btn" id="qr-open" target="_blank" rel="noopener noreferrer" hidden>Open link</a><button class="btn" id="qr-copy">Copy</button></span>
+		</div>
+		<pre class="out qr-out" id="qr-out"></pre>
+	</section>
+	<dl class="qr-fields" id="qr-fields"></dl>
+</ToolShell>
+
+<script>
+	import jsQR from 'jsqr';
+	import { fileZone, loadImageFile } from '../../scripts/files';
+	import { renderQr } from '../../scripts/qr';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	function describe(t: string): [string, [string, string][]] {
+		if (/^https?:\/\//i.test(t)) {
+			try {
+				const u = new URL(t);
+				return ['Link', [['Domain', u.hostname], ['Secure', u.protocol === 'https:' ? 'Yes, https' : 'No, plain http']]];
+			} catch {}
+		}
+		if (/^WIFI:/i.test(t)) {
+			const get = (k: string) => t.match(new RegExp(`${k}:((?:\\\\.|[^;])*)`))?.[1]?.replace(/\\(.)/g, '$1') ?? '';
+			return ['WiFi network', [['Network', get('S')], ['Security', get('T') || 'Open'], ['Password', get('P')], ['Hidden', get('H') === 'true' ? 'Yes' : 'No']]];
+		}
+		if (/^mailto:/i.test(t)) return ['Email', [['To', t.slice(7).split('?')[0]]]];
+		if (/^tel:/i.test(t)) return ['Phone number', [['Number', t.slice(4)]]];
+		if (/^otpauth:\/\//i.test(t)) {
+			const u = new URL(t);
+			return ['2FA secret', [['Issuer', u.searchParams.get('issuer') ?? ''], ['Account', decodeURIComponent(u.pathname.slice(1))]]];
+		}
+		if (/^BEGIN:VCARD/i.test(t)) return ['Contact card', [['Name', t.match(/\nFN:(.*)/)?.[1] ?? '']]];
+		return ['Text', []];
+	}
+
+	onPage('qr-tool', () => {
+		const canvas = byId<HTMLCanvasElement>('qr-canvas');
+		const video = byId<HTMLVideoElement>('qr-video');
+		const out = byId('qr-out');
+		let stream: MediaStream | null = null;
+
+		const show = (text: string | null) => {
+			const open = byId<HTMLAnchorElement>('qr-open');
+			if (text === null) {
+				byId('qr-kind').textContent = 'No QR code found';
+				out.textContent = 'Try a sharper or larger image, with the whole code visible.';
+				byId('qr-fields').replaceChildren();
+				open.hidden = true;
+				return;
+			}
+			const [kind, fields] = describe(text);
+			byId('qr-kind').textContent = kind;
+			out.textContent = text;
+			open.hidden = kind !== 'Link';
+			if (kind === 'Link') open.href = text;
+			byId('qr-fields').replaceChildren(
+				...fields.flatMap(([k, v]) => {
+					const dt = document.createElement('dt');
+					dt.textContent = k;
+					const dd = document.createElement('dd');
+					dd.textContent = v;
+					return [dt, dd];
+				})
+			);
+		};
+
+		const scan = (source: CanvasImageSource, w: number, h: number) => {
+			const scale = Math.min(1, 1200 / Math.max(w, h));
+			canvas.width = Math.round(w * scale);
+			canvas.height = Math.round(h * scale);
+			const g = canvas.getContext('2d', { willReadFrequently: true })!;
+			g.drawImage(source, 0, 0, canvas.width, canvas.height);
+			const code = jsQR(g.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+			if (code) {
+				g.strokeStyle = '#22c55e';
+				g.lineWidth = 6;
+				g.beginPath();
+				const l = code.location;
+				[l.topLeftCorner, l.topRightCorner, l.bottomRightCorner, l.bottomLeftCorner].forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
+				g.closePath();
+				g.stroke();
+			}
+			return code?.data ?? null;
+		};
+
+		const fromFile = async (f: Blob, label: string) => {
+			stop();
+			const img = await loadImageFile(f);
+			byId('qr-drop-label').textContent = `${label}. Drop another image to scan it.`;
+			show(scan(img, img.naturalWidth, img.naturalHeight));
+		};
+
+		const stop = () => {
+			stream?.getTracks().forEach((t) => t.stop());
+			stream = null;
+			video.hidden = true;
+			byId('qr-cam').textContent = 'Use camera';
+		};
+
+		const loop = () => {
+			if (!stream || !document.getElementById('qr-video')) return stop();
+			if (video.readyState >= 2) {
+				const found = scan(video, video.videoWidth, video.videoHeight);
+				if (found) {
+					show(found);
+					return stop();
+				}
+			}
+			requestAnimationFrame(loop);
+		};
+
+		byId('qr-cam').addEventListener('click', async () => {
+			if (stream) return stop();
+			try {
+				stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+				video.srcObject = stream;
+				video.hidden = false;
+				await video.play();
+				byId('qr-cam').textContent = 'Stop camera';
+				byId('qr-kind').textContent = 'Scanning…';
+				loop();
+			} catch {
+				byId('qr-kind').textContent = 'Camera unavailable';
+				out.textContent = 'Allow camera access in your browser, or drop an image instead.';
+			}
+		});
+		fileZone(byId('qr-drop'), byId<HTMLInputElement>('qr-file'), (files) => files[0] && fromFile(files[0], files[0].name));
+		document.addEventListener('paste', (e) => {
+			if (!document.getElementById('qr-tool')) return;
+			const item = [...(e.clipboardData?.items ?? [])].find((i) => i.type.startsWith('image/'));
+			const f = item?.getAsFile();
+			if (f) fromFile(f, 'Pasted image');
+		});
+		copyButton(byId('qr-copy'), () => out.textContent ?? '');
+
+		const sample = document.createElement('canvas');
+		renderQr(sample, 'WIFI:T:WPA;S:Office Guest;P:welcome-2026;;', { ecc: 'M', dark: '#111827', light: '#ffffff', size: 360 }).then(() => {
+			show(scan(sample, sample.width, sample.height));
+		});
+	});
+</script>
+
+<style>
+	.qr-view {
+		display: flex;
+		justify-content: center;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+	.qr-view video,
+	.qr-view canvas {
+		max-width: 100%;
+		max-height: 360px;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+	}
+	.qr-out {
+		min-height: auto !important;
+		white-space: pre-wrap;
+		word-break: break-all;
+	}
+	.qr-actions {
+		display: flex;
+		gap: 8px;
+	}
+	.qr-actions a {
+		text-decoration: none;
+	}
+	.qr-fields {
+		margin: 0;
+		display: grid;
+		grid-template-columns: 120px 1fr;
+		gap: 6px 12px;
+		font-size: 14px;
+	}
+	.qr-fields :global(dt) {
+		color: var(--ink-soft);
+	}
+	.qr-fields :global(dd) {
+		margin: 0;
+		font-family: var(--mono);
+		overflow-wrap: anywhere;
+	}
+</style>

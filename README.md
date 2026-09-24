@@ -127,6 +127,16 @@ Live at **https://techmefr.github.io/kodilo/**
 - **String Escaper** (`/tools/string-escaper/`) — JSON, JS, SQL, shell, regex, CSV, HTML both ways
 - **WCAG Contrast Checker** (`/tools/wcag-contrast-checker/`) — AA/AAA ratios, preview, nearest passing color
 - **px, rem & em Converter** (`/tools/px-rem-converter/`) — any root size, scale table, CSS px to rem
+- **Cubic Bezier Editor** (`/tools/cubic-bezier-editor/`) — drag handles, presets, animated preview against linear
+- **Image Color Palette** (`/tools/image-color-palette/`) — dominant colors with shares, CSS variables export
+- **Favicon Generator** (`/tools/favicon-generator/`) — ico, PNG sizes, Apple icon, manifest and HTML as a zip
+- **SVG Optimizer** (`/tools/svg-optimizer/`) — SVGO in the browser, precision, before/after preview
+- **WebP & AVIF Converter** (`/tools/webp-avif-converter/`) — WebP, AVIF, JPG and PNG with size comparison
+- **EXIF Viewer & Remover** (`/tools/exif-viewer/`) — camera, date and GPS shown, clean copy without metadata
+- **QR Code Reader** (`/tools/qr-code-reader/`) — image, paste or camera, WiFi and 2FA codes explained
+- **TOTP / 2FA Generator** (`/tools/totp-generator/`) — live codes, check a code, otpauth URI and QR
+- **JWT Generator** (`/tools/jwt-generator/`) — HS256/HS512/RS256/ES256, expiry, key pairs, verify
+- **CSP Generator** (`/tools/csp-generator/`) — presets, per-directive fields, warnings, header/meta/Nginx/Apache
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.

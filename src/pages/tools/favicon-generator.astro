@@ -1,0 +1,226 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="favicon-generator" title="Favicon Generator" description="Make a full favicon set from an image or a letter: favicon.ico, PNG sizes, Apple touch icon, web manifest and the HTML to paste. Download it as a zip.">
+	<div class="toolbar" id="fv-tool">
+		<div class="seg" id="fv-source" aria-label="Source">
+			<button data-value="text" aria-pressed="true">Letter or emoji</button>
+			<button data-value="image" aria-pressed="false">Image</button>
+		</div>
+	</div>
+	<div class="fields" id="fv-text-fields">
+		<div class="field"><label for="fv-text">Text</label><input id="fv-text" value="K" maxlength="3" /></div>
+		<div class="field"><label for="fv-bg">Background</label><input id="fv-bg" type="color" value="#4f46e5" /></div>
+		<div class="field"><label for="fv-fg">Text color</label><input id="fv-fg" type="color" value="#ffffff" /></div>
+		<div class="field">
+			<label for="fv-radius">Corner radius <b id="fv-radius-v">22</b>%</label>
+			<input id="fv-radius" type="range" min="0" max="50" value="22" />
+		</div>
+	</div>
+	<label class="drop" id="fv-drop" hidden>
+		<input type="file" id="fv-file" accept="image/*" hidden />
+		<span id="fv-drop-label">Drop a square image here, ideally 512×512 PNG or SVG.</span>
+	</label>
+	<div class="fields">
+		<div class="field"><label for="fv-name">App name</label><input id="fv-name" value="kodilo" /></div>
+		<div class="field"><label for="fv-theme">Theme color</label><input id="fv-theme" type="color" value="#4f46e5" /></div>
+	</div>
+	<div class="fv-sizes" id="fv-sizes"></div>
+	<div class="fv-tab">
+		<span class="fv-tab-icon"><img id="fv-tab-img" alt="" width="16" height="16" /></span>
+		<span id="fv-tab-name">kodilo</span>
+	</div>
+	<div class="toolbar"><button class="btn primary" id="fv-zip">Download favicon.zip</button></div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Paste in your &lt;head&gt;</span>
+			<button class="btn" id="fv-copy">Copy</button>
+		</div>
+		<pre class="out" id="fv-html"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { zipSync } from 'fflate';
+	import { fileZone, loadImageFile, saveBlob, toBlob } from '../../scripts/files';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const SIZES = [16, 32, 48, 180, 192, 512];
+	const NAMES: Record<number, string> = { 16: 'favicon-16x16.png', 32: 'favicon-32x32.png', 48: 'favicon-48x48.png', 180: 'apple-touch-icon.png', 192: 'android-chrome-192x192.png', 512: 'android-chrome-512x512.png' };
+	const HTML = `<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">`;
+
+	function ico(pngs: { size: number; bytes: Uint8Array }[]): Uint8Array {
+		const head = 6 + 16 * pngs.length;
+		const total = head + pngs.reduce((a, p) => a + p.bytes.length, 0);
+		const buf = new Uint8Array(total);
+		const v = new DataView(buf.buffer);
+		v.setUint16(2, 1, true);
+		v.setUint16(4, pngs.length, true);
+		let offset = head;
+		pngs.forEach((p, i) => {
+			const e = 6 + i * 16;
+			buf[e] = p.size >= 256 ? 0 : p.size;
+			buf[e + 1] = p.size >= 256 ? 0 : p.size;
+			v.setUint16(e + 4, 1, true);
+			v.setUint16(e + 6, 32, true);
+			v.setUint32(e + 8, p.bytes.length, true);
+			v.setUint32(e + 12, offset, true);
+			buf.set(p.bytes, offset);
+			offset += p.bytes.length;
+		});
+		return buf;
+	}
+
+	onPage('fv-tool', () => {
+		const text = byId<HTMLInputElement>('fv-text');
+		const bg = byId<HTMLInputElement>('fv-bg');
+		const fg = byId<HTMLInputElement>('fv-fg');
+		const radius = byId<HTMLInputElement>('fv-radius');
+		const name = byId<HTMLInputElement>('fv-name');
+		const theme = byId<HTMLInputElement>('fv-theme');
+		let source = 'text';
+		let image: HTMLImageElement | null = null;
+
+		const draw = (size: number, forApple = false) => {
+			const c = document.createElement('canvas');
+			c.width = c.height = size;
+			const g = c.getContext('2d')!;
+			if (source === 'image' && image) {
+				if (forApple) {
+					g.fillStyle = '#fff';
+					g.fillRect(0, 0, size, size);
+				}
+				g.imageSmoothingQuality = 'high';
+				g.drawImage(image, 0, 0, size, size);
+				return c;
+			}
+			const r = forApple ? 0 : (Number(radius.value) / 100) * size;
+			g.fillStyle = bg.value;
+			g.beginPath();
+			g.roundRect(0, 0, size, size, r);
+			g.fill();
+			g.fillStyle = fg.value;
+			g.textAlign = 'center';
+			g.textBaseline = 'middle';
+			const t = text.value || ' ';
+			g.font = `700 ${size * (t.length > 1 ? 0.46 : 0.62)}px system-ui, -apple-system, 'Segoe UI', sans-serif`;
+			g.fillText(t, size / 2, size * 0.54);
+			return c;
+		};
+
+		const render = () => {
+			byId('fv-radius-v').textContent = radius.value;
+			byId('fv-text-fields').hidden = source !== 'text';
+			byId('fv-drop').hidden = source !== 'image';
+			byId('fv-sizes').replaceChildren(
+				...SIZES.map((s) => {
+					const fig = document.createElement('figure');
+					const c = draw(Math.max(s, 64), s === 180);
+					c.style.width = c.style.height = `${Math.min(s, 96)}px`;
+					const cap = document.createElement('figcaption');
+					cap.textContent = `${s}×${s}`;
+					fig.append(c, cap);
+					return fig;
+				})
+			);
+			(byId('fv-tab-img') as HTMLImageElement).src = draw(32).toDataURL();
+			byId('fv-tab-name').textContent = name.value || 'Untitled';
+			byId('fv-html').textContent = `${HTML}\n<meta name="theme-color" content="${theme.value}">`;
+		};
+
+		const manifest = () =>
+			JSON.stringify(
+				{
+					name: name.value,
+					short_name: name.value,
+					icons: [
+						{ src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
+						{ src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },
+					],
+					theme_color: theme.value,
+					background_color: '#ffffff',
+					display: 'standalone',
+				},
+				null,
+				2
+			);
+
+		segmented(byId('fv-source'), (v) => ((source = v), render()));
+		fileZone(byId('fv-drop'), byId<HTMLInputElement>('fv-file'), async (files) => {
+			if (!files[0]) return;
+			image = await loadImageFile(files[0]);
+			byId('fv-drop-label').textContent = `${files[0].name} · ${image.naturalWidth}×${image.naturalHeight}${image.naturalWidth !== image.naturalHeight ? ' · not square, it will be stretched' : ''}`;
+			render();
+		});
+		[text, bg, fg, radius, name, theme].forEach((el) => el.addEventListener('input', render));
+		byId('fv-zip').addEventListener('click', async () => {
+			const files: Record<string, Uint8Array> = {};
+			const png = async (s: number) => new Uint8Array(await (await toBlob(draw(s, s === 180), 'image/png')).arrayBuffer());
+			for (const s of SIZES) files[NAMES[s]] = await png(s);
+			files['favicon.ico'] = ico([16, 32, 48].map((s) => ({ size: s, bytes: files[NAMES[s]] })));
+			files['site.webmanifest'] = new TextEncoder().encode(manifest());
+			files['head.html'] = new TextEncoder().encode(byId('fv-html').textContent ?? '');
+			saveBlob(new Blob([zipSync(files)], { type: 'application/zip' }), 'favicon.zip');
+		});
+		copyButton(byId('fv-copy'), () => byId('fv-html').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#fv-text {
+		font-size: 22px;
+	}
+	.field input[type='color'] {
+		width: 100%;
+		height: 32px;
+		border: 0;
+		padding: 0;
+		background: none;
+		cursor: pointer;
+	}
+	#fv-radius {
+		accent-color: var(--accent-strong);
+	}
+	.fv-sizes {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		gap: 18px;
+		padding: 16px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.fv-sizes :global(figure) {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+	}
+	.fv-sizes :global(figcaption) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.fv-tab {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		max-width: 240px;
+		padding: 8px 14px;
+		border-radius: 10px 10px 0 0;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-bottom: 0;
+		font-size: 13px;
+	}
+	.fv-tab-icon {
+		display: flex;
+	}
+</style>

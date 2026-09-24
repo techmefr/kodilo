@@ -1,0 +1,237 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="totp-generator" title="TOTP / 2FA Generator" description="Generate and check time-based one-time passwords (RFC 6238) like Google Authenticator. Create a secret and its QR code to test your 2FA flow.">
+	<div class="fields" id="to-tool">
+		<div class="field wide" id="to-secret-field">
+			<label for="to-secret">Secret (Base32)</label>
+			<input id="to-secret" spellcheck="false" autocomplete="off" />
+			<span class="field-note" id="to-secret-note"></span>
+		</div>
+		<div class="field"><label for="to-issuer">Issuer</label><input id="to-issuer" value="kodilo" /></div>
+		<div class="field"><label for="to-account">Account</label><input id="to-account" value="ada@example.com" /></div>
+	</div>
+	<div class="toolbar">
+		<button class="btn" id="to-new">New secret</button>
+		<div class="seg" id="to-digits" aria-label="Digits">
+			<button data-value="6" aria-pressed="true">6 digits</button>
+			<button data-value="8" aria-pressed="false">8 digits</button>
+		</div>
+		<div class="seg" id="to-period" aria-label="Period">
+			<button data-value="30" aria-pressed="true">30 s</button>
+			<button data-value="60" aria-pressed="false">60 s</button>
+		</div>
+		<div class="seg" id="to-algo" aria-label="Algorithm">
+			<button data-value="SHA1" aria-pressed="true">SHA-1</button>
+			<button data-value="SHA256" aria-pressed="false">SHA-256</button>
+			<button data-value="SHA512" aria-pressed="false">SHA-512</button>
+		</div>
+	</div>
+	<div class="to-layout">
+		<div class="to-codes">
+			<div class="to-now">
+				<span>Current code</span>
+				<b id="to-code">——————</b>
+				<div class="to-bar"><i id="to-bar"></i></div>
+				<small id="to-left"></small>
+			</div>
+			<div class="to-sides">
+				<div><span>Previous</span><code id="to-prev"></code></div>
+				<div><span>Next</span><code id="to-next"></code></div>
+			</div>
+			<div class="field" id="to-check-field">
+				<label for="to-check">Check a code</label>
+				<input id="to-check" inputmode="numeric" autocomplete="off" placeholder="123456" />
+				<span class="field-note" id="to-check-note"></span>
+			</div>
+		</div>
+		<div class="to-qr">
+			<canvas id="to-qr" width="200" height="200" aria-label="QR code for an authenticator app"></canvas>
+			<span class="field-note">Scan with an authenticator app</span>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>otpauth:// URI</span>
+			<button class="btn" id="to-copy">Copy</button>
+		</div>
+		<pre class="out to-uri" id="to-uri"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { Secret, TOTP } from 'otpauth';
+	import { renderQr } from '../../scripts/qr';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('to-tool', () => {
+		const secret = byId<HTMLInputElement>('to-secret');
+		const issuer = byId<HTMLInputElement>('to-issuer');
+		const account = byId<HTMLInputElement>('to-account');
+		const check = byId<HTMLInputElement>('to-check');
+		let digits = 6;
+		let period = 30;
+		let algorithm = 'SHA1';
+		let totp: TOTP | null = null;
+		let timer: number | undefined;
+
+		const build = () => {
+			const field = byId('to-secret-field');
+			try {
+				const clean = secret.value.replace(/[\s-]/g, '').toUpperCase();
+				if (!/^[A-Z2-7]+=*$/.test(clean) || clean.length < 16) throw new Error();
+				totp = new TOTP({ issuer: issuer.value, label: account.value, algorithm, digits, period, secret: Secret.fromBase32(clean) });
+				field.classList.remove('invalid');
+				byId('to-secret-note').textContent = `${Math.floor((clean.replace(/=/g, '').length * 5) / 8)} bytes of entropy`;
+			} catch {
+				totp = null;
+				field.classList.add('invalid');
+				byId('to-secret-note').textContent = 'Use at least 16 Base32 characters (A-Z and 2-7).';
+			}
+			const uri = totp?.toString() ?? '';
+			byId('to-uri').textContent = uri;
+			if (uri) renderQr(byId<HTMLCanvasElement>('to-qr'), uri, { ecc: 'M', dark: '#111827', light: '#ffffff', size: 200 });
+			tick();
+			verify();
+		};
+
+		const tick = () => {
+			if (!totp) return;
+			const now = Date.now();
+			const left = period - (Math.floor(now / 1000) % period);
+			byId('to-code').textContent = totp.generate({ timestamp: now }).replace(/(\d{3,4})(?=\d{3,4}$)/, '$1 ');
+			byId('to-prev').textContent = totp.generate({ timestamp: now - period * 1000 });
+			byId('to-next').textContent = totp.generate({ timestamp: now + period * 1000 });
+			byId('to-bar').style.width = `${(left / period) * 100}%`;
+			byId('to-left').textContent = `${left} s left`;
+			byId('to-bar').dataset.low = String(left <= 5);
+		};
+
+		const verify = () => {
+			const field = byId('to-check-field');
+			const note = byId('to-check-note');
+			const v = check.value.replace(/\s/g, '');
+			if (!v || !totp) {
+				field.classList.remove('invalid');
+				note.textContent = 'Accepts one step before or after, like most servers.';
+				return;
+			}
+			const delta = totp.validate({ token: v, window: 1 });
+			field.classList.toggle('invalid', delta === null);
+			note.textContent = delta === null ? '✕ Not valid right now' : delta === 0 ? '✓ Valid, current step' : `✓ Valid, ${delta < 0 ? 'previous' : 'next'} step`;
+		};
+
+		const fresh = () => {
+			secret.value = new Secret({ size: 20 }).base32.replace(/(.{4})/g, '$1 ').trim();
+			build();
+		};
+
+		segmented(byId('to-digits'), (v) => ((digits = Number(v)), build()));
+		segmented(byId('to-period'), (v) => ((period = Number(v)), build()));
+		segmented(byId('to-algo'), (v) => ((algorithm = v), build()));
+		[secret, issuer, account].forEach((el) => el.addEventListener('input', build));
+		check.addEventListener('input', verify);
+		byId('to-new').addEventListener('click', fresh);
+		copyButton(byId('to-copy'), () => byId('to-uri').textContent ?? '');
+		clearInterval(timer);
+		timer = window.setInterval(() => (document.getElementById('to-code') ? (tick(), verify()) : clearInterval(timer)), 1000);
+		fresh();
+	});
+</script>
+
+<style>
+	.to-layout {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 20px;
+		align-items: flex-start;
+	}
+	.to-codes {
+		flex: 1;
+		min-width: 260px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	.to-now {
+		padding: 18px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.to-now span,
+	.to-sides span {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.to-now b {
+		font-family: var(--mono);
+		font-size: 44px;
+		letter-spacing: 0.06em;
+		font-variant-numeric: tabular-nums;
+	}
+	.to-bar {
+		height: 6px;
+		border-radius: 3px;
+		background: var(--surface-2);
+		overflow: hidden;
+	}
+	.to-bar i {
+		display: block;
+		height: 100%;
+		background: var(--accent-strong);
+		transition: width 1s linear;
+	}
+	.to-bar i[data-low='true'] {
+		background: #dc2626;
+	}
+	.to-now small {
+		color: var(--ink-soft);
+	}
+	.to-sides {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 10px;
+	}
+	.to-sides div {
+		padding: 10px 14px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.to-sides code {
+		font-family: var(--mono);
+		font-size: 18px;
+		color: var(--ink-soft);
+	}
+	.to-qr {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+	}
+	.to-qr canvas {
+		border-radius: 12px;
+		border: 1px solid var(--border);
+	}
+	.to-uri {
+		min-height: auto !important;
+		word-break: break-all;
+		white-space: pre-wrap;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.to-bar i {
+			transition: none;
+		}
+	}
+</style>

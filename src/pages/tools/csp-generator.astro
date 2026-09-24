@@ -1,0 +1,180 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="csp-generator" title="CSP Generator" description="Build a Content-Security-Policy directive by directive, with warnings for risky values. Output as a header, a meta tag or Nginx and Apache config.">
+	<div class="toolbar" id="cs-tool">
+		<div class="chips" id="cs-presets">
+			<button data-preset="strict" aria-pressed="true">Strict starter</button>
+			<button data-preset="spa" aria-pressed="false">SPA with an API</button>
+			<button data-preset="cdn" aria-pressed="false">Site with CDN, fonts and analytics</button>
+		</div>
+		<label class="check"><input type="checkbox" id="cs-report" /> Report-only</label>
+	</div>
+	<div class="cs-grid" id="cs-grid"></div>
+	<div class="fields">
+		<div class="field wide">
+			<label for="cs-report-uri">Report endpoint (report-uri), optional</label>
+			<input id="cs-report-uri" spellcheck="false" placeholder="https://example.com/csp-report" />
+		</div>
+	</div>
+	<ul class="cs-warn" id="cs-warn"></ul>
+	<section class="panel">
+		<div class="panel-head">
+			<div class="seg" id="cs-format" aria-label="Output">
+				<button data-value="header" aria-pressed="true">HTTP header</button>
+				<button data-value="meta" aria-pressed="false">Meta tag</button>
+				<button data-value="nginx" aria-pressed="false">Nginx</button>
+				<button data-value="apache" aria-pressed="false">Apache</button>
+			</div>
+			<button class="btn" id="cs-copy">Copy</button>
+		</div>
+		<pre class="out cs-out" id="cs-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const DIRECTIVES: [string, string][] = [
+		['default-src', 'Fallback for every fetch directive'],
+		['script-src', 'JavaScript'],
+		['style-src', 'Stylesheets'],
+		['img-src', 'Images and favicons'],
+		['font-src', 'Web fonts'],
+		['connect-src', 'fetch, XHR, WebSocket'],
+		['media-src', 'Audio and video'],
+		['frame-src', 'Pages you embed in iframes'],
+		['worker-src', 'Web and service workers'],
+		['object-src', 'Plugins: keep it none'],
+		['base-uri', 'Allowed <base> URLs'],
+		['form-action', 'Where forms can submit'],
+		['frame-ancestors', 'Who can embed your page'],
+	];
+
+	const PRESETS: Record<string, Record<string, string>> = {
+		strict: { 'default-src': "'self'", 'script-src': "'self'", 'style-src': "'self'", 'img-src': "'self' data:", 'font-src': "'self'", 'connect-src': "'self'", 'object-src': "'none'", 'base-uri': "'self'", 'form-action': "'self'", 'frame-ancestors': "'none'" },
+		spa: { 'default-src': "'self'", 'script-src': "'self'", 'style-src': "'self' 'unsafe-inline'", 'img-src': "'self' data: blob:", 'font-src': "'self'", 'connect-src': "'self' https://api.example.com wss://api.example.com", 'worker-src': "'self' blob:", 'object-src': "'none'", 'base-uri': "'self'", 'form-action': "'self'", 'frame-ancestors': "'none'" },
+		cdn: { 'default-src': "'self'", 'script-src': "'self' https://cdn.jsdelivr.net https://plausible.io", 'style-src': "'self' https://fonts.googleapis.com", 'img-src': "'self' data: https:", 'font-src': "'self' https://fonts.gstatic.com", 'connect-src': "'self' https://plausible.io", 'frame-src': 'https://www.youtube-nocookie.com', 'object-src': "'none'", 'base-uri': "'self'", 'form-action': "'self'", 'frame-ancestors': "'self'" },
+	};
+
+	onPage('cs-tool', () => {
+		const inputs: Record<string, HTMLInputElement> = {};
+		const report = byId<HTMLInputElement>('cs-report');
+		const reportUri = byId<HTMLInputElement>('cs-report-uri');
+		let format = 'header';
+
+		byId('cs-grid').replaceChildren(
+			...DIRECTIVES.map(([name, help]) => {
+				const f = document.createElement('label');
+				f.className = 'field';
+				f.innerHTML = '<span class="cs-name"></span><input spellcheck="false" /><span class="field-note"></span>';
+				f.querySelector('.cs-name')!.textContent = name;
+				f.querySelector('.field-note')!.textContent = help;
+				inputs[name] = f.querySelector('input')!;
+				inputs[name].placeholder = name === 'default-src' ? "'self'" : 'inherits default-src';
+				return f;
+			})
+		);
+
+		const policy = () => {
+			const parts = DIRECTIVES.map(([n]) => [n, inputs[n].value.trim().replace(/\s+/g, ' ')] as const)
+				.filter(([, v]) => v)
+				.map(([n, v]) => `${n} ${v}`);
+			if (!report.checked || reportUri.value) parts.push('upgrade-insecure-requests');
+			if (reportUri.value.trim()) parts.push(`report-uri ${reportUri.value.trim()}`);
+			return parts.join('; ');
+		};
+
+		const warnings = () => {
+			const w: string[] = [];
+			const all = Object.entries(inputs).map(([k, i]) => [k, i.value] as const);
+			for (const [k, v] of all) {
+				if (/'unsafe-inline'/.test(v) && k === 'script-src') w.push("script-src allows 'unsafe-inline': any injected <script> runs. Prefer nonces or hashes.");
+				if (/'unsafe-eval'/.test(v)) w.push(`${k} allows 'unsafe-eval': eval() and new Function() can run strings as code.`);
+				if (/(^|\s)(\*|https:|http:)(\s|$)/.test(v) && ['script-src', 'default-src', 'connect-src'].includes(k)) w.push(`${k} allows a whole scheme or wildcard, which gives attackers many hosts to load from.`);
+				if (/(^|\s)http:\/\//.test(v)) w.push(`${k} loads over plain http.`);
+			}
+			if (!inputs['object-src'].value && !/'none'/.test(inputs['default-src'].value)) w.push("Set object-src 'none' to block plugins.");
+			if (!inputs['base-uri'].value) w.push('Set base-uri, it does not fall back to default-src.');
+			if (!inputs['frame-ancestors'].value) w.push('Set frame-ancestors to protect against clickjacking. It cannot be set in a meta tag.');
+			if (format === 'meta' && (report.checked || inputs['frame-ancestors'].value)) w.push('Meta tags ignore frame-ancestors, report-uri and report-only. Send the policy as a header when you can.');
+			return w;
+		};
+
+		const render = () => {
+			const p = policy();
+			const name = report.checked ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
+			const out: Record<string, string> = {
+				header: `${name}: ${p}`,
+				meta: `<meta http-equiv="Content-Security-Policy" content="${p.replace(/"/g, '&quot;')}">`,
+				nginx: `add_header ${name} "${p}" always;`,
+				apache: `Header always set ${name} "${p}"`,
+			};
+			byId('cs-out').textContent = out[format];
+			const w = warnings();
+			byId('cs-warn').replaceChildren(
+				...(w.length ? w : ['No obvious weaknesses found.']).map((t) => {
+					const li = document.createElement('li');
+					li.textContent = t;
+					li.dataset.ok = String(!w.length);
+					return li;
+				})
+			);
+		};
+
+		const apply = (name: string) => {
+			for (const [n] of DIRECTIVES) inputs[n].value = PRESETS[name][n] ?? '';
+			document.querySelectorAll<HTMLButtonElement>('#cs-presets button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.preset === name)));
+			render();
+		};
+
+		document.querySelectorAll<HTMLButtonElement>('#cs-presets button').forEach((b) => b.addEventListener('click', () => apply(b.dataset.preset!)));
+		Object.values(inputs).forEach((i) => i.addEventListener('input', render));
+		report.addEventListener('change', render);
+		reportUri.addEventListener('input', render);
+		segmented(byId('cs-format'), (v) => ((format = v), render()));
+		copyButton(byId('cs-copy'), () => byId('cs-out').textContent ?? '');
+		apply('strict');
+	});
+</script>
+
+<style>
+	.cs-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: 10px;
+	}
+	.cs-grid :global(.cs-name) {
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+	}
+	.cs-grid :global(input) {
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 14px;
+		outline: none;
+		width: 100%;
+		min-width: 0;
+	}
+	.cs-warn {
+		margin: 0;
+		padding: 0 0 0 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 14px;
+		color: #b45309;
+	}
+	.cs-warn :global(li[data-ok='true']) {
+		color: #16a34a;
+	}
+	.cs-out {
+		min-height: auto !important;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+</style>
