@@ -1,0 +1,169 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const payload = JSON.stringify({ sub: 'user_4821', name: 'Ada Lovelace', role: 'admin' }, null, 2);
+---
+
+<ToolShell slug="jwt-generator" title="JWT Generator" description="Create and sign a JSON Web Token with HS256, RS256 or ES256, set its expiry, and verify a token against a key. Keys never leave the browser.">
+	<div class="toolbar" id="jg-tool">
+		<div class="seg" id="jg-alg" aria-label="Algorithm">
+			<button data-value="HS256" aria-pressed="true">HS256</button>
+			<button data-value="HS512" aria-pressed="false">HS512</button>
+			<button data-value="RS256" aria-pressed="false">RS256</button>
+			<button data-value="ES256" aria-pressed="false">ES256</button>
+		</div>
+		<label class="check">Expires in <input class="num" id="jg-exp" type="number" min="0" value="60" /> min</label>
+		<label class="check"><input type="checkbox" id="jg-iat" checked /> iat</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Payload</div>
+			<textarea id="jg-payload" spellcheck="false" aria-label="Payload">{payload}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="jg-key-title">Secret</span>
+				<button class="btn" id="jg-gen">New key</button>
+			</div>
+			<textarea id="jg-key" spellcheck="false" aria-label="Key"></textarea>
+		</section>
+	</div>
+	<p class="error" id="jg-error" hidden></p>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Token</span>
+			<button class="btn" id="jg-copy">Copy</button>
+		</div>
+		<pre class="out jg-token" id="jg-token"></pre>
+	</section>
+	<section class="panel" id="jg-pub-panel" hidden>
+		<div class="panel-head">
+			<span>Public key, for verifiers</span>
+			<button class="btn" id="jg-pub-copy">Copy</button>
+		</div>
+		<pre class="out jg-token" id="jg-pub"></pre>
+	</section>
+	<div class="fields">
+		<div class="field wide" id="jg-verify-field">
+			<label for="jg-verify">Verify a token with the key above</label>
+			<input id="jg-verify" spellcheck="false" placeholder="eyJhbGciOi..." />
+			<span class="field-note" id="jg-verify-note"></span>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { SignJWT, exportPKCS8, exportSPKI, generateKeyPair, importPKCS8, importSPKI, jwtVerify } from 'jose';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('jg-tool', () => {
+		const payload = byId<HTMLTextAreaElement>('jg-payload');
+		const key = byId<HTMLTextAreaElement>('jg-key');
+		const exp = byId<HTMLInputElement>('jg-exp');
+		const iat = byId<HTMLInputElement>('jg-iat');
+		const verify = byId<HTMLInputElement>('jg-verify');
+		const error = byId('jg-error');
+		let alg = 'HS256';
+		let pub = '';
+		let run = 0;
+
+		const hmac = () => alg.startsWith('HS');
+
+		const newKey = async () => {
+			if (hmac()) {
+				const bytes = crypto.getRandomValues(new Uint8Array(alg === 'HS512' ? 64 : 32));
+				key.value = btoa(String.fromCharCode(...bytes)).replace(/=+$/, '');
+				pub = '';
+			} else {
+				const pair = await generateKeyPair(alg, { extractable: true });
+				key.value = await exportPKCS8(pair.privateKey);
+				pub = await exportSPKI(pair.publicKey);
+			}
+			byId('jg-key-title').textContent = hmac() ? 'Secret' : 'Private key (PKCS#8 PEM)';
+			byId('jg-pub-panel').hidden = hmac();
+			byId('jg-pub').textContent = pub;
+			render();
+		};
+
+		const signingKey = async () => (hmac() ? new TextEncoder().encode(key.value) : importPKCS8(key.value.trim(), alg));
+
+		const check = async () => {
+			const field = byId('jg-verify-field');
+			const note = byId('jg-verify-note');
+			const t = verify.value.trim();
+			if (!t) {
+				field.classList.remove('invalid');
+				note.textContent = '';
+				return;
+			}
+			try {
+				const k = hmac() ? new TextEncoder().encode(key.value) : await importSPKI(pub, alg);
+				const { payload: p } = await jwtVerify(t, k, { algorithms: [alg] });
+				field.classList.remove('invalid');
+				note.textContent = `✓ Valid signature${p.exp ? `, expires ${new Date(p.exp * 1000).toLocaleString('en-GB')}` : ''}`;
+			} catch (e) {
+				field.classList.add('invalid');
+				const code = (e as { code?: string }).code;
+				note.textContent = code === 'ERR_JWT_EXPIRED' ? '✕ Signature is valid but the token has expired' : code === 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED' ? '✕ Signature does not match this key' : `✕ ${(e as Error).message}`;
+			}
+		};
+
+		const render = async () => {
+			const current = ++run;
+			try {
+				const claims = JSON.parse(payload.value);
+				if (hmac() && new TextEncoder().encode(key.value).length < (alg === 'HS512' ? 64 : 32)) throw new Error(`The secret should be at least ${alg === 'HS512' ? 64 : 32} bytes for ${alg}.`);
+				let jwt = new SignJWT(claims).setProtectedHeader({ alg, typ: 'JWT' });
+				if (iat.checked) jwt = jwt.setIssuedAt();
+				if (Number(exp.value) > 0) jwt = jwt.setExpirationTime(`${Number(exp.value)}m`);
+				const token = await jwt.sign(await signingKey());
+				if (current !== run) return;
+				byId('jg-token').innerHTML = token
+					.split('.')
+					.map((part, i) => `<span class="p${i}">${part}</span>`)
+					.join('.');
+				error.hidden = true;
+				if (!verify.value) verify.placeholder = token.slice(0, 40) + '…';
+			} catch (e) {
+				if (current !== run) return;
+				error.hidden = false;
+				error.textContent = e instanceof SyntaxError ? `Payload is not valid JSON: ${e.message}` : (e as Error).message;
+				byId('jg-token').textContent = '';
+			}
+			check();
+		};
+
+		segmented(byId('jg-alg'), (v) => {
+			alg = v;
+			newKey();
+		});
+		[payload, key, exp].forEach((el) => el.addEventListener('input', render));
+		iat.addEventListener('change', render);
+		verify.addEventListener('input', check);
+		byId('jg-gen').addEventListener('click', newKey);
+		copyButton(byId('jg-copy'), () => byId('jg-token').textContent ?? '');
+		copyButton(byId('jg-pub-copy'), () => pub);
+		newKey();
+	});
+</script>
+
+<style>
+	#jg-payload,
+	#jg-key {
+		min-height: 170px;
+	}
+	.jg-token {
+		min-height: auto !important;
+		word-break: break-all;
+		white-space: pre-wrap;
+	}
+	.jg-token :global(.p0) {
+		color: #db2777;
+	}
+	.jg-token :global(.p1) {
+		color: #7c3aed;
+	}
+	.jg-token :global(.p2) {
+		color: #0891b2;
+	}
+</style>

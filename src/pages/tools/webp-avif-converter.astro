@@ -1,0 +1,151 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="webp-avif-converter" title="WebP & AVIF Converter" description="Convert images to WebP, JPG or PNG, and to AVIF where your browser can encode it. Compare the file sizes. Everything happens in your browser.">
+	<label class="drop" id="wa-tool">
+		<input type="file" id="wa-file" accept="image/*" multiple hidden />
+		<span id="wa-drop">Drop images here or click to choose. A sample is loaded.</span>
+	</label>
+	<div class="toolbar">
+		<div class="seg" id="wa-format" aria-label="Format">
+			<button data-value="image/webp" aria-pressed="true">WebP</button>
+			<button data-value="image/avif" aria-pressed="false">AVIF</button>
+			<button data-value="image/jpeg" aria-pressed="false">JPG</button>
+			<button data-value="image/png" aria-pressed="false">PNG</button>
+		</div>
+		<label class="check">Quality <input type="range" id="wa-q" min="10" max="100" value="80" /> <b id="wa-q-v">80</b></label>
+		<button class="btn primary" id="wa-all">Download all</button>
+	</div>
+	<p class="field-note" id="wa-note"></p>
+	<ul class="wa-list" id="wa-list"></ul>
+</ToolShell>
+
+<script>
+	import { fileZone, loadImageFile, sampleCanvas, saveBlob, toBlob } from '../../scripts/files';
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	type Item = { name: string; size: number; img: HTMLImageElement; out?: Blob };
+	const kb = (n: number) => (n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(2)} MB`);
+	const EXT: Record<string, string> = { 'image/webp': 'webp', 'image/avif': 'avif', 'image/jpeg': 'jpg', 'image/png': 'png' };
+
+	async function supports(type: string) {
+		const c = document.createElement('canvas');
+		c.width = c.height = 2;
+		try {
+			return (await toBlob(c, type, 0.5)).type === type;
+		} catch {
+			return false;
+		}
+	}
+
+	onPage('wa-tool', () => {
+		const items: Item[] = [];
+		const q = byId<HTMLInputElement>('wa-q');
+		let type = 'image/webp';
+		let run = 0;
+
+		const convert = async () => {
+			const current = ++run;
+			byId('wa-q-v').textContent = q.value;
+			const note = byId('wa-note');
+			if (!(await supports(type))) {
+				note.textContent = `This browser cannot encode ${EXT[type].toUpperCase()}. Most browsers can show AVIF but not create it yet. WebP gives similar savings everywhere.`;
+				byId('wa-list').replaceChildren();
+				return;
+			}
+			note.textContent = type === 'image/png' ? 'PNG is lossless, so the quality slider has no effect.' : '';
+			const rows: HTMLLIElement[] = [];
+			for (const it of items) {
+				const c = document.createElement('canvas');
+				c.width = it.img.naturalWidth;
+				c.height = it.img.naturalHeight;
+				const g = c.getContext('2d')!;
+				if (type === 'image/jpeg') {
+					g.fillStyle = '#fff';
+					g.fillRect(0, 0, c.width, c.height);
+				}
+				g.drawImage(it.img, 0, 0);
+				it.out = await toBlob(c, type, Number(q.value) / 100);
+				if (current !== run) return;
+				const li = document.createElement('li');
+				const diff = Math.round((1 - it.out.size / it.size) * 100);
+				li.innerHTML = '<img alt="" /><div><b></b><span></span></div><button class="btn">Save</button>';
+				li.querySelector('img')!.src = URL.createObjectURL(it.out);
+				li.querySelector('b')!.textContent = it.name.replace(/\.[^.]+$/, '') + '.' + EXT[type];
+				const s = li.querySelector('span')!;
+				s.textContent = `${c.width}×${c.height} · ${kb(it.size)} → ${kb(it.out.size)} (${diff >= 0 ? `${diff}% smaller` : `${-diff}% larger`})`;
+				s.dataset.good = String(diff >= 0);
+				const blob = it.out;
+				li.querySelector('button')!.addEventListener('click', () => saveBlob(blob, li.querySelector('b')!.textContent!));
+				rows.push(li);
+			}
+			byId('wa-list').replaceChildren(...rows);
+		};
+
+		fileZone(byId('wa-tool'), byId<HTMLInputElement>('wa-file'), async (files) => {
+			items.length = 0;
+			for (const f of files.filter((x) => x.type.startsWith('image/'))) items.push({ name: f.name, size: f.size, img: await loadImageFile(f) });
+			byId('wa-drop').textContent = `${items.length} image${items.length > 1 ? 's' : ''}. Drop more to replace them.`;
+			convert();
+		});
+		segmented(byId('wa-format'), (v) => ((type = v), convert()));
+		q.addEventListener('change', convert);
+		q.addEventListener('input', () => (byId('wa-q-v').textContent = q.value));
+		byId('wa-all').addEventListener('click', () =>
+			items.forEach((it, i) => it.out && setTimeout(() => saveBlob(it.out!, it.name.replace(/\.[^.]+$/, '') + '.' + EXT[type]), i * 250))
+		);
+
+		toBlob(sampleCanvas(1600, 1000), 'image/png').then(async (b) => {
+			items.push({ name: 'sample.png', size: b.size, img: await loadImageFile(b) });
+			convert();
+		});
+	});
+</script>
+
+<style>
+	#wa-q {
+		accent-color: var(--accent-strong);
+	}
+	.wa-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.wa-list :global(li) {
+		display: grid;
+		grid-template-columns: 72px 1fr auto;
+		align-items: center;
+		gap: 12px;
+		padding: 8px 12px 8px 8px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+	}
+	.wa-list :global(img) {
+		width: 72px;
+		height: 48px;
+		object-fit: cover;
+		border-radius: 6px;
+	}
+	.wa-list :global(div) {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.wa-list :global(b) {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.wa-list :global(span) {
+		font-size: 12.5px;
+		color: var(--ink-soft);
+	}
+	.wa-list :global(span[data-good='true']) {
+		color: #16a34a;
+	}
+</style>
