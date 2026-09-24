@@ -1,0 +1,90 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="qr-code-generator" title="QR Code Generator" description="Turn text or a URL into a QR code. Pick the colors and error correction, then download it as PNG or SVG.">
+	<section class="panel" id="qr-tool">
+		<div class="panel-head">Text or URL</div>
+		<textarea id="qr-text" spellcheck="false" aria-label="Text or URL">https://techmefr.github.io/kodilo/</textarea>
+	</section>
+	<div class="toolbar">
+		<div class="seg" id="qr-ecc" aria-label="Error correction">
+			<button data-value="L" aria-pressed="false">Low 7%</button>
+			<button data-value="M" aria-pressed="true">Medium 15%</button>
+			<button data-value="Q" aria-pressed="false">Quartile 25%</button>
+			<button data-value="H" aria-pressed="false">High 30%</button>
+		</div>
+		<label class="check">Foreground <input type="color" id="qr-dark" value="#111827" /></label>
+		<label class="check">Background <input type="color" id="qr-light" value="#ffffff" /></label>
+	</div>
+	<div class="qr-stage">
+		<canvas id="qr-canvas" width="320" height="320" aria-label="QR code"></canvas>
+		<div class="qr-side">
+			<span class="field-note" id="qr-note"></span>
+			<button class="btn primary" id="qr-png">Download PNG</button>
+			<button class="btn" id="qr-svg">Download SVG</button>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { qrSvg, renderQr, save, type QrOptions } from '../../scripts/qr';
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	onPage('qr-tool', () => {
+		const text = byId<HTMLTextAreaElement>('qr-text');
+		const dark = byId<HTMLInputElement>('qr-dark');
+		const light = byId<HTMLInputElement>('qr-light');
+		const canvas = byId<HTMLCanvasElement>('qr-canvas');
+		let ecc: QrOptions['ecc'] = 'M';
+		const opts = (size: number): QrOptions => ({ ecc, dark: dark.value, light: light.value, size });
+
+		const render = async () => {
+			try {
+				await renderQr(canvas, text.value, opts(320));
+				byId('qr-note').textContent = `${new TextEncoder().encode(text.value).length} bytes`;
+			} catch {
+				byId('qr-note').textContent = 'Too much text for a QR code. Shorten it or lower the error correction.';
+			}
+		};
+
+		segmented(byId('qr-ecc'), (v) => {
+			ecc = v as QrOptions['ecc'];
+			render();
+		});
+		[text, dark, light].forEach((el) => el.addEventListener('input', render));
+		byId('qr-png').addEventListener('click', async () => {
+			const big = document.createElement('canvas');
+			await renderQr(big, text.value, opts(1024));
+			save(big.toDataURL('image/png'), 'qr-code.png');
+		});
+		byId('qr-svg').addEventListener('click', async () => {
+			const svg = await qrSvg(text.value, opts(0));
+			save(URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })), 'qr-code.svg');
+		});
+		render();
+	});
+</script>
+
+<style>
+	#qr-text {
+		min-height: 90px;
+	}
+	.qr-stage {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 20px;
+		align-items: flex-end;
+	}
+	#qr-canvas {
+		max-width: 100%;
+		height: auto;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+	}
+	.qr-side {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+</style>

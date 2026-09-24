@@ -1,0 +1,132 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="wifi-qr-code-generator" title="WiFi QR Code Generator" description="Guests scan it with their phone camera and join your network, no typing. Print it for the office or the living room.">
+	<div class="fields" id="wq-tool">
+		<div class="field">
+			<label for="wq-ssid">Network name (SSID)</label>
+			<input id="wq-ssid" spellcheck="false" value="Office Guest" />
+		</div>
+		<div class="field">
+			<label for="wq-pass">Password</label>
+			<input id="wq-pass" spellcheck="false" value="welcome-2026" />
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="wq-sec" aria-label="Security">
+			<button data-value="WPA" aria-pressed="true">WPA / WPA2 / WPA3</button>
+			<button data-value="WEP" aria-pressed="false">WEP</button>
+			<button data-value="nopass" aria-pressed="false">Open</button>
+		</div>
+		<label class="check"><input type="checkbox" id="wq-hidden" /> Hidden network</label>
+	</div>
+	<div class="qr-stage">
+		<div class="wq-card" id="wq-card">
+			<canvas id="wq-canvas" width="260" height="260" aria-label="WiFi QR code"></canvas>
+			<b id="wq-label"></b>
+			<span id="wq-sub"></span>
+		</div>
+		<div class="qr-side">
+			<code class="wq-payload" id="wq-payload"></code>
+			<button class="btn primary" id="wq-png">Download PNG</button>
+			<button class="btn" id="wq-print">Print</button>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { renderQr, save } from '../../scripts/qr';
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	const esc = (s: string) => s.replace(/([\\;,:"])/g, '\\$1');
+
+	onPage('wq-tool', () => {
+		const ssid = byId<HTMLInputElement>('wq-ssid');
+		const pass = byId<HTMLInputElement>('wq-pass');
+		const hidden = byId<HTMLInputElement>('wq-hidden');
+		let sec = 'WPA';
+
+		const payload = () =>
+			`WIFI:T:${sec};S:${esc(ssid.value)};${sec === 'nopass' ? '' : `P:${esc(pass.value)};`}${hidden.checked ? 'H:true;' : ''};`;
+
+		const render = async () => {
+			pass.disabled = sec === 'nopass';
+			byId('wq-payload').textContent = payload();
+			byId('wq-label').textContent = ssid.value || 'WiFi';
+			byId('wq-sub').textContent = sec === 'nopass' ? 'Open network' : `Password: ${pass.value}`;
+			await renderQr(byId<HTMLCanvasElement>('wq-canvas'), payload(), { ecc: 'M', dark: '#111827', light: '#ffffff', size: 260 });
+		};
+
+		segmented(byId('wq-sec'), (v) => {
+			sec = v;
+			render();
+		});
+		[ssid, pass, hidden].forEach((el) => el.addEventListener('input', render));
+		byId('wq-png').addEventListener('click', async () => {
+			const big = document.createElement('canvas');
+			await renderQr(big, payload(), { ecc: 'M', dark: '#111827', light: '#ffffff', size: 1024 });
+			save(big.toDataURL('image/png'), `wifi-${ssid.value || 'network'}.png`);
+		});
+		byId('wq-print').addEventListener('click', () => window.print());
+		render();
+	});
+</script>
+
+<style>
+	.qr-stage {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 20px;
+		align-items: flex-end;
+	}
+	.qr-side {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		min-width: 0;
+		max-width: 100%;
+	}
+	.wq-card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+		padding: 16px 20px 20px;
+		background: #fff;
+		color: #111827;
+		border: 1px solid var(--border);
+		border-radius: 18px;
+	}
+	.wq-card canvas {
+		max-width: 100%;
+		height: auto;
+	}
+	.wq-card b {
+		font-size: 18px;
+	}
+	.wq-card span {
+		font-size: 13px;
+		color: #4b5563;
+	}
+	.wq-payload {
+		font-family: var(--mono);
+		font-size: 12px;
+		color: var(--ink-soft);
+		word-break: break-all;
+	}
+	@media print {
+		:global(body *) {
+			visibility: hidden;
+		}
+		.wq-card,
+		.wq-card * {
+			visibility: visible;
+		}
+		.wq-card {
+			position: fixed;
+			inset: 40px auto auto 40px;
+			border: 0;
+		}
+	}
+</style>

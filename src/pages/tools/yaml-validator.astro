@@ -1,0 +1,108 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `services:
+  web:
+    image: nginx:1.27
+    ports:
+      - "8080:80"
+    environment:
+      TZ: Europe/Paris
+    depends_on: [api]
+  api:
+    image: ghcr.io/acme/api:2.4.1
+    restart: unless-stopped
+`;
+---
+
+<ToolShell slug="yaml-validator" title="YAML Validator & Formatter" description="Paste YAML to check it, with the exact line and column of any error. Reformat it or convert it to JSON.">
+	<div class="toolbar" id="yv-tool">
+		<div class="seg" id="yv-mode" aria-label="Output">
+			<button data-value="yaml" aria-pressed="true">Formatted YAML</button>
+			<button data-value="json" aria-pressed="false">JSON</button>
+		</div>
+		<label class="check">Indent <input class="num" id="yv-indent" type="number" min="2" max="8" value="2" /></label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">YAML <span class="yv-status" id="yv-status"></span></div>
+			<textarea id="yv-in" spellcheck="false" aria-label="YAML input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Output</span>
+				<button class="btn" id="yv-copy">Copy</button>
+			</div>
+			<pre class="out" id="yv-out"></pre>
+		</section>
+	</div>
+	<p class="error" id="yv-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { parseAllDocuments, stringify } from 'yaml';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('yv-tool', () => {
+		const input = byId<HTMLTextAreaElement>('yv-in');
+		const indent = byId<HTMLInputElement>('yv-indent');
+		const out = byId('yv-out');
+		const error = byId('yv-error');
+		const status = byId('yv-status');
+		let mode = 'yaml';
+
+		const render = () => {
+			const docs = parseAllDocuments(input.value, { prettyErrors: true });
+			const list = Array.isArray(docs) ? docs : [docs];
+			const problems = list.flatMap((d) => d.errors);
+			const warnings = list.flatMap((d) => d.warnings);
+			if (problems.length) {
+				const e = problems[0];
+				const at = e.linePos?.[0];
+				error.hidden = false;
+				error.textContent = at ? `Line ${at.line}, column ${at.col}: ${e.message.split('\n')[0]}` : e.message;
+				status.textContent = '✕ Invalid';
+				status.dataset.ok = 'false';
+				out.textContent = '';
+				return;
+			}
+			error.hidden = !warnings.length;
+			error.textContent = warnings.length ? `Warning: ${warnings[0].message.split('\n')[0]}` : '';
+			status.textContent = `✓ Valid${list.length > 1 ? `, ${list.length} documents` : ''}`;
+			status.dataset.ok = 'true';
+			const n = Math.min(8, Math.max(2, Number(indent.value) || 2));
+			const values = list.map((d) => d.toJS());
+			out.textContent =
+				mode === 'json'
+					? JSON.stringify(values.length === 1 ? values[0] : values, null, n)
+					: values.map((v) => stringify(v, { indent: n })).join('---\n');
+		};
+
+		segmented(byId('yv-mode'), (v) => {
+			mode = v;
+			render();
+		});
+		input.addEventListener('input', render);
+		indent.addEventListener('input', render);
+		copyButton(byId('yv-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#yv-in {
+		min-height: 320px;
+	}
+	.yv-status {
+		font-size: 12px;
+		font-weight: 700;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+	.yv-status[data-ok='true'] {
+		color: #16a34a;
+	}
+	.yv-status[data-ok='false'] {
+		color: #dc2626;
+	}
+</style>

@@ -99,6 +99,17 @@ Live at **https://techmefr.github.io/kodilo/**
 - **Math Evaluator** (`/tools/math-evaluator/`) — calculator notepad with variables
 - **Kubernetes Manifest Generator** (`/tools/kubernetes-manifest-generator/`) — Deployment, Service and Ingress YAML
 - **Nginx Config Generator** (`/tools/nginx-config-generator/`) — proxy, SPA, static or PHP with HTTPS
+- **Bcrypt** (`/tools/bcrypt/`) — hash and verify passwords, adjustable cost
+- **QR Code Generator** (`/tools/qr-code-generator/`) — text or URL to QR, PNG or SVG download
+- **WiFi QR Code Generator** (`/tools/wifi-qr-code-generator/`) — scan-to-join QR card, printable
+- **htpasswd Generator** (`/tools/htpasswd-generator/`) — bcrypt or SHA lines plus Nginx/Apache config
+- **YAML Validator & Formatter** (`/tools/yaml-validator/`) — line and column errors, format, YAML to JSON
+- **REST API Tester** (`/tools/rest-api-tester/`) — send requests, status, timing, headers, body
+- **Phone Parser & Formatter** (`/tools/phone-parser/`) — validity, country, line type, E.164 and more
+- **Developer Calculator** (`/tools/developer-calculator/`) — hex/dec/oct/bin with bitwise ops and bit grid
+- **PDF Merge** (`/tools/pdf-merge/`) — combine and reorder PDFs in the browser
+- **JPG to PDF** (`/tools/jpg-to-pdf/`) — images to a PDF, A4, Letter or fit
+- **Currency Converter** (`/tools/currency-converter/`) — ECB daily rates, 30 currencies
 - More tools land as new categories in the sidebar mega menu and the ⌘K / Ctrl K search — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -118,41 +129,30 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **Text**
 
 **Encoding & Security**
-- Bcrypt
 - BIP39 Generator
 
 **Generators**
-- QR Code Generator
-- WiFi QR Code Generator
 
 **Converters**
 
 **Network**
 - MAC Address Lookup
-- Phone Parser & Formatter
 
 **Validators**
 
 **Images**
 
 **PDF**
-- PDF Merge
 - PDF Split
 - PDF Compress
 - PDF to JPG
-- JPG to PDF
 
 **Dev Utilities**
-- REST API Tester
 
 **DevOps & Sysadmin**
-- YAML Validator & Formatter
-- htpasswd Generator
 - X.509 Certificate Decoder
 
 **Calculators**
-- Developer Calculator
-- Currency Converter
 
 **Productivity**
 

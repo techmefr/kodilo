@@ -255,7 +255,7 @@ export const categories: Category[] = [
 				description: 'Generate an HMAC signature for a message and key.',
 			},
 			{
-				slug: 'bcrypt',
+				slug: 'bcrypt', icon: 'lock-keyhole', built: true,
 				name: 'Bcrypt',
 				description: 'Hash and verify passwords with bcrypt.',
 			},
@@ -326,12 +326,12 @@ export const categories: Category[] = [
 				description: 'Generate secure random passwords.',
 			},
 			{
-				slug: 'qr-code-generator',
+				slug: 'qr-code-generator', icon: 'qr-code', built: true,
 				name: 'QR Code Generator',
 				description: 'Generate QR codes from text or URLs.',
 			},
 			{
-				slug: 'wifi-qr-code-generator',
+				slug: 'wifi-qr-code-generator', icon: 'wifi', built: true,
 				name: 'WiFi QR Code Generator',
 				description: 'Generate a QR code that connects to a WiFi network.',
 			},
@@ -427,7 +427,7 @@ export const categories: Category[] = [
 				description: 'Look up the meaning of an HTTP status code.',
 			},
 			{
-				slug: 'phone-parser',
+				slug: 'phone-parser', icon: 'phone', built: true,
 				name: 'Phone Parser & Formatter',
 				description: 'Parse and format international phone numbers.',
 			},
@@ -495,7 +495,7 @@ export const categories: Category[] = [
 		blurb: 'Merge, split, compress, convert',
 		tools: [
 			{
-				slug: 'pdf-merge',
+				slug: 'pdf-merge', icon: 'files', built: true,
 				name: 'PDF Merge',
 				description: 'Combine multiple PDFs into one.',
 			},
@@ -515,7 +515,7 @@ export const categories: Category[] = [
 				description: 'Convert PDF pages to JPG images.',
 			},
 			{
-				slug: 'jpg-to-pdf',
+				slug: 'jpg-to-pdf', icon: 'file-image', built: true,
 				name: 'JPG to PDF',
 				description: 'Convert JPG images to a PDF.',
 			},
@@ -563,7 +563,7 @@ export const categories: Category[] = [
 				description: 'Quick reference for common regular expression syntax.',
 			},
 			{
-				slug: 'rest-api-tester',
+				slug: 'rest-api-tester', icon: 'send', built: true,
 				name: 'REST API Tester',
 				description: 'Send a request and inspect the response, no app install needed.',
 			},
@@ -629,7 +629,7 @@ export const categories: Category[] = [
 				description: 'Validate, diff and convert .env files to JSON, docker -e flags or a Kubernetes Secret.',
 			},
 			{
-				slug: 'yaml-validator',
+				slug: 'yaml-validator', icon: 'file-check', built: true,
 				name: 'YAML Validator & Formatter',
 				description: 'Validate YAML with line-precise errors, format it, convert it to JSON.',
 			},
@@ -652,7 +652,7 @@ export const categories: Category[] = [
 				description: 'Host blocks for ~/.ssh/config with jump hosts, identity files and port forwarding.',
 			},
 			{
-				slug: 'htpasswd-generator',
+				slug: 'htpasswd-generator', icon: 'user-key', built: true,
 				name: 'htpasswd Generator',
 				description: 'bcrypt or SHA entries for Nginx and Apache basic auth.',
 			},
@@ -717,12 +717,12 @@ export const categories: Category[] = [
 		blurb: 'Bases, currency, units',
 		tools: [
 			{
-				slug: 'developer-calculator',
+				slug: 'developer-calculator', icon: 'binary', built: true,
 				name: 'Developer Calculator',
 				description: 'A calculator with hex, octal and binary modes.',
 			},
 			{
-				slug: 'currency-converter',
+				slug: 'currency-converter', icon: 'banknote', built: true,
 				name: 'Currency Converter',
 				description: 'Convert between currencies.',
 			},
