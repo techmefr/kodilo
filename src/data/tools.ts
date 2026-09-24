@@ -3,6 +3,7 @@ export interface Tool {
 	name: string;
 	description: string;
 	built?: boolean;
+	icon?: string;
 }
 
 export interface Category {
@@ -19,7 +20,7 @@ export const categories: Category[] = [
 		blurb: 'Preview and test outgoing HTML email',
 		tools: [
 			{
-				slug: 'inbox-tester',
+				slug: 'inbox-tester', icon: 'inbox',
 				name: 'Inbox Tester',
 				description:
 					'Paste an HTML email, pick a client tab, see the render and which CSS features it supports.',
@@ -33,31 +34,31 @@ export const categories: Category[] = [
 		blurb: 'Format, validate, diff, convert',
 		tools: [
 			{
-				slug: 'json-formatter',
+				slug: 'json-formatter', icon: 'braces',
 				built: true,
 				name: 'JSON Formatter & Validator',
 				description: 'Format, validate and minify JSON data.',
 			},
 			{
-				slug: 'json-to-yaml',
+				slug: 'json-to-yaml', icon: 'file-code',
 				built: true,
 				name: 'JSON to YAML',
 				description: 'Convert JSON to YAML.',
 			},
 			{
-				slug: 'json-to-csv',
+				slug: 'json-to-csv', icon: 'sheet',
 				built: true,
 				name: 'JSON to CSV',
 				description: 'Convert JSON arrays to CSV.',
 			},
 			{
-				slug: 'json-diff',
+				slug: 'json-diff', icon: 'git-compare',
 				built: true,
 				name: 'JSON Diff',
 				description: 'Compare two JSON documents and highlight what changed.',
 			},
 			{
-				slug: 'json-viewer',
+				slug: 'json-viewer', icon: 'list-tree',
 				built: true,
 				name: 'JSON Viewer',
 				description: 'Explore a JSON document as a collapsible tree.',
@@ -70,37 +71,37 @@ export const categories: Category[] = [
 		blurb: 'Beautify, minify, generate',
 		tools: [
 			{
-				slug: 'html-formatter',
+				slug: 'html-formatter', icon: 'code-xml',
 				built: true,
 				name: 'HTML Formatter',
 				description: 'Beautify and format HTML code.',
 			},
 			{
-				slug: 'css-formatter',
+				slug: 'css-formatter', icon: 'paintbrush',
 				built: true,
 				name: 'CSS Formatter & Minifier',
 				description: 'Format and minify CSS stylesheets.',
 			},
 			{
-				slug: 'box-shadow-generator',
+				slug: 'box-shadow-generator', icon: 'square-stack',
 				built: true,
 				name: 'Box Shadow Generator',
 				description: 'Generate CSS box-shadow values with a live preview.',
 			},
 			{
-				slug: 'gradient-generator',
+				slug: 'gradient-generator', icon: 'blend',
 				built: true,
 				name: 'Gradient Generator',
 				description: 'Generate CSS gradients with a live preview.',
 			},
 			{
-				slug: 'css-grid-generator',
+				slug: 'css-grid-generator', icon: 'layout-grid',
 				built: true,
 				name: 'CSS Grid Generator',
 				description: 'Build a CSS grid layout visually and copy the code.',
 			},
 			{
-				slug: 'flexbox-generator',
+				slug: 'flexbox-generator', icon: 'columns-3',
 				built: true,
 				name: 'Flexbox Generator',
 				description: 'Build a CSS flexbox layout visually and copy the code.',
@@ -113,13 +114,13 @@ export const categories: Category[] = [
 		blurb: 'Write, preview, convert',
 		tools: [
 			{
-				slug: 'markdown-to-html',
+				slug: 'markdown-to-html', icon: 'file-code-2',
 				built: true,
 				name: 'Markdown to HTML',
 				description: 'Convert Markdown to HTML.',
 			},
 			{
-				slug: 'markdown-previewer',
+				slug: 'markdown-previewer', icon: 'eye',
 				built: true,
 				name: 'Markdown Previewer',
 				description: 'Write Markdown and preview the rendered result live.',
@@ -132,13 +133,13 @@ export const categories: Category[] = [
 		blurb: 'Meta tags for link previews',
 		tools: [
 			{
-				slug: 'meta-tag-generator',
+				slug: 'meta-tag-generator', icon: 'tags',
 				built: true,
 				name: 'Meta Tag Generator',
 				description: 'Generate HTML meta tags.',
 			},
 			{
-				slug: 'open-graph-generator',
+				slug: 'open-graph-generator', icon: 'share-2',
 				built: true,
 				name: 'Open Graph Generator',
 				description: 'Generate Open Graph tags for link previews.',
@@ -151,61 +152,61 @@ export const categories: Category[] = [
 		blurb: 'Case, diff, count, encode',
 		tools: [
 			{
-				slug: 'regex-tester',
+				slug: 'regex-tester', icon: 'regex',
 				built: true,
 				name: 'Regex Tester',
 				description: 'Test regular expressions against sample text.',
 			},
 			{
-				slug: 'diff-checker',
+				slug: 'diff-checker', icon: 'diff',
 				built: true,
 				name: 'Diff Checker',
 				description: 'Compare two texts side by side.',
 			},
 			{
-				slug: 'case-converter',
+				slug: 'case-converter', icon: 'case-sensitive',
 				built: true,
 				name: 'Case Converter',
 				description: 'Convert text between case styles (camel, snake, kebab...).',
 			},
 			{
-				slug: 'word-counter',
+				slug: 'word-counter', icon: 'text',
 				built: true,
 				name: 'Word Counter',
 				description: 'Count words, characters and lines.',
 			},
 			{
-				slug: 'slugify',
+				slug: 'slugify', icon: 'link',
 				built: true,
 				name: 'Slugify',
 				description: 'Turn text into a URL-friendly slug.',
 			},
 			{
-				slug: 'lorem-ipsum-generator',
+				slug: 'lorem-ipsum-generator', icon: 'pilcrow',
 				built: true,
 				name: 'Lorem Ipsum Generator',
 				description: 'Generate placeholder text.',
 			},
 			{
-				slug: 'text-to-binary',
+				slug: 'text-to-binary', icon: 'binary',
 				built: true,
 				name: 'Text to Binary',
 				description: 'Convert text to and from binary.',
 			},
 			{
-				slug: 'text-to-nato-alphabet',
+				slug: 'text-to-nato-alphabet', icon: 'radio',
 				built: true,
 				name: 'Text to NATO Alphabet',
 				description: 'Spell out text using the NATO phonetic alphabet.',
 			},
 			{
-				slug: 'text-statistics',
+				slug: 'text-statistics', icon: 'chart-bar',
 				built: true,
 				name: 'Text Statistics',
 				description: 'Reading time, sentence count and other text metrics.',
 			},
 			{
-				slug: 'numeronym-generator',
+				slug: 'numeronym-generator', icon: 'hash',
 				built: true,
 				name: 'Numeronym Generator',
 				description: 'Generate numeronyms like i18n or a11y from a word.',
@@ -218,37 +219,37 @@ export const categories: Category[] = [
 		blurb: 'Hash, sign, encrypt, decode',
 		tools: [
 			{
-				slug: 'base64',
+				slug: 'base64', icon: 'file-lock',
 				built: true,
 				name: 'Base64 Encoder & Decoder',
 				description: 'Encode and decode Base64 strings.',
 			},
 			{
-				slug: 'jwt-decoder',
+				slug: 'jwt-decoder', icon: 'key-round',
 				built: true,
 				name: 'JWT Decoder',
 				description: 'Decode and inspect JWT tokens.',
 			},
 			{
-				slug: 'url-encoder',
+				slug: 'url-encoder', icon: 'link-2',
 				built: true,
 				name: 'URL Encoder & Decoder',
 				description: 'Encode and decode URL strings.',
 			},
 			{
-				slug: 'html-entities',
+				slug: 'html-entities', icon: 'ampersand',
 				built: true,
 				name: 'HTML Entities',
 				description: 'Encode and decode HTML entities.',
 			},
 			{
-				slug: 'hash-text',
+				slug: 'hash-text', icon: 'fingerprint',
 				built: true,
 				name: 'Hash Text',
 				description: 'Generate MD5, SHA-1, SHA-256 and other hashes.',
 			},
 			{
-				slug: 'hmac-generator',
+				slug: 'hmac-generator', icon: 'signature',
 				built: true,
 				name: 'HMAC Generator',
 				description: 'Generate an HMAC signature for a message and key.',
@@ -259,25 +260,25 @@ export const categories: Category[] = [
 				description: 'Hash and verify passwords with bcrypt.',
 			},
 			{
-				slug: 'basic-auth-generator',
+				slug: 'basic-auth-generator', icon: 'user-lock',
 				built: true,
 				name: 'Basic Auth Generator',
 				description: 'Generate an HTTP Basic Authentication header.',
 			},
 			{
-				slug: 'token-generator',
+				slug: 'token-generator', icon: 'ticket',
 				built: true,
 				name: 'Token Generator',
 				description: 'Generate random tokens with a custom charset and length.',
 			},
 			{
-				slug: 'rsa-key-pair-generator',
+				slug: 'rsa-key-pair-generator', icon: 'key',
 				built: true,
 				name: 'RSA Key Pair Generator',
 				description: 'Generate an RSA public/private key pair.',
 			},
 			{
-				slug: 'text-encryption',
+				slug: 'text-encryption', icon: 'lock',
 				built: true,
 				name: 'Text Encryption',
 				description: 'Encrypt and decrypt text with AES and a passphrase.',
@@ -288,13 +289,13 @@ export const categories: Category[] = [
 				description: 'Generate a BIP39 mnemonic seed phrase.',
 			},
 			{
-				slug: 'xor-cipher',
+				slug: 'xor-cipher', icon: 'shuffle',
 				built: true,
 				name: 'XOR Cipher',
 				description: 'Encrypt or decrypt text/bytes with a repeating XOR key.',
 			},
 			{
-				slug: 'checksum-calculator',
+				slug: 'checksum-calculator', icon: 'shield-check',
 				built: true,
 				name: 'Checksum Calculator',
 				description: 'Compute a CRC32 or other checksum for text or a file.',
@@ -307,19 +308,19 @@ export const categories: Category[] = [
 		blurb: 'IDs, passwords, QR, cron',
 		tools: [
 			{
-				slug: 'uuid-generator',
+				slug: 'uuid-generator', icon: 'id-card',
 				built: true,
 				name: 'UUID Generator',
 				description: 'Generate random UUIDs.',
 			},
 			{
-				slug: 'ulid-generator',
+				slug: 'ulid-generator', icon: 'arrow-down-0-1',
 				built: true,
 				name: 'ULID Generator',
 				description: 'Generate ULIDs (sortable unique identifiers).',
 			},
 			{
-				slug: 'password-generator',
+				slug: 'password-generator', icon: 'rectangle-ellipsis',
 				built: true,
 				name: 'Password Generator',
 				description: 'Generate secure random passwords.',
@@ -335,7 +336,7 @@ export const categories: Category[] = [
 				description: 'Generate a QR code that connects to a WiFi network.',
 			},
 			{
-				slug: 'crontab-generator',
+				slug: 'crontab-generator', icon: 'calendar-clock',
 				built: true,
 				name: 'Crontab Generator',
 				description: 'Build and explain a cron expression.',
@@ -348,31 +349,31 @@ export const categories: Category[] = [
 		blurb: 'Dates, colors, bases, units',
 		tools: [
 			{
-				slug: 'date-time-converter',
+				slug: 'date-time-converter', icon: 'clock',
 				built: true,
 				name: 'Date/Time Converter',
 				description: 'Convert between timestamps, ISO dates and time zones.',
 			},
 			{
-				slug: 'color-converter',
+				slug: 'color-converter', icon: 'palette',
 				built: true,
 				name: 'Color Converter',
 				description: 'Convert colors between HEX, RGB, HSL and more.',
 			},
 			{
-				slug: 'integer-base-converter',
+				slug: 'integer-base-converter', icon: 'calculator',
 				built: true,
 				name: 'Integer Base Converter',
 				description: 'Convert numbers between binary, octal, decimal and hex.',
 			},
 			{
-				slug: 'roman-numeral-converter',
+				slug: 'roman-numeral-converter', icon: 'landmark',
 				built: true,
 				name: 'Roman Numeral Converter',
 				description: 'Convert numbers to and from Roman numerals.',
 			},
 			{
-				slug: 'temperature-converter',
+				slug: 'temperature-converter', icon: 'thermometer',
 				built: true,
 				name: 'Temperature Converter',
 				description: 'Convert between Celsius, Fahrenheit and Kelvin.',
@@ -385,25 +386,25 @@ export const categories: Category[] = [
 		blurb: 'IPs, MACs, user agents, status codes',
 		tools: [
 			{
-				slug: 'ipv4-subnet-calculator',
+				slug: 'ipv4-subnet-calculator', icon: 'network',
 				built: true,
 				name: 'IPv4 Subnet Calculator',
 				description: 'Calculate subnet ranges, masks and host counts.',
 			},
 			{
-				slug: 'ipv4-range-expander',
+				slug: 'ipv4-range-expander', icon: 'list-ordered',
 				built: true,
 				name: 'IPv4 Range Expander',
 				description: 'Expand an IPv4 range or CIDR into individual addresses.',
 			},
 			{
-				slug: 'ipv6-ula-generator',
+				slug: 'ipv6-ula-generator', icon: 'globe',
 				built: true,
 				name: 'IPv6 ULA Generator',
 				description: 'Generate a unique local IPv6 address prefix.',
 			},
 			{
-				slug: 'mac-address-generator',
+				slug: 'mac-address-generator', icon: 'ethernet-port',
 				built: true,
 				name: 'MAC Address Generator',
 				description: 'Generate random MAC addresses.',
@@ -414,13 +415,13 @@ export const categories: Category[] = [
 				description: 'Look up the vendor for a MAC address.',
 			},
 			{
-				slug: 'user-agent-parser',
+				slug: 'user-agent-parser', icon: 'monitor-smartphone',
 				built: true,
 				name: 'User Agent Parser',
 				description: 'Parse a User-Agent string into browser, engine and OS.',
 			},
 			{
-				slug: 'http-status-codes',
+				slug: 'http-status-codes', icon: 'server-cog',
 				built: true,
 				name: 'HTTP Status Codes',
 				description: 'Look up the meaning of an HTTP status code.',
@@ -438,19 +439,19 @@ export const categories: Category[] = [
 		blurb: 'Emails, cards, IBANs',
 		tools: [
 			{
-				slug: 'email-validator',
+				slug: 'email-validator', icon: 'mail-check',
 				built: true,
 				name: 'Email Validator',
 				description: 'Validate email address syntax.',
 			},
 			{
-				slug: 'credit-card-validator',
+				slug: 'credit-card-validator', icon: 'credit-card',
 				built: true,
 				name: 'Credit Card Validator',
 				description: 'Validate a credit card number with the Luhn check.',
 			},
 			{
-				slug: 'iban-validator',
+				slug: 'iban-validator', icon: 'landmark',
 				built: true,
 				name: 'IBAN Validator & Parser',
 				description: 'Validate an IBAN and break it down by country/bank/account.',
@@ -463,25 +464,25 @@ export const categories: Category[] = [
 		blurb: 'Resize, compress, convert',
 		tools: [
 			{
-				slug: 'image-resizer',
+				slug: 'image-resizer', icon: 'scaling',
 				built: true,
 				name: 'Image Resizer',
 				description: 'Resize images entirely in the browser.',
 			},
 			{
-				slug: 'image-compressor',
+				slug: 'image-compressor', icon: 'file-archive',
 				built: true,
 				name: 'Image Compressor',
 				description: 'Compress images without uploading them anywhere.',
 			},
 			{
-				slug: 'png-to-jpg',
+				slug: 'png-to-jpg', icon: 'image',
 				built: true,
 				name: 'PNG to JPG Converter',
 				description: 'Convert PNG images to JPG.',
 			},
 			{
-				slug: 'image-to-base64',
+				slug: 'image-to-base64', icon: 'file-image',
 				built: true,
 				name: 'Image to Base64',
 				description: 'Convert an image to a Base64 data URI.',
@@ -526,37 +527,37 @@ export const categories: Category[] = [
 		blurb: 'SQL, cron, chmod, MIME',
 		tools: [
 			{
-				slug: 'sql-prettify',
+				slug: 'sql-prettify', icon: 'database',
 				built: true,
 				name: 'SQL Prettify',
 				description: 'Format SQL queries.',
 			},
 			{
-				slug: 'math-evaluator',
+				slug: 'math-evaluator', icon: 'sigma',
 				built: true,
 				name: 'Math Evaluator',
 				description: 'Evaluate a math expression on the fly.',
 			},
 			{
-				slug: 'docker-run-to-compose',
+				slug: 'docker-run-to-compose', icon: 'container',
 				built: true,
 				name: 'Docker Run to Compose Converter',
 				description: 'Convert a docker run command to a docker-compose.yml.',
 			},
 			{
-				slug: 'mime-types',
+				slug: 'mime-types', icon: 'file-type',
 				built: true,
 				name: 'MIME Types',
 				description: 'Look up the MIME type for a file extension.',
 			},
 			{
-				slug: 'chmod-calculator',
+				slug: 'chmod-calculator', icon: 'shield',
 				built: true,
 				name: 'Chmod Calculator',
 				description: 'Compute and explain Unix file permission values.',
 			},
 			{
-				slug: 'regex-cheatsheet',
+				slug: 'regex-cheatsheet', icon: 'book-open',
 				built: true,
 				name: 'Regex Cheatsheet',
 				description: 'Quick reference for common regular expression syntax.',
@@ -567,19 +568,19 @@ export const categories: Category[] = [
 				description: 'Send a request and inspect the response, no app install needed.',
 			},
 			{
-				slug: 'docker-cheatsheet',
+				slug: 'docker-cheatsheet', icon: 'ship',
 				built: true,
 				name: 'Docker Cheatsheet',
 				description: 'Quick reference for common Docker commands.',
 			},
 			{
-				slug: 'git-cheatsheet',
+				slug: 'git-cheatsheet', icon: 'git-branch',
 				built: true,
 				name: 'Git Cheatsheet',
 				description: 'Quick reference for common Git commands.',
 			},
 			{
-				slug: 'npm-cheatsheet',
+				slug: 'npm-cheatsheet', icon: 'package',
 				built: true,
 				name: 'NPM Cheatsheet',
 				description: 'Quick reference for common npm/pnpm/yarn commands.',
@@ -592,37 +593,37 @@ export const categories: Category[] = [
 		blurb: 'Servers, containers, uptime, config',
 		tools: [
 			{
-				slug: 'uptime-sla-calculator',
+				slug: 'uptime-sla-calculator', icon: 'activity',
 				built: true,
 				name: 'Uptime / SLA Calculator',
 				description: 'Turn 99.9% into allowed downtime per day, month and year, and back.',
 			},
 			{
-				slug: 'byte-size-converter',
+				slug: 'byte-size-converter', icon: 'hard-drive',
 				built: true,
 				name: 'Byte Size Converter',
 				description: 'B, KB, KiB, MB, MiB, GB, GiB, TB, TiB: decimal and binary units side by side.',
 			},
 			{
-				slug: 'transfer-time-calculator',
+				slug: 'transfer-time-calculator', icon: 'gauge',
 				built: true,
 				name: 'Transfer Time Calculator',
 				description: 'How long a file takes to move over a given bandwidth, and the bandwidth a deadline needs.',
 			},
 			{
-				slug: 'kubernetes-resource-units',
+				slug: 'kubernetes-resource-units', icon: 'cpu',
 				built: true,
 				name: 'Kubernetes Resource Units',
 				description: 'CPU millicores and memory quantities (Mi, Gi, M, G) converted and explained.',
 			},
 			{
-				slug: 'kubernetes-manifest-generator',
+				slug: 'kubernetes-manifest-generator', icon: 'boxes',
 				built: true,
 				name: 'Kubernetes Manifest Generator',
 				description: 'Deployment, Service and Ingress YAML from a short form.',
 			},
 			{
-				slug: 'env-file-tool',
+				slug: 'env-file-tool', icon: 'file-cog',
 				built: true,
 				name: '.env Tool',
 				description: 'Validate, diff and convert .env files to JSON, docker -e flags or a Kubernetes Secret.',
@@ -633,19 +634,19 @@ export const categories: Category[] = [
 				description: 'Validate YAML with line-precise errors, format it, convert it to JSON.',
 			},
 			{
-				slug: 'nginx-config-generator',
+				slug: 'nginx-config-generator', icon: 'server',
 				built: true,
 				name: 'Nginx Config Generator',
 				description: 'Reverse proxy, static site, SPA fallback, HTTPS redirect and gzip in a few clicks.',
 			},
 			{
-				slug: 'systemd-unit-generator',
+				slug: 'systemd-unit-generator', icon: 'cog',
 				built: true,
 				name: 'systemd Unit Generator',
 				description: 'Service and timer units with restart policy, user, environment and hardening options.',
 			},
 			{
-				slug: 'ssh-config-generator',
+				slug: 'ssh-config-generator', icon: 'terminal',
 				built: true,
 				name: 'SSH Config Generator',
 				description: 'Host blocks for ~/.ssh/config with jump hosts, identity files and port forwarding.',
@@ -656,13 +657,13 @@ export const categories: Category[] = [
 				description: 'bcrypt or SHA entries for Nginx and Apache basic auth.',
 			},
 			{
-				slug: 'dns-record-builder',
+				slug: 'dns-record-builder', icon: 'globe-lock',
 				built: true,
 				name: 'DNS Record Builder',
 				description: 'SPF, DMARC, CAA and MX records built and explained, ready to paste.',
 			},
 			{
-				slug: 'security-headers-builder',
+				slug: 'security-headers-builder', icon: 'shield-half',
 				built: true,
 				name: 'Security Headers Builder',
 				description: 'Content-Security-Policy, HSTS, Permissions-Policy and friends, for Nginx, Apache or a meta tag.',
@@ -673,37 +674,37 @@ export const categories: Category[] = [
 				description: 'Paste a PEM certificate: subject, issuer, SANs, validity, fingerprints.',
 			},
 			{
-				slug: 'semver-calculator',
+				slug: 'semver-calculator', icon: 'git-commit-horizontal',
 				built: true,
 				name: 'SemVer Calculator',
 				description: 'Compare versions and test ranges like ^1.2.0, ~2.3 or >=1 <2.',
 			},
 			{
-				slug: 'gitignore-generator',
+				slug: 'gitignore-generator', icon: 'eye-off',
 				built: true,
 				name: '.gitignore Generator',
 				description: 'Combine templates for languages, frameworks, editors and operating systems.',
 			},
 			{
-				slug: 'json-log-viewer',
+				slug: 'json-log-viewer', icon: 'scroll-text',
 				built: true,
 				name: 'JSON Log Viewer',
 				description: 'Paste structured logs, filter by level and field, read them as a table.',
 			},
 			{
-				slug: 'curl-converter',
+				slug: 'curl-converter', icon: 'arrow-right-left',
 				built: true,
 				name: 'curl Converter',
 				description: 'Turn a curl command into fetch, axios, Python requests or HTTPie.',
 			},
 			{
-				slug: 'well-known-ports',
+				slug: 'well-known-ports', icon: 'plug',
 				built: true,
 				name: 'Well-Known Ports',
 				description: 'Searchable reference of common TCP and UDP ports and the services behind them.',
 			},
 			{
-				slug: 'linux-signals-exit-codes',
+				slug: 'linux-signals-exit-codes', icon: 'octagon-x',
 				built: true,
 				name: 'Linux Signals & Exit Codes',
 				description: 'What SIGTERM, SIGKILL or exit code 137 actually mean.',
@@ -726,7 +727,7 @@ export const categories: Category[] = [
 				description: 'Convert between currencies.',
 			},
 			{
-				slug: 'unit-converter',
+				slug: 'unit-converter', icon: 'ruler',
 				built: true,
 				name: 'Unit Converter',
 				description: 'Convert length, weight, speed and other units.',
@@ -739,7 +740,7 @@ export const categories: Category[] = [
 		blurb: 'Stay focused while you build',
 		tools: [
 			{
-				slug: 'pomodoro-timer',
+				slug: 'pomodoro-timer', icon: 'timer',
 				built: true,
 				name: 'Pomodoro Timer',
 				description: 'A simple focus timer with work/break intervals.',
