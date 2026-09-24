@@ -1,0 +1,179 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const left = JSON.stringify({ id: 42, name: 'Ada', roles: ['admin', 'dev'], settings: { theme: 'dark', lang: 'en' }, active: true }, null, 2);
+const right = JSON.stringify({ id: 42, name: 'Ada Lovelace', roles: ['admin'], settings: { theme: 'dark', lang: 'fr', beta: true }, lastLogin: '2026-09-24' }, null, 2);
+---
+
+<ToolShell slug="json-diff" title="JSON Diff" description="Compare two JSON documents by structure, not by text: key order is ignored and every change is listed with its path.">
+	<div class="toolbar" id="jd-tool">
+		<label class="check"><input type="checkbox" id="jd-order" /> Ignore array order</label>
+		<button class="btn" id="jd-swap">Swap</button>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Before</div>
+			<textarea id="jd-a" spellcheck="false" aria-label="Before">{left}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">After</div>
+			<textarea id="jd-b" spellcheck="false" aria-label="After">{right}</textarea>
+		</section>
+	</div>
+	<p class="error" id="jd-error" hidden></p>
+	<div class="stats" id="jd-stats"></div>
+	<ul class="jd-list" id="jd-list"></ul>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	type Change = ['added' | 'removed' | 'changed', string, unknown, unknown];
+
+	const show = (v: unknown) => (v === undefined ? '' : JSON.stringify(v));
+	const pathKey = (base: string, k: string | number) => (typeof k === 'number' ? `${base}[${k}]` : /^[A-Za-z_$][\w$]*$/.test(k) ? `${base}.${k}` : `${base}[${JSON.stringify(k)}]`);
+
+	function diff(a: unknown, b: unknown, path: string, out: Change[], unordered: boolean) {
+		if (Array.isArray(a) && Array.isArray(b)) {
+			if (unordered) {
+				const sa = a.map((x) => JSON.stringify(x));
+				const sb = b.map((x) => JSON.stringify(x));
+				sa.forEach((s, i) => !sb.includes(s) && out.push(['removed', pathKey(path, i), a[i], undefined]));
+				sb.forEach((s, i) => !sa.includes(s) && out.push(['added', pathKey(path, i), undefined, b[i]]));
+				return;
+			}
+			for (let i = 0; i < Math.max(a.length, b.length); i++) {
+				if (i >= a.length) out.push(['added', pathKey(path, i), undefined, b[i]]);
+				else if (i >= b.length) out.push(['removed', pathKey(path, i), a[i], undefined]);
+				else diff(a[i], b[i], pathKey(path, i), out, unordered);
+			}
+			return;
+		}
+		if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a) && !Array.isArray(b)) {
+			const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+			for (const k of keys) {
+				const p = pathKey(path, k);
+				if (!(k in a)) out.push(['added', p, undefined, (b as Record<string, unknown>)[k]]);
+				else if (!(k in b)) out.push(['removed', p, (a as Record<string, unknown>)[k], undefined]);
+				else diff((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], p, out, unordered);
+			}
+			return;
+		}
+		if (JSON.stringify(a) !== JSON.stringify(b)) out.push(['changed', path, a, b]);
+	}
+
+	onPage('jd-tool', () => {
+		const a = byId<HTMLTextAreaElement>('jd-a');
+		const b = byId<HTMLTextAreaElement>('jd-b');
+		const order = byId<HTMLInputElement>('jd-order');
+
+		const render = () => {
+			const error = byId('jd-error');
+			let left: unknown;
+			let right: unknown;
+			try {
+				left = JSON.parse(a.value);
+			} catch (e) {
+				error.textContent = `Before: ${(e as Error).message}`;
+				error.hidden = false;
+				return;
+			}
+			try {
+				right = JSON.parse(b.value);
+			} catch (e) {
+				error.textContent = `After: ${(e as Error).message}`;
+				error.hidden = false;
+				return;
+			}
+			error.hidden = true;
+			const changes: Change[] = [];
+			diff(left, right, '$', changes, order.checked);
+			const count = (t: string) => String(changes.filter((c) => c[0] === t).length);
+			const stats: [string, string][] = [['Added', count('added')], ['Removed', count('removed')], ['Changed', count('changed')]];
+			byId('jd-stats').replaceChildren(
+				...stats.map(([label, value]) => {
+					const el = document.createElement('div');
+					el.className = 'stat';
+					el.innerHTML = '<b></b><span></span>';
+					el.querySelector('b')!.textContent = value;
+					el.querySelector('span')!.textContent = label;
+					return el;
+				})
+			);
+			const list = byId('jd-list');
+			if (!changes.length) {
+				const li = document.createElement('li');
+				li.className = 'jd-same';
+				li.textContent = 'The two documents are identical.';
+				list.replaceChildren(li);
+				return;
+			}
+			list.replaceChildren(
+				...changes.map(([type, path, before, after]) => {
+					const li = document.createElement('li');
+					li.className = `jd-${type}`;
+					li.innerHTML = '<i></i><code class="jd-path"></code><span class="jd-values"></span>';
+					li.querySelector('i')!.textContent = type === 'added' ? '+' : type === 'removed' ? '−' : '~';
+					li.querySelector('.jd-path')!.textContent = path;
+					li.querySelector('.jd-values')!.textContent = type === 'changed' ? `${show(before)} → ${show(after)}` : show(type === 'added' ? after : before);
+					return li;
+				})
+			);
+		};
+
+		[a, b, order].forEach((el) => el.addEventListener('input', render));
+		byId('jd-swap').addEventListener('click', () => {
+			[a.value, b.value] = [b.value, a.value];
+			render();
+		});
+		render();
+	});
+</script>
+
+<style>
+	.jd-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 6px;
+	}
+	.jd-list :global(li) {
+		display: grid;
+		grid-template-columns: 22px minmax(120px, auto) 1fr;
+		gap: 10px;
+		align-items: baseline;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 8px 12px;
+		font-family: var(--mono);
+		font-size: 13px;
+	}
+	.jd-list :global(i) {
+		font-style: normal;
+		font-weight: 800;
+		text-align: center;
+	}
+	.jd-list :global(.jd-path) {
+		font-weight: 700;
+	}
+	.jd-list :global(.jd-values) {
+		overflow-wrap: anywhere;
+		color: var(--ink-soft);
+	}
+	.jd-list :global(.jd-added i) {
+		color: var(--ok);
+	}
+	.jd-list :global(.jd-removed i) {
+		color: #e5484d;
+	}
+	.jd-list :global(.jd-changed i) {
+		color: var(--warn);
+	}
+	.jd-list :global(.jd-same) {
+		display: block;
+		font-family: var(--sans);
+		color: var(--ok);
+	}
+</style>

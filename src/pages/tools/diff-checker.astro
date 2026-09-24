@@ -1,0 +1,232 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const left = `server {
+    listen 80;
+    server_name example.com;
+    root /var/www/html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}`;
+const right = `server {
+    listen 443 ssl;
+    server_name example.com www.example.com;
+    root /var/www/html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    gzip on;
+}`;
+---
+
+<ToolShell slug="diff-checker" title="Diff Checker" description="Compare two texts line by line with word-level highlights, split or unified view.">
+	<div class="toolbar" id="dc-tool">
+		<div class="seg" id="dc-view">
+			<button data-value="split" aria-pressed="true">Split</button>
+			<button data-value="unified">Unified</button>
+		</div>
+		<label class="check"><input type="checkbox" id="dc-ws" /> Ignore whitespace</label>
+		<label class="check"><input type="checkbox" id="dc-case" /> Ignore case</label>
+		<button class="btn" id="dc-swap">Swap</button>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Original</div>
+			<textarea id="dc-a" spellcheck="false" aria-label="Original text">{left}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">Changed</div>
+			<textarea id="dc-b" spellcheck="false" aria-label="Changed text">{right}</textarea>
+		</section>
+	</div>
+	<p class="dc-summary" id="dc-summary"></p>
+	<div class="dc-out" id="dc-out"></div>
+</ToolShell>
+
+<script>
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	type Op = ['=' | '-' | '+', string, string?];
+
+	function lcs<T>(a: T[], b: T[], eq: (x: T, y: T) => boolean): ['=' | '-' | '+', number, number][] {
+		const n = a.length;
+		const m = b.length;
+		const dp = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
+		for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i][j] = eq(a[i], b[j]) ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+		const out: ['=' | '-' | '+', number, number][] = [];
+		let i = 0;
+		let j = 0;
+		while (i < n && j < m) {
+			if (eq(a[i], b[j])) out.push(['=', i++, j++]);
+			else if (dp[i + 1][j] >= dp[i][j + 1]) out.push(['-', i++, j]);
+			else out.push(['+', i, j++]);
+		}
+		while (i < n) out.push(['-', i++, j]);
+		while (j < m) out.push(['+', i, j++]);
+		return out;
+	}
+
+	function words(a: string, b: string): [DocumentFragment, DocumentFragment] {
+		const ta = a.split(/(\s+|\b)/).filter(Boolean);
+		const tb = b.split(/(\s+|\b)/).filter(Boolean);
+		const fa = document.createDocumentFragment();
+		const fb = document.createDocumentFragment();
+		for (const [op, i, j] of lcs(ta, tb, (x, y) => x === y)) {
+			if (op === '=') {
+				fa.append(ta[i]);
+				fb.append(tb[j]);
+			} else {
+				const mark = document.createElement('mark');
+				mark.textContent = op === '-' ? ta[i] : tb[j];
+				(op === '-' ? fa : fb).append(mark);
+			}
+		}
+		return [fa, fb];
+	}
+
+	onPage('dc-tool', () => {
+		const a = byId<HTMLTextAreaElement>('dc-a');
+		const b = byId<HTMLTextAreaElement>('dc-b');
+		const ws = byId<HTMLInputElement>('dc-ws');
+		const cs = byId<HTMLInputElement>('dc-case');
+		let view = 'split';
+
+		const render = () => {
+			const la = a.value.split('\n');
+			const lb = b.value.split('\n');
+			const norm = (s: string) => {
+				let t = ws.checked ? s.replace(/\s+/g, ' ').trim() : s;
+				if (cs.checked) t = t.toLowerCase();
+				return t;
+			};
+			const ops = lcs(la, lb, (x, y) => norm(x) === norm(y));
+			const rows: { type: string; left?: [number, string]; right?: [number, string] }[] = [];
+			for (let k = 0; k < ops.length; k++) {
+				const [op, i, j] = ops[k];
+				if (op === '=') rows.push({ type: 'same', left: [i + 1, la[i]], right: [j + 1, lb[j]] });
+				else if (op === '-' && ops[k + 1]?.[0] === '+') {
+					rows.push({ type: 'mod', left: [i + 1, la[i]], right: [ops[k + 1][2] + 1, lb[ops[k + 1][2]]] });
+					k++;
+				} else if (op === '-') rows.push({ type: 'del', left: [i + 1, la[i]] });
+				else rows.push({ type: 'add', right: [j + 1, lb[j]] });
+			}
+			const added = rows.filter((r) => r.type === 'add').length;
+			const removed = rows.filter((r) => r.type === 'del').length;
+			const modified = rows.filter((r) => r.type === 'mod').length;
+			byId('dc-summary').textContent = added + removed + modified ? `${added} added · ${removed} removed · ${modified} modified` : 'No differences.';
+
+			const out = byId('dc-out');
+			out.className = `dc-out dc-${view}`;
+			const lines: HTMLElement[] = [];
+			const cell = (cls: string, num: number | undefined, content: string | DocumentFragment, sign: string) => {
+				const n = document.createElement('span');
+				n.className = 'dc-num';
+				n.textContent = num ? String(num) : '';
+				const c = document.createElement('span');
+				c.className = `dc-code ${cls}`;
+				c.dataset.sign = sign;
+				c.append(content);
+				return [n, c];
+			};
+			for (const r of rows) {
+				const [wa, wb] = r.type === 'mod' ? words(r.left![1], r.right![1]) : [r.left?.[1] ?? '', r.right?.[1] ?? ''];
+				if (view === 'split') {
+					const row = document.createElement('div');
+					row.className = 'dc-line';
+					row.append(
+						...cell(r.left ? (r.type === 'same' ? '' : 'dc-del') : 'dc-empty', r.left?.[0], wa, r.left && r.type !== 'same' ? '−' : ' '),
+						...cell(r.right ? (r.type === 'same' ? '' : 'dc-add') : 'dc-empty', r.right?.[0], wb, r.right && r.type !== 'same' ? '+' : ' ')
+					);
+					lines.push(row);
+				} else {
+					if (r.left) {
+						const row = document.createElement('div');
+						row.className = 'dc-line';
+						row.append(...cell(r.type === 'same' ? '' : 'dc-del', r.left[0], wa, r.type === 'same' ? ' ' : '−'));
+						lines.push(row);
+					}
+					if (r.right && r.type !== 'same') {
+						const row = document.createElement('div');
+						row.className = 'dc-line';
+						row.append(...cell('dc-add', r.right[0], wb, '+'));
+						lines.push(row);
+					}
+				}
+			}
+			out.replaceChildren(...lines);
+		};
+
+		segmented(byId('dc-view'), (v) => ((view = v), render()));
+		[a, b, ws, cs].forEach((el) => el.addEventListener('input', render));
+		byId('dc-swap').addEventListener('click', () => {
+			[a.value, b.value] = [b.value, a.value];
+			render();
+		});
+		render();
+	});
+</script>
+
+<style>
+	.dc-summary {
+		margin: 0;
+		font-size: 14px;
+		font-weight: 700;
+	}
+	.dc-out {
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		background: var(--surface);
+		overflow-x: auto;
+		font-family: var(--mono);
+		font-size: 13px;
+	}
+	.dc-out :global(.dc-line) {
+		display: grid;
+		grid-template-columns: 40px minmax(0, 1fr) 40px minmax(0, 1fr);
+	}
+	.dc-out:global(.dc-unified) :global(.dc-line) {
+		grid-template-columns: 40px minmax(0, 1fr);
+	}
+	.dc-out :global(.dc-num) {
+		text-align: right;
+		padding: 2px 8px;
+		color: var(--ink-soft);
+		background: var(--surface-2);
+		user-select: none;
+	}
+	.dc-out :global(.dc-code) {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+		padding: 2px 8px 2px 22px;
+		position: relative;
+	}
+	.dc-out :global(.dc-code::before) {
+		content: attr(data-sign);
+		position: absolute;
+		left: 7px;
+		color: var(--ink-soft);
+	}
+	.dc-out :global(.dc-del) {
+		background: rgba(229, 72, 77, 0.12);
+	}
+	.dc-out :global(.dc-add) {
+		background: rgba(80, 250, 123, 0.14);
+	}
+	.dc-out :global(.dc-empty) {
+		background: repeating-linear-gradient(45deg, transparent 0 6px, var(--surface-2) 6px 7px);
+	}
+	.dc-out :global(.dc-del mark) {
+		background: rgba(229, 72, 77, 0.35);
+		color: inherit;
+		border-radius: 3px;
+	}
+	.dc-out :global(.dc-add mark) {
+		background: rgba(80, 250, 123, 0.4);
+		color: inherit;
+		border-radius: 3px;
+	}
+</style>

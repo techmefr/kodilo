@@ -1,0 +1,83 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = JSON.stringify(
+	{
+		name: 'kodilo',
+		version: '1.0.0',
+		private: true,
+		scripts: { dev: 'astro dev', build: 'astro build' },
+		deploy: { targets: ['github-pages', 'netlify'], replicas: 2, notes: 'line one\nline two' },
+		owner: null,
+	},
+	null,
+	2
+);
+---
+
+<ToolShell slug="json-to-yaml" title="JSON to YAML" description="Convert JSON to clean YAML: safe quoting, block strings for multi-line text, your choice of indent. Also takes JSON Lines as a multi-document stream.">
+	<div class="toolbar" id="jy-tool">
+		<div class="seg" id="jy-indent">
+			<button data-value="2" aria-pressed="true">2 spaces</button>
+			<button data-value="4">4 spaces</button>
+		</div>
+		<label class="check"><input type="checkbox" id="jy-doc" /> Start with ---</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">JSON</div>
+			<textarea id="jy-in" spellcheck="false" aria-label="JSON input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>YAML</span>
+				<button class="btn" id="jy-copy">Copy</button>
+			</div>
+			<pre class="out" id="jy-out"></pre>
+		</section>
+	</div>
+	<p class="error" id="jy-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { toYaml } from '../../scripts/yaml';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('jy-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jy-in');
+		const doc = byId<HTMLInputElement>('jy-doc');
+		let indent = 2;
+
+		const render = () => {
+			const error = byId('jy-error');
+			const text = input.value.trim();
+			try {
+				let docs: unknown[];
+				try {
+					docs = [JSON.parse(text)];
+				} catch (e) {
+					const lines = text.split('\n').filter((l) => l.trim());
+					if (lines.length < 2) throw e;
+					docs = lines.map((l, i) => {
+						try {
+							return JSON.parse(l);
+						} catch {
+							throw new Error(`Line ${i + 1} is not valid JSON.`);
+						}
+					});
+				}
+				const body = docs.map((d) => toYaml(d, indent)).join('\n---\n');
+				byId('jy-out').textContent = `${doc.checked || docs.length > 1 ? '---\n' : ''}${body}\n`;
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+			}
+		};
+
+		segmented(byId('jy-indent'), (v) => ((indent = Number(v)), render()));
+		[input, doc].forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('jy-copy'), () => byId('jy-out').textContent ?? '');
+		render();
+	});
+</script>
