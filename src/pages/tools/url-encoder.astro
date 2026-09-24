@@ -1,0 +1,135 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="url-encoder"
+	title="URL Encoder"
+	description="Encode or decode URLs and components, and see every part of a URL at a glance."
+>
+	<div class="toolbar" id="url-tool">
+		<div class="seg" id="url-mode" aria-label="Direction">
+			<button data-value="encode" aria-pressed="true">Encode</button>
+			<button data-value="decode" aria-pressed="false">Decode</button>
+		</div>
+		<div class="seg" id="url-scope" aria-label="Scope">
+			<button data-value="component" aria-pressed="true">Component</button>
+			<button data-value="full" aria-pressed="false">Full URL</button>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="url-in" spellcheck="false" aria-label="URL input"
+				>https://example.com/search?q=café crème&lang=fr#results</textarea
+			>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Output</span>
+				<button class="btn" id="url-copy">Copy</button>
+			</div>
+			<pre class="out" id="url-out"></pre>
+		</section>
+	</div>
+	<div class="error" id="url-error" hidden></div>
+	<section class="panel" id="url-parts-panel" hidden>
+		<div class="panel-head">URL parts</div>
+		<dl class="parts" id="url-parts"></dl>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	function row(list: HTMLElement, key: string, value: string) {
+		const dt = document.createElement('dt');
+		dt.textContent = key;
+		const dd = document.createElement('dd');
+		dd.textContent = value || '—';
+		list.append(dt, dd);
+	}
+
+	onPage('url-tool', () => {
+		const input = byId<HTMLTextAreaElement>('url-in');
+		const output = byId('url-out');
+		const error = byId('url-error');
+		const partsPanel = byId('url-parts-panel');
+		const parts = byId('url-parts');
+		let mode = 'encode';
+		let scope = 'component';
+
+		const renderParts = (text: string) => {
+			parts.replaceChildren();
+			let url: URL;
+			try {
+				url = new URL(text.trim());
+			} catch {
+				partsPanel.hidden = true;
+				return;
+			}
+			partsPanel.hidden = false;
+			row(parts, 'Protocol', url.protocol);
+			row(parts, 'Host', url.hostname);
+			row(parts, 'Port', url.port);
+			row(parts, 'Path', decodeURIComponent(url.pathname));
+			url.searchParams.forEach((value, key) => row(parts, `?${key}`, value));
+			row(parts, 'Hash', decodeURIComponent(url.hash));
+		};
+
+		const render = () => {
+			try {
+				const fn =
+					mode === 'encode'
+						? scope === 'full'
+							? encodeURI
+							: encodeURIComponent
+						: scope === 'full'
+							? decodeURI
+							: decodeURIComponent;
+				output.textContent = fn(input.value);
+				error.hidden = true;
+			} catch {
+				output.textContent = '';
+				error.textContent = 'Malformed percent-encoding: a % must be followed by two hex digits.';
+				error.hidden = false;
+			}
+			renderParts(mode === 'decode' ? (output.textContent ?? '') : input.value);
+		};
+
+		segmented(byId('url-mode'), (value) => {
+			mode = value;
+			render();
+		});
+		segmented(byId('url-scope'), (value) => {
+			scope = value;
+			render();
+		});
+		input.addEventListener('input', render);
+		copyButton(byId('url-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.parts {
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		margin: 0;
+		font-size: 13px;
+	}
+	.parts :global(dt),
+	.parts :global(dd) {
+		margin: 0;
+		padding: 9px 14px;
+		border-bottom: 1px solid var(--border);
+	}
+	.parts :global(dt) {
+		color: var(--ink-soft);
+		font-weight: 600;
+	}
+	.parts :global(dd) {
+		font-family: var(--mono);
+		word-break: break-all;
+	}
+</style>

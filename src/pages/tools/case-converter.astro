@@ -1,0 +1,142 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="case-converter"
+	title="Case Converter"
+	description="Type once, get every case. Click any row to copy it."
+>
+	<section class="panel" id="case-tool">
+		<div class="panel-head">Input</div>
+		<textarea id="case-in" class="case-input" spellcheck="false" aria-label="Text to convert"
+			>kodilo developer tools without account</textarea
+		>
+	</section>
+	<ul class="cases" id="case-list"></ul>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	function words(text: string): string[] {
+		return text
+			.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+			.replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+			.split(/[^\p{L}\p{N}]+/u)
+			.filter(Boolean)
+			.map((w) => w.toLowerCase());
+	}
+
+	const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+
+	const CASES: [string, (w: string[], raw: string) => string][] = [
+		['camelCase', (w) => w.map((x, i) => (i ? cap(x) : x)).join('')],
+		['PascalCase', (w) => w.map(cap).join('')],
+		['snake_case', (w) => w.join('_')],
+		['CONSTANT_CASE', (w) => w.join('_').toUpperCase()],
+		['kebab-case', (w) => w.join('-')],
+		['dot.case', (w) => w.join('.')],
+		['path/case', (w) => w.join('/')],
+		['Title Case', (w) => w.map(cap).join(' ')],
+		['Sentence case', (w) => cap(w.join(' '))],
+		['lowercase', (_, raw) => raw.toLowerCase()],
+		['UPPERCASE', (_, raw) => raw.toUpperCase()],
+	];
+
+	onPage('case-tool', () => {
+		const input = byId<HTMLTextAreaElement>('case-in');
+		const list = byId('case-list');
+
+		const render = () => {
+			const w = words(input.value);
+			list.replaceChildren(
+				...CASES.map(([name, fn]) => {
+					const value = fn(w, input.value);
+					const li = document.createElement('li');
+					const button = document.createElement('button');
+					button.className = 'case-row';
+					button.innerHTML = '<span class="case-name"></span><code></code><span class="case-hint">Copy</span>';
+					button.querySelector('.case-name')!.textContent = name;
+					button.querySelector('code')!.textContent = value;
+					button.addEventListener('click', async () => {
+						await navigator.clipboard.writeText(value);
+						const hint = button.querySelector('.case-hint')!;
+						hint.textContent = 'Copied';
+						button.classList.add('copied');
+						setTimeout(() => {
+							hint.textContent = 'Copy';
+							button.classList.remove('copied');
+						}, 1200);
+					});
+					li.append(button);
+					return li;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		render();
+	});
+</script>
+
+<style>
+	.case-input {
+		min-height: 90px !important;
+		font-family: var(--sans) !important;
+		font-size: 16px !important;
+	}
+	.cases {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		overflow: hidden;
+	}
+	.cases :global(li + li) {
+		border-top: 1px solid var(--border);
+	}
+	.cases :global(.case-row) {
+		display: grid;
+		grid-template-columns: 140px 1fr auto;
+		align-items: center;
+		gap: 12px;
+		width: 100%;
+		padding: 12px 14px;
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.cases :global(.case-row:hover) {
+		background: var(--surface-2);
+	}
+	.cases :global(.case-name) {
+		font-size: 12.5px;
+		font-weight: 600;
+		color: var(--ink-soft);
+	}
+	.cases :global(code) {
+		font-family: var(--mono);
+		font-size: 13.5px;
+		word-break: break-all;
+	}
+	.cases :global(.case-hint) {
+		font-size: 12px;
+		color: var(--ink-soft);
+		opacity: 0;
+		transition: opacity 0.15s;
+	}
+	.cases :global(.case-row:hover .case-hint),
+	.cases :global(.case-row:focus-visible .case-hint),
+	.cases :global(.case-row.copied .case-hint) {
+		opacity: 1;
+	}
+	.cases :global(.case-row.copied .case-hint) {
+		color: var(--ok);
+	}
+</style>

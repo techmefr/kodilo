@@ -37,6 +37,7 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'json-formatter',
+				built: true,
 				name: 'JSON Formatter & Validator',
 				description: 'Format, validate and minify JSON data.',
 			},
@@ -150,6 +151,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'case-converter',
+				built: true,
 				name: 'Case Converter',
 				description: 'Convert text between case styles (camel, snake, kebab...).',
 			},
@@ -197,6 +199,7 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'base64',
+				built: true,
 				name: 'Base64 Encoder & Decoder',
 				description: 'Encode and decode Base64 strings.',
 			},
@@ -207,6 +210,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'url-encoder',
+				built: true,
 				name: 'URL Encoder & Decoder',
 				description: 'Encode and decode URL strings.',
 			},
@@ -274,6 +278,7 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'uuid-generator',
+				built: true,
 				name: 'UUID Generator',
 				description: 'Generate random UUIDs.',
 			},

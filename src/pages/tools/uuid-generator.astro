@@ -1,0 +1,69 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="uuid-generator"
+	title="UUID Generator"
+	description="Random v4 or time-ordered v7 UUIDs, one or a thousand at a time."
+>
+	<div class="toolbar" id="uuid-tool">
+		<div class="seg" id="uuid-version" aria-label="Version">
+			<button data-value="v4" aria-pressed="true">v4 · random</button>
+			<button data-value="v7" aria-pressed="false">v7 · time-ordered</button>
+		</div>
+		<label class="check">Count <input class="num" type="number" id="uuid-count" min="1" max="1000" value="5" /></label>
+		<label class="check"><input type="checkbox" id="uuid-upper" /> Uppercase</label>
+		<label class="check"><input type="checkbox" id="uuid-hyphens" checked /> Hyphens</label>
+		<button class="btn primary" id="uuid-regen">Regenerate</button>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="uuid-label">UUIDs</span>
+			<button class="btn" id="uuid-copy">Copy all</button>
+		</div>
+		<pre class="out" id="uuid-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	function uuidV7(): string {
+		const bytes = crypto.getRandomValues(new Uint8Array(16));
+		const ms = BigInt(Date.now());
+		for (let i = 0; i < 6; i++) bytes[i] = Number((ms >> BigInt(8 * (5 - i))) & 0xffn);
+		bytes[6] = (bytes[6] & 0x0f) | 0x70;
+		bytes[8] = (bytes[8] & 0x3f) | 0x80;
+		const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+		return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+	}
+
+	onPage('uuid-tool', () => {
+		const output = byId('uuid-out');
+		const count = byId<HTMLInputElement>('uuid-count');
+		const upper = byId<HTMLInputElement>('uuid-upper');
+		const hyphens = byId<HTMLInputElement>('uuid-hyphens');
+		let version = 'v4';
+
+		const render = () => {
+			const n = Math.min(1000, Math.max(1, Number(count.value) || 1));
+			const ids = Array.from({ length: n }, () => {
+				let id = version === 'v7' ? uuidV7() : crypto.randomUUID();
+				if (!hyphens.checked) id = id.replace(/-/g, '');
+				return upper.checked ? id.toUpperCase() : id;
+			});
+			output.textContent = ids.join('\n');
+			byId('uuid-label').textContent = `${n} UUID ${version}`;
+		};
+
+		segmented(byId('uuid-version'), (value) => {
+			version = value;
+			render();
+		});
+		[count, upper, hyphens].forEach((el) => el.addEventListener('input', render));
+		byId('uuid-regen').addEventListener('click', render);
+		copyButton(byId('uuid-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

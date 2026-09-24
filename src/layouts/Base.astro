@@ -29,12 +29,14 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 			rel="stylesheet"
 		/>
 		<script is:inline>
-			try {
-				const stored = localStorage.getItem('kodilo-theme');
-				if (stored === 'dark' || stored === 'light') {
-					document.documentElement.dataset.theme = stored;
-				}
-			} catch {}
+			function applyStoredTheme(root) {
+				try {
+					const stored = localStorage.getItem('kodilo-theme');
+					if (stored === 'dark' || stored === 'light') root.dataset.theme = stored;
+				} catch {}
+			}
+			applyStoredTheme(document.documentElement);
+			document.addEventListener('astro:before-swap', (event) => applyStoredTheme(event.newDocument.documentElement));
 		</script>
 		<ClientRouter />
 	</head>
