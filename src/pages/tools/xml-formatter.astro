@@ -1,0 +1,113 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `<?xml version="1.0" encoding="UTF-8"?><catalog><!-- spring list --><book id="bk101" lang="en"><author>Gambardella, Matthew</author><title>XML Developer's Guide</title><price currency="EUR">44.95</price><description><![CDATA[An in-depth look at <XML> & friends.]]></description></book><book id="bk102"><author>Ralls, Kim</author><title>Midnight Rain</title><price currency="EUR">5.95</price><tags/></book></catalog>`;
+---
+
+<ToolShell slug="xml-formatter" title="XML Formatter" description="Pretty-print or minify XML, with a clear message and line number when the document is not well-formed.">
+	<div class="toolbar" id="xf-tool">
+		<div class="seg" id="xf-mode" aria-label="Mode">
+			<button data-value="pretty" aria-pressed="true">Format</button>
+			<button data-value="minify" aria-pressed="false">Minify</button>
+		</div>
+		<div class="seg" id="xf-indent" aria-label="Indent">
+			<button data-value="2" aria-pressed="true">2 spaces</button>
+			<button data-value="4" aria-pressed="false">4 spaces</button>
+			<button data-value="tab" aria-pressed="false">Tab</button>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">XML</div>
+			<textarea id="xf-in" spellcheck="false" aria-label="XML input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="xf-status">Output</span>
+				<button class="btn" id="xf-copy">Copy</button>
+			</div>
+			<pre class="out" id="xf-out"></pre>
+		</section>
+	</div>
+	<p class="error" id="xf-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	const attr = (s: string) => esc(s).replace(/"/g, '&quot;');
+
+	function format(node: Node, unit: string, depth: number, pretty: boolean): string {
+		const pad = pretty ? unit.repeat(depth) : '';
+		const nl = pretty ? '\n' : '';
+		switch (node.nodeType) {
+			case Node.ELEMENT_NODE: {
+				const el = node as Element;
+				const attrs = [...el.attributes].map((a) => ` ${a.name}="${attr(a.value)}"`).join('');
+				const kids = [...el.childNodes].filter((c) => c.nodeType !== Node.TEXT_NODE || c.textContent!.trim());
+				if (!kids.length) return `${pad}<${el.tagName}${attrs}/>`;
+				if (kids.length === 1 && kids[0].nodeType === Node.TEXT_NODE) return `${pad}<${el.tagName}${attrs}>${esc(kids[0].textContent!.trim())}</${el.tagName}>`;
+				return `${pad}<${el.tagName}${attrs}>${nl}${kids.map((k) => format(k, unit, depth + 1, pretty)).join(nl)}${nl}${pad}</${el.tagName}>`;
+			}
+			case Node.TEXT_NODE:
+				return `${pad}${esc(node.textContent!.trim())}`;
+			case Node.CDATA_SECTION_NODE:
+				return `${pad}<![CDATA[${node.textContent}]]>`;
+			case Node.COMMENT_NODE:
+				return pretty ? `${pad}<!--${node.textContent}-->` : '';
+			case Node.PROCESSING_INSTRUCTION_NODE: {
+				const pi = node as ProcessingInstruction;
+				return `${pad}<?${pi.target} ${pi.data}?>`;
+			}
+			default:
+				return '';
+		}
+	}
+
+	onPage('xf-tool', () => {
+		const input = byId<HTMLTextAreaElement>('xf-in');
+		const out = byId('xf-out');
+		const error = byId('xf-error');
+		let mode = 'pretty';
+		let unit = '  ';
+
+		const render = () => {
+			const src = input.value.trim();
+			const decl = src.match(/^<\?xml[^?]*\?>/)?.[0] ?? '';
+			const doc = new DOMParser().parseFromString(src, 'application/xml');
+			const err = doc.querySelector('parsererror');
+			if (err) {
+				error.hidden = false;
+				const text = err.textContent ?? '';
+				const line = text.match(/line (\d+)/i)?.[1];
+				const col = text.match(/column (\d+)/i)?.[1];
+				error.textContent = `Not well-formed${line ? ` at line ${line}${col ? `, column ${col}` : ''}` : ''}: ${text.split('\n').find((l) => /error|expected|mismatch|unclosed/i.test(l))?.trim() ?? 'check the tags'}`;
+				byId('xf-status').textContent = '✕ Invalid';
+				out.textContent = '';
+				return;
+			}
+			error.hidden = true;
+			const pretty = mode === 'pretty';
+			const body = [...doc.childNodes].map((n) => format(n, unit, 0, pretty)).filter(Boolean).join(pretty ? '\n' : '');
+			out.textContent = (decl ? decl + (pretty ? '\n' : '') : '') + body;
+			byId('xf-status').textContent = `✓ Well-formed · ${out.textContent.length.toLocaleString('en-US')} characters`;
+		};
+
+		segmented(byId('xf-mode'), (v) => ((mode = v), render()));
+		segmented(byId('xf-indent'), (v) => ((unit = v === 'tab' ? '\t' : ' '.repeat(Number(v))), render()));
+		input.addEventListener('input', render);
+		copyButton(byId('xf-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#xf-in {
+		min-height: 360px;
+	}
+	#xf-out {
+		white-space: pre;
+		overflow: auto;
+	}
+</style>

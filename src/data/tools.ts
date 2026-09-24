@@ -63,6 +63,18 @@ export const categories: Category[] = [
 				name: 'JSON Viewer',
 				description: 'Explore a JSON document as a collapsible tree.',
 			},
+			{
+				slug: 'json-to-typescript', icon: 'file-type-2',
+				built: true,
+				name: 'JSON to TypeScript',
+				description: 'Generate TypeScript interfaces or types from a JSON sample.',
+			},
+			{
+				slug: 'json-schema-validator', icon: 'list-checks',
+				built: true,
+				name: 'JSON Schema Validator',
+				description: 'Validate JSON against a JSON Schema, or generate a schema from data.',
+			},
 		],
 	},
 	{
@@ -112,6 +124,12 @@ export const categories: Category[] = [
 				name: 'Flexbox Generator',
 				description: 'Build a CSS flexbox layout visually and copy the code.',
 			},
+			{
+				slug: 'xml-formatter', icon: 'code',
+				built: true,
+				name: 'XML Formatter',
+				description: 'Pretty-print or minify XML and catch well-formedness errors.',
+			},
 		],
 	},
 	{
@@ -130,6 +148,12 @@ export const categories: Category[] = [
 				built: true,
 				name: 'Markdown Previewer',
 				description: 'Write Markdown and preview the rendered result live.',
+			},
+			{
+				slug: 'html-to-markdown', icon: 'file-down',
+				built: true,
+				name: 'HTML to Markdown',
+				description: 'Convert HTML or pasted rich text to clean Markdown.',
 			},
 		],
 	},
@@ -306,6 +330,12 @@ export const categories: Category[] = [
 				name: 'Checksum Calculator',
 				description: 'Compute a CRC32 or other checksum for text or a file.',
 			},
+			{
+				slug: 'string-escaper', icon: 'quote',
+				built: true,
+				name: 'String Escaper',
+				description: 'Escape or unescape strings for JSON, JS, SQL, shell, regex, CSV and HTML.',
+			},
 		],
 	},
 	{
@@ -384,6 +414,12 @@ export const categories: Category[] = [
 				name: 'Temperature Converter',
 				description: 'Convert between Celsius, Fahrenheit and Kelvin.',
 			},
+			{
+				slug: 'toml-formatter', icon: 'settings-2',
+				built: true,
+				name: 'TOML Formatter & Converter',
+				description: 'Validate and format TOML, convert it to and from JSON.',
+			},
 		],
 	},
 	{
@@ -436,6 +472,12 @@ export const categories: Category[] = [
 				slug: 'phone-parser', icon: 'phone', built: true,
 				name: 'Phone Parser & Formatter',
 				description: 'Parse and format international phone numbers.',
+			},
+			{
+				slug: 'url-parser', icon: 'link',
+				built: true,
+				name: 'URL Parser',
+				description: 'Split a URL into its parts and edit query parameters.',
 			},
 		],
 	},
@@ -590,6 +632,12 @@ export const categories: Category[] = [
 				built: true,
 				name: 'NPM Cheatsheet',
 				description: 'Quick reference for common npm/pnpm/yarn commands.',
+			},
+			{
+				slug: 'graphql-formatter', icon: 'waypoints',
+				built: true,
+				name: 'GraphQL Formatter',
+				description: 'Format or minify GraphQL queries and schemas.',
 			},
 		],
 	},
@@ -762,8 +810,21 @@ export const categories: Category[] = [
 	{
 		name: 'Design',
 		icon: 'palette',
-		blurb: 'Coming soon',
-		tools: [],
+		blurb: 'Contrast, color, motion and icons',
+		tools: [
+			{
+				slug: 'wcag-contrast-checker', icon: 'contrast',
+				built: true,
+				name: 'WCAG Contrast Checker',
+				description: 'Check text and background contrast against WCAG AA and AAA.',
+			},
+			{
+				slug: 'px-rem-converter', icon: 'ruler-dimension-line',
+				built: true,
+				name: 'px, rem & em Converter',
+				description: 'Convert px, rem, em, pt and percent, or a whole CSS snippet to rem.',
+			},
+		],
 	},
 ];
 

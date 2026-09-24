@@ -1,0 +1,113 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `He said "it's done" \\ C:\\temp\\new
+	next line with a tab and $HOME, (a+b)*2?`;
+---
+
+<ToolShell slug="string-escaper" title="String Escaper" description="Escape or unescape a string for JSON, JavaScript, SQL, shell, regex, CSV, HTML or XML, so it can be pasted safely into code.">
+	<div class="toolbar" id="se-tool">
+		<div class="seg" id="se-lang" aria-label="Target">
+			<button data-value="json" aria-pressed="true">JSON</button>
+			<button data-value="js" aria-pressed="false">JavaScript</button>
+			<button data-value="sql" aria-pressed="false">SQL</button>
+			<button data-value="shell" aria-pressed="false">Shell</button>
+			<button data-value="regex" aria-pressed="false">Regex</button>
+			<button data-value="csv" aria-pressed="false">CSV</button>
+			<button data-value="html" aria-pressed="false">HTML / XML</button>
+		</div>
+		<div class="seg" id="se-dir" aria-label="Direction">
+			<button data-value="escape" aria-pressed="true">Escape</button>
+			<button data-value="unescape" aria-pressed="false">Unescape</button>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="se-in" spellcheck="false" aria-label="Input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="se-out-title">Escaped</span>
+				<button class="btn" id="se-copy">Copy</button>
+			</div>
+			<pre class="out" id="se-out"></pre>
+		</section>
+	</div>
+	<p class="error" id="se-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const HTML: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+	const ESCAPE: Record<string, (s: string) => string> = {
+		json: (s) => JSON.stringify(s).slice(1, -1),
+		js: (s) => s.replace(/[\\'"`$]/g, (c) => (c === '$' ? '\\$' : '\\' + c)).replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t'),
+		sql: (s) => s.replace(/'/g, "''"),
+		shell: (s) => `'${s.replace(/'/g, `'\\''`)}'`,
+		regex: (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'),
+		csv: (s) => (/[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s),
+		html: (s) => s.replace(/[&<>"']/g, (c) => HTML[c]),
+	};
+
+	const UNESCAPE: Record<string, (s: string) => string> = {
+		json: (s) => JSON.parse(`"${s.replace(/(^|[^\\])"/g, '$1\\"')}"`),
+		js: (s) =>
+			s.replace(/\\(u\{[0-9a-f]+\}|u[0-9a-f]{4}|x[0-9a-f]{2}|.)/gi, (_, c: string) => {
+				if (/^u\{/i.test(c)) return String.fromCodePoint(parseInt(c.slice(2, -1), 16));
+				if (/^[ux]/i.test(c) && c.length > 1) return String.fromCharCode(parseInt(c.slice(1), 16));
+				return ({ n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v', '0': '\0' } as Record<string, string>)[c] ?? c;
+			}),
+		sql: (s) => s.replace(/''/g, "'"),
+		shell: (s) => s.replace(/^'|'$/g, '').replace(/'\\''/g, "'"),
+		regex: (s) => s.replace(/\\(.)/g, '$1'),
+		csv: (s) => (/^".*"$/s.test(s) ? s.slice(1, -1).replace(/""/g, '"') : s),
+		html: (s) => {
+			const t = document.createElement('textarea');
+			t.innerHTML = s;
+			return t.value;
+		},
+	};
+
+	onPage('se-tool', () => {
+		const input = byId<HTMLTextAreaElement>('se-in');
+		const out = byId('se-out');
+		const error = byId('se-error');
+		let lang = 'json';
+		let dir = 'escape';
+
+		const render = () => {
+			try {
+				out.textContent = (dir === 'escape' ? ESCAPE : UNESCAPE)[lang](input.value);
+				error.hidden = true;
+			} catch (e) {
+				error.hidden = false;
+				error.textContent = `This is not a valid escaped string: ${(e as Error).message}`;
+				out.textContent = '';
+			}
+			byId('se-out-title').textContent = dir === 'escape' ? 'Escaped' : 'Unescaped';
+		};
+
+		segmented(byId('se-lang'), (v) => ((lang = v), render()));
+		segmented(byId('se-dir'), (v) => {
+			if (v !== dir && out.textContent) input.value = out.textContent;
+			dir = v;
+			render();
+		});
+		input.addEventListener('input', render);
+		copyButton(byId('se-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#se-in {
+		min-height: 220px;
+	}
+	#se-out {
+		white-space: pre-wrap;
+		word-break: break-all;
+	}
+</style>

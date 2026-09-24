@@ -1,0 +1,98 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `title = "kodilo"
+[server]
+host="0.0.0.0"
+port=8080
+tls = { enabled = true, cert = "/etc/ssl/app.pem" }
+
+[database]
+url = "postgres://localhost/app"
+pool   = 10
+timeouts = [ 5, 30 ]
+
+[[workers]]
+name = "mailer"
+concurrency = 4
+
+[[workers]]
+name = "thumbnails"
+concurrency = 2
+`;
+---
+
+<ToolShell slug="toml-formatter" title="TOML Formatter & Converter" description="Validate and reformat TOML, or convert it to and from JSON. Errors point to the line and column.">
+	<div class="toolbar" id="tf-tool">
+		<div class="seg" id="tf-mode" aria-label="Output">
+			<button data-value="toml" aria-pressed="true">Formatted TOML</button>
+			<button data-value="json" aria-pressed="false">TOML → JSON</button>
+			<button data-value="from-json" aria-pressed="false">JSON → TOML</button>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head" id="tf-in-title">TOML</div>
+			<textarea id="tf-in" spellcheck="false" aria-label="Input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="tf-status">Output</span>
+				<button class="btn" id="tf-copy">Copy</button>
+			</div>
+			<pre class="out" id="tf-out"></pre>
+		</section>
+	</div>
+	<p class="error" id="tf-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { parse, stringify } from 'smol-toml';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('tf-tool', () => {
+		const input = byId<HTMLTextAreaElement>('tf-in');
+		const out = byId('tf-out');
+		const error = byId('tf-error');
+		let mode = 'toml';
+
+		const render = () => {
+			byId('tf-in-title').textContent = mode === 'from-json' ? 'JSON' : 'TOML';
+			try {
+				if (mode === 'from-json') out.textContent = stringify(JSON.parse(input.value));
+				else {
+					const data = parse(input.value);
+					out.textContent = mode === 'json' ? JSON.stringify(data, null, 2) : stringify(data);
+				}
+				error.hidden = true;
+				byId('tf-status').textContent = '✓ Valid';
+			} catch (e) {
+				const err = e as Error & { line?: number; column?: number };
+				error.hidden = false;
+				error.textContent = err.line ? `Line ${err.line}, column ${err.column}: ${err.message.split('\n')[0]}` : err.message.split('\n')[0];
+				byId('tf-status').textContent = '✕ Invalid';
+				out.textContent = '';
+			}
+		};
+
+		segmented(byId('tf-mode'), (v) => {
+			const prev = mode;
+			mode = v;
+			if (v === 'from-json' && prev !== 'from-json' && out.textContent) {
+				try {
+					input.value = JSON.stringify(parse(input.value), null, 2);
+				} catch {}
+			} else if (prev === 'from-json' && v !== 'from-json' && out.textContent) input.value = out.textContent;
+			render();
+		});
+		input.addEventListener('input', render);
+		copyButton(byId('tf-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#tf-in {
+		min-height: 380px;
+	}
+</style>
