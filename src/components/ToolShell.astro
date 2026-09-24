@@ -11,7 +11,7 @@ interface Props {
 const { slug, title, description } = Astro.props;
 ---
 
-<Base title={`${title} — kodilo`}>
+<Base title={`${title} — kodilo`} description={description}>
 	<div class="shell">
 		<Header activeSlug={slug} />
 		<main class="tool">

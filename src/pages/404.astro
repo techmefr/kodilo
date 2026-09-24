@@ -1,0 +1,186 @@
+---
+import Header from '../components/Header.astro';
+import { builtCategories } from '../data/tools';
+import Base from '../layouts/Base.astro';
+import { icon } from '../scripts/icons';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const tools = builtCategories.flatMap((c) => c.tools.map((t) => ({ slug: t.slug, name: t.name, icon: t.icon ?? 'wrench' })));
+const icons = Object.fromEntries(tools.map((t) => [t.slug, icon(t.icon)]));
+---
+
+<Base title="Page not found — kodilo" description="This page does not exist on kodilo." noindex>
+	<div class="shell">
+		<Header />
+		<main class="nf" id="nf-tool" data-base={base} data-tools={JSON.stringify(tools)} data-icons={JSON.stringify(icons)}>
+			<p class="nf-code">404</p>
+			<h1>This page does not exist</h1>
+			<p class="nf-lead">
+				The link may be old or mistyped: <code id="nf-path"></code>
+			</p>
+			<div class="nf-actions">
+				<a class="btn primary" href={base}>
+					Browse all tools
+				</a>
+				<button type="button" class="btn" id="nf-search">
+					<span set:html={icon('search')} />
+					Search a tool
+				</button>
+			</div>
+			<section class="nf-suggest" id="nf-suggest" hidden>
+				<h2>Were you looking for</h2>
+				<ul id="nf-list"></ul>
+			</section>
+		</main>
+	</div>
+</Base>
+
+<script>
+	import { byId, onPage } from '../scripts/ui';
+
+	type Entry = { slug: string; name: string };
+
+	function distance(a: string, b: string) {
+		const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+		for (let i = 1; i <= a.length; i++) {
+			let prev = row[0];
+			row[0] = i;
+			for (let j = 1; j <= b.length; j++) {
+				const next = row[j];
+				row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+				prev = next;
+			}
+		}
+		return row[b.length];
+	}
+
+	onPage('nf-tool', () => {
+		const root = byId('nf-tool');
+		const base = root.dataset.base ?? '/';
+		const tools: Entry[] = JSON.parse(root.dataset.tools ?? '[]');
+		const icons: Record<string, string> = JSON.parse(root.dataset.icons ?? '{}');
+		const path = decodeURIComponent(location.pathname);
+		byId('nf-path').textContent = path;
+		byId('nf-search').addEventListener('click', () => document.getElementById('search-open')?.click());
+
+		const query = path
+			.replace(base, '')
+			.replace(/^tools\//, '')
+			.replace(/\/$/, '')
+			.toLowerCase();
+		if (!query) return;
+		const words = query.split(/[^a-z0-9]+/).filter((w) => w.length > 1);
+		const ranked = tools
+			.map((t) => {
+				const hits = words.filter((w) => t.slug.includes(w)).length;
+				return { t, score: distance(query, t.slug) - hits * 6 };
+			})
+			.sort((a, b) => a.score - b.score)
+			.filter((r, _, all) => r.score < Math.max(8, query.length * 0.6) && r.score <= all[0].score + 4)
+			.slice(0, 4);
+		if (!ranked.length) return;
+		byId('nf-list').replaceChildren(
+			...ranked.map(({ t }) => {
+				const li = document.createElement('li');
+				const a = document.createElement('a');
+				a.href = `${base}tools/${t.slug}/`;
+				a.innerHTML = `<span class="t-icon">${icons[t.slug] ?? ''}</span>`;
+				a.append(t.name);
+				li.append(a);
+				return li;
+			}),
+		);
+		byId('nf-suggest').hidden = false;
+	});
+</script>
+
+<style>
+	.shell {
+		display: flex;
+		min-height: 100vh;
+	}
+	@media (max-width: 760px) {
+		.shell {
+			display: block;
+		}
+	}
+	.nf {
+		flex: 1;
+		min-width: 0;
+		max-width: 640px;
+		margin: 0 auto;
+		padding: 10vh 24px 48px;
+	}
+	.nf-code {
+		margin: 0;
+		font-size: 88px;
+		font-weight: 800;
+		line-height: 1;
+		letter-spacing: -0.04em;
+		color: var(--accent-strong);
+	}
+	.nf h1 {
+		margin: 12px 0 8px;
+		font-size: 30px;
+		text-wrap: balance;
+	}
+	.nf-lead {
+		margin: 0 0 24px;
+		color: var(--ink-soft);
+		overflow-wrap: anywhere;
+	}
+	.nf-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+	}
+	.nf-actions .btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		text-decoration: none;
+	}
+	.nf-actions :global(svg) {
+		width: 16px;
+		height: 16px;
+	}
+	.nf-suggest {
+		margin-top: 36px;
+	}
+	.nf-suggest h2 {
+		margin: 0 0 10px;
+		font-size: 13px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--ink-soft);
+	}
+	.nf-suggest ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: grid;
+		gap: 8px;
+	}
+	.nf-suggest :global(a) {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 10px 12px;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font-weight: 600;
+		text-decoration: none;
+	}
+	.nf-suggest :global(a:hover),
+	.nf-suggest :global(a:focus-visible) {
+		border-color: var(--accent-strong);
+	}
+	.nf-suggest :global(.t-icon svg) {
+		width: 18px;
+		height: 18px;
+		color: var(--accent-strong);
+	}
+</style>
