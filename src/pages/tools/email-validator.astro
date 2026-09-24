@@ -1,0 +1,167 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="email-validator"
+	title="Email Validator"
+	description="Check a list of addresses for syntax, typos in popular domains and disposable providers. One per line."
+>
+	<section class="panel" id="mail-tool">
+		<div class="panel-head">
+			<span>Addresses</span>
+			<button class="btn" id="mail-copy">Copy valid</button>
+		</div>
+		<textarea id="mail-in" spellcheck="false" aria-label="Email addresses"
+			>jane.doe@gmail.com
+john@gmial.com
+first..last@example.com
+hello@mailinator.com
+no-at-sign.example.com
+dev+tag@sub.company.io</textarea
+		>
+	</section>
+	<p class="mail-summary" id="mail-summary"></p>
+	<ul class="mail-list" id="mail-list"></ul>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const POPULAR = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'live.com', 'aol.com', 'proton.me', 'protonmail.com', 'orange.fr', 'free.fr', 'wanadoo.fr', 'laposte.net', 'sfr.fr', 'gmx.com', 'yahoo.fr', 'hotmail.fr'];
+	const DISPOSABLE = ['mailinator.com', 'yopmail.com', 'guerrillamail.com', '10minutemail.com', 'tempmail.com', 'temp-mail.org', 'trashmail.com', 'sharklasers.com', 'getnada.com', 'throwawaymail.com', 'maildrop.cc', 'dispostable.com'];
+
+	function distance(a: string, b: string): number {
+		const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+		for (let i = 1; i <= a.length; i++) {
+			let previous = row[0];
+			row[0] = i;
+			for (let j = 1; j <= b.length; j++) {
+				const current = row[j];
+				row[j] = Math.min(row[j] + 1, row[j - 1] + 1, previous + (a[i - 1] === b[j - 1] ? 0 : 1));
+				previous = current;
+			}
+		}
+		return row[b.length];
+	}
+
+	type Result = { email: string; status: 'ok' | 'warn' | 'bad'; message: string };
+
+	function check(email: string): Result {
+		const bad = (message: string): Result => ({ email, status: 'bad', message });
+		const at = email.lastIndexOf('@');
+		if (at < 1) return bad('Missing the @ or the part before it.');
+		const local = email.slice(0, at);
+		const domain = email.slice(at + 1).toLowerCase();
+		if (local.length > 64) return bad('The part before @ is longer than 64 characters.');
+		if (email.length > 254) return bad('Longer than 254 characters.');
+		if (/^\.|\.$|\.\./.test(local)) return bad('Dots cannot start, end or repeat before the @.');
+		if (!/^[\p{L}\p{N}.!#$%&'*+/=?^_`{|}~-]+$/u.test(local)) return bad('The part before @ contains characters that are not allowed.');
+		if (!domain) return bad('Missing the domain after @.');
+		const labels = domain.split('.');
+		if (labels.length < 2) return bad('The domain needs a dot, like example.com.');
+		if (labels.some((l) => !/^[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?$/u.test(l))) return bad('The domain has an empty or malformed label.');
+		if (!/^\p{L}{2,}$/u.test(labels[labels.length - 1])) return bad('The top-level domain must be at least two letters.');
+		if (DISPOSABLE.includes(domain)) return { email, status: 'warn', message: 'Valid syntax, but a disposable email provider.' };
+		if (!POPULAR.includes(domain)) {
+			const guess = POPULAR.map((p) => [p, distance(domain, p)] as const).sort((a, b) => a[1] - b[1])[0];
+			if (guess[1] > 0 && guess[1] <= 2) return { email, status: 'warn', message: `Did you mean ${local}@${guess[0]}?` };
+		}
+		return { email, status: 'ok', message: 'Looks valid.' };
+	}
+
+	onPage('mail-tool', () => {
+		const input = byId<HTMLTextAreaElement>('mail-in');
+		const list = byId('mail-list');
+		let results: Result[] = [];
+
+		const render = () => {
+			results = input.value.split('\n').map((l) => l.trim()).filter(Boolean).map(check);
+			list.replaceChildren(
+				...results.map((r) => {
+					const li = document.createElement('li');
+					li.dataset.status = r.status;
+					li.innerHTML = '<span class="mark"></span><code></code><span class="msg"></span>';
+					li.querySelector('.mark')!.textContent = r.status === 'ok' ? '✓' : r.status === 'warn' ? '!' : '✕';
+					li.querySelector('code')!.textContent = r.email;
+					li.querySelector('.msg')!.textContent = r.message;
+					return li;
+				})
+			);
+			const count = (s: string) => results.filter((r) => r.status === s).length;
+			byId('mail-summary').textContent = `${count('ok')} valid · ${count('warn')} to review · ${count('bad')} invalid. Syntax only — no message is sent and no server is contacted.`;
+		};
+
+		input.addEventListener('input', render);
+		copyButton(byId('mail-copy'), () => results.filter((r) => r.status !== 'bad').map((r) => r.email).join('\n'));
+		render();
+	});
+</script>
+
+<style>
+	.mail-summary {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.mail-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		overflow: hidden;
+	}
+	.mail-list :global(li) {
+		display: grid;
+		grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1.2fr);
+		gap: 12px;
+		align-items: center;
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+		font-size: 14px;
+	}
+	.mail-list :global(li:last-child) {
+		border-bottom: 0;
+	}
+	.mail-list :global(.mark) {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		border-radius: 6px;
+		font-weight: 700;
+		font-size: 12px;
+	}
+	.mail-list :global(li[data-status='ok'] .mark) {
+		background: var(--ok-bg);
+		color: var(--ok);
+	}
+	.mail-list :global(li[data-status='warn'] .mark) {
+		background: var(--partial-bg);
+		color: var(--partial);
+	}
+	.mail-list :global(li[data-status='bad'] .mark) {
+		background: var(--warn-bg);
+		color: var(--warn);
+	}
+	.mail-list :global(code) {
+		font-family: var(--mono);
+		font-size: 13px;
+		overflow-wrap: anywhere;
+	}
+	.mail-list :global(.msg) {
+		color: var(--ink-soft);
+		font-size: 13px;
+	}
+	@media (max-width: 600px) {
+		.mail-list :global(li) {
+			grid-template-columns: 28px 1fr;
+		}
+		.mail-list :global(.msg) {
+			grid-column: 2;
+		}
+	}
+</style>

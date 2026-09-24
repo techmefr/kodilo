@@ -1,0 +1,156 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="json-to-csv"
+	title="JSON to CSV"
+	description="An array of objects (or JSON Lines) becomes a spreadsheet-ready CSV. Nested fields are flattened with dots."
+>
+	<div class="toolbar" id="csv-tool">
+		<div class="seg" id="csv-delim" aria-label="Delimiter">
+			<button data-value="," aria-pressed="true">Comma</button>
+			<button data-value=";" aria-pressed="false">Semicolon</button>
+			<button data-value="&#9;" aria-pressed="false">Tab</button>
+		</div>
+		<label class="check"><input type="checkbox" id="csv-bom" /> Excel-friendly (UTF-8 BOM)</label>
+		<button class="btn primary" id="csv-download">Download .csv</button>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">JSON</div>
+			<textarea id="csv-in" spellcheck="false" aria-label="JSON input"
+				>{`[
+  {"id": 1, "name": "Ada", "email": "ada@example.com", "address": {"city": "London"}, "tags": ["admin", "dev"]},
+  {"id": 2, "name": "Linus", "email": "linus@example.com", "address": {"city": "Helsinki"}},
+  {"id": 3, "name": "Grace, \\"Amazing\\" Hopper", "address": {"city": "New York"}, "active": false}
+]`}</textarea
+			>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="csv-label">CSV</span>
+				<button class="btn" id="csv-copy">Copy</button>
+			</div>
+			<pre class="out" id="csv-out"></pre>
+		</section>
+	</div>
+	<div class="error" id="csv-error" hidden></div>
+	<section class="panel csv-preview-panel">
+		<div class="panel-head">Preview</div>
+		<div class="csv-preview" id="csv-preview"></div>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	function flatten(value: unknown, prefix = '', out: Record<string, unknown> = {}) {
+		if (value && typeof value === 'object' && !Array.isArray(value)) {
+			Object.entries(value).forEach(([k, v]) => flatten(v, prefix ? `${prefix}.${k}` : k, out));
+		} else if (Array.isArray(value) && value.every((v) => v === null || typeof v !== 'object')) {
+			out[prefix] = value.join(' | ');
+		} else if (Array.isArray(value)) {
+			out[prefix] = JSON.stringify(value);
+		} else {
+			out[prefix] = value;
+		}
+		return out;
+	}
+
+	function parseInput(text: string): unknown[] {
+		const trimmed = text.trim();
+		try {
+			const parsed = JSON.parse(trimmed);
+			return Array.isArray(parsed) ? parsed : [parsed];
+		} catch (e) {
+			const lines = trimmed.split('\n').filter((l) => l.trim());
+			if (lines.length > 1) return lines.map((l) => JSON.parse(l));
+			throw e;
+		}
+	}
+
+	onPage('csv-tool', () => {
+		const input = byId<HTMLTextAreaElement>('csv-in');
+		const output = byId('csv-out');
+		const error = byId('csv-error');
+		const bom = byId<HTMLInputElement>('csv-bom');
+		let delimiter = ',';
+		let rows: Record<string, unknown>[] = [];
+		let headers: string[] = [];
+
+		const cell = (value: unknown) => {
+			if (value === null || value === undefined) return '';
+			const text = String(value);
+			return /["\n\r]|^\s|\s$/.test(text) || text.includes(delimiter) ? `"${text.replace(/"/g, '""')}"` : text;
+		};
+
+		const render = () => {
+			try {
+				rows = parseInput(input.value).map((r) => flatten(r));
+				headers = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+				output.textContent = [headers, ...rows.map((r) => headers.map((h) => r[h]))]
+					.map((line) => line.map(cell).join(delimiter))
+					.join('\n');
+				error.hidden = true;
+				byId('csv-label').textContent = `CSV · ${rows.length} rows · ${headers.length} columns`;
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+				return;
+			}
+			const table = document.createElement('table');
+			const head = table.createTHead().insertRow();
+			headers.forEach((h) => (head.appendChild(document.createElement('th')).textContent = h));
+			const body = table.createTBody();
+			rows.slice(0, 100).forEach((r) => {
+				const tr = body.insertRow();
+				headers.forEach((h) => (tr.insertCell().textContent = r[h] === undefined ? '' : String(r[h])));
+			});
+			byId('csv-preview').replaceChildren(table);
+		};
+
+		segmented(byId('csv-delim'), (value) => {
+			delimiter = value;
+			render();
+		});
+		input.addEventListener('input', render);
+		copyButton(byId('csv-copy'), () => output.textContent ?? '');
+		byId('csv-download').addEventListener('click', () => {
+			const blob = new Blob([(bom.checked ? '﻿' : '') + (output.textContent ?? '')], { type: 'text/csv;charset=utf-8' });
+			const link = document.createElement('a');
+			link.href = URL.createObjectURL(blob);
+			link.download = 'data.csv';
+			link.click();
+			URL.revokeObjectURL(link.href);
+		});
+		render();
+	});
+</script>
+
+<style>
+	.csv-preview {
+		overflow-x: auto;
+	}
+	.csv-preview :global(table) {
+		border-collapse: collapse;
+		font-size: 13px;
+		min-width: 100%;
+	}
+	.csv-preview :global(th),
+	.csv-preview :global(td) {
+		padding: 8px 12px;
+		border-bottom: 1px solid var(--border);
+		text-align: left;
+		white-space: nowrap;
+	}
+	.csv-preview :global(th) {
+		font-family: var(--mono);
+		font-size: 12px;
+		color: var(--ink-soft);
+		background: var(--surface-2);
+	}
+	.csv-preview :global(td) {
+		font-variant-numeric: tabular-nums;
+	}
+</style>

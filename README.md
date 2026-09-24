@@ -37,6 +37,16 @@ Live at **https://techmefr.github.io/kodilo/**
 - **Chmod Calculator** — permission grid, octal, symbolic, setuid/setgid/sticky, common presets.
 - **HTTP Status Codes** — searchable and filterable by class.
 - **Credit Card Validator** — Luhn check, network detection, formatting, test card numbers.
+- **IBAN Validator** — mod-97 checksum, per-country length, country, check digits and BBAN.
+- **Email Validator** — bulk syntax checks, typo suggestions for popular domains, disposable providers.
+- **Date & Time Converter** — Unix seconds/ms/µs, ISO and date strings to every format, in any time zone.
+- **Color Converter** — any CSS color to HEX, RGB, HSL, HWB, OKLCH and CMYK, with WCAG contrast.
+- **IPv4 Subnet Calculator** — network, broadcast, host range, masks, address type, binary.
+- **Regex Tester** — live highlighting, flags, capture and named groups, replace preview.
+- **Box Shadow Generator** — multiple layers, presets, live preview.
+- **Gradient Generator** — linear, radial and conic with any number of stops.
+- **JSON to CSV** — arrays or JSON Lines, flattened keys, delimiter choice, preview and download.
+- **Image to Base64** — drop, pick or paste; data URI, raw, CSS, HTML or Markdown.
 - More tools land as separate categories in the sidebar — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -47,15 +57,12 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 
 **JSON**
 - JSON to YAML
-- JSON to CSV
 - JSON Diff
 - JSON Viewer
 
 **HTML / CSS**
 - HTML Formatter
 - CSS Formatter & Minifier
-- Box Shadow Generator
-- Gradient Generator
 - CSS Grid Generator
 - Flexbox Generator
 
@@ -68,7 +75,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Open Graph Generator
 
 **Text**
-- Regex Tester
 - Diff Checker
 - Text Statistics
 
@@ -86,11 +92,8 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Crontab Generator
 
 **Converters**
-- Date/Time Converter
-- Color Converter
 
 **Network**
-- IPv4 Subnet Calculator
 - IPv4 Range Expander
 - IPv6 ULA Generator
 - MAC Address Generator
@@ -99,14 +102,11 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Phone Parser & Formatter
 
 **Validators**
-- Email Validator
-- IBAN Validator & Parser
 
 **Images**
 - Image Resizer
 - Image Compressor
 - PNG to JPG Converter
-- Image to Base64
 
 **PDF**
 - PDF Merge
@@ -125,6 +125,28 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Docker Cheatsheet
 - Git Cheatsheet
 - NPM Cheatsheet
+
+**DevOps & Sysadmin**
+- Uptime / SLA Calculator
+- Byte Size Converter
+- Transfer Time Calculator
+- Kubernetes Resource Units
+- Kubernetes Manifest Generator
+- .env Tool
+- YAML Validator & Formatter
+- Nginx Config Generator
+- systemd Unit Generator
+- SSH Config Generator
+- htpasswd Generator
+- DNS Record Builder
+- Security Headers Builder
+- X.509 Certificate Decoder
+- SemVer Calculator
+- .gitignore Generator
+- JSON Log Viewer
+- curl Converter
+- Well-Known Ports
+- Linux Signals & Exit Codes
 
 **Calculators**
 - Developer Calculator

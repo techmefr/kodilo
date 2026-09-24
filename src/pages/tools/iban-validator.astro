@@ -1,0 +1,108 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const samples = [
+	['France', 'FR14 2004 1010 0505 0001 3M02 606'],
+	['Germany', 'DE89 3704 0044 0532 0130 00'],
+	['United Kingdom', 'GB82 WEST 1234 5698 7654 32'],
+	['Invalid', 'FR14 2004 1010 0505 0001 3M02 607'],
+];
+---
+
+<ToolShell
+	slug="iban-validator"
+	title="IBAN Validator"
+	description="Check an IBAN's length and mod-97 checksum, and see its country, check digits and bank part."
+>
+	<div class="fields" id="iban-tool">
+		<div class="field wide" id="iban-field">
+			<label for="iban-in">IBAN</label>
+			<input id="iban-in" spellcheck="false" autocomplete="off" value="FR14 2004 1010 0505 0001 3M02 606" />
+			<span class="field-note" id="iban-note"></span>
+		</div>
+	</div>
+	<div class="stats" id="iban-stats"></div>
+	<div class="chips" id="iban-samples">
+		{samples.map(([label, iban]) => <button data-iban={iban}>{label}</button>)}
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const LENGTHS: Record<string, [string, number]> = {
+		AD: ['Andorra', 24], AE: ['United Arab Emirates', 23], AT: ['Austria', 20], BE: ['Belgium', 16],
+		BG: ['Bulgaria', 22], BH: ['Bahrain', 22], BR: ['Brazil', 29], CH: ['Switzerland', 21], CY: ['Cyprus', 28],
+		CZ: ['Czechia', 24], DE: ['Germany', 22], DK: ['Denmark', 18], EE: ['Estonia', 20], ES: ['Spain', 24],
+		FI: ['Finland', 18], FR: ['France', 27], GB: ['United Kingdom', 22], GI: ['Gibraltar', 23], GR: ['Greece', 27],
+		HR: ['Croatia', 21], HU: ['Hungary', 28], IE: ['Ireland', 22], IL: ['Israel', 23], IS: ['Iceland', 26],
+		IT: ['Italy', 27], LI: ['Liechtenstein', 21], LT: ['Lithuania', 20], LU: ['Luxembourg', 20], LV: ['Latvia', 21],
+		MA: ['Morocco', 28], MC: ['Monaco', 27], MT: ['Malta', 31], NL: ['Netherlands', 18], NO: ['Norway', 15],
+		PL: ['Poland', 28], PT: ['Portugal', 25], QA: ['Qatar', 29], RO: ['Romania', 24], SA: ['Saudi Arabia', 24],
+		SE: ['Sweden', 24], SI: ['Slovenia', 19], SK: ['Slovakia', 24], SM: ['San Marino', 27], TN: ['Tunisia', 24],
+		TR: ['Turkey', 26], UA: ['Ukraine', 29],
+	};
+
+	function mod97(iban: string): number {
+		const rearranged = iban.slice(4) + iban.slice(0, 4);
+		const numeric = [...rearranged].map((c) => (/[A-Z]/.test(c) ? String(c.charCodeAt(0) - 55) : c)).join('');
+		let remainder = 0;
+		for (let i = 0; i < numeric.length; i += 7) remainder = Number(String(remainder) + numeric.slice(i, i + 7)) % 97;
+		return remainder;
+	}
+
+	onPage('iban-tool', () => {
+		const input = byId<HTMLInputElement>('iban-in');
+
+		const render = () => {
+			const iban = input.value.replace(/[\s-]/g, '').toUpperCase();
+			const country = LENGTHS[iban.slice(0, 2)];
+			const formatted = iban.replace(/(.{4})/g, '$1 ').trim();
+			let problem = '';
+			if (!iban) problem = '';
+			else if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) problem = 'An IBAN starts with a country code and two check digits, then letters and digits only.';
+			else if (!country) problem = `Unknown or unsupported country code ${iban.slice(0, 2)}.`;
+			else if (iban.length !== country[1]) problem = `${country[0]} IBANs have ${country[1]} characters, this one has ${iban.length}.`;
+			else if (mod97(iban) !== 1) problem = 'The check digits do not match (mod-97 checksum fails).';
+
+			byId('iban-field').classList.toggle('invalid', Boolean(problem));
+			byId('iban-note').textContent = !iban ? '' : problem ? `✕ ${problem}` : '✓ Valid IBAN';
+			if (document.activeElement !== input && iban) input.value = formatted;
+
+			const stats: [string, string][] = [
+				['Country', country ? `${country[0]} · ${iban.slice(0, 2)}` : '—'],
+				['Check digits', iban.slice(2, 4) || '—'],
+				['BBAN', iban.slice(4) || '—'],
+				['Length', country ? `${iban.length} / ${country[1]}` : String(iban.length)],
+			];
+			byId('iban-stats').replaceChildren(
+				...stats.map(([label, value]) => {
+					const el = document.createElement('div');
+					el.className = 'stat';
+					el.innerHTML = '<b></b><span></span>';
+					el.querySelector('b')!.textContent = value;
+					el.querySelector('span')!.textContent = label;
+					return el;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		input.addEventListener('blur', render);
+		document.querySelectorAll<HTMLButtonElement>('#iban-samples button').forEach((button) =>
+			button.addEventListener('click', () => {
+				input.value = button.dataset.iban!;
+				render();
+			})
+		);
+		render();
+	});
+</script>
+
+<style>
+	.stats :global(.stat b) {
+		font-size: 16px;
+		font-family: var(--mono);
+		overflow-wrap: anywhere;
+	}
+</style>
