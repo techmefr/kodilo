@@ -1,5 +1,6 @@
 ---
 import { builtCategories as categories } from '../data/tools';
+import { icon } from '../scripts/icons';
 
 interface Props {
 	activeSlug?: string;
@@ -7,224 +8,79 @@ interface Props {
 
 const { activeSlug } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
-
-const iconModules = import.meta.glob('/node_modules/lucide-static/icons/*.svg', {
-	query: '?raw',
-	import: 'default',
-	eager: true,
-}) as Record<string, string>;
-
-function icon(name: string): string {
-	const mod = iconModules[`/node_modules/lucide-static/icons/${name}.svg`];
-	return mod ?? '';
-}
-
-const chevron = icon('chevron-right');
-const sunIcon = icon('sun');
-const moonIcon = icon('moon');
+const category = categories.find((c) => c.tools.some((t) => t.slug === activeSlug));
 ---
 
-<nav class="sidebar" transition:name="sidebar">
-	<div class="brand-row">
-		<a class="brand" href={base}>kodilo</a>
-		<button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
-			<span class="icon-sun" set:html={sunIcon} />
-			<span class="icon-moon" set:html={moonIcon} />
-		</button>
-	</div>
-	{
-		categories.map((category) => {
-			const isActive = category.tools.some((t) => t.slug === activeSlug);
-			return (
-				<details class="cat" name="cat-group" open={isActive}>
-					<summary>
-						<span class="cat-icon" set:html={icon(category.icon)} />
-						<span class="cat-text">
-							<span class="cat-name">{category.name}</span>
-							<span class="cat-blurb">{category.blurb}</span>
-						</span>
-						<span class="cat-chevron" set:html={chevron} />
-					</summary>
-					<div class="cat-tools">
-						{category.tools.map((tool) => (
-							<a
-								class="sidebar-tool"
-								href={`${base}tools/${tool.slug}/`}
-								aria-current={tool.slug === activeSlug ? 'true' : undefined}
-							>
-								{tool.name}
-							</a>
-						))}
-					</div>
-				</details>
-			);
-		})
-	}
-</nav>
-
-<script>
-	document.addEventListener('astro:page-load', () => {
-		document.getElementById('theme-toggle')?.addEventListener('click', () => {
-			const root = document.documentElement;
-			const current =
-				root.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-			const next = current === 'dark' ? 'light' : 'dark';
-			root.dataset.theme = next;
-			try {
-				localStorage.setItem('kodilo-theme', next);
-			} catch {}
-		});
-	});
-</script>
+{
+	category && (
+		<nav class="sidebar" aria-label={`${category.name} tools`}>
+			<div class="side-head">
+				<span class="side-icon" set:html={icon(category.icon)} />
+				<span>{category.name}</span>
+			</div>
+			{category.tools.map((tool) => (
+				<a class="sidebar-tool" href={`${base}tools/${tool.slug}/`} aria-current={tool.slug === activeSlug ? 'page' : undefined}>
+					{tool.name}
+				</a>
+			))}
+		</nav>
+	)
+}
 
 <style>
 	.sidebar {
-		width: 200px;
+		width: 210px;
 		flex-shrink: 0;
 		border-right: 1px solid var(--border);
 		padding: 20px 10px;
 		position: sticky;
-		top: 0;
+		top: 57px;
 		align-self: flex-start;
-		height: 100vh;
+		max-height: calc(100vh - 57px);
 		overflow-y: auto;
-	}
-	.brand-row {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin: 0 0 16px;
-		padding: 0 8px;
+		flex-direction: column;
+		gap: 1px;
 	}
-	.brand {
-		font-size: 15px;
-		font-weight: 800;
-		letter-spacing: -0.02em;
-		color: var(--accent-strong);
-		text-decoration: none;
-	}
-	.theme-toggle {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 26px;
-		height: 26px;
-		border: 1px solid var(--border);
-		border-radius: 7px;
-		background: var(--surface);
-		color: var(--ink-soft);
-		cursor: pointer;
-		padding: 0;
-	}
-	.theme-toggle:hover {
-		background: var(--surface-2);
-	}
-	.theme-toggle :global(svg) {
-		width: 14px;
-		height: 14px;
-	}
-	.icon-moon {
-		display: none;
-	}
-	:root[data-theme='dark'] .theme-toggle .icon-sun {
-		display: none;
-	}
-	:root[data-theme='dark'] .theme-toggle .icon-moon {
-		display: flex;
-	}
-	@media (prefers-color-scheme: dark) {
-		:root:not([data-theme='light']) .theme-toggle .icon-sun {
-			display: none;
-		}
-		:root:not([data-theme='light']) .theme-toggle .icon-moon {
-			display: flex;
-		}
-	}
-	.cat {
-		margin-bottom: 2px;
-		border-radius: 8px;
-	}
-	.cat summary {
+	.side-head {
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		list-style: none;
-		cursor: pointer;
-		padding: 7px 8px;
-		border-radius: 8px;
-		user-select: none;
+		padding: 0 8px 10px;
+		font-size: 12px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--ink-soft);
 	}
-	.cat summary::-webkit-details-marker {
-		display: none;
-	}
-	.cat summary:hover {
-		background: var(--surface-2);
-	}
-	.cat-icon {
+	.side-icon {
 		display: flex;
-		flex-shrink: 0;
 		color: var(--accent-strong);
 	}
-	.cat-icon :global(svg) {
-		width: 16px;
-		height: 16px;
-	}
-	.cat-text {
-		display: flex;
-		flex-direction: column;
-		min-width: 0;
-		flex: 1;
-	}
-	.cat-name {
-		font-size: 12.5px;
-		font-weight: 700;
-		color: var(--ink);
-	}
-	.cat-blurb {
-		font-size: 11px;
-		color: var(--ink-soft);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.cat[open] > summary .cat-blurb {
-		display: none;
-	}
-	.cat-chevron {
-		display: flex;
-		flex-shrink: 0;
-		color: var(--ink-soft);
-		transition: transform 0.15s ease;
-	}
-	.cat-chevron :global(svg) {
-		width: 14px;
-		height: 14px;
-	}
-	.cat[open] > summary .cat-chevron {
-		transform: rotate(90deg);
-	}
-	.cat-tools {
-		display: flex;
-		flex-direction: column;
-		padding: 2px 0 6px 28px;
+	.side-icon :global(svg) {
+		width: 15px;
+		height: 15px;
 	}
 	.sidebar-tool {
-		display: block;
-		width: 100%;
-		text-align: left;
-		border: none;
-		background: transparent;
 		color: var(--ink-soft);
 		font-size: 13px;
 		font-weight: 500;
-		padding: 6px 8px;
+		padding: 7px 8px;
 		border-radius: 7px;
 		text-decoration: none;
-		box-sizing: border-box;
 	}
-	.sidebar-tool[aria-current='true'] {
+	.sidebar-tool:hover {
+		background: var(--surface-2);
+		color: var(--ink);
+	}
+	.sidebar-tool[aria-current='page'] {
 		background: var(--accent);
 		color: var(--accent-strong);
 		font-weight: 700;
+	}
+	@media (max-width: 760px) {
+		.sidebar {
+			display: none;
+		}
 	}
 </style>
