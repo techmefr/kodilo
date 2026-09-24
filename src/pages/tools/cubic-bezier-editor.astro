@@ -1,0 +1,223 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="cubic-bezier-editor" title="Cubic Bezier Editor" description="Drag the handles to shape a CSS easing curve, compare it with linear, and copy the cubic-bezier() value.">
+	<div class="toolbar" id="cb-tool">
+		<div class="chips" id="cb-presets"></div>
+	</div>
+	<div class="cb-layout">
+		<svg class="cb-graph" id="cb-graph" viewBox="-20 -120 340 560" role="img" aria-label="Easing curve">
+			<rect x="0" y="0" width="300" height="300" class="cb-box"></rect>
+			<line x1="0" y1="300" x2="300" y2="0" class="cb-diag"></line>
+			<line id="cb-l1" class="cb-arm"></line>
+			<line id="cb-l2" class="cb-arm"></line>
+			<path id="cb-path" class="cb-curve"></path>
+			<circle id="cb-h1" r="10" class="cb-handle" tabindex="0" aria-label="First control point"></circle>
+			<circle id="cb-h2" r="10" class="cb-handle two" tabindex="0" aria-label="Second control point"></circle>
+		</svg>
+		<div class="cb-side">
+			<section class="panel">
+				<div class="panel-head">
+					<span>CSS</span>
+					<button class="btn" id="cb-copy">Copy</button>
+				</div>
+				<pre class="out cb-out" id="cb-out"></pre>
+			</section>
+			<div class="fields">
+				<div class="field"><label for="cb-dur">Duration (ms)</label><input id="cb-dur" type="number" min="100" step="100" value="1000" /></div>
+			</div>
+			<div class="cb-lane"><span>Your curve</span><i id="cb-ball"></i></div>
+			<div class="cb-lane"><span>linear</span><i id="cb-ball-lin"></i></div>
+			<button class="btn primary" id="cb-play">Play</button>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const PRESETS: Record<string, number[]> = {
+		ease: [0.25, 0.1, 0.25, 1],
+		'ease-in': [0.42, 0, 1, 1],
+		'ease-out': [0, 0, 0.58, 1],
+		'ease-in-out': [0.42, 0, 0.58, 1],
+		'ease-out-back': [0.34, 1.56, 0.64, 1],
+		'ease-in-out-expo': [0.87, 0, 0.13, 1],
+		snappy: [0.2, 0.9, 0.1, 1],
+	};
+	const r2 = (n: number) => Math.round(n * 100) / 100;
+
+	onPage('cb-tool', () => {
+		let p = [...PRESETS['ease-out-back']];
+		const svg = byId('cb-graph') as unknown as SVGSVGElement;
+		const dur = byId<HTMLInputElement>('cb-dur');
+		const X = (v: number) => v * 300;
+		const Y = (v: number) => 300 - v * 300;
+
+		const paint = () => {
+			const [a, b, c, d] = p;
+			byId('cb-path').setAttribute('d', `M0 300 C${X(a)} ${Y(b)} ${X(c)} ${Y(d)} 300 0`);
+			const set = (id: string, attrs: Record<string, number>) => Object.entries(attrs).forEach(([k, v]) => byId(id).setAttribute(k, String(v)));
+			set('cb-h1', { cx: X(a), cy: Y(b) });
+			set('cb-h2', { cx: X(c), cy: Y(d) });
+			set('cb-l1', { x1: 0, y1: 300, x2: X(a), y2: Y(b) });
+			set('cb-l2', { x1: 300, y1: 0, x2: X(c), y2: Y(d) });
+			const value = `cubic-bezier(${p.map(r2).join(', ')})`;
+			const name = Object.entries(PRESETS).find(([, v]) => v.every((x, i) => r2(x) === r2(p[i])))?.[0];
+			const keyword = name && ['ease', 'ease-in', 'ease-out', 'ease-in-out'].includes(name) ? `\ntransition-timing-function: ${name};` : '';
+			byId('cb-out').textContent = `transition: transform ${dur.value}ms ${value};${keyword}`;
+			document.querySelectorAll<HTMLButtonElement>('#cb-presets button').forEach((btn) => btn.setAttribute('aria-pressed', String(btn.dataset.name === name)));
+		};
+
+		byId('cb-presets').replaceChildren(
+			...Object.keys(PRESETS).map((k) => {
+				const b = document.createElement('button');
+				b.textContent = k;
+				b.dataset.name = k;
+				b.addEventListener('click', () => ((p = [...PRESETS[k]]), paint(), play()));
+				return b;
+			})
+		);
+
+		const drag = (handle: string, ix: number) => {
+			const el = byId(handle);
+			const move = (e: PointerEvent) => {
+				const pt = svg.createSVGPoint();
+				pt.x = e.clientX;
+				pt.y = e.clientY;
+				const loc = pt.matrixTransform(svg.getScreenCTM()!.inverse());
+				p[ix] = Math.min(1, Math.max(0, loc.x / 300));
+				p[ix + 1] = Math.min(1.5, Math.max(-0.5, (300 - loc.y) / 300));
+				paint();
+			};
+			el.addEventListener('pointerdown', (e) => {
+				el.setPointerCapture(e.pointerId);
+				el.addEventListener('pointermove', move);
+			});
+			el.addEventListener('pointerup', () => {
+				el.removeEventListener('pointermove', move);
+				play();
+			});
+			el.addEventListener('keydown', (e) => {
+				const step = e.shiftKey ? 0.1 : 0.01;
+				const k = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key];
+				if (!k) return;
+				e.preventDefault();
+				p[ix] = Math.min(1, Math.max(0, p[ix] + k[0]));
+				p[ix + 1] = p[ix + 1] + k[1];
+				paint();
+			});
+		};
+		drag('cb-h1', 0);
+		drag('cb-h2', 2);
+
+		const play = () => {
+			const ms = Number(dur.value) || 1000;
+			const easing = `cubic-bezier(${p.join(',')})`;
+			for (const [id, e] of [['cb-ball', easing], ['cb-ball-lin', 'linear']]) {
+				byId(id).animate([{ left: '0%' }, { left: 'calc(100% - 18px)' }], { duration: ms, easing: e, fill: 'forwards' });
+			}
+		};
+
+		byId('cb-play').addEventListener('click', play);
+		dur.addEventListener('input', paint);
+		copyButton(byId('cb-copy'), () => `cubic-bezier(${p.map(r2).join(', ')})`);
+		paint();
+		play();
+	});
+</script>
+
+<style>
+	.cb-layout {
+		display: grid;
+		grid-template-columns: minmax(0, 340px) 1fr;
+		gap: 20px;
+		align-items: start;
+	}
+	@media (max-width: 720px) {
+		.cb-layout {
+			grid-template-columns: 1fr;
+		}
+	}
+	.cb-graph {
+		width: 100%;
+		max-width: 340px;
+		touch-action: none;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.cb-box {
+		fill: var(--surface-2);
+		stroke: var(--border);
+	}
+	.cb-diag {
+		stroke: var(--border);
+		stroke-dasharray: 4 4;
+	}
+	.cb-arm {
+		stroke: var(--ink-soft);
+		stroke-width: 1.5;
+	}
+	.cb-curve {
+		fill: none;
+		stroke: var(--accent-strong);
+		stroke-width: 4;
+		stroke-linecap: round;
+	}
+	.cb-handle {
+		fill: #ec4899;
+		stroke: #fff;
+		stroke-width: 3;
+		cursor: grab;
+	}
+	.cb-handle.two {
+		fill: #06b6d4;
+	}
+	.cb-handle:focus-visible {
+		outline: none;
+		stroke: var(--ink);
+	}
+	.cb-side {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		min-width: 0;
+	}
+	.cb-out {
+		min-height: auto !important;
+		white-space: pre-wrap;
+	}
+	.cb-lane {
+		position: relative;
+		height: 34px;
+		border-radius: 10px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+	}
+	.cb-lane span {
+		position: absolute;
+		right: 10px;
+		top: 8px;
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.cb-lane i {
+		position: absolute;
+		top: 7px;
+		left: 0;
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: var(--accent-strong);
+	}
+	#cb-ball-lin {
+		background: var(--ink-soft);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.cb-lane i {
+			transition: none;
+		}
+	}
+</style>

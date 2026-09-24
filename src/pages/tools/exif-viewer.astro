@@ -1,0 +1,194 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="exif-viewer" title="EXIF Viewer & Remover" description="See the hidden metadata in a photo, such as camera, date and GPS position, then download a clean copy without it. Nothing is uploaded.">
+	<label class="drop" id="ex-tool">
+		<input type="file" id="ex-file" accept="image/jpeg,image/png,image/webp,image/heic,image/tiff" multiple hidden />
+		<span id="ex-drop">Drop photos here or click to choose. A sample photo with GPS data is loaded.</span>
+	</label>
+	<div id="ex-list" class="ex-list"></div>
+</ToolShell>
+
+<script>
+	import exifr from 'exifr';
+	import { fileZone, loadImageFile, sampleCanvas, saveBlob, toBlob } from '../../scripts/files';
+	import { byId, onPage } from '../../scripts/ui';
+
+	const PICK: [string, string][] = [
+		['Make', 'Camera make'],
+		['Model', 'Camera model'],
+		['LensModel', 'Lens'],
+		['DateTimeOriginal', 'Taken'],
+		['Software', 'Software'],
+		['Artist', 'Artist'],
+		['Copyright', 'Copyright'],
+		['ExposureTime', 'Exposure'],
+		['FNumber', 'Aperture'],
+		['ISO', 'ISO'],
+		['FocalLength', 'Focal length'],
+		['ImageWidth', 'Width'],
+		['ImageHeight', 'Height'],
+		['Orientation', 'Orientation'],
+	];
+
+	function jpegWithExif(): Promise<Blob> {
+		const ascii = (s: string) => [...s, '\0'].map((c) => c.charCodeAt(0));
+		const rational = (n: number, d: number) => [n >>> 24, (n >> 16) & 255, (n >> 8) & 255, n & 255, d >>> 24, (d >> 16) & 255, (d >> 8) & 255, d & 255];
+		const make = ascii('Kodilo');
+		const model = ascii('Sample Camera X1');
+		const date = ascii('2026:07:14 18:42:07');
+		const ifd0Count = 4;
+		const ifd0Size = 2 + ifd0Count * 12 + 4;
+		const exifSize = 2 + 12 + 4;
+		const gpsCount = 4;
+		const gpsSize = 2 + gpsCount * 12 + 4;
+		const data = 8 + ifd0Size + exifSize + gpsSize;
+		const bytes: number[] = [0x4d, 0x4d, 0, 42, 0, 0, 0, 8];
+		const u16 = (n: number) => [n >> 8, n & 255];
+		const u32 = (n: number) => [n >>> 24, (n >> 16) & 255, (n >> 8) & 255, n & 255];
+		const extra: number[] = [];
+		const put = (arr: number[]) => {
+			const at = data + extra.length;
+			extra.push(...arr);
+			return at;
+		};
+		const exifAt = 8 + ifd0Size;
+		const gpsAt = exifAt + exifSize;
+		bytes.push(...u16(ifd0Count));
+		bytes.push(...u16(0x010f), ...u16(2), ...u32(make.length), ...u32(put(make)));
+		bytes.push(...u16(0x0110), ...u16(2), ...u32(model.length), ...u32(put(model)));
+		bytes.push(...u16(0x8769), ...u16(4), ...u32(1), ...u32(exifAt));
+		bytes.push(...u16(0x8825), ...u16(4), ...u32(1), ...u32(gpsAt));
+		bytes.push(...u32(0));
+		bytes.push(...u16(1), ...u16(0x9003), ...u16(2), ...u32(date.length), ...u32(put(date)), ...u32(0));
+		const lat = put([...rational(48, 1), ...rational(51, 1), ...rational(2964, 100)]);
+		const lon = put([...rational(2, 1), ...rational(17, 1), ...rational(4020, 100)]);
+		bytes.push(...u16(gpsCount));
+		bytes.push(...u16(1), ...u16(2), ...u32(2), ...[78, 0, 0, 0]);
+		bytes.push(...u16(2), ...u16(5), ...u32(3), ...u32(lat));
+		bytes.push(...u16(3), ...u16(2), ...u32(2), ...[69, 0, 0, 0]);
+		bytes.push(...u16(4), ...u16(5), ...u32(3), ...u32(lon));
+		bytes.push(...u32(0));
+		const tiff = [...bytes, ...extra];
+		const app1 = [0xff, 0xe1, ...u16(tiff.length + 8), 0x45, 0x78, 0x69, 0x66, 0, 0, ...tiff];
+		return toBlob(sampleCanvas(1200, 800), 'image/jpeg', 0.9).then(async (b) => {
+			const jpg = new Uint8Array(await b.arrayBuffer());
+			return new Blob([jpg.slice(0, 2), new Uint8Array(app1), jpg.slice(2)], { type: 'image/jpeg' });
+		});
+	}
+
+	const fmt = (k: string, v: unknown) => {
+		if (v instanceof Date) return v.toLocaleString('en-GB');
+		if (k === 'ExposureTime' && typeof v === 'number') return v < 1 ? `1/${Math.round(1 / v)} s` : `${v} s`;
+		if (k === 'FNumber') return `f/${v}`;
+		if (k === 'FocalLength') return `${v} mm`;
+		return String(v);
+	};
+
+	onPage('ex-tool', () => {
+		const list = byId('ex-list');
+
+		const show = async (file: File | Blob, name: string) => {
+			const card = document.createElement('section');
+			card.className = 'panel ex-card';
+			const img = await loadImageFile(file);
+			let tags: Record<string, unknown> = {};
+			try {
+				tags = (await exifr.parse(file, { tiff: true, exif: true, gps: true, xmp: true, iptc: true, icc: false })) ?? {};
+			} catch {}
+			const gps = tags.latitude !== undefined && tags.longitude !== undefined ? [Number(tags.latitude), Number(tags.longitude)] : null;
+			const rows = PICK.filter(([k]) => tags[k] !== undefined).map(([k, label]) => [label, fmt(k, tags[k])]);
+			const count = Object.keys(tags).length;
+			card.innerHTML = `<div class="panel-head"><span class="ex-name"></span><button class="btn primary">Download without metadata</button></div><div class="ex-body"><img alt="" /><div class="ex-info"><p class="ex-badge"></p><dl></dl></div></div>`;
+			card.querySelector('.ex-name')!.textContent = name;
+			card.querySelector('img')!.src = img.src;
+			const badge = card.querySelector('.ex-badge')!;
+			badge.textContent = count ? `${count} metadata fields found${gps ? ', including the GPS position' : ''}.` : 'No metadata found.';
+			(badge as HTMLElement).dataset.risk = String(!!gps);
+			const dl = card.querySelector('dl')!;
+			const add = (k: string, v: string, href?: string) => {
+				const dt = document.createElement('dt');
+				dt.textContent = k;
+				const dd = document.createElement('dd');
+				if (href) {
+					const a = document.createElement('a');
+					a.href = href;
+					a.target = '_blank';
+					a.rel = 'noopener noreferrer';
+					a.textContent = v;
+					dd.append(a);
+				} else dd.textContent = v;
+				dl.append(dt, dd);
+			};
+			if (gps) add('GPS position', `${gps[0].toFixed(5)}, ${gps[1].toFixed(5)}`, `https://www.openstreetmap.org/?mlat=${gps[0]}&mlon=${gps[1]}#map=15/${gps[0]}/${gps[1]}`);
+			rows.forEach(([k, v]) => add(k, v));
+			card.querySelector('button')!.addEventListener('click', async () => {
+				const c = document.createElement('canvas');
+				c.width = img.naturalWidth;
+				c.height = img.naturalHeight;
+				c.getContext('2d')!.drawImage(img, 0, 0);
+				const type = file.type === 'image/png' ? 'image/png' : file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+				const ext = type.split('/')[1].replace('jpeg', 'jpg');
+				saveBlob(await toBlob(c, type, 0.95), `${name.replace(/\.[^.]+$/, '')}-clean.${ext}`);
+			});
+			list.prepend(card);
+		};
+
+		fileZone(byId('ex-tool'), byId<HTMLInputElement>('ex-file'), (files) => {
+			list.replaceChildren();
+			files.filter((f) => f.type.startsWith('image/')).forEach((f) => show(f, f.name));
+		});
+		jpegWithExif().then((b) => show(b, 'sample-photo.jpg'));
+	});
+</script>
+
+<style>
+	.ex-list {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
+	.ex-list :global(.ex-body) {
+		display: grid;
+		grid-template-columns: minmax(0, 260px) 1fr;
+		gap: 16px;
+		padding: 12px 14px 14px;
+	}
+	@media (max-width: 640px) {
+		.ex-list :global(.ex-body) {
+			grid-template-columns: 1fr;
+		}
+	}
+	.ex-list :global(img) {
+		width: 100%;
+		border-radius: 10px;
+	}
+	.ex-list :global(.ex-name) {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.ex-list :global(.ex-badge) {
+		margin: 0 0 8px;
+		font-weight: 700;
+		color: #16a34a;
+	}
+	.ex-list :global(.ex-badge[data-risk='true']) {
+		color: #dc2626;
+	}
+	.ex-list :global(dl) {
+		margin: 0;
+		display: grid;
+		grid-template-columns: 130px 1fr;
+		gap: 4px 12px;
+		font-size: 14px;
+	}
+	.ex-list :global(dt) {
+		color: var(--ink-soft);
+	}
+	.ex-list :global(dd) {
+		margin: 0;
+		overflow-wrap: anywhere;
+	}
+</style>
