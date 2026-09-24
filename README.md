@@ -57,6 +57,8 @@ Live at **https://techmefr.github.io/kodilo/**
 - **SemVer Calculator** (`/tools/semver-calculator/`) — range matching, sorting and next versions
 - **DNS Record Builder** (`/tools/dns-record-builder/`) — zone file lines for A, MX, SPF, DMARC, CAA, SRV and more
 - **Security Headers Builder** (`/tools/security-headers-builder/`) — HSTS, CSP and friends for Nginx, Apache, Caddy, Netlify
+- **IPv4 Range Expander** (`/tools/ipv4-range-expander/`) — expand a CIDR or range into addresses and minimal CIDR blocks
+- **IPv6 ULA Generator** (`/tools/ipv6-ula-generator/`) — random RFC 4193 prefix and /64 subnets
 - More tools land as separate categories in the sidebar — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -104,8 +106,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **Converters**
 
 **Network**
-- IPv4 Range Expander
-- IPv6 ULA Generator
 - MAC Address Generator
 - MAC Address Lookup
 - User Agent Parser
