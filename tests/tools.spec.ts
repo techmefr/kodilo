@@ -186,3 +186,29 @@ for (const client of ['outlook-desktop', 'outlook-com', 'gmail', 'yahoo', 'apple
 		await expect(frame.locator('body')).toHaveCSS('background-color', /rgb\((\d|[1-4]\d), (\d|[1-4]\d), (\d|[1-4]\d)\)/);
 	});
 }
+
+test('inbox tester previews pasted html without an extra click', async ({ page }) => {
+	await page.goto('tools/inbox-tester/');
+	await page.locator('[data-tab-id="__html__"]').click();
+	await page.locator('#source').fill('<html><body><p id="mine">Hello from my email</p></body></html>');
+	await page.locator('[data-tab-id="gmail"]').click();
+	await expect(page.frameLocator('#preview').locator('#mine')).toHaveText('Hello from my email');
+});
+
+test('inbox tester explains outlook desktop on mobile', async ({ page }) => {
+	await page.goto('tools/inbox-tester/');
+	await page.locator('[data-tab-id="outlook-desktop"]').click();
+	await page.locator('#subtab-mobile-light').click();
+	await expect(page.locator('#darkNote')).toContainText('ignores @media queries');
+});
+
+test('inbox tester applies data-ogsc rules for outlook.com dark mode', async ({ page }) => {
+	await page.goto('tools/inbox-tester/');
+	await page.locator('[data-tab-id="__html__"]').click();
+	await page
+		.locator('#source')
+		.fill('<html><head><style>[data-ogsc] .x{color:rgb(1, 2, 3) !important}</style></head><body><p class="x" style="color:#222222">Hi</p></body></html>');
+	await page.locator('[data-tab-id="outlook-com"]').click();
+	await page.locator('#subtab-desktop-dark').click();
+	await expect(page.frameLocator('#preview').locator('.x')).toHaveCSS('color', 'rgb(1, 2, 3)');
+});
