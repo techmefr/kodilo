@@ -174,6 +174,18 @@ export const categories: Category[] = [
 				name: 'Open Graph Generator',
 				description: 'Generate Open Graph tags for link previews.',
 			},
+			{
+				slug: 'robots-txt-generator', icon: 'bot',
+				built: true,
+				name: 'robots.txt Generator',
+				description: 'Write robots.txt rules per crawler, block AI bots and test a path.',
+			},
+			{
+				slug: 'sitemap-generator', icon: 'network',
+				built: true,
+				name: 'Sitemap Generator',
+				description: 'Turn a list of pages into a valid sitemap.xml.',
+			},
 		],
 	},
 	{
@@ -240,6 +252,12 @@ export const categories: Category[] = [
 				built: true,
 				name: 'Numeronym Generator',
 				description: 'Generate numeronyms like i18n or a11y from a word.',
+			},
+			{
+				slug: 'unicode-inspector', icon: 'scan-text',
+				built: true,
+				name: 'Unicode Inspector',
+				description: 'Inspect every character with its code point, bytes and escapes, and find invisible ones.',
 			},
 		],
 	},
@@ -681,6 +699,12 @@ export const categories: Category[] = [
 				name: 'GraphQL Formatter',
 				description: 'Format or minify GraphQL queries and schemas.',
 			},
+			{
+				slug: 'keycode-info', icon: 'keyboard',
+				built: true,
+				name: 'Keyboard Event Info',
+				description: 'Press a key to see event.key, event.code, keyCode and modifiers.',
+			},
 		],
 	},
 	{
@@ -805,6 +829,12 @@ export const categories: Category[] = [
 				name: 'Linux Signals & Exit Codes',
 				description: 'What SIGTERM, SIGKILL or exit code 137 actually mean.',
 			},
+			{
+				slug: 'redirect-generator', icon: 'corner-down-right',
+				built: true,
+				name: 'Redirect Generator',
+				description: 'Write redirects once and get Nginx, Apache, Netlify, Vercel and Caddy rules.',
+			},
 		],
 	},
 	{
@@ -827,6 +857,12 @@ export const categories: Category[] = [
 				built: true,
 				name: 'Unit Converter',
 				description: 'Convert length, weight, speed and other units.',
+			},
+			{
+				slug: 'aspect-ratio-calculator', icon: 'ratio',
+				built: true,
+				name: 'Aspect Ratio Calculator',
+				description: 'Find an aspect ratio or the missing width or height.',
 			},
 		],
 	},

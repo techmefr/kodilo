@@ -1,0 +1,179 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="robots-txt-generator" title="robots.txt Generator" description="Write a robots.txt with rules per crawler, a sitemap link and one-click blocking of AI training bots. Test a URL against the rules.">
+	<div class="toolbar" id="rb-tool">
+		<div class="chips" id="rb-presets">
+			<button data-preset="allow" aria-pressed="true">Allow everything</button>
+			<button data-preset="private" aria-pressed="false">Hide admin and search</button>
+			<button data-preset="block" aria-pressed="false">Block all crawlers</button>
+		</div>
+		<label class="check"><input type="checkbox" id="rb-ai" /> Block AI training crawlers</label>
+	</div>
+	<div id="rb-groups" class="rb-groups"></div>
+	<div class="toolbar"><button class="btn" id="rb-add">Add crawler rule</button></div>
+	<div class="fields">
+		<div class="field wide"><label for="rb-sitemap">Sitemap URLs, one per line</label><textarea id="rb-sitemap" rows="2" spellcheck="false">https://example.com/sitemap.xml</textarea></div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>robots.txt</span>
+			<span class="rb-actions"><button class="btn" id="rb-dl">Download</button><button class="btn" id="rb-copy">Copy</button></span>
+		</div>
+		<pre class="out" id="rb-out"></pre>
+	</section>
+	<div class="fields">
+		<div class="field"><label for="rb-test-path">Test a path</label><input id="rb-test-path" value="/admin/users" spellcheck="false" /></div>
+		<div class="field"><label for="rb-test-agent">As crawler</label><input id="rb-test-agent" value="Googlebot" spellcheck="false" /><span class="field-note" id="rb-test-note"></span></div>
+	</div>
+</ToolShell>
+
+<script>
+	import { saveBlob } from '../../scripts/files';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Group = { agent: string; allow: string; disallow: string; delay: string };
+	const AI = ['GPTBot', 'ChatGPT-User', 'OAI-SearchBot', 'ClaudeBot', 'anthropic-ai', 'Google-Extended', 'CCBot', 'PerplexityBot', 'Bytespider', 'Applebot-Extended', 'meta-externalagent', 'Amazonbot'];
+	const PRESETS: Record<string, Group[]> = {
+		allow: [{ agent: '*', allow: '', disallow: '', delay: '' }],
+		private: [{ agent: '*', allow: '/admin/public/', disallow: '/admin/\n/search\n/*?sort=\n/cart', delay: '' }],
+		block: [{ agent: '*', allow: '', disallow: '/', delay: '' }],
+	};
+
+	function matches(rule: string, path: string) {
+		const re = new RegExp('^' + rule.replace(/[.+?^{}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\\\$$|\$$/, '$'));
+		return re.test(path);
+	}
+
+	onPage('rb-tool', () => {
+		let groups: Group[] = [];
+		const ai = byId<HTMLInputElement>('rb-ai');
+		const sitemap = byId<HTMLTextAreaElement>('rb-sitemap');
+
+		const text = () => {
+			const blocks = groups.map((g) => {
+				const lines = [`User-agent: ${g.agent || '*'}`];
+				g.allow.split('\n').map((s) => s.trim()).filter(Boolean).forEach((p) => lines.push(`Allow: ${p}`));
+				const dis = g.disallow.split('\n').map((s) => s.trim()).filter(Boolean);
+				dis.forEach((p) => lines.push(`Disallow: ${p}`));
+				if (!dis.length && !g.allow.trim()) lines.push('Disallow:');
+				if (g.delay) lines.push(`Crawl-delay: ${g.delay}`);
+				return lines.join('\n');
+			});
+			if (ai.checked) blocks.push(AI.map((a) => `User-agent: ${a}`).join('\n') + '\nDisallow: /');
+			const maps = sitemap.value.split('\n').map((s) => s.trim()).filter(Boolean).map((s) => `Sitemap: ${s}`);
+			return [...blocks, ...(maps.length ? [maps.join('\n')] : [])].join('\n\n') + '\n';
+		};
+
+		const test = () => {
+			const path = byId<HTMLInputElement>('rb-test-path').value || '/';
+			const agent = byId<HTMLInputElement>('rb-test-agent').value.toLowerCase();
+			const all = [...groups];
+			if (ai.checked) all.push(...AI.map((a) => ({ agent: a, allow: '', disallow: '/', delay: '' })));
+			const own = all.filter((g) => g.agent.toLowerCase() !== '*' && agent.includes(g.agent.toLowerCase()));
+			const pick = own.length ? own : all.filter((g) => g.agent === '*' || !g.agent);
+			let best = { len: -1, allow: true };
+			for (const g of pick) {
+				for (const [list, allow] of [[g.allow, true], [g.disallow, false]] as const)
+					for (const r of list.split('\n').map((s) => s.trim()).filter(Boolean))
+						if (matches(r, path) && (r.length > best.len || (r.length === best.len && allow))) best = { len: r.length, allow };
+			}
+			const note = byId('rb-test-note');
+			note.textContent = best.allow ? `✓ Allowed for ${agent || 'this crawler'}` : `✕ Blocked for ${agent || 'this crawler'}`;
+			note.dataset.ok = String(best.allow);
+		};
+
+		const render = () => {
+			byId('rb-out').textContent = text();
+			test();
+		};
+
+		const paint = () => {
+			byId('rb-groups').replaceChildren(
+				...groups.map((g, i) => {
+					const box = document.createElement('section');
+					box.className = 'panel rb-group';
+					box.innerHTML = `<div class="panel-head"><span>Rule ${i + 1}</span><button class="btn" aria-label="Remove rule">✕</button></div><div class="rb-fields"><label>User-agent<input data-k="agent" spellcheck="false" /></label><label>Crawl-delay (s)<input data-k="delay" type="number" min="0" /></label><label>Disallow, one path per line<textarea data-k="disallow" rows="3" spellcheck="false"></textarea></label><label>Allow, one path per line<textarea data-k="allow" rows="3" spellcheck="false"></textarea></label></div>`;
+					box.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-k]').forEach((el) => {
+						const k = el.dataset.k as keyof Group;
+						el.value = g[k];
+						el.addEventListener('input', () => ((g[k] = el.value), render()));
+					});
+					box.querySelector('button')!.addEventListener('click', () => {
+						groups.splice(i, 1);
+						paint();
+					});
+					return box;
+				})
+			);
+			render();
+		};
+
+		const apply = (name: string) => {
+			groups = PRESETS[name].map((g) => ({ ...g }));
+			document.querySelectorAll<HTMLButtonElement>('#rb-presets button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.preset === name)));
+			paint();
+		};
+
+		document.querySelectorAll<HTMLButtonElement>('#rb-presets button').forEach((b) => b.addEventListener('click', () => apply(b.dataset.preset!)));
+		byId('rb-add').addEventListener('click', () => {
+			groups.push({ agent: 'Bingbot', allow: '', disallow: '/private/', delay: '10' });
+			paint();
+		});
+		ai.addEventListener('change', render);
+		sitemap.addEventListener('input', render);
+		['rb-test-path', 'rb-test-agent'].forEach((id) => byId(id).addEventListener('input', test));
+		byId('rb-dl').addEventListener('click', () => saveBlob(new Blob([text()], { type: 'text/plain' }), 'robots.txt'));
+		copyButton(byId('rb-copy'), text);
+		apply('private');
+	});
+</script>
+
+<style>
+	.rb-groups {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.rb-groups :global(.rb-fields) {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 10px;
+		padding: 10px 14px 14px;
+	}
+	.rb-groups :global(label) {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+	}
+	.rb-groups :global(input),
+	.rb-groups :global(textarea) {
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 7px 10px;
+		background: var(--surface-2);
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 13px;
+		resize: vertical;
+	}
+	.rb-actions {
+		display: flex;
+		gap: 8px;
+	}
+	#rb-sitemap {
+		font-family: var(--mono);
+		font-size: 14px;
+		resize: vertical;
+	}
+	#rb-test-note[data-ok='true'] {
+		color: #16a34a;
+	}
+	#rb-test-note[data-ok='false'] {
+		color: #dc2626;
+	}
+</style>

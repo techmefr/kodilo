@@ -1,0 +1,131 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="aspect-ratio-calculator" title="Aspect Ratio Calculator" description="Find the aspect ratio of any size, or the missing width or height for a ratio. Includes common video, photo and social formats.">
+	<div class="fields" id="ar-tool">
+		<div class="field"><label for="ar-w">Width</label><input id="ar-w" type="number" min="1" value="1920" /></div>
+		<div class="field"><label for="ar-h">Height</label><input id="ar-h" type="number" min="1" value="1080" /></div>
+	</div>
+	<div class="toolbar"><div class="chips" id="ar-presets"></div></div>
+	<div class="stats">
+		<div class="stat"><b id="ar-ratio">—</b><span>Ratio</span></div>
+		<div class="stat"><b id="ar-decimal">—</b><span>Decimal</span></div>
+		<div class="stat"><b id="ar-mp">—</b><span>Megapixels</span></div>
+		<div class="stat"><b id="ar-orient">—</b><span>Orientation</span></div>
+	</div>
+	<div class="ar-box-wrap"><div class="ar-box" id="ar-box"><span id="ar-box-label"></span></div></div>
+	<section class="panel">
+		<div class="panel-head">Resize keeping the ratio</div>
+		<div class="fields ar-resize">
+			<div class="field"><label for="ar-nw">New width</label><input id="ar-nw" type="number" min="1" value="1280" /></div>
+			<div class="field"><label for="ar-nh">New height</label><input id="ar-nh" type="number" min="1" /></div>
+		</div>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="ar-copy">Copy</button>
+		</div>
+		<pre class="out ar-css" id="ar-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const PRESETS: [string, number, number][] = [
+		['16:9 · 1080p', 1920, 1080],
+		['4K UHD', 3840, 2160],
+		['4:3', 1024, 768],
+		['1:1 · Instagram', 1080, 1080],
+		['4:5 · Instagram portrait', 1080, 1350],
+		['9:16 · Stories, Reels', 1080, 1920],
+		['1.91:1 · Open Graph', 1200, 630],
+		['21:9 · Ultrawide', 2560, 1080],
+		['3:2 · Photo', 6000, 4000],
+		['A4', 2480, 3508],
+	];
+	const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+
+	onPage('ar-tool', () => {
+		const w = byId<HTMLInputElement>('ar-w');
+		const h = byId<HTMLInputElement>('ar-h');
+		const nw = byId<HTMLInputElement>('ar-nw');
+		const nh = byId<HTMLInputElement>('ar-nh');
+
+		const ratio = () => (Number(w.value) || 1) / (Number(h.value) || 1);
+
+		const render = () => {
+			const W = Math.round(Number(w.value));
+			const H = Math.round(Number(h.value));
+			if (!W || !H) return;
+			const g = gcd(W, H);
+			let label = `${W / g}:${H / g}`;
+			if (W / g > 50) {
+				const r = W / H;
+				label = r >= 1 ? `${r.toFixed(2)}:1` : `1:${(H / W).toFixed(2)}`;
+			}
+			byId('ar-ratio').textContent = label;
+			byId('ar-decimal').textContent = (W / H).toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+			byId('ar-mp').textContent = ((W * H) / 1e6).toFixed(2);
+			byId('ar-orient').textContent = W === H ? 'Square' : W > H ? 'Landscape' : 'Portrait';
+			const box = byId('ar-box');
+			box.style.aspectRatio = `${W} / ${H}`;
+			box.style.width = W >= H ? '100%' : `${(W / H) * 100}%`;
+			byId('ar-box-label').textContent = `${W} × ${H}`;
+			nh.value = String(Math.round((Number(nw.value) || 0) / ratio()));
+			byId('ar-css').textContent = `aspect-ratio: ${W / g > 50 ? `${W} / ${H}` : `${W / g} / ${H / g}`};\n\n.legacy-box {\n  position: relative;\n  padding-top: ${((H / W) * 100).toFixed(4).replace(/0+$/, '')}%;\n}`;
+			document.querySelectorAll<HTMLButtonElement>('#ar-presets button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.w) === W && Number(b.dataset.h) === H)));
+		};
+
+		byId('ar-presets').replaceChildren(
+			...PRESETS.map(([name, pw, ph]) => {
+				const b = document.createElement('button');
+				b.textContent = name;
+				b.dataset.w = String(pw);
+				b.dataset.h = String(ph);
+				b.addEventListener('click', () => {
+					w.value = String(pw);
+					h.value = String(ph);
+					render();
+				});
+				return b;
+			})
+		);
+		[w, h, nw].forEach((el) => el.addEventListener('input', render));
+		nh.addEventListener('input', () => (nw.value = String(Math.round((Number(nh.value) || 0) * ratio()))));
+		copyButton(byId('ar-copy'), () => byId('ar-css').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.ar-box-wrap {
+		display: flex;
+		justify-content: center;
+		max-height: 320px;
+		height: 320px;
+		align-items: center;
+	}
+	.ar-box {
+		max-height: 100%;
+		max-width: 100%;
+		display: grid;
+		place-items: center;
+		border-radius: 12px;
+		background: color-mix(in srgb, var(--accent-strong) 16%, var(--surface));
+		border: 2px solid var(--accent-strong);
+	}
+	.ar-box span {
+		font-family: var(--mono);
+		font-size: 14px;
+		font-weight: 700;
+	}
+	.ar-resize {
+		padding: 10px 14px 14px;
+	}
+	.ar-css {
+		min-height: auto !important;
+	}
+</style>
