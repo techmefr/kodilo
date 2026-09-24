@@ -2,32 +2,36 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="url-encoder"
-	title="URL Encoder"
-	description="Encode or decode URLs and components, and see every part of a URL at a glance."
->
+<ToolShell slug="url-encoder" title="URL Encoder" description="Encode or decode URLs and components, and see every part of a URL at a glance.">
 	<div class="toolbar" id="url-tool">
 		<div class="seg" id="url-mode" aria-label="Direction">
-			<button data-value="encode" aria-pressed="true">Encode</button>
-			<button data-value="decode" aria-pressed="false">Decode</button>
+			<button data-value="encode" aria-pressed="true">
+				Encode
+			</button>
+			<button data-value="decode" aria-pressed="false">
+				Decode
+			</button>
 		</div>
 		<div class="seg" id="url-scope" aria-label="Scope">
-			<button data-value="component" aria-pressed="true">Component</button>
-			<button data-value="full" aria-pressed="false">Full URL</button>
+			<button data-value="component" aria-pressed="true">
+				Component
+			</button>
+			<button data-value="full" aria-pressed="false">
+				Full URL
+			</button>
 		</div>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
 			<div class="panel-head">Input</div>
-			<textarea id="url-in" spellcheck="false" aria-label="URL input"
-				>https://example.com/search?q=café crème&lang=fr#results</textarea
-			>
+			<textarea id="url-in" spellcheck="false" aria-label="URL input">https://example.com/search?q=café crème&lang=fr#results</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span>Output</span>
-				<button class="btn" id="url-copy">Copy</button>
+				<button class="btn" id="url-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="url-out"></pre>
 		</section>
@@ -79,14 +83,7 @@ import ToolShell from '../../components/ToolShell.astro';
 
 		const render = () => {
 			try {
-				const fn =
-					mode === 'encode'
-						? scope === 'full'
-							? encodeURI
-							: encodeURIComponent
-						: scope === 'full'
-							? decodeURI
-							: decodeURIComponent;
+				const fn = mode === 'encode' ? (scope === 'full' ? encodeURI : encodeURIComponent) : scope === 'full' ? decodeURI : decodeURIComponent;
 				output.textContent = fn(input.value);
 				error.hidden = true;
 			} catch {

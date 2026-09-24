@@ -10,19 +10,18 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 
 <Base title="kodilo — Developer tools, no sign-up">
 	<div class="shell">
-	<Header />
-	<main class="home">
-		<section class="hero">
-			<h1>kodilo</h1>
-			<p>{total} open-source tools for developers. No sign-up, no account, nothing leaves your browser.</p>
-			<button type="button" class="hero-search" id="hero-search">
-				<span set:html={icon('search')} />
-				Search a tool
-				<kbd>⌘K</kbd>
-			</button>
-		</section>
-		{
-			categories.map((c) => (
+		<Header />
+		<main class="home">
+			<section class="hero">
+				<h1>kodilo</h1>
+				<p>{total} open-source tools for developers. No sign-up, no account, nothing leaves your browser.</p>
+				<button type="button" class="hero-search" id="hero-search">
+					<span set:html={icon('search')} />
+					Search a tool
+					<kbd>⌘K</kbd>
+				</button>
+			</section>
+			{categories.map((c) => (
 				<section class="home-cat">
 					<h2>
 						<span class="home-icon" set:html={icon(c.icon)} />
@@ -43,9 +42,8 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 						))}
 					</ul>
 				</section>
-			))
-		}
-	</main>
+			))}
+		</main>
 	</div>
 </Base>
 

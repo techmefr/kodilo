@@ -9,7 +9,9 @@ import ToolShell from '../../components/ToolShell.astro';
 >
 	<div class="pomo" id="pomo-tool">
 		<div class="seg" id="pomo-phase">
-			<button data-value="focus" aria-pressed="true">Focus</button>
+			<button data-value="focus" aria-pressed="true">
+				Focus
+			</button>
 			<button data-value="short">Short break</button>
 			<button data-value="long">Long break</button>
 		</div>
@@ -19,7 +21,9 @@ import ToolShell from '../../components/ToolShell.astro';
 				<circle cx="60" cy="60" r="54" class="pomo-bar" id="pomo-bar"></circle>
 			</svg>
 			<div class="pomo-center">
-				<b id="pomo-time" role="timer" aria-live="off">25:00</b>
+				<b id="pomo-time" role="timer" aria-live="off">
+					25:00
+				</b>
 				<span id="pomo-round"></span>
 			</div>
 		</div>
@@ -28,17 +32,35 @@ import ToolShell from '../../components/ToolShell.astro';
 			<span id="pomo-pct">100% left</span>
 		</div>
 		<div class="toolbar pomo-actions">
-			<button class="btn primary" id="pomo-start">Start</button>
-			<button class="btn" id="pomo-reset">Reset</button>
-			<button class="btn" id="pomo-skip">Skip</button>
+			<button class="btn primary" id="pomo-start">
+				Start
+			</button>
+			<button class="btn" id="pomo-reset">
+				Reset
+			</button>
+			<button class="btn" id="pomo-skip">
+				Skip
+			</button>
 		</div>
 		<div class="toolbar pomo-settings">
-			<label class="check">Focus <input class="num" id="pomo-focus" type="number" min="1" max="120" value="25" /> min</label>
-			<label class="check">Short <input class="num" id="pomo-short" type="number" min="1" max="60" value="5" /> min</label>
-			<label class="check">Long <input class="num" id="pomo-long" type="number" min="1" max="60" value="15" /> min</label>
-			<label class="check">Long break every <input class="num" id="pomo-every" type="number" min="2" max="10" value="4" /> rounds</label>
-			<label class="check"><input type="checkbox" id="pomo-sound" checked /> Sound</label>
-			<label class="check"><input type="checkbox" id="pomo-auto" /> Auto-start next</label>
+			<label class="check">
+				Focus <input class="num" id="pomo-focus" type="number" min="1" max="120" value="25" /> min
+			</label>
+			<label class="check">
+				Short <input class="num" id="pomo-short" type="number" min="1" max="60" value="5" /> min
+			</label>
+			<label class="check">
+				Long <input class="num" id="pomo-long" type="number" min="1" max="60" value="15" /> min
+			</label>
+			<label class="check">
+				Long break every <input class="num" id="pomo-every" type="number" min="2" max="10" value="4" /> rounds
+			</label>
+			<label class="check">
+				<input type="checkbox" id="pomo-sound" checked /> Sound
+			</label>
+			<label class="check">
+				<input type="checkbox" id="pomo-auto" /> Auto-start next
+			</label>
 		</div>
 		<p class="pomo-done" id="pomo-done"></p>
 	</div>
@@ -154,7 +176,7 @@ import ToolShell from '../../components/ToolShell.astro';
 		['focus', 'short', 'long'].forEach((p) =>
 			byId(`pomo-${p}`).addEventListener('input', () => {
 				if (p === phase && !running()) setPhase(p);
-			})
+			}),
 		);
 		setPhase('focus');
 	});

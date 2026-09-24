@@ -23,7 +23,9 @@ const samples = [
 	</div>
 	<div class="stats" id="iban-stats"></div>
 	<div class="chips" id="iban-samples">
-		{samples.map(([label, iban]) => <button data-iban={iban}>{label}</button>)}
+		{samples.map(([label, iban]) => (
+			<button data-iban={iban}>{label}</button>
+		))}
 	</div>
 </ToolShell>
 
@@ -31,16 +33,52 @@ const samples = [
 	import { byId, onPage } from '../../scripts/ui';
 
 	const LENGTHS: Record<string, [string, number]> = {
-		AD: ['Andorra', 24], AE: ['United Arab Emirates', 23], AT: ['Austria', 20], BE: ['Belgium', 16],
-		BG: ['Bulgaria', 22], BH: ['Bahrain', 22], BR: ['Brazil', 29], CH: ['Switzerland', 21], CY: ['Cyprus', 28],
-		CZ: ['Czechia', 24], DE: ['Germany', 22], DK: ['Denmark', 18], EE: ['Estonia', 20], ES: ['Spain', 24],
-		FI: ['Finland', 18], FR: ['France', 27], GB: ['United Kingdom', 22], GI: ['Gibraltar', 23], GR: ['Greece', 27],
-		HR: ['Croatia', 21], HU: ['Hungary', 28], IE: ['Ireland', 22], IL: ['Israel', 23], IS: ['Iceland', 26],
-		IT: ['Italy', 27], LI: ['Liechtenstein', 21], LT: ['Lithuania', 20], LU: ['Luxembourg', 20], LV: ['Latvia', 21],
-		MA: ['Morocco', 28], MC: ['Monaco', 27], MT: ['Malta', 31], NL: ['Netherlands', 18], NO: ['Norway', 15],
-		PL: ['Poland', 28], PT: ['Portugal', 25], QA: ['Qatar', 29], RO: ['Romania', 24], SA: ['Saudi Arabia', 24],
-		SE: ['Sweden', 24], SI: ['Slovenia', 19], SK: ['Slovakia', 24], SM: ['San Marino', 27], TN: ['Tunisia', 24],
-		TR: ['Turkey', 26], UA: ['Ukraine', 29],
+		AD: ['Andorra', 24],
+		AE: ['United Arab Emirates', 23],
+		AT: ['Austria', 20],
+		BE: ['Belgium', 16],
+		BG: ['Bulgaria', 22],
+		BH: ['Bahrain', 22],
+		BR: ['Brazil', 29],
+		CH: ['Switzerland', 21],
+		CY: ['Cyprus', 28],
+		CZ: ['Czechia', 24],
+		DE: ['Germany', 22],
+		DK: ['Denmark', 18],
+		EE: ['Estonia', 20],
+		ES: ['Spain', 24],
+		FI: ['Finland', 18],
+		FR: ['France', 27],
+		GB: ['United Kingdom', 22],
+		GI: ['Gibraltar', 23],
+		GR: ['Greece', 27],
+		HR: ['Croatia', 21],
+		HU: ['Hungary', 28],
+		IE: ['Ireland', 22],
+		IL: ['Israel', 23],
+		IS: ['Iceland', 26],
+		IT: ['Italy', 27],
+		LI: ['Liechtenstein', 21],
+		LT: ['Lithuania', 20],
+		LU: ['Luxembourg', 20],
+		LV: ['Latvia', 21],
+		MA: ['Morocco', 28],
+		MC: ['Monaco', 27],
+		MT: ['Malta', 31],
+		NL: ['Netherlands', 18],
+		NO: ['Norway', 15],
+		PL: ['Poland', 28],
+		PT: ['Portugal', 25],
+		QA: ['Qatar', 29],
+		RO: ['Romania', 24],
+		SA: ['Saudi Arabia', 24],
+		SE: ['Sweden', 24],
+		SI: ['Slovenia', 19],
+		SK: ['Slovakia', 24],
+		SM: ['San Marino', 27],
+		TN: ['Tunisia', 24],
+		TR: ['Turkey', 26],
+		UA: ['Ukraine', 29],
 	};
 
 	function mod97(iban: string): number {
@@ -83,7 +121,7 @@ const samples = [
 					el.querySelector('b')!.textContent = value;
 					el.querySelector('span')!.textContent = label;
 					return el;
-				})
+				}),
 			);
 		};
 
@@ -93,7 +131,7 @@ const samples = [
 			button.addEventListener('click', () => {
 				input.value = button.dataset.iban!;
 				render();
-			})
+			}),
 		);
 		render();
 	});

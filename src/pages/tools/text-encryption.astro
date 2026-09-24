@@ -2,30 +2,47 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="text-encryption" title="Text Encryption" description="Encrypt and decrypt text with AES-256-GCM and a passphrase (PBKDF2-SHA-256, 600,000 iterations). Runs entirely in your browser.">
+<ToolShell
+	slug="text-encryption"
+	title="Text Encryption"
+	description="Encrypt and decrypt text with AES-256-GCM and a passphrase (PBKDF2-SHA-256, 600,000 iterations). Runs entirely in your browser."
+>
 	<div class="toolbar" id="te-tool">
 		<div class="seg" id="te-mode">
-			<button data-value="encrypt" aria-pressed="true">Encrypt</button>
+			<button data-value="encrypt" aria-pressed="true">
+				Encrypt
+			</button>
 			<button data-value="decrypt">Decrypt</button>
 		</div>
-		<label class="check">Passphrase <input class="te-pass" id="te-pass" type="password" value="correct horse battery staple" autocomplete="off" /></label>
-		<label class="check"><input type="checkbox" id="te-show" /> Show</label>
+		<label class="check">
+			Passphrase <input class="te-pass" id="te-pass" type="password" value="correct horse battery staple" autocomplete="off" />
+		</label>
+		<label class="check">
+			<input type="checkbox" id="te-show" /> Show
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
-			<div class="panel-head" id="te-in-label">Plain text</div>
+			<div class="panel-head" id="te-in-label">
+				Plain text
+			</div>
 			<textarea id="te-in" spellcheck="false" aria-label="Input">Meet me at the usual place at 7.</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span id="te-out-label">Encrypted · Base64</span>
-				<button class="btn" id="te-copy">Copy</button>
+				<button class="btn" id="te-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out te-out" id="te-out"></pre>
 		</section>
 	</div>
 	<p class="error" id="te-error" hidden></p>
-	<p class="te-note">The output bundles a random salt (16 bytes), a random IV (12 bytes) and the ciphertext with its authentication tag. The same text encrypts differently every time. Losing the passphrase means losing the data.</p>
+	<p class="te-note">
+		The output bundles a random salt (16 bytes), a random IV (12 bytes) and the ciphertext with its authentication tag. The same text encrypts differently every
+		time. Losing the passphrase means losing the data.
+	</p>
 </ToolShell>
 
 <script>
@@ -36,7 +53,13 @@ import ToolShell from '../../components/ToolShell.astro';
 
 	const key = async (pass: string, salt: Uint8Array) => {
 		const base = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveKey']);
-		return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: ITER, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+		return crypto.subtle.deriveKey(
+			{ name: 'PBKDF2', salt: salt as BufferSource, iterations: ITER, hash: 'SHA-256' },
+			base,
+			{ name: 'AES-GCM', length: 256 },
+			false,
+			['encrypt', 'decrypt'],
+		);
 	};
 	const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
 	const unb64 = (s: string) => Uint8Array.from(atob(s.replace(/\s/g, '')), (c) => c.charCodeAt(0));

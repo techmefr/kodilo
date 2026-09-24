@@ -23,17 +23,32 @@ const sample = [
 	</section>
 	<div class="toolbar">
 		<div class="chips" id="log-levels">
-			<button data-value="debug" aria-pressed="true">debug</button>
-			<button data-value="info" aria-pressed="true">info</button>
-			<button data-value="warn" aria-pressed="true">warn</button>
-			<button data-value="error" aria-pressed="true">error</button>
+			<button data-value="debug" aria-pressed="true">
+				debug
+			</button>
+			<button data-value="info" aria-pressed="true">
+				info
+			</button>
+			<button data-value="warn" aria-pressed="true">
+				warn
+			</button>
+			<button data-value="error" aria-pressed="true">
+				error
+			</button>
 		</div>
 		<input class="log-search" id="log-q" type="search" placeholder="Filter: text or field=value" aria-label="Filter logs" />
 	</div>
 	<p class="log-count" id="log-count"></p>
 	<div class="log-wrap">
 		<table class="log-table">
-			<thead><tr><th>Time</th><th>Level</th><th>Message</th><th>Fields</th></tr></thead>
+			<thead>
+				<tr>
+					<th>Time</th>
+					<th>Level</th>
+					<th>Message</th>
+					<th>Fields</th>
+				</tr>
+			</thead>
 			<tbody id="log-body"></tbody>
 		</table>
 	</div>
@@ -106,12 +121,20 @@ const sample = [
 			const counts = { debug: 0, info: 0, warn: 0, error: 0 } as Record<string, number>;
 			entries.forEach((e) => counts[e.level]++);
 			document.querySelectorAll<HTMLButtonElement>('#log-levels button').forEach((b) => (b.textContent = `${b.dataset.value} · ${counts[b.dataset.value!]}`));
-			byId('log-count').textContent = `${shown.length} of ${entries.length} lines${entries.some((e) => e.bad) ? ` · ${entries.filter((e) => e.bad).length} not JSON` : ''}`;
+			byId('log-count').textContent =
+				`${shown.length} of ${entries.length} lines${entries.some((e) => e.bad) ? ` · ${entries.filter((e) => e.bad).length} not JSON` : ''}`;
 			byId('log-body').replaceChildren(
 				...shown.map((e) => {
 					const tr = document.createElement('tr');
 					tr.className = `log-${e.level}${e.bad ? ' log-bad' : ''}`;
-					const cells = [e.time, e.bad ? '—' : e.level, e.msg, Object.entries(e.fields).map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`).join('  ')];
+					const cells = [
+						e.time,
+						e.bad ? '—' : e.level,
+						e.msg,
+						Object.entries(e.fields)
+							.map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
+							.join('  '),
+					];
 					cells.forEach((c, i) => {
 						const td = document.createElement('td');
 						td.textContent = c;
@@ -119,7 +142,7 @@ const sample = [
 						tr.append(td);
 					});
 					return tr;
-				})
+				}),
 			);
 		};
 
@@ -130,7 +153,7 @@ const sample = [
 				if (on) levels.add(b.dataset.value!);
 				else levels.delete(b.dataset.value!);
 				render();
-			})
+			}),
 		);
 		[input, q].forEach((el) => el.addEventListener('input', render));
 		render();

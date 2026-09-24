@@ -13,13 +13,19 @@ max(3, 7, 2) / 2
 ans * 4`;
 ---
 
-<ToolShell slug="math-evaluator" title="Math Evaluator" description="A calculator notepad: one expression per line, variables, percentages, functions, constants and hex or binary literals.">
+<ToolShell
+	slug="math-evaluator"
+	title="Math Evaluator"
+	description="A calculator notepad: one expression per line, variables, percentages, functions, constants and hex or binary literals."
+>
 	<div class="me-grid" id="me-tool">
 		<textarea id="me-in" class="me-in" spellcheck="false" aria-label="Expressions">{sample}</textarea>
 		<ol class="me-out" id="me-out" aria-label="Results"></ol>
 	</div>
 	<p class="me-help">
-		Operators <code>+ - * / % ^ !</code> · functions <code>sqrt cbrt abs round floor ceil min max log log2 log10 ln exp sin cos tan asin acos atan</code> · constants <code>pi e tau</code> · <code>ans</code> is the previous result · <code>20%</code> means 0.2 · a total line <code>sum</code> adds everything above.
+		Operators <code>+ - * / % ^ !</code> · functions <code>sqrt cbrt abs round floor ceil min max log log2 log10 ln exp sin cos tan asin acos atan</code> ·
+		constants <code>pi e tau</code> · <code>ans</code> is the previous result · <code>20%</code> means 0.2 · a total line <code>sum</code> adds everything
+		above.
 	</p>
 </ToolShell>
 
@@ -27,8 +33,24 @@ ans * 4`;
 	import { byId, onPage } from '../../scripts/ui';
 
 	const FN: Record<string, (...a: number[]) => number> = {
-		sqrt: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs, floor: Math.floor, ceil: Math.ceil, exp: Math.exp, ln: Math.log, log: Math.log10, log10: Math.log10, log2: Math.log2,
-		sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan, min: Math.min, max: Math.max,
+		sqrt: Math.sqrt,
+		cbrt: Math.cbrt,
+		abs: Math.abs,
+		floor: Math.floor,
+		ceil: Math.ceil,
+		exp: Math.exp,
+		ln: Math.log,
+		log: Math.log10,
+		log10: Math.log10,
+		log2: Math.log2,
+		sin: Math.sin,
+		cos: Math.cos,
+		tan: Math.tan,
+		asin: Math.asin,
+		acos: Math.acos,
+		atan: Math.atan,
+		min: Math.min,
+		max: Math.max,
 		round: (x, d = 0) => Math.round(x * 10 ** d) / 10 ** d,
 	};
 	const CONST: Record<string, number> = { pi: Math.PI, e: Math.E, tau: Math.PI * 2 };
@@ -112,7 +134,12 @@ ans * 4`;
 		return v;
 	}
 
-	const show = (n: number) => (Number.isInteger(n) && Math.abs(n) < 1e15 ? n.toLocaleString('en') : Math.abs(n) >= 1e15 || (n !== 0 && Math.abs(n) < 1e-6) ? n.toExponential(6) : Number(n.toPrecision(12)).toLocaleString('en', { maximumFractionDigits: 10 }));
+	const show = (n: number) =>
+		Number.isInteger(n) && Math.abs(n) < 1e15
+			? n.toLocaleString('en')
+			: Math.abs(n) >= 1e15 || (n !== 0 && Math.abs(n) < 1e-6)
+				? n.toExponential(6)
+				: Number(n.toPrecision(12)).toLocaleString('en', { maximumFractionDigits: 10 });
 
 	onPage('me-tool', () => {
 		const input = byId<HTMLTextAreaElement>('me-in');
@@ -143,7 +170,7 @@ ans * 4`;
 						li.className = 'me-err';
 					}
 					return li;
-				})
+				}),
 			);
 		};
 

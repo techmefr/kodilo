@@ -2,7 +2,11 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="phone-parser" title="Phone Parser & Formatter" description="Check a phone number and get it in E.164, international, national and tel: formats, with its country and line type.">
+<ToolShell
+	slug="phone-parser"
+	title="Phone Parser & Formatter"
+	description="Check a phone number and get it in E.164, international, national and tel: formats, with its country and line type."
+>
 	<div class="fields" id="pp-tool">
 		<div class="field">
 			<label for="pp-num">Phone number</label>
@@ -15,9 +19,18 @@ import ToolShell from '../../components/ToolShell.astro';
 		</div>
 	</div>
 	<div class="stats">
-		<div class="stat"><b id="pp-valid">—</b><span>Validity</span></div>
-		<div class="stat"><b id="pp-cc">—</b><span>Country</span></div>
-		<div class="stat"><b id="pp-type">—</b><span>Line type</span></div>
+		<div class="stat">
+			<b id="pp-valid">—</b>
+			<span>Validity</span>
+		</div>
+		<div class="stat">
+			<b id="pp-cc">—</b>
+			<span>Country</span>
+		</div>
+		<div class="stat">
+			<b id="pp-type">—</b>
+			<span>Line type</span>
+		</div>
 	</div>
 	<section class="panel">
 		<div class="panel-head">Formats</div>
@@ -52,7 +65,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			...getCountries()
 				.map((c) => [c, countryName(c)] as const)
 				.sort((a, b) => a[1].localeCompare(b[1]))
-				.map(([c, n]) => new Option(`${n} (+${getCountryCallingCode(c)})`, c, false, c === 'FR'))
+				.map(([c, n]) => new Option(`${n} (+${getCountryCallingCode(c)})`, c, false, c === 'FR')),
 		);
 
 		const render = () => {
@@ -96,7 +109,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						}, 1200);
 					});
 					return li;
-				})
+				}),
 			);
 		};
 

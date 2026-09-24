@@ -2,7 +2,11 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="cubic-bezier-editor" title="Cubic Bezier Editor" description="Drag the handles to shape a CSS easing curve, compare it with linear, and copy the cubic-bezier() value.">
+<ToolShell
+	slug="cubic-bezier-editor"
+	title="Cubic Bezier Editor"
+	description="Drag the handles to shape a CSS easing curve, compare it with linear, and copy the cubic-bezier() value."
+>
 	<div class="toolbar" id="cb-tool">
 		<div class="chips" id="cb-presets"></div>
 	</div>
@@ -20,16 +24,29 @@ import ToolShell from '../../components/ToolShell.astro';
 			<section class="panel">
 				<div class="panel-head">
 					<span>CSS</span>
-					<button class="btn" id="cb-copy">Copy</button>
+					<button class="btn" id="cb-copy">
+						Copy
+					</button>
 				</div>
 				<pre class="out cb-out" id="cb-out"></pre>
 			</section>
 			<div class="fields">
-				<div class="field"><label for="cb-dur">Duration (ms)</label><input id="cb-dur" type="number" min="100" step="100" value="1000" /></div>
+				<div class="field">
+					<label for="cb-dur">Duration (ms)</label>
+					<input id="cb-dur" type="number" min="100" step="100" value="1000" />
+				</div>
 			</div>
-			<div class="cb-lane"><span>Your curve</span><i id="cb-ball"></i></div>
-			<div class="cb-lane"><span>linear</span><i id="cb-ball-lin"></i></div>
-			<button class="btn primary" id="cb-play">Play</button>
+			<div class="cb-lane">
+				<span>Your curve</span>
+				<i id="cb-ball"></i>
+			</div>
+			<div class="cb-lane">
+				<span>linear</span>
+				<i id="cb-ball-lin"></i>
+			</div>
+			<button class="btn primary" id="cb-play">
+				Play
+			</button>
 		</div>
 	</div>
 </ToolShell>
@@ -77,7 +94,7 @@ import ToolShell from '../../components/ToolShell.astro';
 				b.dataset.name = k;
 				b.addEventListener('click', () => ((p = [...PRESETS[k]]), paint(), play()));
 				return b;
-			})
+			}),
 		);
 
 		const drag = (handle: string, ix: number) => {
@@ -115,7 +132,10 @@ import ToolShell from '../../components/ToolShell.astro';
 		const play = () => {
 			const ms = Number(dur.value) || 1000;
 			const easing = `cubic-bezier(${p.join(',')})`;
-			for (const [id, e] of [['cb-ball', easing], ['cb-ball-lin', 'linear']]) {
+			for (const [id, e] of [
+				['cb-ball', easing],
+				['cb-ball-lin', 'linear'],
+			]) {
 				byId(id).animate([{ left: '0%' }, { left: 'calc(100% - 18px)' }], { duration: ms, easing: e, fill: 'forwards' });
 			}
 		};
@@ -191,6 +211,7 @@ import ToolShell from '../../components/ToolShell.astro';
 	}
 	.cb-lane {
 		position: relative;
+		overflow: hidden;
 		height: 34px;
 		border-radius: 10px;
 		background: var(--surface);

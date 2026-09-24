@@ -5,11 +5,19 @@ const sample = `query GetUser($id: ID!, $first: Int = 10) { user(id: $id) { id n
 fragment Avatar on User { avatar(size: 64) { url } }`;
 ---
 
-<ToolShell slug="graphql-formatter" title="GraphQL Formatter" description="Format or minify GraphQL queries, mutations, fragments and schemas. Syntax errors show the line and column.">
+<ToolShell
+	slug="graphql-formatter"
+	title="GraphQL Formatter"
+	description="Format or minify GraphQL queries, mutations, fragments and schemas. Syntax errors show the line and column."
+>
 	<div class="toolbar" id="gq-tool">
 		<div class="seg" id="gq-mode" aria-label="Mode">
-			<button data-value="pretty" aria-pressed="true">Format</button>
-			<button data-value="minify" aria-pressed="false">Minify</button>
+			<button data-value="pretty" aria-pressed="true">
+				Format
+			</button>
+			<button data-value="minify" aria-pressed="false">
+				Minify
+			</button>
 		</div>
 		<span class="field-note" id="gq-summary"></span>
 	</div>
@@ -21,7 +29,9 @@ fragment Avatar on User { avatar(size: 64) { url } }`;
 		<section class="panel">
 			<div class="panel-head">
 				<span>Output</span>
-				<button class="btn" id="gq-copy">Copy</button>
+				<button class="btn" id="gq-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="gq-out"></pre>
 		</section>
@@ -44,9 +54,18 @@ fragment Avatar on User { avatar(size: 64) { url } }`;
 				const doc = parse(input.value);
 				out.textContent = mode === 'pretty' ? print(doc) : stripIgnoredCharacters(input.value);
 				error.hidden = true;
-				const kinds = doc.definitions.map((d) => ('operation' in d ? d.operation : d.kind.replace(/Definition$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()));
+				const kinds = doc.definitions.map((d) =>
+					'operation' in d
+						? d.operation
+						: d.kind
+								.replace(/Definition$/, '')
+								.replace(/([a-z])([A-Z])/g, '$1 $2')
+								.toLowerCase(),
+				);
 				const counts = kinds.reduce<Record<string, number>>((a, k) => ((a[k] = (a[k] ?? 0) + 1), a), {});
-				byId('gq-summary').textContent = Object.entries(counts).map(([k, n]) => `${n} ${k}${n > 1 ? 's' : ''}`).join(', ');
+				byId('gq-summary').textContent = Object.entries(counts)
+					.map(([k, n]) => `${n} ${k}${n > 1 ? 's' : ''}`)
+					.join(', ');
 			} catch (e) {
 				const err = e as Error & { locations?: { line: number; column: number }[] };
 				const at = err.locations?.[0];

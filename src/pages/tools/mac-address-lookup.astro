@@ -2,7 +2,11 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="mac-address-lookup" title="MAC Address Lookup" description="Find the manufacturer behind a MAC address from the IEEE OUI registry, bundled in the page. Paste one address or a whole list.">
+<ToolShell
+	slug="mac-address-lookup"
+	title="MAC Address Lookup"
+	description="Find the manufacturer behind a MAC address from the IEEE OUI registry, bundled in the page. Paste one address or a whole list."
+>
 	<section class="panel" id="ml-tool">
 		<div class="panel-head">MAC addresses, one per line</div>
 		<textarea id="ml-in" spellcheck="false" aria-label="MAC addresses">3C:22:FB:12:34:56
@@ -10,7 +14,9 @@ import ToolShell from '../../components/ToolShell.astro';
 b827.eb12.3456
 02:42:ac:11:00:02</textarea>
 	</section>
-	<p class="field-note" id="ml-note">Loading the vendor registry…</p>
+	<p class="field-note" id="ml-note">
+		Loading the vendor registry…
+	</p>
 	<ul class="ml-list" id="ml-list"></ul>
 </ToolShell>
 
@@ -25,7 +31,10 @@ b827.eb12.3456
 		let db: Record<string, string> = {};
 
 		const render = () => {
-			const lines = input.value.split('\n').map((l) => l.trim()).filter(Boolean);
+			const lines = input.value
+				.split('\n')
+				.map((l) => l.trim())
+				.filter(Boolean);
 			byId('ml-list').replaceChildren(
 				...lines.map((line) => {
 					const hex = line.replace(/[^0-9a-f]/gi, '').toUpperCase();
@@ -52,7 +61,7 @@ b827.eb12.3456
 						li.dataset.kind = 'none';
 					}
 					return li;
-				})
+				}),
 			);
 		};
 

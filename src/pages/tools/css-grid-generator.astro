@@ -2,29 +2,56 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="css-grid-generator" title="CSS Grid Generator" description="Define columns, rows and gaps, drag across cells to place named areas, then copy the grid CSS.">
+<ToolShell
+	slug="css-grid-generator"
+	title="CSS Grid Generator"
+	description="Define columns, rows and gaps, drag across cells to place named areas, then copy the grid CSS."
+>
 	<div class="fields" id="cg-tool">
-		<div class="field"><label for="cg-cols">Columns</label><input id="cg-cols" spellcheck="false" value="200px 1fr 1fr" /></div>
-		<div class="field"><label for="cg-rows">Rows</label><input id="cg-rows" spellcheck="false" value="auto 1fr auto" /></div>
-		<div class="field"><label for="cg-gap">Gap</label><input id="cg-gap" spellcheck="false" value="12px" /></div>
+		<div class="field">
+			<label for="cg-cols">Columns</label>
+			<input id="cg-cols" spellcheck="false" value="200px 1fr 1fr" />
+		</div>
+		<div class="field">
+			<label for="cg-rows">Rows</label>
+			<input id="cg-rows" spellcheck="false" value="auto 1fr auto" />
+		</div>
+		<div class="field">
+			<label for="cg-gap">Gap</label>
+			<input id="cg-gap" spellcheck="false" value="12px" />
+		</div>
 	</div>
 	<div class="chips" id="cg-presets">
-		<button data-cols="200px 1fr 1fr" data-rows="auto 1fr auto" data-areas="header header header|sidebar main main|footer footer footer">Holy grail</button>
-		<button data-cols="repeat(3, 1fr)" data-rows="auto" data-areas="">3 equal columns</button>
-		<button data-cols="repeat(auto-fill, minmax(160px, 1fr))" data-rows="auto" data-areas="">Responsive cards</button>
-		<button data-cols="1fr 300px" data-rows="auto 1fr" data-areas="header header|main aside">Content + aside</button>
+		<button data-cols="200px 1fr 1fr" data-rows="auto 1fr auto" data-areas="header header header|sidebar main main|footer footer footer">
+			Holy grail
+		</button>
+		<button data-cols="repeat(3, 1fr)" data-rows="auto" data-areas="">
+			3 equal columns
+		</button>
+		<button data-cols="repeat(auto-fill, minmax(160px, 1fr))" data-rows="auto" data-areas="">
+			Responsive cards
+		</button>
+		<button data-cols="1fr 300px" data-rows="auto 1fr" data-areas="header header|main aside">
+			Content + aside
+		</button>
 	</div>
 	<div class="toolbar">
-		<label class="check">Area name <input class="cg-name" id="cg-name" spellcheck="false" value="main" /></label>
+		<label class="check">
+			Area name <input class="cg-name" id="cg-name" spellcheck="false" value="main" />
+		</label>
 		<span class="cg-hint">Drag across cells to assign them to this area.</span>
-		<button class="btn" id="cg-clear">Clear areas</button>
+		<button class="btn" id="cg-clear">
+			Clear areas
+		</button>
 	</div>
 	<div class="cg-stage" id="cg-stage"></div>
 	<p class="error" id="cg-error" hidden></p>
 	<section class="panel">
 		<div class="panel-head">
 			<span>CSS</span>
-			<button class="btn" id="cg-copy">Copy</button>
+			<button class="btn" id="cg-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="cg-out"></pre>
 	</section>
@@ -96,7 +123,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						el.style.background = `hsl(${HUES[names.indexOf(area) % HUES.length]} 70% 60% / 0.35)`;
 					}
 					cells.push(el);
-				})
+				}),
 			);
 			stage.replaceChildren(...cells);
 			const hasAreas = names.length > 0;
@@ -106,10 +133,25 @@ import ToolShell from '../../components/ToolShell.astro';
 				const cs = pos.map((p) => p[2]);
 				return pos.length === (Math.max(...rs) - Math.min(...rs) + 1) * (Math.max(...cs) - Math.min(...cs) + 1);
 			});
-			const lines = ['.container {', '  display: grid;', `  grid-template-columns: ${cols.value.trim()};`, `  grid-template-rows: ${rows.value.trim()};`, `  gap: ${gap.value.trim()};`];
+			const lines = [
+				'.container {',
+				'  display: grid;',
+				`  grid-template-columns: ${cols.value.trim()};`,
+				`  grid-template-rows: ${rows.value.trim()};`,
+				`  gap: ${gap.value.trim()};`,
+			];
 			if (hasAreas) {
 				const width = Math.max(...grid.flat().map((a) => a.length));
-				lines.push('  grid-template-areas:', ...grid.map((row, i) => `    "${row.map((a) => a.padEnd(width)).join(' ').trimEnd()}"${i === grid.length - 1 ? ';' : ''}`));
+				lines.push(
+					'  grid-template-areas:',
+					...grid.map(
+						(row, i) =>
+							`    "${row
+								.map((a) => a.padEnd(width))
+								.join(' ')
+								.trimEnd()}"${i === grid.length - 1 ? ';' : ''}`,
+					),
+				);
 			}
 			lines.push('}');
 			names.forEach((n) => lines.push('', `.${n} {`, `  grid-area: ${n};`, '}'));
@@ -151,7 +193,7 @@ import ToolShell from '../../components/ToolShell.astro';
 				rows.value = b.dataset.rows!;
 				load(b.dataset.areas!);
 				render();
-			})
+			}),
 		);
 		copyButton(byId('cg-copy'), () => byId('cg-out').textContent ?? '');
 		load('header header header|sidebar main main|footer footer footer');

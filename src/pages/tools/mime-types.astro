@@ -2,11 +2,7 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="mime-types"
-	title="MIME Types"
-	description="Find the Content-Type for an extension, or the extensions for a MIME type. Search both ways."
->
+<ToolShell slug="mime-types" title="MIME Types" description="Find the Content-Type for an extension, or the extensions for a MIME type. Search both ways.">
 	<div class="toolbar" id="mime-tool">
 		<input class="mime-search" id="mime-q" type="search" value="webp" placeholder=".svg, json, video/…" aria-label="Search extensions or MIME types" />
 	</div>
@@ -18,22 +14,93 @@ import ToolShell from '../../components/ToolShell.astro';
 	import { byId, onPage } from '../../scripts/ui';
 
 	const TYPES: [string, string][] = [
-		['html htm', 'text/html'], ['css', 'text/css'], ['js mjs cjs', 'text/javascript'], ['json', 'application/json'], ['jsonld', 'application/ld+json'],
-		['ndjson jsonl', 'application/x-ndjson'], ['map', 'application/json'], ['wasm', 'application/wasm'], ['webmanifest', 'application/manifest+json'],
-		['xml', 'application/xml'], ['rss', 'application/rss+xml'], ['atom', 'application/atom+xml'], ['txt log', 'text/plain'], ['csv', 'text/csv'], ['tsv', 'text/tab-separated-values'],
-		['md markdown', 'text/markdown'], ['yaml yml', 'application/yaml'], ['toml', 'application/toml'], ['ics', 'text/calendar'], ['vcf', 'text/vcard'],
-		['png', 'image/png'], ['jpg jpeg', 'image/jpeg'], ['gif', 'image/gif'], ['webp', 'image/webp'], ['avif', 'image/avif'], ['svg', 'image/svg+xml'],
-		['ico', 'image/vnd.microsoft.icon'], ['bmp', 'image/bmp'], ['tif tiff', 'image/tiff'], ['heic', 'image/heic'], ['jxl', 'image/jxl'],
-		['mp4 m4v', 'video/mp4'], ['webm', 'video/webm'], ['mov', 'video/quicktime'], ['mkv', 'video/x-matroska'], ['avi', 'video/x-msvideo'], ['ogv', 'video/ogg'], ['m3u8', 'application/vnd.apple.mpegurl'], ['ts', 'video/mp2t'],
-		['mp3', 'audio/mpeg'], ['wav', 'audio/wav'], ['ogg oga', 'audio/ogg'], ['opus', 'audio/opus'], ['flac', 'audio/flac'], ['m4a', 'audio/mp4'], ['aac', 'audio/aac'], ['weba', 'audio/webm'],
-		['woff', 'font/woff'], ['woff2', 'font/woff2'], ['ttf', 'font/ttf'], ['otf', 'font/otf'],
-		['pdf', 'application/pdf'], ['zip', 'application/zip'], ['gz tgz', 'application/gzip'], ['tar', 'application/x-tar'], ['7z', 'application/x-7z-compressed'], ['rar', 'application/vnd.rar'], ['bz2', 'application/x-bzip2'], ['xz', 'application/x-xz'], ['zst', 'application/zstd'],
-		['doc', 'application/msword'], ['docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], ['xls', 'application/vnd.ms-excel'],
-		['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'], ['ppt', 'application/vnd.ms-powerpoint'], ['pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
-		['odt', 'application/vnd.oasis.opendocument.text'], ['ods', 'application/vnd.oasis.opendocument.spreadsheet'], ['epub', 'application/epub+zip'], ['rtf', 'application/rtf'],
-		['exe dll', 'application/vnd.microsoft.portable-executable'], ['apk', 'application/vnd.android.package-archive'], ['dmg', 'application/x-apple-diskimage'], ['deb', 'application/vnd.debian.binary-package'], ['rpm', 'application/x-rpm'],
-		['jar', 'application/java-archive'], ['sh', 'application/x-sh'], ['py', 'text/x-python'], ['php', 'application/x-httpd-php'], ['sql', 'application/sql'], ['bin', 'application/octet-stream'],
-		['pem crt', 'application/x-pem-file'], ['der cer', 'application/pkix-cert'], ['p12 pfx', 'application/x-pkcs12'], ['eml', 'message/rfc822'], ['glb', 'model/gltf-binary'], ['gltf', 'model/gltf+json'],
+		['html htm', 'text/html'],
+		['css', 'text/css'],
+		['js mjs cjs', 'text/javascript'],
+		['json', 'application/json'],
+		['jsonld', 'application/ld+json'],
+		['ndjson jsonl', 'application/x-ndjson'],
+		['map', 'application/json'],
+		['wasm', 'application/wasm'],
+		['webmanifest', 'application/manifest+json'],
+		['xml', 'application/xml'],
+		['rss', 'application/rss+xml'],
+		['atom', 'application/atom+xml'],
+		['txt log', 'text/plain'],
+		['csv', 'text/csv'],
+		['tsv', 'text/tab-separated-values'],
+		['md markdown', 'text/markdown'],
+		['yaml yml', 'application/yaml'],
+		['toml', 'application/toml'],
+		['ics', 'text/calendar'],
+		['vcf', 'text/vcard'],
+		['png', 'image/png'],
+		['jpg jpeg', 'image/jpeg'],
+		['gif', 'image/gif'],
+		['webp', 'image/webp'],
+		['avif', 'image/avif'],
+		['svg', 'image/svg+xml'],
+		['ico', 'image/vnd.microsoft.icon'],
+		['bmp', 'image/bmp'],
+		['tif tiff', 'image/tiff'],
+		['heic', 'image/heic'],
+		['jxl', 'image/jxl'],
+		['mp4 m4v', 'video/mp4'],
+		['webm', 'video/webm'],
+		['mov', 'video/quicktime'],
+		['mkv', 'video/x-matroska'],
+		['avi', 'video/x-msvideo'],
+		['ogv', 'video/ogg'],
+		['m3u8', 'application/vnd.apple.mpegurl'],
+		['ts', 'video/mp2t'],
+		['mp3', 'audio/mpeg'],
+		['wav', 'audio/wav'],
+		['ogg oga', 'audio/ogg'],
+		['opus', 'audio/opus'],
+		['flac', 'audio/flac'],
+		['m4a', 'audio/mp4'],
+		['aac', 'audio/aac'],
+		['weba', 'audio/webm'],
+		['woff', 'font/woff'],
+		['woff2', 'font/woff2'],
+		['ttf', 'font/ttf'],
+		['otf', 'font/otf'],
+		['pdf', 'application/pdf'],
+		['zip', 'application/zip'],
+		['gz tgz', 'application/gzip'],
+		['tar', 'application/x-tar'],
+		['7z', 'application/x-7z-compressed'],
+		['rar', 'application/vnd.rar'],
+		['bz2', 'application/x-bzip2'],
+		['xz', 'application/x-xz'],
+		['zst', 'application/zstd'],
+		['doc', 'application/msword'],
+		['docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+		['xls', 'application/vnd.ms-excel'],
+		['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+		['ppt', 'application/vnd.ms-powerpoint'],
+		['pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+		['odt', 'application/vnd.oasis.opendocument.text'],
+		['ods', 'application/vnd.oasis.opendocument.spreadsheet'],
+		['epub', 'application/epub+zip'],
+		['rtf', 'application/rtf'],
+		['exe dll', 'application/vnd.microsoft.portable-executable'],
+		['apk', 'application/vnd.android.package-archive'],
+		['dmg', 'application/x-apple-diskimage'],
+		['deb', 'application/vnd.debian.binary-package'],
+		['rpm', 'application/x-rpm'],
+		['jar', 'application/java-archive'],
+		['sh', 'application/x-sh'],
+		['py', 'text/x-python'],
+		['php', 'application/x-httpd-php'],
+		['sql', 'application/sql'],
+		['bin', 'application/octet-stream'],
+		['pem crt', 'application/x-pem-file'],
+		['der cer', 'application/pkix-cert'],
+		['p12 pfx', 'application/x-pkcs12'],
+		['eml', 'message/rfc822'],
+		['glb', 'model/gltf-binary'],
+		['gltf', 'model/gltf+json'],
 	];
 
 	onPage('mime-tool', () => {
@@ -47,7 +114,10 @@ import ToolShell from '../../components/ToolShell.astro';
 				...rows.map(([ext, mime]) => {
 					const li = document.createElement('li');
 					li.innerHTML = '<button><span></span><code></code><em>Copy</em></button>';
-					li.querySelector('span')!.textContent = ext.split(' ').map((e) => `.${e}`).join(' ');
+					li.querySelector('span')!.textContent = ext
+						.split(' ')
+						.map((e) => `.${e}`)
+						.join(' ');
 					li.querySelector('code')!.textContent = mime;
 					li.querySelector('button')!.addEventListener('click', () => {
 						navigator.clipboard.writeText(mime);
@@ -55,7 +125,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						setTimeout(() => (li.querySelector('em')!.textContent = 'Copy'), 1200);
 					});
 					return li;
-				})
+				}),
 			);
 		};
 

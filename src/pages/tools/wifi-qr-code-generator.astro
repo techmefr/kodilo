@@ -2,7 +2,11 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="wifi-qr-code-generator" title="WiFi QR Code Generator" description="Guests scan it with their phone camera and join your network, no typing. Print it for the office or the living room.">
+<ToolShell
+	slug="wifi-qr-code-generator"
+	title="WiFi QR Code Generator"
+	description="Guests scan it with their phone camera and join your network, no typing. Print it for the office or the living room."
+>
 	<div class="fields" id="wq-tool">
 		<div class="field">
 			<label for="wq-ssid">Network name (SSID)</label>
@@ -15,11 +19,19 @@ import ToolShell from '../../components/ToolShell.astro';
 	</div>
 	<div class="toolbar">
 		<div class="seg" id="wq-sec" aria-label="Security">
-			<button data-value="WPA" aria-pressed="true">WPA / WPA2 / WPA3</button>
-			<button data-value="WEP" aria-pressed="false">WEP</button>
-			<button data-value="nopass" aria-pressed="false">Open</button>
+			<button data-value="WPA" aria-pressed="true">
+				WPA / WPA2 / WPA3
+			</button>
+			<button data-value="WEP" aria-pressed="false">
+				WEP
+			</button>
+			<button data-value="nopass" aria-pressed="false">
+				Open
+			</button>
 		</div>
-		<label class="check"><input type="checkbox" id="wq-hidden" /> Hidden network</label>
+		<label class="check">
+			<input type="checkbox" id="wq-hidden" /> Hidden network
+		</label>
 	</div>
 	<div class="qr-stage">
 		<div class="wq-card" id="wq-card">
@@ -29,8 +41,12 @@ import ToolShell from '../../components/ToolShell.astro';
 		</div>
 		<div class="qr-side">
 			<code class="wq-payload" id="wq-payload"></code>
-			<button class="btn primary" id="wq-png">Download PNG</button>
-			<button class="btn" id="wq-print">Print</button>
+			<button class="btn primary" id="wq-png">
+				Download PNG
+			</button>
+			<button class="btn" id="wq-print">
+				Print
+			</button>
 		</div>
 	</div>
 </ToolShell>
@@ -47,8 +63,7 @@ import ToolShell from '../../components/ToolShell.astro';
 		const hidden = byId<HTMLInputElement>('wq-hidden');
 		let sec = 'WPA';
 
-		const payload = () =>
-			`WIFI:T:${sec};S:${esc(ssid.value)};${sec === 'nopass' ? '' : `P:${esc(pass.value)};`}${hidden.checked ? 'H:true;' : ''};`;
+		const payload = () => `WIFI:T:${sec};S:${esc(ssid.value)};${sec === 'nopass' ? '' : `P:${esc(pass.value)};`}${hidden.checked ? 'H:true;' : ''};`;
 
 		const render = async () => {
 			pass.disabled = sec === 'nopass';

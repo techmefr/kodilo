@@ -15,20 +15,18 @@ const bases = [
 	description="Binary, octal, decimal, hex or any base from 2 to 36. Arbitrary size, negatives welcome."
 >
 	<div class="fields" id="base-tool">
-		{
-			bases.map(([base, label]) => (
-				<div class="field">
-					<label for={`base-${base}`}>
-						{label} · base {base}
-					</label>
-					<input id={`base-${base}`} data-base={base} spellcheck="false" />
-				</div>
-			))
-		}
+		{bases.map(([base, label]) => (
+			<div class="field">
+				<label for={`base-${base}`}>
+					{label} · base {base}
+				</label>
+				<input id={`base-${base}`} data-base={base} spellcheck="false" />
+			</div>
+		))}
 		<div class="field wide">
-			<label for="base-custom"
-				>Base <input class="num" type="number" id="base-custom-radix" min="2" max="36" value="36" /></label
-			>
+			<label for="base-custom">
+				Base <input class="num" type="number" id="base-custom-radix" min="2" max="36" value="36" />
+			</label>
 			<input id="base-custom" data-base="custom" spellcheck="false" />
 		</div>
 	</div>
@@ -41,7 +39,11 @@ const bases = [
 	const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
 
 	function parse(text: string, base: number): bigint | null {
-		const clean = text.trim().toLowerCase().replace(/[\s_]/g, '').replace(/^(-?)0[bxo]/, '$1');
+		const clean = text
+			.trim()
+			.toLowerCase()
+			.replace(/[\s_]/g, '')
+			.replace(/^(-?)0[bxo]/, '$1');
 		const negative = clean.startsWith('-');
 		const digits = negative ? clean.slice(1) : clean;
 		if (!digits) return null;
@@ -78,7 +80,7 @@ const bases = [
 				if (value === null) return;
 				current = value;
 				fill(input);
-			})
+			}),
 		);
 		radix.addEventListener('input', () => fill());
 		fill();

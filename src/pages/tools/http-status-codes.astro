@@ -58,11 +58,7 @@ const classes = [
 ];
 ---
 
-<ToolShell
-	slug="http-status-codes"
-	title="HTTP Status Codes"
-	description="Every status code you will meet, searchable by number, name or meaning."
->
+<ToolShell slug="http-status-codes" title="HTTP Status Codes" description="Every status code you will meet, searchable by number, name or meaning.">
 	<div class="fields" id="http-tool">
 		<div class="field wide">
 			<label for="http-search">Search</label>
@@ -70,20 +66,24 @@ const classes = [
 		</div>
 	</div>
 	<div class="chips" id="http-classes">
-		{classes.map(([value, label]) => <button data-value={value} aria-pressed={String(value === 'all')}>{label}</button>)}
+		{classes.map(([value, label]) => (
+			<button data-value={value} aria-pressed={value === 'all' ? 'true' : 'false'}>
+				{label}
+			</button>
+		))}
 	</div>
 	<ul class="http-list" id="http-list">
-		{
-			codes.map(([code, name, text]) => (
-				<li data-class={String(code)[0]} data-search={`${code} ${name} ${text}`.toLowerCase()}>
-					<b class={`c${String(code)[0]}`}>{code}</b>
-					<span class="http-name">{name}</span>
-					<span class="http-text">{text}</span>
-				</li>
-			))
-		}
+		{codes.map(([code, name, text]) => (
+			<li data-class={String(code)[0]} data-search={`${code} ${name} ${text}`.toLowerCase()}>
+				<b class={`c${String(code)[0]}`}>{code}</b>
+				<span class="http-name">{name}</span>
+				<span class="http-text">{text}</span>
+			</li>
+		))}
 	</ul>
-	<p class="http-empty" id="http-empty" hidden>No status code matches.</p>
+	<p class="http-empty" id="http-empty" hidden>
+		No status code matches.
+	</p>
 </ToolShell>
 
 <script>
@@ -111,7 +111,7 @@ const classes = [
 				chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
 				active = chip.dataset.value!;
 				filter();
-			})
+			}),
 		);
 		search.addEventListener('input', filter);
 	});

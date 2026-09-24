@@ -2,32 +2,44 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="text-to-binary"
-	title="Text to Binary"
-	description="Convert text to UTF-8 bytes in binary, hex, octal or decimal, and back."
->
+<ToolShell slug="text-to-binary" title="Text to Binary" description="Convert text to UTF-8 bytes in binary, hex, octal or decimal, and back.">
 	<div class="toolbar" id="bin-tool">
 		<div class="seg" id="bin-mode" aria-label="Direction">
-			<button data-value="encode" aria-pressed="true">Text → Bytes</button>
-			<button data-value="decode" aria-pressed="false">Bytes → Text</button>
+			<button data-value="encode" aria-pressed="true">
+				Text → Bytes
+			</button>
+			<button data-value="decode" aria-pressed="false">
+				Bytes → Text
+			</button>
 		</div>
 		<div class="seg" id="bin-radix" aria-label="Base">
-			<button data-value="2" aria-pressed="true">Binary</button>
-			<button data-value="16" aria-pressed="false">Hex</button>
-			<button data-value="8" aria-pressed="false">Octal</button>
-			<button data-value="10" aria-pressed="false">Decimal</button>
+			<button data-value="2" aria-pressed="true">
+				Binary
+			</button>
+			<button data-value="16" aria-pressed="false">
+				Hex
+			</button>
+			<button data-value="8" aria-pressed="false">
+				Octal
+			</button>
+			<button data-value="10" aria-pressed="false">
+				Decimal
+			</button>
 		</div>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
-			<div class="panel-head" id="bin-in-label">Text</div>
+			<div class="panel-head" id="bin-in-label">
+				Text
+			</div>
 			<textarea id="bin-in" spellcheck="false" aria-labelledby="bin-in-label">Hi kodilo ✨</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span id="bin-out-label">Bytes</span>
-				<button class="btn" id="bin-copy">Copy</button>
+				<button class="btn" id="bin-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="bin-out"></pre>
 		</section>
@@ -47,13 +59,13 @@ import ToolShell from '../../components/ToolShell.astro';
 		let mode = 'encode';
 		let radix = 2;
 
-		const encode = () =>
-			Array.from(new TextEncoder().encode(input.value), (b) =>
-				b.toString(radix).toUpperCase().padStart(WIDTH[radix], '0')
-			).join(' ');
+		const encode = () => Array.from(new TextEncoder().encode(input.value), (b) => b.toString(radix).toUpperCase().padStart(WIDTH[radix], '0')).join(' ');
 
 		const decode = () => {
-			const tokens = input.value.trim().split(/[\s,]+/).filter(Boolean);
+			const tokens = input.value
+				.trim()
+				.split(/[\s,]+/)
+				.filter(Boolean);
 			const bytes = tokens.map((t) => {
 				const value = parseInt(t.replace(/^0x/i, ''), radix);
 				if (Number.isNaN(value) || value > 255) throw new Error(t);
@@ -70,10 +82,7 @@ import ToolShell from '../../components/ToolShell.astro';
 				error.hidden = true;
 			} catch (e) {
 				output.textContent = '';
-				error.textContent =
-					e instanceof TypeError
-						? 'These bytes are not valid UTF-8.'
-						: `“${(e as Error).message}” is not a byte in base ${radix}.`;
+				error.textContent = e instanceof TypeError ? 'These bytes are not valid UTF-8.' : `“${(e as Error).message}” is not a byte in base ${radix}.`;
 				error.hidden = false;
 			}
 		};
@@ -87,9 +96,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			if (mode === 'decode' && error.hidden) {
 				const text = output.textContent ?? '';
 				radix = Number(value);
-				input.value = Array.from(new TextEncoder().encode(text), (b) =>
-					b.toString(radix).toUpperCase().padStart(WIDTH[radix], '0')
-				).join(' ');
+				input.value = Array.from(new TextEncoder().encode(text), (b) => b.toString(radix).toUpperCase().padStart(WIDTH[radix], '0')).join(' ');
 			} else {
 				radix = Number(value);
 			}

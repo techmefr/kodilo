@@ -12,9 +12,15 @@ import ToolShell from '../../components/ToolShell.astro';
 		<span>Drop PNG files here or click to choose. A sample is loaded.</span>
 	</label>
 	<div class="toolbar">
-		<label class="check">Quality <input type="range" id="pj-q" min="10" max="100" value="90" /> <b id="pj-q-value">90</b></label>
-		<label class="check">Background <input type="color" id="pj-bg" value="#ffffff" /></label>
-		<button class="btn" id="pj-clear">Clear</button>
+		<label class="check">
+			Quality <input type="range" id="pj-q" min="10" max="100" value="90" /> <b id="pj-q-value">90</b>
+		</label>
+		<label class="check">
+			Background <input type="color" id="pj-bg" value="#ffffff" />
+		</label>
+		<button class="btn" id="pj-clear">
+			Clear
+		</button>
 	</div>
 	<ul class="pj-list" id="pj-list"></ul>
 </ToolShell>
@@ -39,7 +45,8 @@ import ToolShell from '../../components/ToolShell.astro';
 			a.href = item.url;
 			a.download = `${item.name.replace(/\.[^.]+$/, '')}.jpg`;
 			const diff = Math.round((1 - blob.size / item.size) * 100);
-			item.li.querySelector('span')!.textContent = `${item.img.naturalWidth} × ${item.img.naturalHeight} · ${humanSize(item.size)} → ${humanSize(blob.size)}${diff > 0 ? ` (−${diff}%)` : ''}`;
+			item.li.querySelector('span')!.textContent =
+				`${item.img.naturalWidth} × ${item.img.naturalHeight} · ${humanSize(item.size)} → ${humanSize(blob.size)}${diff > 0 ? ` (−${diff}%)` : ''}`;
 		};
 
 		const add = async (file: Blob, name: string) => {

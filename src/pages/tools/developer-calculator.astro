@@ -2,21 +2,37 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="developer-calculator" title="Developer Calculator" description="Integer maths in hex, decimal, octal and binary with bitwise operators and a clickable bit grid. Uses 64-bit or smaller word sizes.">
+<ToolShell
+	slug="developer-calculator"
+	title="Developer Calculator"
+	description="Integer maths in hex, decimal, octal and binary with bitwise operators and a clickable bit grid. Uses 64-bit or smaller word sizes."
+>
 	<div class="toolbar" id="dc-tool">
 		<div class="seg" id="dc-width" aria-label="Word size">
-			<button data-value="8" aria-pressed="false">8-bit</button>
-			<button data-value="16" aria-pressed="false">16-bit</button>
-			<button data-value="32" aria-pressed="true">32-bit</button>
-			<button data-value="64" aria-pressed="false">64-bit</button>
+			<button data-value="8" aria-pressed="false">
+				8-bit
+			</button>
+			<button data-value="16" aria-pressed="false">
+				16-bit
+			</button>
+			<button data-value="32" aria-pressed="true">
+				32-bit
+			</button>
+			<button data-value="64" aria-pressed="false">
+				64-bit
+			</button>
 		</div>
-		<label class="check"><input type="checkbox" id="dc-signed" checked /> Signed</label>
+		<label class="check">
+			<input type="checkbox" id="dc-signed" checked /> Signed
+		</label>
 	</div>
 	<div class="fields">
 		<div class="field wide" id="dc-field">
 			<label for="dc-expr">Expression</label>
 			<input id="dc-expr" spellcheck="false" autocomplete="off" value="(0xFF00 | 0b1010) >> 4" />
-			<span class="field-note" id="dc-note">Operators: + - * / % &amp; | ^ ~ &lt;&lt; &gt;&gt; ( ). Prefixes: 0x hex, 0o octal, 0b binary.</span>
+			<span class="field-note" id="dc-note">
+				Operators: + - * / % &amp; | ^ ~ &lt;&lt; &gt;&gt; ( ). Prefixes: 0x hex, 0o octal, 0b binary.
+			</span>
 		</div>
 	</div>
 	<ul class="dc-bases" id="dc-bases"></ul>
@@ -40,14 +56,20 @@ import ToolShell from '../../components/ToolShell.astro';
 		'+': [5, (a, b) => a + b],
 		'-': [5, (a, b) => a - b],
 		'*': [6, (a, b) => a * b],
-		'/': [6, (a, b) => {
-			if (b === 0n) throw new Error('Division by zero');
-			return a / b;
-		}],
-		'%': [6, (a, b) => {
-			if (b === 0n) throw new Error('Division by zero');
-			return a % b;
-		}],
+		'/': [
+			6,
+			(a, b) => {
+				if (b === 0n) throw new Error('Division by zero');
+				return a / b;
+			},
+		],
+		'%': [
+			6,
+			(a, b) => {
+				if (b === 0n) throw new Error('Division by zero');
+				return a % b;
+			},
+		],
 	};
 
 	function tokenize(s: string): Tok[] {
@@ -116,7 +138,15 @@ import ToolShell from '../../components/ToolShell.astro';
 			const shown = signed.checked ? BigInt.asIntN(width, value) : u;
 			const bin = u.toString(2).padStart(width, '0');
 			const rows: [string, string][] = [
-				['HEX', u.toString(16).toUpperCase().padStart(width / 4, '0').replace(/(?=(.{4})+$)/g, ' ').trim()],
+				[
+					'HEX',
+					u
+						.toString(16)
+						.toUpperCase()
+						.padStart(width / 4, '0')
+						.replace(/(?=(.{4})+$)/g, ' ')
+						.trim(),
+				],
 				['DEC', shown.toLocaleString('en-US')],
 				['OCT', u.toString(8)],
 				['BIN', bin.replace(/(?=(.{4})+$)/g, ' ').trim()],
@@ -134,7 +164,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						setTimeout(() => li.classList.remove('copied'), 900);
 					});
 					return li;
-				})
+				}),
 			);
 			const bits = byId('dc-bits');
 			bits.replaceChildren(
@@ -151,7 +181,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						paint();
 					});
 					return bit;
-				})
+				}),
 			);
 		};
 
@@ -186,7 +216,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					render();
 				});
 				return b;
-			})
+			}),
 		);
 
 		segmented(byId('dc-width'), (v) => {

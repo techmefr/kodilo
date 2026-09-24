@@ -2,9 +2,15 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="qr-code-reader" title="QR Code Reader" description="Read a QR code from an image, a screenshot you paste, or your camera. See what it contains before you open it.">
+<ToolShell
+	slug="qr-code-reader"
+	title="QR Code Reader"
+	description="Read a QR code from an image, a screenshot you paste, or your camera. See what it contains before you open it."
+>
 	<div class="toolbar" id="qr-tool">
-		<button class="btn primary" id="qr-cam">Use camera</button>
+		<button class="btn primary" id="qr-cam">
+			Use camera
+		</button>
 		<span class="field-note">You can also paste a screenshot with Ctrl V / ⌘ V.</span>
 	</div>
 	<label class="drop" id="qr-drop">
@@ -18,7 +24,14 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span id="qr-kind">Content</span>
-			<span class="qr-actions"><a class="btn" id="qr-open" target="_blank" rel="noopener noreferrer" hidden>Open link</a><button class="btn" id="qr-copy">Copy</button></span>
+			<span class="qr-actions">
+				<a class="btn" id="qr-open" target="_blank" rel="noopener noreferrer" hidden>
+					Open link
+				</a>
+				<button class="btn" id="qr-copy">
+					Copy
+				</button>
+			</span>
 		</div>
 		<pre class="out qr-out" id="qr-out"></pre>
 	</section>
@@ -35,18 +48,38 @@ import ToolShell from '../../components/ToolShell.astro';
 		if (/^https?:\/\//i.test(t)) {
 			try {
 				const u = new URL(t);
-				return ['Link', [['Domain', u.hostname], ['Secure', u.protocol === 'https:' ? 'Yes, https' : 'No, plain http']]];
+				return [
+					'Link',
+					[
+						['Domain', u.hostname],
+						['Secure', u.protocol === 'https:' ? 'Yes, https' : 'No, plain http'],
+					],
+				];
 			} catch {}
 		}
 		if (/^WIFI:/i.test(t)) {
 			const get = (k: string) => t.match(new RegExp(`${k}:((?:\\\\.|[^;])*)`))?.[1]?.replace(/\\(.)/g, '$1') ?? '';
-			return ['WiFi network', [['Network', get('S')], ['Security', get('T') || 'Open'], ['Password', get('P')], ['Hidden', get('H') === 'true' ? 'Yes' : 'No']]];
+			return [
+				'WiFi network',
+				[
+					['Network', get('S')],
+					['Security', get('T') || 'Open'],
+					['Password', get('P')],
+					['Hidden', get('H') === 'true' ? 'Yes' : 'No'],
+				],
+			];
 		}
 		if (/^mailto:/i.test(t)) return ['Email', [['To', t.slice(7).split('?')[0]]]];
 		if (/^tel:/i.test(t)) return ['Phone number', [['Number', t.slice(4)]]];
 		if (/^otpauth:\/\//i.test(t)) {
 			const u = new URL(t);
-			return ['2FA secret', [['Issuer', u.searchParams.get('issuer') ?? ''], ['Account', decodeURIComponent(u.pathname.slice(1))]]];
+			return [
+				'2FA secret',
+				[
+					['Issuer', u.searchParams.get('issuer') ?? ''],
+					['Account', decodeURIComponent(u.pathname.slice(1))],
+				],
+			];
 		}
 		if (/^BEGIN:VCARD/i.test(t)) return ['Contact card', [['Name', t.match(/\nFN:(.*)/)?.[1] ?? '']]];
 		return ['Text', []];
@@ -79,7 +112,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					const dd = document.createElement('dd');
 					dd.textContent = v;
 					return [dt, dd];
-				})
+				}),
 			);
 		};
 

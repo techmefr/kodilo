@@ -9,7 +9,11 @@ import ToolShell from '../../components/ToolShell.astro';
 >
 	<section class="panel" id="ts-tool">
 		<div class="panel-head">Text</div>
-		<textarea id="ts-in" spellcheck="false" aria-label="Text to analyse">Good tools stay out of the way. They open instantly, work offline and never ask you to sign up. You paste something, you get an answer, and you move on with your day.
+		<textarea
+			id="ts-in"
+			spellcheck="false"
+			aria-label="Text to analyse"
+		>Good tools stay out of the way. They open instantly, work offline and never ask you to sign up. You paste something, you get an answer, and you move on with your day.
 
 Most of the time, that is all a developer needs. A quick conversion, a sanity check, a value to copy. The best tool is the one you forget you used.</textarea>
 	</section>
@@ -23,12 +27,24 @@ Most of the time, that is all a developer needs. A quick conversion, a sanity ch
 <script>
 	import { byId, onPage } from '../../scripts/ui';
 
-	const STOP = new Set('a an and are as at be but by for from has have i in is it its of on or that the this to was were will with you your we they them our not no so do if all one can'.split(' '));
+	const STOP = new Set(
+		'a an and are as at be but by for from has have i in is it its of on or that the this to was were will with you your we they them our not no so do if all one can'.split(
+			' ',
+		),
+	);
 
 	const syllables = (word: string) => {
 		const w = word.toLowerCase().replace(/[^a-z]/g, '');
 		if (w.length <= 3) return 1;
-		return Math.max(1, (w.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '').replace(/^y/, '').match(/[aeiouy]{1,2}/g) ?? []).length);
+		return Math.max(
+			1,
+			(
+				w
+					.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '')
+					.replace(/^y/, '')
+					.match(/[aeiouy]{1,2}/g) ?? []
+			).length,
+		);
 	};
 
 	const minutes = (m: number) => (m < 1 ? `${Math.max(1, Math.round(m * 60))} s` : `${Math.floor(m)} min ${Math.round((m % 1) * 60)} s`);
@@ -65,10 +81,13 @@ Most of the time, that is all a developer needs. A quick conversion, a sanity ch
 					el.querySelector('b')!.textContent = value;
 					el.querySelector('span')!.textContent = label;
 					return el;
-				})
+				}),
 			);
 			const freq = new Map<string, number>();
-			words.map((w) => w.toLowerCase()).filter((w) => !STOP.has(w) && w.length > 1).forEach((w) => freq.set(w, (freq.get(w) ?? 0) + 1));
+			words
+				.map((w) => w.toLowerCase())
+				.filter((w) => !STOP.has(w) && w.length > 1)
+				.forEach((w) => freq.set(w, (freq.get(w) ?? 0) + 1));
 			const top = [...freq].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12);
 			const max = top[0]?.[1] ?? 1;
 			byId('ts-words').replaceChildren(
@@ -79,7 +98,7 @@ Most of the time, that is all a developer needs. A quick conversion, a sanity ch
 					(li.querySelector('i') as HTMLElement).style.width = `${(n / max) * 100}%`;
 					li.querySelector('b')!.textContent = String(n);
 					return li;
-				})
+				}),
 			);
 		};
 

@@ -8,50 +8,88 @@ import ToolShell from '../../components/ToolShell.astro';
 	description="A service unit with restart policy, user, environment and hardening, plus an optional timer to run it on a schedule."
 >
 	<div class="fields" id="sd-tool">
-		<div class="field"><label for="sd-name">Name</label><input id="sd-name" spellcheck="false" value="my-app" /></div>
-		<div class="field"><label for="sd-desc">Description</label><input id="sd-desc" value="My App API" /></div>
-		<div class="field wide"><label for="sd-exec">ExecStart</label><input id="sd-exec" spellcheck="false" value="/usr/bin/node /opt/my-app/server.js" /></div>
-		<div class="field"><label for="sd-dir">WorkingDirectory</label><input id="sd-dir" spellcheck="false" value="/opt/my-app" /></div>
-		<div class="field"><label for="sd-user">User</label><input id="sd-user" spellcheck="false" value="www-data" /></div>
-		<div class="field wide"><label for="sd-env">Environment · one KEY=value per line</label><textarea id="sd-env" class="sd-env" spellcheck="false">NODE_ENV=production
-PORT=3000</textarea></div>
-		<div class="field"><label for="sd-envfile">EnvironmentFile</label><input id="sd-envfile" spellcheck="false" placeholder="/etc/my-app.env" /></div>
-		<div class="field"><label for="sd-timer">Timer · OnCalendar</label><input id="sd-timer" spellcheck="false" placeholder="daily, *-*-* 03:00:00" /></div>
+		<div class="field">
+			<label for="sd-name">Name</label>
+			<input id="sd-name" spellcheck="false" value="my-app" />
+		</div>
+		<div class="field">
+			<label for="sd-desc">Description</label>
+			<input id="sd-desc" value="My App API" />
+		</div>
+		<div class="field wide">
+			<label for="sd-exec">ExecStart</label>
+			<input id="sd-exec" spellcheck="false" value="/usr/bin/node /opt/my-app/server.js" />
+		</div>
+		<div class="field">
+			<label for="sd-dir">WorkingDirectory</label>
+			<input id="sd-dir" spellcheck="false" value="/opt/my-app" />
+		</div>
+		<div class="field">
+			<label for="sd-user">User</label>
+			<input id="sd-user" spellcheck="false" value="www-data" />
+		</div>
+		<div class="field wide">
+			<label for="sd-env">Environment · one KEY=value per line</label>
+			<textarea id="sd-env" class="sd-env" spellcheck="false">NODE_ENV=production
+PORT=3000</textarea>
+		</div>
+		<div class="field">
+			<label for="sd-envfile">EnvironmentFile</label>
+			<input id="sd-envfile" spellcheck="false" placeholder="/etc/my-app.env" />
+		</div>
+		<div class="field">
+			<label for="sd-timer">Timer · OnCalendar</label>
+			<input id="sd-timer" spellcheck="false" placeholder="daily, *-*-* 03:00:00" />
+		</div>
 	</div>
 	<div class="toolbar">
 		<div class="seg" id="sd-type">
-			<button data-value="simple" aria-pressed="true">simple</button>
+			<button data-value="simple" aria-pressed="true">
+				simple
+			</button>
 			<button data-value="exec">exec</button>
 			<button data-value="forking">forking</button>
 			<button data-value="oneshot">oneshot</button>
 			<button data-value="notify">notify</button>
 		</div>
 		<div class="seg" id="sd-restart">
-			<button data-value="on-failure" aria-pressed="true">on-failure</button>
+			<button data-value="on-failure" aria-pressed="true">
+				on-failure
+			</button>
 			<button data-value="always">always</button>
 			<button data-value="no">no</button>
 		</div>
-		<label class="check"><input type="checkbox" id="sd-network" checked /> After network-online</label>
-		<label class="check"><input type="checkbox" id="sd-harden" checked /> Hardening</label>
+		<label class="check">
+			<input type="checkbox" id="sd-network" checked /> After network-online
+		</label>
+		<label class="check">
+			<input type="checkbox" id="sd-harden" checked /> Hardening
+		</label>
 	</div>
 	<section class="panel">
 		<div class="panel-head">
 			<span id="sd-file"></span>
-			<button class="btn" id="sd-copy">Copy</button>
+			<button class="btn" id="sd-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="sd-out"></pre>
 	</section>
 	<section class="panel" id="sd-timer-panel" hidden>
 		<div class="panel-head">
 			<span id="sd-timer-file"></span>
-			<button class="btn" id="sd-timer-copy">Copy</button>
+			<button class="btn" id="sd-timer-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="sd-timer-out"></pre>
 	</section>
 	<section class="panel">
 		<div class="panel-head">
 			<span>Install</span>
-			<button class="btn" id="sd-cmd-copy">Copy</button>
+			<button class="btn" id="sd-cmd-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out sd-cmd" id="sd-cmd"></pre>
 	</section>
@@ -70,7 +108,10 @@ PORT=3000</textarea></div>
 			const timer = val('sd-timer');
 			const network = byId<HTMLInputElement>('sd-network').checked;
 			const harden = byId<HTMLInputElement>('sd-harden').checked;
-			const env = byId<HTMLTextAreaElement>('sd-env').value.split('\n').map((l) => l.trim()).filter((l) => /^[A-Za-z_]\w*=/.test(l));
+			const env = byId<HTMLTextAreaElement>('sd-env')
+				.value.split('\n')
+				.map((l) => l.trim())
+				.filter((l) => /^[A-Za-z_]\w*=/.test(l));
 			const lines = [
 				'[Unit]',
 				`Description=${val('sd-desc') || name}`,
@@ -85,7 +126,16 @@ PORT=3000</textarea></div>
 				...(val('sd-envfile') ? [`EnvironmentFile=${val('sd-envfile')}`] : []),
 				...(type === 'oneshot' ? [] : [`Restart=${restart}`, 'RestartSec=5']),
 				...(harden
-					? ['NoNewPrivileges=true', 'PrivateTmp=true', 'ProtectSystem=strict', 'ProtectHome=true', ...(val('sd-dir') ? [`ReadWritePaths=${val('sd-dir')}`] : []), 'ProtectKernelTunables=true', 'ProtectControlGroups=true', 'RestrictSUIDSGID=true']
+					? [
+							'NoNewPrivileges=true',
+							'PrivateTmp=true',
+							'ProtectSystem=strict',
+							'ProtectHome=true',
+							...(val('sd-dir') ? [`ReadWritePaths=${val('sd-dir')}`] : []),
+							'ProtectKernelTunables=true',
+							'ProtectControlGroups=true',
+							'RestrictSUIDSGID=true',
+						]
 					: []),
 				...(timer ? [] : ['', '[Install]', 'WantedBy=multi-user.target']),
 			];
@@ -93,9 +143,20 @@ PORT=3000</textarea></div>
 			byId('sd-out').textContent = lines.join('\n');
 			byId('sd-timer-panel').hidden = !timer;
 			byId('sd-timer-file').textContent = `/etc/systemd/system/${name}.timer`;
-			byId('sd-timer-out').textContent = ['[Unit]', `Description=Run ${name} on a schedule`, '', '[Timer]', `OnCalendar=${timer}`, 'Persistent=true', '', '[Install]', 'WantedBy=timers.target'].join('\n');
+			byId('sd-timer-out').textContent = [
+				'[Unit]',
+				`Description=Run ${name} on a schedule`,
+				'',
+				'[Timer]',
+				`OnCalendar=${timer}`,
+				'Persistent=true',
+				'',
+				'[Install]',
+				'WantedBy=timers.target',
+			].join('\n');
 			const unit = timer ? `${name}.timer` : `${name}.service`;
-			byId('sd-cmd').textContent = `sudo systemctl daemon-reload\nsudo systemctl enable --now ${unit}\nsystemctl status ${unit}\njournalctl -u ${name}.service -f`;
+			byId('sd-cmd').textContent =
+				`sudo systemctl daemon-reload\nsudo systemctl enable --now ${unit}\nsystemctl status ${unit}\njournalctl -u ${name}.service -f`;
 		};
 
 		segmented(byId('sd-type'), (v) => ((type = v), render()));

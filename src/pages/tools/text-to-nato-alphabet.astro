@@ -12,8 +12,12 @@ import ToolShell from '../../components/ToolShell.astro';
 		<input class="nato-input" id="nato-in" spellcheck="false" aria-label="Text to spell" value="KDL-42x" />
 	</section>
 	<div class="toolbar">
-		<label class="check"><input type="checkbox" id="nato-icao" /> ICAO digits (Tree, Fife, Niner)</label>
-		<button class="btn" id="nato-copy">Copy as text</button>
+		<label class="check">
+			<input type="checkbox" id="nato-icao" /> ICAO digits (Tree, Fife, Niner)
+		</label>
+		<button class="btn" id="nato-copy">
+			Copy as text
+		</button>
 	</div>
 	<ol class="nato-list" id="nato-list"></ol>
 </ToolShell>
@@ -21,10 +25,13 @@ import ToolShell from '../../components/ToolShell.astro';
 <script>
 	import { byId, copyButton, onPage } from '../../scripts/ui';
 
-	const LETTERS = 'Alfa Bravo Charlie Delta Echo Foxtrot Golf Hotel India Juliett Kilo Lima Mike November Oscar Papa Quebec Romeo Sierra Tango Uniform Victor Whiskey X-ray Yankee Zulu'.split(' ');
+	const LETTERS =
+		'Alfa Bravo Charlie Delta Echo Foxtrot Golf Hotel India Juliett Kilo Lima Mike November Oscar Papa Quebec Romeo Sierra Tango Uniform Victor Whiskey X-ray Yankee Zulu'.split(
+			' ',
+		);
 	const DIGITS = 'Zero One Two Three Four Five Six Seven Eight Nine'.split(' ');
 	const ICAO = 'Zero One Two Tree Four Fife Six Seven Eight Niner'.split(' ');
-	const SYMBOLS: Record<string, string> = { '-': 'Dash', '.': 'Stop', '/': 'Slash', '@': 'At', '_': 'Underscore', ' ': 'Space' };
+	const SYMBOLS: Record<string, string> = { '-': 'Dash', '.': 'Stop', '/': 'Slash', '@': 'At', _: 'Underscore', ' ': 'Space' };
 
 	onPage('nato-tool', () => {
 		const input = byId<HTMLInputElement>('nato-in');
@@ -52,7 +59,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					li.querySelector('.char')!.textContent = char === ' ' ? '␣' : char;
 					li.querySelector('.word')!.textContent = word;
 					return li;
-				})
+				}),
 			);
 		};
 

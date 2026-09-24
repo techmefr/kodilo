@@ -2,21 +2,37 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="image-color-palette" title="Image Color Palette" description="Extract the dominant colors of an image, with their share of the picture. Click a color to copy it, or export the palette as CSS variables.">
+<ToolShell
+	slug="image-color-palette"
+	title="Image Color Palette"
+	description="Extract the dominant colors of an image, with their share of the picture. Click a color to copy it, or export the palette as CSS variables."
+>
 	<label class="drop" id="ip-tool">
 		<input type="file" id="ip-file" accept="image/*" hidden />
 		<span id="ip-drop">Drop an image here or click to choose. A sample is loaded.</span>
 	</label>
 	<div class="toolbar">
 		<div class="seg" id="ip-count" aria-label="Colors">
-			<button data-value="5" aria-pressed="false">5</button>
-			<button data-value="8" aria-pressed="true">8</button>
-			<button data-value="12" aria-pressed="false">12</button>
+			<button data-value="5" aria-pressed="false">
+				5
+			</button>
+			<button data-value="8" aria-pressed="true">
+				8
+			</button>
+			<button data-value="12" aria-pressed="false">
+				12
+			</button>
 		</div>
 		<div class="seg" id="ip-format" aria-label="Format">
-			<button data-value="hex" aria-pressed="true">HEX</button>
-			<button data-value="rgb" aria-pressed="false">RGB</button>
-			<button data-value="hsl" aria-pressed="false">HSL</button>
+			<button data-value="hex" aria-pressed="true">
+				HEX
+			</button>
+			<button data-value="rgb" aria-pressed="false">
+				RGB
+			</button>
+			<button data-value="hsl" aria-pressed="false">
+				HSL
+			</button>
 		</div>
 	</div>
 	<div class="ip-layout">
@@ -27,7 +43,9 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span>CSS variables</span>
-			<button class="btn" id="ip-copy">Copy</button>
+			<button class="btn" id="ip-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="ip-css"></pre>
 	</section>
@@ -49,7 +67,10 @@ import ToolShell from '../../components/ToolShell.astro';
 				let d = Infinity;
 				centers.forEach((c, i) => {
 					const x = (p[0] - c[0]) ** 2 * 0.3 + (p[1] - c[1]) ** 2 * 0.59 + (p[2] - c[2]) ** 2 * 0.11;
-					if (x < d) ((d = x), (best = i));
+					if (x < d) {
+						d = x;
+						best = i;
+					}
 				});
 				groups[best].push(p);
 			}
@@ -96,7 +117,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						setTimeout(() => (li.querySelector('span')!.textContent = `${(c.share * 100).toFixed(1)}%`), 1000);
 					});
 					return li;
-				})
+				}),
 			);
 			byId('ip-bar').replaceChildren(
 				...colors.map((c) => {
@@ -104,7 +125,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					s.style.background = hex(c.rgb);
 					s.style.flexGrow = String(c.share);
 					return s;
-				})
+				}),
 			);
 			byId('ip-css').textContent = `:root {\n${colors.map((c, i) => `  --palette-${i + 1}: ${fmt(c)};`).join('\n')}\n}`;
 		};

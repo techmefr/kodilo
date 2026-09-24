@@ -9,9 +9,12 @@ import ToolShell from '../../components/ToolShell.astro';
 >
 	<section class="panel" id="jwt-tool">
 		<div class="panel-head">Token</div>
-		<textarea id="jwt-in" class="jwt-in" spellcheck="false" aria-label="JWT"
-			>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IktvZGlsbyBVc2VyIiwicm9sZSI6ImRldmVsb3BlciIsImlhdCI6MTc1ODcwMDAwMCwiZXhwIjo0MTAyNDQ0ODAwfQ.c2lnbmF0dXJlLW5vdC12ZXJpZmllZA</textarea
-		>
+		<textarea
+			id="jwt-in"
+			class="jwt-in"
+			spellcheck="false"
+			aria-label="JWT"
+		>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IktvZGlsbyBVc2VyIiwicm9sZSI6ImRldmVsb3BlciIsImlhdCI6MTc1ODcwMDAwMCwiZXhwIjo0MTAyNDQ0ODAwfQ.c2lnbmF0dXJlLW5vdC12ZXJpZmllZA</textarea>
 	</section>
 	<div class="error" id="jwt-error" hidden></div>
 	<div class="chips" id="jwt-times"></div>
@@ -19,14 +22,18 @@ import ToolShell from '../../components/ToolShell.astro';
 		<section class="panel">
 			<div class="panel-head">
 				<span>Header</span>
-				<button class="btn" id="jwt-copy-header">Copy</button>
+				<button class="btn" id="jwt-copy-header">
+					Copy
+				</button>
 			</div>
 			<pre class="out jwt-part" id="jwt-header"></pre>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span>Payload</span>
-				<button class="btn" id="jwt-copy-payload">Copy</button>
+				<button class="btn" id="jwt-copy-payload">
+					Copy
+				</button>
 			</div>
 			<pre class="out jwt-part" id="jwt-payload"></pre>
 		</section>
@@ -42,7 +49,12 @@ import ToolShell from '../../components/ToolShell.astro';
 	const relative = (seconds: number) => {
 		const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 		const units: [Intl.RelativeTimeFormatUnit, number][] = [
-			['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1],
+			['year', 31536000],
+			['month', 2592000],
+			['day', 86400],
+			['hour', 3600],
+			['minute', 60],
+			['second', 1],
 		];
 		const [unit, size] = units.find(([, s]) => Math.abs(seconds) >= s) ?? units[units.length - 1];
 		return rtf.format(Math.round(seconds / size), unit);
@@ -61,7 +73,10 @@ import ToolShell from '../../components/ToolShell.astro';
 			header.textContent = '';
 			payload.textContent = '';
 			times.replaceChildren();
-			const parts = input.value.trim().replace(/^Bearer\s+/i, '').split('.');
+			const parts = input.value
+				.trim()
+				.replace(/^Bearer\s+/i, '')
+				.split('.');
 			if (!input.value.trim()) {
 				error.hidden = true;
 				return;

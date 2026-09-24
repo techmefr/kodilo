@@ -2,15 +2,23 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="pdf-split" title="PDF Split" description="Pull pages out of a PDF: pick a range like 1-3, 5, or split every page into its own file. Nothing is uploaded.">
+<ToolShell
+	slug="pdf-split"
+	title="PDF Split"
+	description="Pull pages out of a PDF: pick a range like 1-3, 5, or split every page into its own file. Nothing is uploaded."
+>
 	<label class="drop" id="ps-tool">
 		<input type="file" id="ps-file" accept="application/pdf" hidden />
 		<span id="ps-drop">Drop a PDF here or click to choose. A 6-page sample is loaded.</span>
 	</label>
 	<div class="toolbar">
 		<div class="seg" id="ps-mode" aria-label="Mode">
-			<button data-value="range" aria-pressed="true">Extract pages</button>
-			<button data-value="each" aria-pressed="false">One file per page</button>
+			<button data-value="range" aria-pressed="true">
+				Extract pages
+			</button>
+			<button data-value="each" aria-pressed="false">
+				One file per page
+			</button>
 		</div>
 	</div>
 	<div class="fields">
@@ -22,7 +30,9 @@ import ToolShell from '../../components/ToolShell.astro';
 	</div>
 	<div class="ps-thumbs" id="ps-thumbs"></div>
 	<div class="toolbar">
-		<button class="btn primary" id="ps-go">Download</button>
+		<button class="btn primary" id="ps-go">
+			Download
+		</button>
 	</div>
 	<p class="error" id="ps-error" hidden></p>
 </ToolShell>
@@ -36,7 +46,10 @@ import ToolShell from '../../components/ToolShell.astro';
 
 	function parseRange(s: string, max: number): number[] {
 		const out: number[] = [];
-		for (const part of s.split(',').map((p) => p.trim()).filter(Boolean)) {
+		for (const part of s
+			.split(',')
+			.map((p) => p.trim())
+			.filter(Boolean)) {
 			const m = part.match(/^(\d+)?\s*-\s*(\d+)?$|^(\d+)$/);
 			if (!m) throw new Error(`"${part}" is not a page or a range`);
 			const a = Number(m[3] ?? m[1] ?? 1);
@@ -67,9 +80,11 @@ import ToolShell from '../../components/ToolShell.astro';
 				byId('ps-note').textContent = (e as Error).message;
 			}
 			range.disabled = mode === 'each';
-			byId('ps-thumbs').querySelectorAll<HTMLElement>('figure').forEach((f, i) => {
-				f.dataset.on = String(pages.includes(i + 1));
-			});
+			byId('ps-thumbs')
+				.querySelectorAll<HTMLElement>('figure')
+				.forEach((f, i) => {
+					f.dataset.on = String(pages.includes(i + 1));
+				});
 			byId<HTMLButtonElement>('ps-go').disabled = !pages.length;
 		};
 
@@ -94,7 +109,8 @@ import ToolShell from '../../components/ToolShell.astro';
 					fig.addEventListener('click', () => {
 						if (mode !== 'range') return;
 						const set = new Set(pages);
-						set.has(i) ? set.delete(i) : set.add(i);
+						if (set.has(i)) set.delete(i);
+						else set.add(i);
 						range.value = compress([...set].sort((a, b) => a - b));
 						select();
 					});
@@ -132,7 +148,12 @@ import ToolShell from '../../components/ToolShell.astro';
 			const groups = mode === 'each' ? pages.map((p) => [p]) : [pages];
 			for (const g of groups) {
 				const out = await PDFDocument.create();
-				(await out.copyPages(src, g.map((p) => p - 1))).forEach((p) => out.addPage(p));
+				(
+					await out.copyPages(
+						src,
+						g.map((p) => p - 1),
+					)
+				).forEach((p) => out.addPage(p));
 				downloadBytes(await out.save(), mode === 'each' ? `${name}-page-${g[0]}.pdf` : `${name}-pages.pdf`);
 			}
 		});

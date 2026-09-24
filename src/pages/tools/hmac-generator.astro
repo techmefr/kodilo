@@ -2,21 +2,29 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="hmac-generator"
-	title="HMAC Generator"
-	description="Sign a message with a secret key. Handy for checking webhook signatures."
->
+<ToolShell slug="hmac-generator" title="HMAC Generator" description="Sign a message with a secret key. Handy for checking webhook signatures.">
 	<div class="toolbar" id="hmac-tool">
 		<div class="seg" id="hmac-algo" aria-label="Algorithm">
-			<button data-value="SHA-1" aria-pressed="false">SHA-1</button>
-			<button data-value="SHA-256" aria-pressed="true">SHA-256</button>
-			<button data-value="SHA-384" aria-pressed="false">SHA-384</button>
-			<button data-value="SHA-512" aria-pressed="false">SHA-512</button>
+			<button data-value="SHA-1" aria-pressed="false">
+				SHA-1
+			</button>
+			<button data-value="SHA-256" aria-pressed="true">
+				SHA-256
+			</button>
+			<button data-value="SHA-384" aria-pressed="false">
+				SHA-384
+			</button>
+			<button data-value="SHA-512" aria-pressed="false">
+				SHA-512
+			</button>
 		</div>
 		<div class="seg" id="hmac-enc" aria-label="Encoding">
-			<button data-value="hex" aria-pressed="true">Hex</button>
-			<button data-value="base64" aria-pressed="false">Base64</button>
+			<button data-value="hex" aria-pressed="true">
+				Hex
+			</button>
+			<button data-value="base64" aria-pressed="false">
+				Base64
+			</button>
 		</div>
 	</div>
 	<div class="fields">
@@ -32,7 +40,9 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span>Signature</span>
-			<button class="btn" id="hmac-copy">Copy</button>
+			<button class="btn" id="hmac-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out hmac-out" id="hmac-out"></pre>
 	</section>
@@ -75,13 +85,7 @@ import ToolShell from '../../components/ToolShell.astro';
 		const render = async () => {
 			const current = ++run;
 			const encoder = new TextEncoder();
-			const cryptoKey = await crypto.subtle.importKey(
-				'raw',
-				encoder.encode(key.value),
-				{ name: 'HMAC', hash: algo },
-				false,
-				['sign']
-			);
+			const cryptoKey = await crypto.subtle.importKey('raw', encoder.encode(key.value), { name: 'HMAC', hash: algo }, false, ['sign']);
 			const signature = new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(msg.value)));
 			if (current !== run) return;
 			out.textContent = key.value ? encodeBytes(signature, encoding) : '';

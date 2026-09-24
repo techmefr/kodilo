@@ -10,40 +10,56 @@ const controls: [string, string, string[]][] = [
 ];
 ---
 
-<ToolShell slug="flexbox-generator" title="Flexbox Generator" description="Set up a flex container visually, tweak each item's grow, shrink and basis, then copy the CSS.">
+<ToolShell
+	slug="flexbox-generator"
+	title="Flexbox Generator"
+	description="Set up a flex container visually, tweak each item's grow, shrink and basis, then copy the CSS."
+>
 	<div class="fb-controls" id="fb-tool">
-		{
-			controls.map(([id, prop, values]) => (
-				<div class="fb-control">
-					<span>{prop}</span>
-					<div class="seg" id={`fb-${id}`} data-prop={prop}>
-						{values.map((v, i) => (
-							<button data-value={v} aria-pressed={i === (id === 'justify' ? 3 : id === 'align' ? 2 : id === 'wrap' ? 1 : 0) ? 'true' : 'false'}>
-								{v}
-							</button>
-						))}
-					</div>
+		{controls.map(([id, prop, values]) => (
+			<div class="fb-control">
+				<span>{prop}</span>
+				<div class="seg" id={`fb-${id}`} data-prop={prop}>
+					{values.map((v, i) => (
+						<button data-value={v} aria-pressed={i === (id === 'justify' ? 3 : id === 'align' ? 2 : id === 'wrap' ? 1 : 0) ? 'true' : 'false'}>
+							{v}
+						</button>
+					))}
 				</div>
-			))
-		}
+			</div>
+		))}
 		<div class="toolbar">
-			<label class="check">gap <input class="num" id="fb-gap" type="number" min="0" max="64" value="12" /> px</label>
-			<label class="check">Items <input class="num" id="fb-count" type="number" min="1" max="12" value="5" /></label>
+			<label class="check">
+				gap <input class="num" id="fb-gap" type="number" min="0" max="64" value="12" /> px
+			</label>
+			<label class="check">
+				Items <input class="num" id="fb-count" type="number" min="1" max="12" value="5" />
+			</label>
 		</div>
 	</div>
 	<div class="fb-stage" id="fb-stage"></div>
 	<p class="fb-hint">Click an item to edit its flex properties.</p>
 	<div class="toolbar" id="fb-item" hidden>
 		<b id="fb-item-name"></b>
-		<label class="check">grow <input class="num" id="fb-grow" type="number" min="0" max="10" /></label>
-		<label class="check">shrink <input class="num" id="fb-shrink" type="number" min="0" max="10" /></label>
-		<label class="check">basis <input class="fb-basis" id="fb-basis" spellcheck="false" /></label>
-		<label class="check">order <input class="num" id="fb-order" type="number" min="-10" max="10" /></label>
+		<label class="check">
+			grow <input class="num" id="fb-grow" type="number" min="0" max="10" />
+		</label>
+		<label class="check">
+			shrink <input class="num" id="fb-shrink" type="number" min="0" max="10" />
+		</label>
+		<label class="check">
+			basis <input class="fb-basis" id="fb-basis" spellcheck="false" />
+		</label>
+		<label class="check">
+			order <input class="num" id="fb-order" type="number" min="-10" max="10" />
+		</label>
 	</div>
 	<section class="panel">
 		<div class="panel-head">
 			<span>CSS</span>
-			<button class="btn" id="fb-copy">Copy</button>
+			<button class="btn" id="fb-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="fb-out"></pre>
 	</section>
@@ -87,9 +103,17 @@ const controls: [string, string, string[]][] = [
 						render();
 					});
 					return el;
-				})
+				}),
 			);
-			const container = [`.container {`, `  display: flex;`, ...Object.entries(props).filter(([k, v]) => !(k === 'align-content' && v === 'normal') && !(k === 'flex-direction' && v === 'row') && !(k === 'flex-wrap' && v === 'nowrap')).map(([k, v]) => `  ${k}: ${v};`), `  gap: ${gap};`, '}'];
+			const container = [
+				`.container {`,
+				`  display: flex;`,
+				...Object.entries(props)
+					.filter(([k, v]) => !(k === 'align-content' && v === 'normal') && !(k === 'flex-direction' && v === 'row') && !(k === 'flex-wrap' && v === 'nowrap'))
+					.map(([k, v]) => `  ${k}: ${v};`),
+				`  gap: ${gap};`,
+				'}',
+			];
 			const custom = items
 				.slice(0, count)
 				.map((it, i) => [i, it] as const)
@@ -113,7 +137,7 @@ const controls: [string, string, string[]][] = [
 				if (selected < 0) return;
 				items[selected][k] = Number((e.target as HTMLInputElement).value) || 0;
 				render();
-			})
+			}),
 		);
 		byId('fb-basis').addEventListener('input', (e) => {
 			if (selected < 0) return;

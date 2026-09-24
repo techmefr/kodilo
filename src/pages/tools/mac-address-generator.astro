@@ -8,25 +8,39 @@ import ToolShell from '../../components/ToolShell.astro';
 	description="Random MAC addresses: locally administered or with a vendor prefix, in any separator and case."
 >
 	<div class="toolbar" id="mac-tool">
-		<label class="check">How many <input class="num" id="mac-count" type="number" min="1" max="500" value="10" /></label>
-		<label class="check">Prefix <input class="mac-prefix" id="mac-prefix" spellcheck="false" placeholder="00:1A:2B" /></label>
+		<label class="check">
+			How many <input class="num" id="mac-count" type="number" min="1" max="500" value="10" />
+		</label>
+		<label class="check">
+			Prefix <input class="mac-prefix" id="mac-prefix" spellcheck="false" placeholder="00:1A:2B" />
+		</label>
 		<div class="seg" id="mac-sep">
-			<button data-value=":" aria-pressed="true">aa:bb</button>
+			<button data-value=":" aria-pressed="true">
+				aa:bb
+			</button>
 			<button data-value="-">aa-bb</button>
 			<button data-value=".">aabb.ccdd</button>
 			<button data-value="">aabbcc</button>
 		</div>
 		<div class="seg" id="mac-case">
-			<button data-value="upper" aria-pressed="true">ABC</button>
+			<button data-value="upper" aria-pressed="true">
+				ABC
+			</button>
 			<button data-value="lower">abc</button>
 		</div>
-		<label class="check"><input type="checkbox" id="mac-local" checked /> Locally administered, unicast</label>
+		<label class="check">
+			<input type="checkbox" id="mac-local" checked /> Locally administered, unicast
+		</label>
 	</div>
 	<p class="error" id="mac-error" hidden></p>
 	<section class="panel">
 		<div class="panel-head">
-			<button class="btn" id="mac-new">Regenerate</button>
-			<button class="btn" id="mac-copy">Copy</button>
+			<button class="btn" id="mac-new">
+				Regenerate
+			</button>
+			<button class="btn" id="mac-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="mac-out"></pre>
 	</section>

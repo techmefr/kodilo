@@ -21,7 +21,9 @@ const nines = ['99', '99.5', '99.9', '99.95', '99.99', '99.999'];
 		</div>
 	</div>
 	<div class="chips" id="sla-nines">
-		{nines.map((n) => <button data-value={n}>{n}%</button>)}
+		{nines.map((n) => (
+			<button data-value={n}>{n}%</button>
+		))}
 	</div>
 	<ul class="sla-list" id="sla-list"></ul>
 	<section class="panel">
@@ -66,9 +68,9 @@ const nines = ['99', '99.5', '99.9', '99.95', '99.99', '99.999'];
 			const pct = Number(input.value.replace(',', '.'));
 			const valid = input.value.trim() !== '' && pct >= 0 && pct <= 100;
 			byId('sla-field').classList.toggle('invalid', !valid);
-			document.querySelectorAll<HTMLButtonElement>('#sla-nines button').forEach((b) =>
-				b.setAttribute('aria-pressed', String(b.dataset.value === input.value.trim()))
-			);
+			document
+				.querySelectorAll<HTMLButtonElement>('#sla-nines button')
+				.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === input.value.trim())));
 			if (!valid) return;
 			byId('sla-list').replaceChildren(
 				...PERIODS.map(([label, seconds]) => {
@@ -77,7 +79,7 @@ const nines = ['99', '99.5', '99.9', '99.95', '99.99', '99.999'];
 					li.querySelector('span')!.textContent = label;
 					li.querySelector('b')!.textContent = formatDuration(seconds * (1 - pct / 100));
 					return li;
-				})
+				}),
 			);
 		};
 
@@ -91,7 +93,10 @@ const nines = ['99', '99.5', '99.9', '99.95', '99.99', '99.999'];
 		};
 
 		const composite = () => {
-			const values = chain.value.split(/[,;\s]+/).map(Number).filter((n) => n > 0 && n <= 100);
+			const values = chain.value
+				.split(/[,;\s]+/)
+				.map(Number)
+				.filter((n) => n > 0 && n <= 100);
 			const product = values.reduce((acc, v) => acc * (v / 100), 1) * 100;
 			byId('sla-chain-out').textContent = values.length
 				? `Services in series: ${Number(product.toFixed(4))}% — ${formatDuration(PERIODS[2][1] * (1 - product / 100))} of downtime a month. A chain is never more available than its weakest link.`
@@ -110,7 +115,7 @@ const nines = ['99', '99.5', '99.9', '99.95', '99.99', '99.999'];
 				input.value = b.dataset.value!;
 				down.value = '';
 				render();
-			})
+			}),
 		);
 		render();
 		composite();

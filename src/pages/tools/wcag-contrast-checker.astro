@@ -2,29 +2,60 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="wcag-contrast-checker" title="WCAG Contrast Checker" description="Check the contrast ratio between a text color and its background against WCAG 2.2 AA and AAA, as required by RGAA. Get the nearest passing color when it fails.">
+<ToolShell
+	slug="wcag-contrast-checker"
+	title="WCAG Contrast Checker"
+	description="Check the contrast ratio between a text color and its background against WCAG 2.2 AA and AAA, as required by RGAA. Get the nearest passing color when it fails."
+>
 	<div class="fields" id="wc-tool">
 		<div class="field">
 			<label for="wc-fg">Text color</label>
-			<div class="wc-pick"><input type="color" id="wc-fg-pick" value="#6b7280" aria-label="Pick text color" /><input id="wc-fg" value="#6b7280" spellcheck="false" /></div>
+			<div class="wc-pick">
+				<input type="color" id="wc-fg-pick" value="#6b7280" aria-label="Pick text color" />
+				<input id="wc-fg" value="#6b7280" spellcheck="false" />
+			</div>
 		</div>
 		<div class="field">
 			<label for="wc-bg">Background</label>
-			<div class="wc-pick"><input type="color" id="wc-bg-pick" value="#f3f4f6" aria-label="Pick background" /><input id="wc-bg" value="#f3f4f6" spellcheck="false" /></div>
+			<div class="wc-pick">
+				<input type="color" id="wc-bg-pick" value="#f3f4f6" aria-label="Pick background" />
+				<input id="wc-bg" value="#f3f4f6" spellcheck="false" />
+			</div>
 		</div>
 	</div>
-	<div class="toolbar"><button class="btn" id="wc-swap">Swap colors</button></div>
+	<div class="toolbar">
+		<button class="btn" id="wc-swap">
+			Swap colors
+		</button>
+	</div>
 	<div class="wc-preview" id="wc-preview">
 		<p class="wc-large">Large text, 24px regular or 18.66px bold</p>
 		<p>Normal body text at 16px. The quick brown fox jumps over the lazy dog.</p>
-		<button type="button" class="wc-ui" tabindex="-1">Button border</button>
+		<button type="button" class="wc-ui" tabindex="-1">
+			Button border
+		</button>
 	</div>
 	<div class="stats">
-		<div class="stat"><b id="wc-ratio">—</b><span>Contrast ratio</span></div>
-		<div class="stat"><b id="wc-aa">—</b><span>AA normal text, 4.5:1</span></div>
-		<div class="stat"><b id="wc-aa-large">—</b><span>AA large text and UI, 3:1</span></div>
-		<div class="stat"><b id="wc-aaa">—</b><span>AAA normal text, 7:1</span></div>
-		<div class="stat"><b id="wc-aaa-large">—</b><span>AAA large text, 4.5:1</span></div>
+		<div class="stat">
+			<b id="wc-ratio">—</b>
+			<span>Contrast ratio</span>
+		</div>
+		<div class="stat">
+			<b id="wc-aa">—</b>
+			<span>AA normal text, 4.5:1</span>
+		</div>
+		<div class="stat">
+			<b id="wc-aa-large">—</b>
+			<span>AA large text and UI, 3:1</span>
+		</div>
+		<div class="stat">
+			<b id="wc-aaa">—</b>
+			<span>AAA normal text, 7:1</span>
+		</div>
+		<div class="stat">
+			<b id="wc-aaa-large">—</b>
+			<span>AAA large text, 4.5:1</span>
+		</div>
 	</div>
 	<section class="panel">
 		<div class="panel-head">Nearest passing text colors, same hue</div>
@@ -149,7 +180,7 @@ import ToolShell from '../../components/ToolShell.astro';
 							});
 					} else li.querySelector('span')!.textContent = `${label}: no shade of this hue reaches ${t}:1 on this background.`;
 					return li;
-				})
+				}),
 			);
 		};
 

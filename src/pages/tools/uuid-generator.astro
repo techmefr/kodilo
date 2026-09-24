@@ -2,25 +2,35 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="uuid-generator"
-	title="UUID Generator"
-	description="Random v4 or time-ordered v7 UUIDs, one or a thousand at a time."
->
+<ToolShell slug="uuid-generator" title="UUID Generator" description="Random v4 or time-ordered v7 UUIDs, one or a thousand at a time.">
 	<div class="toolbar" id="uuid-tool">
 		<div class="seg" id="uuid-version" aria-label="Version">
-			<button data-value="v4" aria-pressed="true">v4 · random</button>
-			<button data-value="v7" aria-pressed="false">v7 · time-ordered</button>
+			<button data-value="v4" aria-pressed="true">
+				v4 · random
+			</button>
+			<button data-value="v7" aria-pressed="false">
+				v7 · time-ordered
+			</button>
 		</div>
-		<label class="check">Count <input class="num" type="number" id="uuid-count" min="1" max="1000" value="5" /></label>
-		<label class="check"><input type="checkbox" id="uuid-upper" /> Uppercase</label>
-		<label class="check"><input type="checkbox" id="uuid-hyphens" checked /> Hyphens</label>
-		<button class="btn primary" id="uuid-regen">Regenerate</button>
+		<label class="check">
+			Count <input class="num" type="number" id="uuid-count" min="1" max="1000" value="5" />
+		</label>
+		<label class="check">
+			<input type="checkbox" id="uuid-upper" /> Uppercase
+		</label>
+		<label class="check">
+			<input type="checkbox" id="uuid-hyphens" checked /> Hyphens
+		</label>
+		<button class="btn primary" id="uuid-regen">
+			Regenerate
+		</button>
 	</div>
 	<section class="panel">
 		<div class="panel-head">
 			<span id="uuid-label">UUIDs</span>
-			<button class="btn" id="uuid-copy">Copy all</button>
+			<button class="btn" id="uuid-copy">
+				Copy all
+			</button>
 		</div>
 		<pre class="out" id="uuid-out"></pre>
 	</section>

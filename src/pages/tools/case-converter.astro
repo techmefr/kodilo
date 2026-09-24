@@ -2,16 +2,10 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="case-converter"
-	title="Case Converter"
-	description="Type once, get every case. Click any row to copy it."
->
+<ToolShell slug="case-converter" title="Case Converter" description="Type once, get every case. Click any row to copy it.">
 	<section class="panel" id="case-tool">
 		<div class="panel-head">Input</div>
-		<textarea id="case-in" class="case-input" spellcheck="false" aria-label="Text to convert"
-			>kodilo developer tools without account</textarea
-		>
+		<textarea id="case-in" class="case-input" spellcheck="false" aria-label="Text to convert">kodilo developer tools without account</textarea>
 	</section>
 	<ul class="cases" id="case-list"></ul>
 </ToolShell>
@@ -71,7 +65,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					});
 					li.append(button);
 					return li;
-				})
+				}),
 			);
 		};
 
