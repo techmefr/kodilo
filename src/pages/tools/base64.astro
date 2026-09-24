@@ -2,27 +2,33 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="base64"
-	title="Base64"
-	description="Encode and decode Base64, UTF-8 safe, with an optional URL-safe alphabet."
->
+<ToolShell slug="base64" title="Base64" description="Encode and decode Base64, UTF-8 safe, with an optional URL-safe alphabet.">
 	<div class="toolbar" id="b64-tool">
 		<div class="seg" id="b64-mode" aria-label="Direction">
-			<button data-value="encode" aria-pressed="true">Encode</button>
-			<button data-value="decode" aria-pressed="false">Decode</button>
+			<button data-value="encode" aria-pressed="true">
+				Encode
+			</button>
+			<button data-value="decode" aria-pressed="false">
+				Decode
+			</button>
 		</div>
-		<label class="check"><input type="checkbox" id="b64-url" /> URL-safe</label>
+		<label class="check">
+			<input type="checkbox" id="b64-url" /> URL-safe
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
-			<div class="panel-head" id="b64-in-label">Text</div>
+			<div class="panel-head" id="b64-in-label">
+				Text
+			</div>
 			<textarea id="b64-in" spellcheck="false" aria-labelledby="b64-in-label">Hello, kodilo ✨</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span id="b64-out-label">Base64</span>
-				<button class="btn" id="b64-copy">Copy</button>
+				<button class="btn" id="b64-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="b64-out"></pre>
 		</section>

@@ -15,9 +15,11 @@ import ToolShell from '../../components/ToolShell.astro';
 		</div>
 	</div>
 	<div class="toolbar">
-		<button class="btn primary" id="dt-now">Now</button>
-		<label class="check"
-			>Time zone
+		<button class="btn primary" id="dt-now">
+			Now
+		</button>
+		<label class="check">
+			Time zone
 			<select class="num dt-zone" id="dt-zone" aria-label="Time zone"></select>
 		</label>
 	</div>
@@ -52,7 +54,13 @@ import ToolShell from '../../components/ToolShell.astro';
 		const seconds = (date.getTime() - Date.now()) / 1000;
 		const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 		const units: [Intl.RelativeTimeFormatUnit, number][] = [
-			['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1],
+			['year', 31536000],
+			['month', 2592000],
+			['week', 604800],
+			['day', 86400],
+			['hour', 3600],
+			['minute', 60],
+			['second', 1],
 		];
 		const [unit, size] = units.find(([, s]) => Math.abs(seconds) >= s) ?? units[units.length - 1];
 		return rtf.format(Math.round(seconds / size), unit);
@@ -61,8 +69,18 @@ import ToolShell from '../../components/ToolShell.astro';
 	function inZone(date: Date, zone: string): string {
 		const parts = Object.fromEntries(
 			new Intl.DateTimeFormat('en-CA', {
-				timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZoneName: 'longOffset',
-			}).formatToParts(date).map((p) => [p.type, p.value])
+				timeZone: zone,
+				year: 'numeric',
+				month: '2-digit',
+				day: '2-digit',
+				hour: '2-digit',
+				minute: '2-digit',
+				second: '2-digit',
+				hourCycle: 'h23',
+				timeZoneName: 'longOffset',
+			})
+				.formatToParts(date)
+				.map((p) => [p.type, p.value]),
 		);
 		const offset = parts.timeZoneName.replace('GMT', '') || '+00:00';
 		return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}${offset}`;
@@ -111,7 +129,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					});
 					li.append(button);
 					return li;
-				})
+				}),
 			);
 		};
 

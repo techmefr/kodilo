@@ -9,7 +9,9 @@ import ToolShell from '../../components/ToolShell.astro';
 >
 	<div class="toolbar" id="ck-tool">
 		<div class="seg" id="ck-mode">
-			<button data-value="text" aria-pressed="true">Text</button>
+			<button data-value="text" aria-pressed="true">
+				Text
+			</button>
 			<button data-value="file">File</button>
 		</div>
 		<input type="file" id="ck-file" hidden aria-label="File to checksum" />
@@ -85,7 +87,7 @@ import ToolShell from '../../components/ToolShell.astro';
 				byId('ck-list').replaceChildren();
 				return;
 			}
-			const sha = encodeBytes(new Uint8Array(await crypto.subtle.digest('SHA-256', data)), 'hex');
+			const sha = encodeBytes(new Uint8Array(await crypto.subtle.digest('SHA-256', data as BufferSource)), 'hex');
 			values = [
 				['CRC32', hex32(crc(T32, data))],
 				['CRC32C', hex32(crc(T32C, data))],
@@ -105,7 +107,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						setTimeout(() => (li.querySelector('em')!.textContent = 'Copy'), 1200);
 					});
 					return li;
-				})
+				}),
 			);
 			compare();
 		};

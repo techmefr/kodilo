@@ -4,7 +4,11 @@ import ToolShell from '../../components/ToolShell.astro';
 const headers = `Accept: application/json`;
 ---
 
-<ToolShell slug="rest-api-tester" title="REST API Tester" description="Send an HTTP request from your browser and inspect the status, timing, headers and body. The API must allow CORS.">
+<ToolShell
+	slug="rest-api-tester"
+	title="REST API Tester"
+	description="Send an HTTP request from your browser and inspect the status, timing, headers and body. The API must allow CORS."
+>
 	<div class="ra-bar" id="ra-tool">
 		<select id="ra-method" aria-label="Method">
 			<option>GET</option>
@@ -16,7 +20,9 @@ const headers = `Accept: application/json`;
 			<option>OPTIONS</option>
 		</select>
 		<input id="ra-url" spellcheck="false" aria-label="URL" value="https://jsonplaceholder.typicode.com/todos/1" />
-		<button class="btn primary" id="ra-send">Send</button>
+		<button class="btn primary" id="ra-send">
+			Send
+		</button>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
@@ -29,18 +35,33 @@ const headers = `Accept: application/json`;
 		</section>
 	</div>
 	<div class="stats">
-		<div class="stat"><b id="ra-status">—</b><span>Status</span></div>
-		<div class="stat"><b id="ra-time">—</b><span>Time</span></div>
-		<div class="stat"><b id="ra-size">—</b><span>Size</span></div>
+		<div class="stat">
+			<b id="ra-status">—</b>
+			<span>Status</span>
+		</div>
+		<div class="stat">
+			<b id="ra-time">—</b>
+			<span>Time</span>
+		</div>
+		<div class="stat">
+			<b id="ra-size">—</b>
+			<span>Size</span>
+		</div>
 	</div>
 	<p class="error" id="ra-error" hidden></p>
 	<section class="panel">
 		<div class="panel-head">
 			<div class="seg" id="ra-view" aria-label="Response view">
-				<button data-value="body" aria-pressed="true">Body</button>
-				<button data-value="headers" aria-pressed="false">Headers</button>
+				<button data-value="body" aria-pressed="true">
+					Body
+				</button>
+				<button data-value="headers" aria-pressed="false">
+					Headers
+				</button>
 			</div>
-			<button class="btn" id="ra-copy">Copy</button>
+			<button class="btn" id="ra-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="ra-out"></pre>
 	</section>
@@ -98,7 +119,8 @@ const headers = `Accept: application/json`;
 				byId('ra-size').textContent = '—';
 				body = head = '';
 				error.hidden = false;
-				error.textContent = 'The request did not go through. Check the URL, or the API may block browser calls (CORS). Only headers the server exposes are visible.';
+				error.textContent =
+					'The request did not go through. Check the URL, or the API may block browser calls (CORS). Only headers the server exposes are visible.';
 			}
 			paint();
 		};

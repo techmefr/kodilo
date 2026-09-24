@@ -10,11 +10,7 @@ const flags = [
 ];
 ---
 
-<ToolShell
-	slug="regex-tester"
-	title="Regex Tester"
-	description="JavaScript regular expressions with live highlighting, capture groups and replace preview."
->
+<ToolShell slug="regex-tester" title="Regex Tester" description="JavaScript regular expressions with live highlighting, capture groups and replace preview.">
 	<div class="fields" id="re-tool">
 		<div class="field wide" id="re-field">
 			<label for="re-pattern">Pattern</label>
@@ -23,24 +19,22 @@ const flags = [
 		</div>
 	</div>
 	<div class="toolbar">
-		{
-			flags.map(([flag, label]) => (
-				<label class="check">
-					<input type="checkbox" class="re-flag" value={flag} checked={flag === 'g'} /> <code>{flag}</code> {label}
-				</label>
-			))
-		}
+		{flags.map(([flag, label]) => (
+			<label class="check">
+				<input type="checkbox" class="re-flag" value={flag} checked={flag === 'g'} /> <code>{flag}</code> {label}
+			</label>
+		))}
 	</div>
 	<div class="grid-2">
 		<section class="panel">
 			<div class="panel-head">Test text</div>
-			<textarea id="re-text" spellcheck="false" aria-label="Test text"
-				>Contact jane.doe@example.com or ops+alerts@kodilo.dev.
-Not an email: hello@localhost</textarea
-			>
+			<textarea id="re-text" spellcheck="false" aria-label="Test text">Contact jane.doe@example.com or ops+alerts@kodilo.dev.
+Not an email: hello@localhost</textarea>
 		</section>
 		<section class="panel">
-			<div class="panel-head"><span id="re-count">Matches</span></div>
+			<div class="panel-head">
+				<span id="re-count">Matches</span>
+			</div>
 			<div class="out re-highlight" id="re-highlight"></div>
 		</section>
 	</div>
@@ -53,7 +47,9 @@ Not an email: hello@localhost</textarea
 	<section class="panel">
 		<div class="panel-head">
 			<span>Replaced</span>
-			<button class="btn" id="re-copy">Copy</button>
+			<button class="btn" id="re-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out re-small" id="re-replaced"></pre>
 	</section>
@@ -75,7 +71,10 @@ Not an email: hello@localhost</textarea
 		const flagBoxes = Array.from(document.querySelectorAll<HTMLInputElement>('.re-flag'));
 
 		const render = () => {
-			const flags = flagBoxes.filter((b) => b.checked).map((b) => b.value).join('');
+			const flags = flagBoxes
+				.filter((b) => b.checked)
+				.map((b) => b.value)
+				.join('');
 			let re: RegExp;
 			try {
 				re = new RegExp(pattern.value, flags.includes('g') ? flags : flags + 'g');
@@ -121,7 +120,7 @@ Not an email: hello@localhost</textarea
 					];
 					li.textContent = groups.join('   ·   ');
 					return li;
-				})
+				}),
 			);
 		};
 

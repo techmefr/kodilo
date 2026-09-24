@@ -2,30 +2,66 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="aspect-ratio-calculator" title="Aspect Ratio Calculator" description="Find the aspect ratio of any size, or the missing width or height for a ratio. Includes common video, photo and social formats.">
+<ToolShell
+	slug="aspect-ratio-calculator"
+	title="Aspect Ratio Calculator"
+	description="Find the aspect ratio of any size, or the missing width or height for a ratio. Includes common video, photo and social formats."
+>
 	<div class="fields" id="ar-tool">
-		<div class="field"><label for="ar-w">Width</label><input id="ar-w" type="number" min="1" value="1920" /></div>
-		<div class="field"><label for="ar-h">Height</label><input id="ar-h" type="number" min="1" value="1080" /></div>
+		<div class="field">
+			<label for="ar-w">Width</label>
+			<input id="ar-w" type="number" min="1" value="1920" />
+		</div>
+		<div class="field">
+			<label for="ar-h">Height</label>
+			<input id="ar-h" type="number" min="1" value="1080" />
+		</div>
 	</div>
-	<div class="toolbar"><div class="chips" id="ar-presets"></div></div>
+	<div class="toolbar">
+		<div class="chips" id="ar-presets"></div>
+	</div>
 	<div class="stats">
-		<div class="stat"><b id="ar-ratio">—</b><span>Ratio</span></div>
-		<div class="stat"><b id="ar-decimal">—</b><span>Decimal</span></div>
-		<div class="stat"><b id="ar-mp">—</b><span>Megapixels</span></div>
-		<div class="stat"><b id="ar-orient">—</b><span>Orientation</span></div>
+		<div class="stat">
+			<b id="ar-ratio">—</b>
+			<span>Ratio</span>
+		</div>
+		<div class="stat">
+			<b id="ar-decimal">—</b>
+			<span>Decimal</span>
+		</div>
+		<div class="stat">
+			<b id="ar-mp">—</b>
+			<span>Megapixels</span>
+		</div>
+		<div class="stat">
+			<b id="ar-orient">—</b>
+			<span>Orientation</span>
+		</div>
 	</div>
-	<div class="ar-box-wrap"><div class="ar-box" id="ar-box"><span id="ar-box-label"></span></div></div>
+	<div class="ar-box-wrap">
+		<div class="ar-box" id="ar-box">
+			<span id="ar-box-label"></span>
+		</div>
+	</div>
 	<section class="panel">
 		<div class="panel-head">Resize keeping the ratio</div>
 		<div class="fields ar-resize">
-			<div class="field"><label for="ar-nw">New width</label><input id="ar-nw" type="number" min="1" value="1280" /></div>
-			<div class="field"><label for="ar-nh">New height</label><input id="ar-nh" type="number" min="1" /></div>
+			<div class="field">
+				<label for="ar-nw">New width</label>
+				<input id="ar-nw" type="number" min="1" value="1280" />
+			</div>
+			<div class="field">
+				<label for="ar-nh">New height</label>
+				<input id="ar-nh" type="number" min="1" />
+			</div>
 		</div>
 	</section>
 	<section class="panel">
 		<div class="panel-head">
 			<span>CSS</span>
-			<button class="btn" id="ar-copy">Copy</button>
+			<button class="btn" id="ar-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out ar-css" id="ar-css"></pre>
 	</section>
@@ -75,8 +111,11 @@ import ToolShell from '../../components/ToolShell.astro';
 			box.style.width = W >= H ? '100%' : `${(W / H) * 100}%`;
 			byId('ar-box-label').textContent = `${W} × ${H}`;
 			nh.value = String(Math.round((Number(nw.value) || 0) / ratio()));
-			byId('ar-css').textContent = `aspect-ratio: ${W / g > 50 ? `${W} / ${H}` : `${W / g} / ${H / g}`};\n\n.legacy-box {\n  position: relative;\n  padding-top: ${((H / W) * 100).toFixed(4).replace(/0+$/, '')}%;\n}`;
-			document.querySelectorAll<HTMLButtonElement>('#ar-presets button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.w) === W && Number(b.dataset.h) === H)));
+			byId('ar-css').textContent =
+				`aspect-ratio: ${W / g > 50 ? `${W} / ${H}` : `${W / g} / ${H / g}`};\n\n.legacy-box {\n  position: relative;\n  padding-top: ${((H / W) * 100).toFixed(4).replace(/0+$/, '')}%;\n}`;
+			document
+				.querySelectorAll<HTMLButtonElement>('#ar-presets button')
+				.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.w) === W && Number(b.dataset.h) === H)));
 		};
 
 		byId('ar-presets').replaceChildren(
@@ -91,7 +130,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					render();
 				});
 				return b;
-			})
+			}),
 		);
 		[w, h, nw].forEach((el) => el.addEventListener('input', render));
 		nh.addEventListener('input', () => (nw.value = String(Math.round((Number(nh.value) || 0) * ratio()))));

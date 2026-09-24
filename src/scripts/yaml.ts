@@ -1,4 +1,4 @@
-const PLAIN = /^[A-Za-z_][\w .\/-]*$/;
+const PLAIN = /^[A-Za-z_][\w ./-]*$/;
 const RESERVED = /^(true|false|yes|no|on|off|null|~|y|n)$/i;
 
 export function scalar(value: unknown): string {
@@ -31,7 +31,11 @@ export function toYaml(value: unknown, indent = 2, level = 0): string {
 		return entries
 			.map(([k, v]) => {
 				if (v && typeof v === 'object' && Object.keys(v).length) return `${pad}${key(k)}:\n${toYaml(v, indent, level + 1)}`;
-				if (typeof v === 'string' && v.includes('\n')) return `${pad}${key(k)}: |\n${v.split('\n').map((l) => `${pad}${' '.repeat(indent)}${l}`).join('\n')}`;
+				if (typeof v === 'string' && v.includes('\n'))
+					return `${pad}${key(k)}: |\n${v
+						.split('\n')
+						.map((l) => `${pad}${' '.repeat(indent)}${l}`)
+						.join('\n')}`;
 				return `${pad}${key(k)}: ${toYaml(v, indent, level + 1)}`;
 			})
 			.join('\n');

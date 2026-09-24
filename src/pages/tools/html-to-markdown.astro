@@ -16,26 +16,42 @@ const sample = `<h1>Release notes</h1>
 </table>`;
 ---
 
-<ToolShell slug="html-to-markdown" title="HTML to Markdown" description="Convert HTML into clean Markdown, with headings, lists, links, code blocks and tables. Paste rich text copied from a web page too.">
+<ToolShell
+	slug="html-to-markdown"
+	title="HTML to Markdown"
+	description="Convert HTML into clean Markdown, with headings, lists, links, code blocks and tables. Paste rich text copied from a web page too."
+>
 	<div class="toolbar" id="hm-tool">
 		<div class="seg" id="hm-heading" aria-label="Headings">
-			<button data-value="atx" aria-pressed="true"># Headings</button>
-			<button data-value="setext" aria-pressed="false">Underlined</button>
+			<button data-value="atx" aria-pressed="true">
+				# Headings
+			</button>
+			<button data-value="setext" aria-pressed="false">
+				Underlined
+			</button>
 		</div>
 		<div class="seg" id="hm-bullet" aria-label="Bullet">
-			<button data-value="-" aria-pressed="true">- list</button>
-			<button data-value="*" aria-pressed="false">* list</button>
+			<button data-value="-" aria-pressed="true">
+				- list
+			</button>
+			<button data-value="*" aria-pressed="false">
+				* list
+			</button>
 		</div>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
-			<div class="panel-head">HTML <span class="field-note">or paste rich text</span></div>
+			<div class="panel-head">
+				HTML <span class="field-note">or paste rich text</span>
+			</div>
 			<textarea id="hm-in" spellcheck="false" aria-label="HTML input">{sample}</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span>Markdown</span>
-				<button class="btn" id="hm-copy">Copy</button>
+				<button class="btn" id="hm-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="hm-out"></pre>
 		</section>

@@ -2,30 +2,57 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="pdf-compress" title="PDF Compress" description="Shrink a PDF in your browser. Lossless mode repacks the file; image mode re-renders every page as a JPEG, which is much smaller but turns text into pixels.">
+<ToolShell
+	slug="pdf-compress"
+	title="PDF Compress"
+	description="Shrink a PDF in your browser. Lossless mode repacks the file; image mode re-renders every page as a JPEG, which is much smaller but turns text into pixels."
+>
 	<label class="drop" id="pc-tool">
 		<input type="file" id="pc-file" accept="application/pdf" hidden />
 		<span id="pc-drop">Drop a PDF here or click to choose. A sample is loaded.</span>
 	</label>
 	<div class="toolbar">
 		<div class="seg" id="pc-mode" aria-label="Mode">
-			<button data-value="lossless" aria-pressed="false">Lossless</button>
-			<button data-value="image" aria-pressed="true">Pages as images</button>
+			<button data-value="lossless" aria-pressed="false">
+				Lossless
+			</button>
+			<button data-value="image" aria-pressed="true">
+				Pages as images
+			</button>
 		</div>
 		<div class="seg" id="pc-level" aria-label="Level">
-			<button data-value="72,0.5" aria-pressed="false">Smallest</button>
-			<button data-value="110,0.65" aria-pressed="true">Balanced</button>
-			<button data-value="150,0.8" aria-pressed="false">Sharp</button>
+			<button data-value="72,0.5" aria-pressed="false">
+				Smallest
+			</button>
+			<button data-value="110,0.65" aria-pressed="true">
+				Balanced
+			</button>
+			<button data-value="150,0.8" aria-pressed="false">
+				Sharp
+			</button>
 		</div>
-		<button class="btn primary" id="pc-go">Compress</button>
+		<button class="btn primary" id="pc-go">
+			Compress
+		</button>
 	</div>
 	<div class="stats">
-		<div class="stat"><b id="pc-before">—</b><span>Original</span></div>
-		<div class="stat"><b id="pc-after">—</b><span>Compressed</span></div>
-		<div class="stat"><b id="pc-saved">—</b><span>Saved</span></div>
+		<div class="stat">
+			<b id="pc-before">—</b>
+			<span>Original</span>
+		</div>
+		<div class="stat">
+			<b id="pc-after">—</b>
+			<span>Compressed</span>
+		</div>
+		<div class="stat">
+			<b id="pc-saved">—</b>
+			<span>Saved</span>
+		</div>
 	</div>
 	<div class="toolbar">
-		<button class="btn" id="pc-save" disabled>Download</button>
+		<button class="btn" id="pc-save" disabled>
+			Download
+		</button>
 		<span class="field-note" id="pc-note"></span>
 	</div>
 	<p class="error" id="pc-error" hidden></p>

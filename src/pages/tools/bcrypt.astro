@@ -2,14 +2,20 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="bcrypt" title="Bcrypt" description="Hash a password with bcrypt and check a password against an existing hash. Everything runs in your browser.">
+<ToolShell
+	slug="bcrypt"
+	title="Bcrypt"
+	description="Hash a password with bcrypt and check a password against an existing hash. Everything runs in your browser."
+>
 	<div class="fields" id="bc-tool">
 		<div class="field">
 			<label for="bc-pass">Password</label>
 			<input id="bc-pass" spellcheck="false" value="correct horse battery staple" />
 		</div>
 		<div class="field">
-			<label for="bc-cost">Cost factor <b id="bc-cost-value">10</b></label>
+			<label for="bc-cost">
+				Cost factor <b id="bc-cost-value">10</b>
+			</label>
 			<input id="bc-cost" type="range" min="4" max="14" value="10" />
 			<span class="field-note" id="bc-time"></span>
 		</div>
@@ -17,7 +23,14 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span>Hash</span>
-			<span class="bc-actions"><button class="btn" id="bc-again">New salt</button><button class="btn" id="bc-copy">Copy</button></span>
+			<span class="bc-actions">
+				<button class="btn" id="bc-again">
+					New salt
+				</button>
+				<button class="btn" id="bc-copy">
+					Copy
+				</button>
+			</span>
 		</div>
 		<pre class="out bc-out" id="bc-out"></pre>
 	</section>

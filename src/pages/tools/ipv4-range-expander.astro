@@ -19,14 +19,18 @@ import ToolShell from '../../components/ToolShell.astro';
 		<section class="panel">
 			<div class="panel-head">
 				<span>CIDR blocks</span>
-				<button class="btn" id="rx-copy-cidr">Copy</button>
+				<button class="btn" id="rx-copy-cidr">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="rx-cidr"></pre>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span id="rx-list-title">Addresses</span>
-				<button class="btn" id="rx-copy-list">Copy</button>
+				<button class="btn" id="rx-copy-list">
+					Copy
+				</button>
 			</div>
 			<pre class="out rx-list" id="rx-list"></pre>
 		</section>
@@ -102,7 +106,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					el.querySelector('b')!.textContent = value;
 					el.querySelector('span')!.textContent = label;
 					return el;
-				})
+				}),
 			);
 			byId('rx-cidr').textContent = cidrs.join('\n');
 			const shown = Math.min(count, LIMIT);

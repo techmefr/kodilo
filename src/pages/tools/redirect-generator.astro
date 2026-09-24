@@ -7,16 +7,32 @@ const rules = `/old-page /new-page
 /pricing.html https://shop.example.com/pricing`;
 ---
 
-<ToolShell slug="redirect-generator" title="Redirect Generator" description="Write redirects once as old and new paths, and get the rules for Nginx, Apache .htaccess, Netlify, Vercel and Caddy. Wildcards with * are supported.">
+<ToolShell
+	slug="redirect-generator"
+	title="Redirect Generator"
+	description="Write redirects once as old and new paths, and get the rules for Nginx, Apache .htaccess, Netlify, Vercel and Caddy. Wildcards with * are supported."
+>
 	<div class="toolbar" id="rd-tool">
 		<div class="seg" id="rd-target" aria-label="Server">
-			<button data-value="nginx" aria-pressed="true">Nginx</button>
-			<button data-value="apache" aria-pressed="false">Apache .htaccess</button>
-			<button data-value="netlify" aria-pressed="false">Netlify</button>
-			<button data-value="vercel" aria-pressed="false">Vercel</button>
-			<button data-value="caddy" aria-pressed="false">Caddy</button>
+			<button data-value="nginx" aria-pressed="true">
+				Nginx
+			</button>
+			<button data-value="apache" aria-pressed="false">
+				Apache .htaccess
+			</button>
+			<button data-value="netlify" aria-pressed="false">
+				Netlify
+			</button>
+			<button data-value="vercel" aria-pressed="false">
+				Vercel
+			</button>
+			<button data-value="caddy" aria-pressed="false">
+				Caddy
+			</button>
 		</div>
-		<label class="check"><input type="checkbox" id="rd-www" /> Force https and no www</label>
+		<label class="check">
+			<input type="checkbox" id="rd-www" /> Force https and no www
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
@@ -26,7 +42,9 @@ const rules = `/old-page /new-page
 		<section class="panel">
 			<div class="panel-head">
 				<span id="rd-file">nginx.conf</span>
-				<button class="btn" id="rd-copy">Copy</button>
+				<button class="btn" id="rd-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="rd-out"></pre>
 		</section>
@@ -39,7 +57,13 @@ const rules = `/old-page /new-page
 	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
 
 	type Rule = { from: string; to: string; code: number; wild: boolean };
-	const FILES: Record<string, string> = { nginx: 'nginx.conf (inside server {})', apache: '.htaccess', netlify: '_redirects', vercel: 'vercel.json', caddy: 'Caddyfile' };
+	const FILES: Record<string, string> = {
+		nginx: 'nginx.conf (inside server {})',
+		apache: '.htaccess',
+		netlify: '_redirects',
+		vercel: 'vercel.json',
+		caddy: 'Caddyfile',
+	};
 	const reEsc = (s: string) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
 
 	function parse(src: string) {
@@ -63,7 +87,7 @@ const rules = `/old-page /new-page
 				...r.map((x) =>
 					x.wild
 						? `location ~ ^${reEsc(x.from)}(.*)$ {\n    return ${x.code} ${x.to.replace(':splat', '$1')};\n}`
-						: `location = ${x.from} {\n    return ${x.code} ${x.to};\n}`
+						: `location = ${x.from} {\n    return ${x.code} ${x.to};\n}`,
 				),
 			]
 				.filter(Boolean)
@@ -71,13 +95,20 @@ const rules = `/old-page /new-page
 		apache: (r, www) =>
 			[
 				'RewriteEngine On',
-				www ? 'RewriteCond %{HTTPS} off [OR]\nRewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]\nRewriteCond %{HTTP_HOST} ^(?:www\\.)?(.+)$ [NC]\nRewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]' : '',
+				www
+					? 'RewriteCond %{HTTPS} off [OR]\nRewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]\nRewriteCond %{HTTP_HOST} ^(?:www\\.)?(.+)$ [NC]\nRewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]'
+					: '',
 				...r.map((x) => `RewriteRule ^${reEsc(x.from.slice(1))}${x.wild ? '(.*)' : ''}$ ${x.to.replace(':splat', '$1')} [L,R=${x.code}]`),
 			]
 				.filter(Boolean)
 				.join('\n'),
 		netlify: (r, www) =>
-			[www ? 'http://www.example.com/* https://example.com/:splat 301!\nhttps://www.example.com/* https://example.com/:splat 301!' : '', ...r.map((x) => `${x.from}${x.wild ? '*' : ''}  ${x.to}  ${x.code}`)].filter(Boolean).join('\n'),
+			[
+				www ? 'http://www.example.com/* https://example.com/:splat 301!\nhttps://www.example.com/* https://example.com/:splat 301!' : '',
+				...r.map((x) => `${x.from}${x.wild ? '*' : ''}  ${x.to}  ${x.code}`),
+			]
+				.filter(Boolean)
+				.join('\n'),
 		vercel: (r) =>
 			JSON.stringify(
 				{
@@ -88,13 +119,15 @@ const rules = `/old-page /new-page
 					})),
 				},
 				null,
-				2
+				2,
 			),
 		caddy: (r, www) =>
 			[
 				www ? 'www.example.com {\n    redir https://example.com{uri} permanent\n}\n' : '',
 				'example.com {',
-				...r.map((x) => (x.wild ? `    redir ${x.from}* ${x.to.replace(':splat', '{http.request.uri.path.0}')} ${x.code}` : `    redir ${x.from} ${x.to} ${x.code}`)),
+				...r.map((x) =>
+					x.wild ? `    redir ${x.from}* ${x.to.replace(':splat', '{http.request.uri.path.0}')} ${x.code}` : `    redir ${x.from} ${x.to} ${x.code}`,
+				),
 				'}',
 			]
 				.filter(Boolean)

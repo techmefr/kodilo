@@ -2,17 +2,27 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="keycode-info" title="Keyboard Event Info" description="Press any key to see event.key, event.code, the legacy keyCode, modifiers and location, ready to paste into a keyboard handler.">
+<ToolShell
+	slug="keycode-info"
+	title="Keyboard Event Info"
+	description="Press any key to see event.key, event.code, the legacy keyCode, modifiers and location, ready to paste into a keyboard handler."
+>
 	<div class="kc-stage" id="kc-tool" tabindex="0" aria-label="Press a key">
-		<span class="kc-hint" id="kc-hint">Press any key</span>
-		<b class="kc-key" id="kc-key">Enter</b>
+		<span class="kc-hint" id="kc-hint">
+			Press any key
+		</span>
+		<b class="kc-key" id="kc-key">
+			Enter
+		</b>
 		<div class="kc-mods" id="kc-mods"></div>
 	</div>
 	<div class="kc-grid" id="kc-grid"></div>
 	<section class="panel">
 		<div class="panel-head">
 			<span>Handler</span>
-			<button class="btn" id="kc-copy">Copy</button>
+			<button class="btn" id="kc-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="kc-code"></pre>
 	</section>
@@ -25,7 +35,18 @@ import ToolShell from '../../components/ToolShell.astro';
 <script>
 	import { byId, copyButton, onPage } from '../../scripts/ui';
 
-	type Info = { key: string; code: string; keyCode: number; which: number; location: number; ctrl: boolean; shift: boolean; alt: boolean; meta: boolean; repeat: boolean };
+	type Info = {
+		key: string;
+		code: string;
+		keyCode: number;
+		which: number;
+		location: number;
+		ctrl: boolean;
+		shift: boolean;
+		alt: boolean;
+		meta: boolean;
+		repeat: boolean;
+	};
 	const LOCATIONS = ['Standard', 'Left', 'Right', 'Numpad'];
 
 	onPage('kc-tool', () => {
@@ -41,7 +62,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					s.textContent = { ctrl: 'Ctrl', shift: 'Shift', alt: 'Alt / Option', meta: 'Meta / ⌘' }[m];
 					s.dataset.on = String(e[m]);
 					return s;
-				})
+				}),
 			);
 			const cells: [string, string][] = [
 				['event.key', JSON.stringify(e.key)],
@@ -60,7 +81,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					d.querySelector('code')!.textContent = v;
 					d.addEventListener('click', () => navigator.clipboard.writeText(v.split(' ')[0]));
 					return d;
-				})
+				}),
 			);
 			const mods = [e.ctrl && 'e.ctrlKey', e.shift && 'e.shiftKey', e.alt && 'e.altKey', e.meta && 'e.metaKey'].filter(Boolean);
 			const cond = [`e.key === ${JSON.stringify(e.key)}`, ...mods].join(' && ');
@@ -70,17 +91,32 @@ import ToolShell from '../../components/ToolShell.astro';
 			byId('kc-history').replaceChildren(
 				...history.map((h) => {
 					const li = document.createElement('li');
-					li.textContent = `${[h.ctrl && 'Ctrl', h.shift && 'Shift', h.alt && 'Alt', h.meta && 'Meta'].filter(Boolean).concat(h.key === ' ' ? 'Space' : h.key).join(' + ')}  ·  ${h.code}  ·  ${h.keyCode}`;
+					li.textContent = `${[h.ctrl && 'Ctrl', h.shift && 'Shift', h.alt && 'Alt', h.meta && 'Meta']
+						.filter(Boolean)
+						.concat(h.key === ' ' ? 'Space' : h.key)
+						.join(' + ')}  ·  ${h.code}  ·  ${h.keyCode}`;
 					return li;
-				})
+				}),
 			);
 		};
 
 		const onKey = (e: KeyboardEvent) => {
 			if (!document.getElementById('kc-tool')) return document.removeEventListener('keydown', onKey);
 			if (e.target instanceof Element && e.target.closest('input, textarea, dialog')) return;
-			if (!['Tab', 'F5', 'F12'].includes(e.key) && !(e.metaKey && e.key.toLowerCase() === 'k') && !(e.ctrlKey && e.key.toLowerCase() === 'k')) e.preventDefault();
-			show({ key: e.key, code: e.code, keyCode: e.keyCode, which: e.which, location: e.location, ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, meta: e.metaKey, repeat: e.repeat });
+			if (!['Tab', 'F5', 'F12'].includes(e.key) && !(e.metaKey && e.key.toLowerCase() === 'k') && !(e.ctrlKey && e.key.toLowerCase() === 'k'))
+				e.preventDefault();
+			show({
+				key: e.key,
+				code: e.code,
+				keyCode: e.keyCode,
+				which: e.which,
+				location: e.location,
+				ctrl: e.ctrlKey,
+				shift: e.shiftKey,
+				alt: e.altKey,
+				meta: e.metaKey,
+				repeat: e.repeat,
+			});
 		};
 		document.addEventListener('keydown', onKey);
 		copyButton(byId('kc-copy'), () => byId('kc-code').textContent ?? '');

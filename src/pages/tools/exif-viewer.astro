@@ -2,7 +2,11 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="exif-viewer" title="EXIF Viewer & Remover" description="See the hidden metadata in a photo, such as camera, date and GPS position, then download a clean copy without it. Nothing is uploaded.">
+<ToolShell
+	slug="exif-viewer"
+	title="EXIF Viewer & Remover"
+	description="See the hidden metadata in a photo, such as camera, date and GPS position, then download a clean copy without it. Nothing is uploaded."
+>
 	<label class="drop" id="ex-tool">
 		<input type="file" id="ex-file" accept="image/jpeg,image/png,image/webp,image/heic,image/tiff" multiple hidden />
 		<span id="ex-drop">Drop photos here or click to choose. A sample photo with GPS data is loaded.</span>
@@ -121,7 +125,12 @@ import ToolShell from '../../components/ToolShell.astro';
 				} else dd.textContent = v;
 				dl.append(dt, dd);
 			};
-			if (gps) add('GPS position', `${gps[0].toFixed(5)}, ${gps[1].toFixed(5)}`, `https://www.openstreetmap.org/?mlat=${gps[0]}&mlon=${gps[1]}#map=15/${gps[0]}/${gps[1]}`);
+			if (gps)
+				add(
+					'GPS position',
+					`${gps[0].toFixed(5)}, ${gps[1].toFixed(5)}`,
+					`https://www.openstreetmap.org/?mlat=${gps[0]}&mlon=${gps[1]}#map=15/${gps[0]}/${gps[1]}`,
+				);
 			rows.forEach(([k, v]) => add(k, v));
 			card.querySelector('button')!.addEventListener('click', async () => {
 				const c = document.createElement('canvas');

@@ -2,15 +2,13 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="well-known-ports"
-	title="Well-Known Ports"
-	description="Search common TCP and UDP ports by number, service or category."
->
+<ToolShell slug="well-known-ports" title="Well-Known Ports" description="Search common TCP and UDP ports by number, service or category.">
 	<div class="toolbar" id="ports-tool">
 		<input class="ports-search" id="ports-q" type="search" placeholder="443, postgres, mail…" aria-label="Search ports" />
 		<div class="seg" id="ports-cat">
-			<button data-value="all" aria-pressed="true">All</button>
+			<button data-value="all" aria-pressed="true">
+				All
+			</button>
 			<button data-value="web">Web</button>
 			<button data-value="db">Databases</button>
 			<button data-value="mail">Mail</button>
@@ -21,7 +19,14 @@ import ToolShell from '../../components/ToolShell.astro';
 	<p class="ports-count" id="ports-count"></p>
 	<div class="ports-wrap">
 		<table class="ports-table">
-			<thead><tr><th>Port</th><th>Proto</th><th>Service</th><th>Notes</th></tr></thead>
+			<thead>
+				<tr>
+					<th>Port</th>
+					<th>Proto</th>
+					<th>Service</th>
+					<th>Notes</th>
+				</tr>
+			</thead>
 			<tbody id="ports-body"></tbody>
 		</table>
 	</div>
@@ -100,8 +105,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			const term = q.value.trim().toLowerCase();
 			const rows = PORTS.filter(
 				([port, proto, name, c, notes]) =>
-					(cat === 'all' || c === cat) &&
-					(!term || String(port).startsWith(term) || `${name} ${proto} ${notes}`.toLowerCase().includes(term))
+					(cat === 'all' || c === cat) && (!term || String(port).startsWith(term) || `${name} ${proto} ${notes}`.toLowerCase().includes(term)),
 			);
 			byId('ports-count').textContent = `${rows.length} of ${PORTS.length} ports`;
 			byId('ports-body').replaceChildren(
@@ -114,7 +118,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						tr.append(td);
 					});
 					return tr;
-				})
+				}),
 			);
 		};
 

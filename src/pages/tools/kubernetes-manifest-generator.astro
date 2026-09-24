@@ -2,26 +2,68 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="kubernetes-manifest-generator" title="Kubernetes Manifest Generator" description="Deployment, Service and Ingress YAML from a short form, with probes, resources and environment variables.">
+<ToolShell
+	slug="kubernetes-manifest-generator"
+	title="Kubernetes Manifest Generator"
+	description="Deployment, Service and Ingress YAML from a short form, with probes, resources and environment variables."
+>
 	<div class="fields" id="km-tool">
-		<div class="field"><label for="km-name">Name</label><input id="km-name" spellcheck="false" value="web" /></div>
-		<div class="field"><label for="km-ns">Namespace</label><input id="km-ns" spellcheck="false" value="default" /></div>
-		<div class="field"><label for="km-image">Image</label><input id="km-image" spellcheck="false" value="ghcr.io/acme/web:1.4.2" /></div>
-		<div class="field"><label for="km-port">Container port</label><input id="km-port" inputmode="numeric" value="3000" /></div>
-		<div class="field"><label for="km-replicas">Replicas</label><input id="km-replicas" inputmode="numeric" value="2" /></div>
-		<div class="field"><label for="km-host">Ingress host</label><input id="km-host" spellcheck="false" value="web.example.com" /></div>
-		<div class="field"><label for="km-probe">Health path</label><input id="km-probe" spellcheck="false" value="/healthz" /></div>
-		<div class="field"><label for="km-cpu">CPU request / limit</label><input id="km-cpu" spellcheck="false" value="100m / 500m" /></div>
-		<div class="field"><label for="km-mem">Memory request / limit</label><input id="km-mem" spellcheck="false" value="128Mi / 512Mi" /></div>
-		<div class="field wide"><label for="km-env">Environment · KEY=value per line</label><textarea id="km-env" class="km-env" spellcheck="false">NODE_ENV=production
-LOG_LEVEL=info</textarea></div>
+		<div class="field">
+			<label for="km-name">Name</label>
+			<input id="km-name" spellcheck="false" value="web" />
+		</div>
+		<div class="field">
+			<label for="km-ns">Namespace</label>
+			<input id="km-ns" spellcheck="false" value="default" />
+		</div>
+		<div class="field">
+			<label for="km-image">Image</label>
+			<input id="km-image" spellcheck="false" value="ghcr.io/acme/web:1.4.2" />
+		</div>
+		<div class="field">
+			<label for="km-port">Container port</label>
+			<input id="km-port" inputmode="numeric" value="3000" />
+		</div>
+		<div class="field">
+			<label for="km-replicas">Replicas</label>
+			<input id="km-replicas" inputmode="numeric" value="2" />
+		</div>
+		<div class="field">
+			<label for="km-host">Ingress host</label>
+			<input id="km-host" spellcheck="false" value="web.example.com" />
+		</div>
+		<div class="field">
+			<label for="km-probe">Health path</label>
+			<input id="km-probe" spellcheck="false" value="/healthz" />
+		</div>
+		<div class="field">
+			<label for="km-cpu">CPU request / limit</label>
+			<input id="km-cpu" spellcheck="false" value="100m / 500m" />
+		</div>
+		<div class="field">
+			<label for="km-mem">Memory request / limit</label>
+			<input id="km-mem" spellcheck="false" value="128Mi / 512Mi" />
+		</div>
+		<div class="field wide">
+			<label for="km-env">Environment · KEY=value per line</label>
+			<textarea id="km-env" class="km-env" spellcheck="false">NODE_ENV=production
+LOG_LEVEL=info</textarea>
+		</div>
 	</div>
 	<div class="toolbar">
-		<label class="check"><input type="checkbox" id="km-svc" checked /> Service</label>
-		<label class="check"><input type="checkbox" id="km-ing" checked /> Ingress</label>
-		<label class="check"><input type="checkbox" id="km-tls" checked /> TLS (cert-manager)</label>
+		<label class="check">
+			<input type="checkbox" id="km-svc" checked /> Service
+		</label>
+		<label class="check">
+			<input type="checkbox" id="km-ing" checked /> Ingress
+		</label>
+		<label class="check">
+			<input type="checkbox" id="km-tls" checked /> TLS (cert-manager)
+		</label>
 		<div class="seg" id="km-svctype">
-			<button data-value="ClusterIP" aria-pressed="true">ClusterIP</button>
+			<button data-value="ClusterIP" aria-pressed="true">
+				ClusterIP
+			</button>
 			<button data-value="NodePort">NodePort</button>
 			<button data-value="LoadBalancer">LoadBalancer</button>
 		</div>
@@ -29,11 +71,15 @@ LOG_LEVEL=info</textarea></div>
 	<section class="panel">
 		<div class="panel-head">
 			<span>manifest.yaml</span>
-			<button class="btn" id="km-copy">Copy</button>
+			<button class="btn" id="km-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="km-out"></pre>
 	</section>
-	<p class="km-apply">Apply with <code>kubectl apply -f manifest.yaml</code></p>
+	<p class="km-apply">
+		Apply with <code>kubectl apply -f manifest.yaml</code>
+	</p>
 </ToolShell>
 
 <script>
@@ -45,12 +91,22 @@ LOG_LEVEL=info</textarea></div>
 		let svcType = 'ClusterIP';
 
 		const render = () => {
-			const name = val('km-name').toLowerCase().replace(/[^a-z0-9-]/g, '-') || 'app';
+			const name =
+				val('km-name')
+					.toLowerCase()
+					.replace(/[^a-z0-9-]/g, '-') || 'app';
 			const ns = val('km-ns') || 'default';
 			const port = Number(val('km-port')) || 80;
-			const [cpuReq, cpuLim] = val('km-cpu').split('/').map((s) => s.trim());
-			const [memReq, memLim] = val('km-mem').split('/').map((s) => s.trim());
-			const env = byId<HTMLTextAreaElement>('km-env').value.split('\n').map((l) => l.trim()).filter((l) => /^[A-Za-z_]\w*=/.test(l));
+			const [cpuReq, cpuLim] = val('km-cpu')
+				.split('/')
+				.map((s) => s.trim());
+			const [memReq, memLim] = val('km-mem')
+				.split('/')
+				.map((s) => s.trim());
+			const env = byId<HTMLTextAreaElement>('km-env')
+				.value.split('\n')
+				.map((l) => l.trim())
+				.filter((l) => /^[A-Za-z_]\w*=/.test(l));
 			const probe = val('km-probe');
 			const labels = `app.kubernetes.io/name: ${name}`;
 			const deploy = [
@@ -77,12 +133,40 @@ LOG_LEVEL=info</textarea></div>
 				'          ports:',
 				`            - containerPort: ${port}`,
 				'              name: http',
-				...(env.length ? ['          env:', ...env.flatMap((e) => [`            - name: ${e.slice(0, e.indexOf('='))}`, `              value: ${JSON.stringify(e.slice(e.indexOf('=') + 1))}`])] : []),
+				...(env.length
+					? [
+							'          env:',
+							...env.flatMap((e) => [
+								`            - name: ${e.slice(0, e.indexOf('='))}`,
+								`              value: ${JSON.stringify(e.slice(e.indexOf('=') + 1))}`,
+							]),
+						]
+					: []),
 				...(cpuReq || memReq
-					? ['          resources:', '            requests:', ...(cpuReq ? [`              cpu: ${cpuReq}`] : []), ...(memReq ? [`              memory: ${memReq}`] : []), ...(cpuLim || memLim ? ['            limits:', ...(cpuLim ? [`              cpu: ${cpuLim}`] : []), ...(memLim ? [`              memory: ${memLim}`] : [])] : [])]
+					? [
+							'          resources:',
+							'            requests:',
+							...(cpuReq ? [`              cpu: ${cpuReq}`] : []),
+							...(memReq ? [`              memory: ${memReq}`] : []),
+							...(cpuLim || memLim
+								? ['            limits:', ...(cpuLim ? [`              cpu: ${cpuLim}`] : []), ...(memLim ? [`              memory: ${memLim}`] : [])]
+								: []),
+						]
 					: []),
 				...(probe
-					? ['          readinessProbe:', '            httpGet:', `              path: ${probe}`, '              port: http', '            periodSeconds: 10', '          livenessProbe:', '            httpGet:', `              path: ${probe}`, '              port: http', '            initialDelaySeconds: 15', '            periodSeconds: 20']
+					? [
+							'          readinessProbe:',
+							'            httpGet:',
+							`              path: ${probe}`,
+							'              port: http',
+							'            periodSeconds: 10',
+							'          livenessProbe:',
+							'            httpGet:',
+							`              path: ${probe}`,
+							'              port: http',
+							'            initialDelaySeconds: 15',
+							'            periodSeconds: 20',
+						]
 					: []),
 				'          securityContext:',
 				'            runAsNonRoot: true',
@@ -91,7 +175,23 @@ LOG_LEVEL=info</textarea></div>
 			];
 			const docs = [deploy.join('\n')];
 			if (on('km-svc')) {
-				docs.push(['apiVersion: v1', 'kind: Service', 'metadata:', `  name: ${name}`, `  namespace: ${ns}`, 'spec:', `  type: ${svcType}`, '  selector:', `    ${labels}`, '  ports:', '    - name: http', '      port: 80', '      targetPort: http'].join('\n'));
+				docs.push(
+					[
+						'apiVersion: v1',
+						'kind: Service',
+						'metadata:',
+						`  name: ${name}`,
+						`  namespace: ${ns}`,
+						'spec:',
+						`  type: ${svcType}`,
+						'  selector:',
+						`    ${labels}`,
+						'  ports:',
+						'    - name: http',
+						'      port: 80',
+						'      targetPort: http',
+					].join('\n'),
+				);
 			}
 			if (on('km-ing') && val('km-host')) {
 				const host = val('km-host');
@@ -117,7 +217,7 @@ LOG_LEVEL=info</textarea></div>
 						`                name: ${name}`,
 						'                port:',
 						'                  name: http',
-					].join('\n')
+					].join('\n'),
 				);
 			}
 			byId('km-out').textContent = docs.join('\n---\n');

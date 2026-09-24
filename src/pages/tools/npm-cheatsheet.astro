@@ -3,16 +3,88 @@ import Cheatsheet from '../../components/Cheatsheet.astro';
 import ToolShell from '../../components/ToolShell.astro';
 
 const sections: [string, [string, string][]][] = [
-	['Install', [['npm install', 'Install from package.json'], ['npm ci', 'Clean install from the lockfile (CI)'], ['pnpm install --frozen-lockfile', 'pnpm equivalent of npm ci'], ['yarn install --immutable', 'Yarn Berry equivalent of npm ci'], ['bun install', 'Bun install']]],
-	['Add & remove', [['npm install <pkg>', 'Add a dependency'], ['npm install -D <pkg>', 'Add a dev dependency'], ['pnpm add <pkg>', 'pnpm add'], ['pnpm add -D <pkg>', 'pnpm dev dependency'], ['yarn add <pkg>', 'Yarn add'], ['npm uninstall <pkg>', 'Remove a dependency'], ['pnpm remove <pkg>', 'pnpm remove'], ['npm install -g <pkg>', 'Global install']]],
-	['Run', [['npm run <script>', 'Run a package.json script'], ['npm run <script> -- --flag', 'Pass extra arguments to the script'], ['pnpm <script>', 'pnpm runs scripts directly'], ['npx <bin>', 'Run a package binary without installing'], ['pnpm dlx <bin>', 'pnpm equivalent of npx'], ['npm run', 'List available scripts']]],
-	['Update & audit', [['npm outdated', 'What has newer versions'], ['npm update', 'Update within the allowed ranges'], ['pnpm update --latest', 'Update past the ranges'], ['npx npm-check-updates -u', 'Bump every range in package.json'], ['npm audit', 'Known vulnerabilities'], ['npm audit fix', 'Apply safe fixes']]],
-	['Inspect', [['npm ls <pkg>', 'Why a package is installed'], ['pnpm why <pkg>', 'pnpm dependency path'], ['npm view <pkg> versions', 'Every published version'], ['npm view <pkg> dist-tags', 'latest, next and other tags'], ['npm pack --dry-run', 'Files that would be published'], ['npm config list', 'Effective config']]],
-	['Publish', [['npm login', 'Log in to the registry'], ['npm version patch', 'Bump 1.2.3 → 1.2.4, commit and tag'], ['npm version minor', 'Bump 1.2.3 → 1.3.0'], ['npm publish --access public', 'Publish a scoped package publicly'], ['npm publish --tag next', 'Publish without moving latest'], ['npm deprecate <pkg>@<version> "message"', 'Warn users off a version']]],
-	['Cache & cleanup', [['npm cache clean --force', 'Clear the npm cache'], ['pnpm store prune', 'Drop unreferenced packages from the store'], ['rm -rf node_modules package-lock.json && npm install', 'Start fresh']]],
+	[
+		'Install',
+		[
+			['npm install', 'Install from package.json'],
+			['npm ci', 'Clean install from the lockfile (CI)'],
+			['pnpm install --frozen-lockfile', 'pnpm equivalent of npm ci'],
+			['yarn install --immutable', 'Yarn Berry equivalent of npm ci'],
+			['bun install', 'Bun install'],
+		],
+	],
+	[
+		'Add & remove',
+		[
+			['npm install <pkg>', 'Add a dependency'],
+			['npm install -D <pkg>', 'Add a dev dependency'],
+			['pnpm add <pkg>', 'pnpm add'],
+			['pnpm add -D <pkg>', 'pnpm dev dependency'],
+			['yarn add <pkg>', 'Yarn add'],
+			['npm uninstall <pkg>', 'Remove a dependency'],
+			['pnpm remove <pkg>', 'pnpm remove'],
+			['npm install -g <pkg>', 'Global install'],
+		],
+	],
+	[
+		'Run',
+		[
+			['npm run <script>', 'Run a package.json script'],
+			['npm run <script> -- --flag', 'Pass extra arguments to the script'],
+			['pnpm <script>', 'pnpm runs scripts directly'],
+			['npx <bin>', 'Run a package binary without installing'],
+			['pnpm dlx <bin>', 'pnpm equivalent of npx'],
+			['npm run', 'List available scripts'],
+		],
+	],
+	[
+		'Update & audit',
+		[
+			['npm outdated', 'What has newer versions'],
+			['npm update', 'Update within the allowed ranges'],
+			['pnpm update --latest', 'Update past the ranges'],
+			['npx npm-check-updates -u', 'Bump every range in package.json'],
+			['npm audit', 'Known vulnerabilities'],
+			['npm audit fix', 'Apply safe fixes'],
+		],
+	],
+	[
+		'Inspect',
+		[
+			['npm ls <pkg>', 'Why a package is installed'],
+			['pnpm why <pkg>', 'pnpm dependency path'],
+			['npm view <pkg> versions', 'Every published version'],
+			['npm view <pkg> dist-tags', 'latest, next and other tags'],
+			['npm pack --dry-run', 'Files that would be published'],
+			['npm config list', 'Effective config'],
+		],
+	],
+	[
+		'Publish',
+		[
+			['npm login', 'Log in to the registry'],
+			['npm version patch', 'Bump 1.2.3 → 1.2.4, commit and tag'],
+			['npm version minor', 'Bump 1.2.3 → 1.3.0'],
+			['npm publish --access public', 'Publish a scoped package publicly'],
+			['npm publish --tag next', 'Publish without moving latest'],
+			['npm deprecate <pkg>@<version> "message"', 'Warn users off a version'],
+		],
+	],
+	[
+		'Cache & cleanup',
+		[
+			['npm cache clean --force', 'Clear the npm cache'],
+			['pnpm store prune', 'Drop unreferenced packages from the store'],
+			['rm -rf node_modules package-lock.json && npm install', 'Start fresh'],
+		],
+	],
 ];
 ---
 
-<ToolShell slug="npm-cheatsheet" title="npm Cheatsheet" description="npm, pnpm, Yarn and Bun commands side by side, grouped by task. Filter them, click one to copy it.">
+<ToolShell
+	slug="npm-cheatsheet"
+	title="npm Cheatsheet"
+	description="npm, pnpm, Yarn and Bun commands side by side, grouped by task. Filter them, click one to copy it."
+>
 	<Cheatsheet id="np-tool" placeholder="install, publish, pnpm…" sections={sections} />
 </ToolShell>

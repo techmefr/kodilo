@@ -12,16 +12,32 @@ const sample = `<?xml version="1.0" encoding="UTF-8"?>
 </svg>`;
 ---
 
-<ToolShell slug="svg-to-component" title="SVG to JSX, TSX & Vue" description="Paste an SVG and get a clean React (JSX or TSX) or Vue component, with size and color props. Attributes are renamed for you.">
+<ToolShell
+	slug="svg-to-component"
+	title="SVG to JSX, TSX & Vue"
+	description="Paste an SVG and get a clean React (JSX or TSX) or Vue component, with size and color props. Attributes are renamed for you."
+>
 	<div class="toolbar" id="sc-tool">
 		<div class="seg" id="sc-target" aria-label="Output">
-			<button data-value="jsx" aria-pressed="false">JSX</button>
-			<button data-value="tsx" aria-pressed="true">TSX</button>
-			<button data-value="vue" aria-pressed="false">Vue</button>
+			<button data-value="jsx" aria-pressed="false">
+				JSX
+			</button>
+			<button data-value="tsx" aria-pressed="true">
+				TSX
+			</button>
+			<button data-value="vue" aria-pressed="false">
+				Vue
+			</button>
 		</div>
-		<label class="check">Name <input class="sc-name" id="sc-name" value="RocketIcon" spellcheck="false" /></label>
-		<label class="check"><input type="checkbox" id="sc-props" checked /> size and color props</label>
-		<label class="check"><input type="checkbox" id="sc-clean" checked /> Remove title and class</label>
+		<label class="check">
+			Name <input class="sc-name" id="sc-name" value="RocketIcon" spellcheck="false" />
+		</label>
+		<label class="check">
+			<input type="checkbox" id="sc-props" checked /> size and color props
+		</label>
+		<label class="check">
+			<input type="checkbox" id="sc-clean" checked /> Remove title and class
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
@@ -34,7 +50,9 @@ const sample = `<?xml version="1.0" encoding="UTF-8"?>
 		<section class="panel">
 			<div class="panel-head">
 				<span id="sc-out-title">Component</span>
-				<button class="btn" id="sc-copy">Copy</button>
+				<button class="btn" id="sc-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="sc-out"></pre>
 		</section>
@@ -51,9 +69,15 @@ const sample = `<?xml version="1.0" encoding="UTF-8"?>
 
 	const DROP_TAGS = new Set(['metadata', 'desc', 'sodipodi:namedview', 'defs:empty']);
 	const KEEP_KEBAB = /^(data-|aria-)/;
-	const JSX_NAMES: Record<string, string> = { class: 'className', for: 'htmlFor', 'xlink:href': 'xlinkHref', 'xml:space': 'xmlSpace', 'xmlns:xlink': 'xmlnsXlink' };
+	const JSX_NAMES: Record<string, string> = {
+		class: 'className',
+		for: 'htmlFor',
+		'xlink:href': 'xlinkHref',
+		'xml:space': 'xmlSpace',
+		'xmlns:xlink': 'xmlnsXlink',
+	};
 	const SCRIPT = ['scr', 'ipt'].join('');
-	const PAINT =new Set(['fill', 'stroke', 'stop-color', 'color']);
+	const PAINT = new Set(['fill', 'stroke', 'stop-color', 'color']);
 
 	const camel = (s: string) => s.replace(/[-:]([a-z])/g, (_, c) => c.toUpperCase());
 	const pascal = (s: string) => {
@@ -161,7 +185,11 @@ const sample = `<?xml version="1.0" encoding="UTF-8"?>
 		}
 		const body = serialize(svg, o, 2, true, stats);
 		const tsx = o.target === 'tsx';
-		const args = o.props ? `{ size = ${sizeValue}, color = 'currentColor', ...props }${tsx ? `: ${comp}Props` : ''}` : tsx ? `props: SVGProps<SVGSVGElement>` : 'props';
+		const args = o.props
+			? `{ size = ${sizeValue}, color = 'currentColor', ...props }${tsx ? `: ${comp}Props` : ''}`
+			: tsx
+				? `props: SVGProps<SVGSVGElement>`
+				: 'props';
 		const head = tsx
 			? `import type { SVGProps } from 'react';\n\n${o.props ? `type ${comp}Props = SVGProps<SVGSVGElement> & {\n  size?: number | string;\n  color?: string;\n};\n\n` : ''}`
 			: '';
@@ -183,7 +211,10 @@ const sample = `<?xml version="1.0" encoding="UTF-8"?>
 				out.textContent = r.code;
 				error.hidden = true;
 				byId('sc-out-title').textContent = r.file;
-				byId('sc-note').textContent = r.stats.colors.size > 1 ? `${r.stats.colors.size} different colors were replaced by the color prop. Untick "size and color props" to keep a multicolor SVG as it is.` : '';
+				byId('sc-note').textContent =
+					r.stats.colors.size > 1
+						? `${r.stats.colors.size} different colors were replaced by the color prop. Untick "size and color props" to keep a multicolor SVG as it is.`
+						: '';
 				const doc = new DOMParser().parseFromString(input.value.trim(), 'image/svg+xml');
 				const preview = byId('sc-preview');
 				preview.replaceChildren();

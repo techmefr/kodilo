@@ -13,14 +13,31 @@ const sample = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 </svg>`;
 ---
 
-<ToolShell slug="svg-optimizer" title="SVG Optimizer" description="Shrink SVG files with SVGO in your browser: remove editor metadata, round numbers, merge paths. Compare the size and the result side by side.">
+<ToolShell
+	slug="svg-optimizer"
+	title="SVG Optimizer"
+	description="Shrink SVG files with SVGO in your browser: remove editor metadata, round numbers, merge paths. Compare the size and the result side by side."
+>
 	<div class="toolbar" id="so-tool">
-		<label class="check">Precision <input class="num" id="so-precision" type="number" min="0" max="8" value="2" /></label>
-		<label class="check"><input type="checkbox" id="so-multipass" checked /> Multipass</label>
-		<label class="check"><input type="checkbox" id="so-viewbox" checked /> Keep viewBox</label>
-		<label class="check"><input type="checkbox" id="so-ids" /> Keep IDs</label>
-		<label class="check"><input type="checkbox" id="so-pretty" /> Pretty print</label>
-		<label class="btn so-file">Open .svg<input type="file" id="so-file" accept=".svg,image/svg+xml" hidden /></label>
+		<label class="check">
+			Precision <input class="num" id="so-precision" type="number" min="0" max="8" value="2" />
+		</label>
+		<label class="check">
+			<input type="checkbox" id="so-multipass" checked /> Multipass
+		</label>
+		<label class="check">
+			<input type="checkbox" id="so-viewbox" checked /> Keep viewBox
+		</label>
+		<label class="check">
+			<input type="checkbox" id="so-ids" /> Keep IDs
+		</label>
+		<label class="check">
+			<input type="checkbox" id="so-pretty" /> Pretty print
+		</label>
+		<label class="btn so-file">
+			Open .svg
+			<input type="file" id="so-file" accept=".svg,image/svg+xml" hidden />
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
@@ -30,21 +47,46 @@ const sample = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 		<section class="panel">
 			<div class="panel-head">
 				<span>Optimized</span>
-				<span class="so-actions"><button class="btn" id="so-dl">Download</button><button class="btn" id="so-copy">Copy</button></span>
+				<span class="so-actions">
+					<button class="btn" id="so-dl">
+						Download
+					</button>
+					<button class="btn" id="so-copy">
+						Copy
+					</button>
+				</span>
 			</div>
 			<pre class="out" id="so-out"></pre>
 		</section>
 	</div>
 	<p class="error" id="so-error" hidden></p>
 	<div class="stats">
-		<div class="stat"><b id="so-before">—</b><span>Original</span></div>
-		<div class="stat"><b id="so-after">—</b><span>Optimized</span></div>
-		<div class="stat"><b id="so-saved">—</b><span>Saved</span></div>
-		<div class="stat"><b id="so-gzip">—</b><span>Optimized, gzipped</span></div>
+		<div class="stat">
+			<b id="so-before">—</b>
+			<span>Original</span>
+		</div>
+		<div class="stat">
+			<b id="so-after">—</b>
+			<span>Optimized</span>
+		</div>
+		<div class="stat">
+			<b id="so-saved">—</b>
+			<span>Saved</span>
+		</div>
+		<div class="stat">
+			<b id="so-gzip">—</b>
+			<span>Optimized, gzipped</span>
+		</div>
 	</div>
 	<div class="so-compare">
-		<figure><div class="so-img" id="so-img-a"></div><figcaption>Original</figcaption></figure>
-		<figure><div class="so-img" id="so-img-b"></div><figcaption>Optimized</figcaption></figure>
+		<figure>
+			<div class="so-img" id="so-img-a"></div>
+			<figcaption>Original</figcaption>
+		</figure>
+		<figure>
+			<div class="so-img" id="so-img-b"></div>
+			<figcaption>Optimized</figcaption>
+		</figure>
 	</div>
 </ToolShell>
 

@@ -41,7 +41,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					li.querySelector('code')!.textContent = formatNumber(bytes / size, 6);
 					li.querySelector('span')!.textContent = unit;
 					return li;
-				})
+				}),
 			);
 		};
 

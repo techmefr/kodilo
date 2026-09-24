@@ -2,11 +2,7 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="basic-auth-generator"
-	title="Basic Auth"
-	description="Build an HTTP Basic Authorization header, or paste one to read it back."
->
+<ToolShell slug="basic-auth-generator" title="Basic Auth" description="Build an HTTP Basic Authorization header, or paste one to read it back.">
 	<div class="fields" id="auth-tool">
 		<div class="field">
 			<label for="auth-user">Username</label>
@@ -20,14 +16,18 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span>Header</span>
-			<button class="btn" id="auth-copy">Copy</button>
+			<button class="btn" id="auth-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out auth-out" id="auth-out"></pre>
 	</section>
 	<section class="panel">
 		<div class="panel-head">
 			<span>curl</span>
-			<button class="btn" id="auth-copy-curl">Copy</button>
+			<button class="btn" id="auth-copy-curl">
+				Copy
+			</button>
 		</div>
 		<pre class="out auth-out" id="auth-curl"></pre>
 	</section>
@@ -60,7 +60,10 @@ import ToolShell from '../../components/ToolShell.astro';
 		const read = () => {
 			const field = byId('auth-decode-field');
 			const note = byId('auth-decode-note');
-			const raw = decode.value.trim().replace(/^Authorization:\s*/i, '').replace(/^Basic\s+/i, '');
+			const raw = decode.value
+				.trim()
+				.replace(/^Authorization:\s*/i, '')
+				.replace(/^Basic\s+/i, '');
 			if (!raw) {
 				field.classList.remove('invalid');
 				note.textContent = '';

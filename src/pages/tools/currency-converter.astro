@@ -2,7 +2,11 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="currency-converter" title="Currency Converter" description="Convert between 30 currencies with the daily reference rates published by the European Central Bank.">
+<ToolShell
+	slug="currency-converter"
+	title="Currency Converter"
+	description="Convert between 30 currencies with the daily reference rates published by the European Central Bank."
+>
 	<div class="cc-row" id="cc-tool">
 		<div class="field">
 			<label for="cc-amount">Amount</label>
@@ -12,7 +16,9 @@ import ToolShell from '../../components/ToolShell.astro';
 			<label for="cc-from">From</label>
 			<select id="cc-from"></select>
 		</div>
-		<button class="btn cc-swap" id="cc-swap" aria-label="Swap currencies">⇄</button>
+		<button class="btn cc-swap" id="cc-swap" aria-label="Swap currencies">
+			⇄
+		</button>
 		<div class="field">
 			<label for="cc-to">To</label>
 			<select id="cc-to"></select>
@@ -26,7 +32,9 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span id="cc-table-title">Other currencies</span>
-			<button class="btn" id="cc-copy">Copy</button>
+			<button class="btn" id="cc-copy">
+				Copy
+			</button>
 		</div>
 		<ul class="cc-table" id="cc-table"></ul>
 	</section>
@@ -71,7 +79,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						li.querySelector('span')!.textContent = `${c} · ${names.of(c)}`;
 						li.querySelector('b')!.textContent = fmt((n * rates[c]) / rates[from.value], c);
 						return li;
-					})
+					}),
 			);
 		};
 

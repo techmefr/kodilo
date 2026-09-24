@@ -8,14 +8,20 @@ import ToolShell from '../../components/ToolShell.astro';
 	description="Generate a random RFC 4193 unique local prefix (fd00::/8) and ready-to-use /64 subnets."
 >
 	<div class="toolbar" id="ula-tool">
-		<button class="btn primary" id="ula-new">Generate</button>
-		<label class="check">Subnets <input class="num" id="ula-count" type="number" min="1" max="256" value="4" aria-label="How many subnets" /></label>
+		<button class="btn primary" id="ula-new">
+			Generate
+		</button>
+		<label class="check">
+			Subnets <input class="num" id="ula-count" type="number" min="1" max="256" value="4" aria-label="How many subnets" />
+		</label>
 	</div>
 	<ul class="ula-list" id="ula-main"></ul>
 	<section class="panel">
 		<div class="panel-head">
 			<span>/64 subnets</span>
-			<button class="btn" id="ula-copy">Copy</button>
+			<button class="btn" id="ula-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="ula-subnets"></pre>
 	</section>
@@ -52,7 +58,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						setTimeout(() => (li.querySelector('em')!.textContent = 'Copy'), 1200);
 					});
 					return li;
-				})
+				}),
 			);
 			const n = Math.min(256, Math.max(1, Number(count.value) || 1));
 			byId('ula-subnets').textContent = Array.from({ length: n }, (_, i) => `${prefix}:${i.toString(16)}::/64`).join('\n');

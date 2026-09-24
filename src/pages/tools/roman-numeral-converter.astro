@@ -2,11 +2,7 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="roman-numeral-converter"
-	title="Roman Numerals"
-	description="Type in either field. Strict validation, from I to MMMCMXCIX."
->
+<ToolShell slug="roman-numeral-converter" title="Roman Numerals" description="Type in either field. Strict validation, from I to MMMCMXCIX.">
 	<div class="fields" id="roman-tool">
 		<div class="field" id="roman-num-field">
 			<label for="roman-num">Number</label>
@@ -29,8 +25,19 @@ import ToolShell from '../../components/ToolShell.astro';
 	import { byId, onPage } from '../../scripts/ui';
 
 	const TABLE: [number, string][] = [
-		[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
-		[50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+		[1000, 'M'],
+		[900, 'CM'],
+		[500, 'D'],
+		[400, 'CD'],
+		[100, 'C'],
+		[90, 'XC'],
+		[50, 'L'],
+		[40, 'XL'],
+		[10, 'X'],
+		[9, 'IX'],
+		[5, 'V'],
+		[4, 'IV'],
+		[1, 'I'],
 	];
 	const STRICT = /^M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
 
@@ -69,7 +76,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					el.querySelector('b')!.textContent = symbol;
 					el.querySelector('span')!.textContent = String(value);
 					return el;
-				})
+				}),
 			);
 		};
 
@@ -86,7 +93,9 @@ import ToolShell from '../../components/ToolShell.astro';
 				return;
 			}
 			setState('num', '');
-			rom.value = parts(n).map(([, s]) => s).join('');
+			rom.value = parts(n)
+				.map(([, s]) => s)
+				.join('');
 			showParts(n);
 		};
 

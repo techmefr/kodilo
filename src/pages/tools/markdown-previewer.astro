@@ -3,15 +3,23 @@ import ToolShell from '../../components/ToolShell.astro';
 import { SAMPLE } from '../../scripts/markdown';
 ---
 
-<ToolShell slug="markdown-previewer" title="Markdown Previewer" description="Write Markdown on the left, read the rendered page on the right. Word count, outline and scroll sync included.">
+<ToolShell
+	slug="markdown-previewer"
+	title="Markdown Previewer"
+	description="Write Markdown on the left, read the rendered page on the right. Word count, outline and scroll sync included."
+>
 	<div class="toolbar" id="mp-tool">
 		<div class="seg" id="mp-view">
-			<button data-value="split" aria-pressed="true">Split</button>
+			<button data-value="split" aria-pressed="true">
+				Split
+			</button>
 			<button data-value="write">Write</button>
 			<button data-value="preview">Preview</button>
 		</div>
 		<span class="mp-stats" id="mp-stats"></span>
-		<button class="btn" id="mp-copy">Copy Markdown</button>
+		<button class="btn" id="mp-copy">
+			Copy Markdown
+		</button>
 	</div>
 	<div class="mp-grid" id="mp-grid">
 		<textarea id="mp-in" class="mp-in" spellcheck="true" aria-label="Markdown">{SAMPLE}</textarea>
@@ -48,7 +56,7 @@ import { SAMPLE } from '../../scripts/markdown';
 					b.style.paddingLeft = `${(Number(h.tagName[1]) - 1) * 14 + 10}px`;
 					b.addEventListener('click', () => h.scrollIntoView({ block: 'start' }));
 					return b;
-				})
+				}),
 			);
 			try {
 				localStorage.setItem('kodilo-markdown-draft', input.value);

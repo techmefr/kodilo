@@ -35,13 +35,17 @@ MAIL_HOST=</textarea>
 	<section class="panel">
 		<div class="panel-head">
 			<div class="seg" id="env-format">
-				<button data-value="json" aria-pressed="true">JSON</button>
+				<button data-value="json" aria-pressed="true">
+					JSON
+				</button>
 				<button data-value="docker">docker -e</button>
 				<button data-value="compose">Compose</button>
 				<button data-value="k8s">K8s Secret</button>
 				<button data-value="clean">Clean .env</button>
 			</div>
-			<button class="btn" id="env-copy">Copy</button>
+			<button class="btn" id="env-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="env-out"></pre>
 	</section>
@@ -101,7 +105,7 @@ MAIL_HOST=</textarea>
 					li.className = `env-${level}`;
 					li.textContent = text;
 					return li;
-				})
+				}),
 			);
 			const entries = [...vars];
 			const out: Record<string, () => string> = {

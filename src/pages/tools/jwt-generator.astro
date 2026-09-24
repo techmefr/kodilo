@@ -4,16 +4,32 @@ import ToolShell from '../../components/ToolShell.astro';
 const payload = JSON.stringify({ sub: 'user_4821', name: 'Ada Lovelace', role: 'admin' }, null, 2);
 ---
 
-<ToolShell slug="jwt-generator" title="JWT Generator" description="Create and sign a JSON Web Token with HS256, RS256 or ES256, set its expiry, and verify a token against a key. Keys never leave the browser.">
+<ToolShell
+	slug="jwt-generator"
+	title="JWT Generator"
+	description="Create and sign a JSON Web Token with HS256, RS256 or ES256, set its expiry, and verify a token against a key. Keys never leave the browser."
+>
 	<div class="toolbar" id="jg-tool">
 		<div class="seg" id="jg-alg" aria-label="Algorithm">
-			<button data-value="HS256" aria-pressed="true">HS256</button>
-			<button data-value="HS512" aria-pressed="false">HS512</button>
-			<button data-value="RS256" aria-pressed="false">RS256</button>
-			<button data-value="ES256" aria-pressed="false">ES256</button>
+			<button data-value="HS256" aria-pressed="true">
+				HS256
+			</button>
+			<button data-value="HS512" aria-pressed="false">
+				HS512
+			</button>
+			<button data-value="RS256" aria-pressed="false">
+				RS256
+			</button>
+			<button data-value="ES256" aria-pressed="false">
+				ES256
+			</button>
 		</div>
-		<label class="check">Expires in <input class="num" id="jg-exp" type="number" min="0" value="60" /> min</label>
-		<label class="check"><input type="checkbox" id="jg-iat" checked /> iat</label>
+		<label class="check">
+			Expires in <input class="num" id="jg-exp" type="number" min="0" value="60" /> min
+		</label>
+		<label class="check">
+			<input type="checkbox" id="jg-iat" checked /> iat
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
@@ -23,7 +39,9 @@ const payload = JSON.stringify({ sub: 'user_4821', name: 'Ada Lovelace', role: '
 		<section class="panel">
 			<div class="panel-head">
 				<span id="jg-key-title">Secret</span>
-				<button class="btn" id="jg-gen">New key</button>
+				<button class="btn" id="jg-gen">
+					New key
+				</button>
 			</div>
 			<textarea id="jg-key" spellcheck="false" aria-label="Key"></textarea>
 		</section>
@@ -32,14 +50,18 @@ const payload = JSON.stringify({ sub: 'user_4821', name: 'Ada Lovelace', role: '
 	<section class="panel">
 		<div class="panel-head">
 			<span>Token</span>
-			<button class="btn" id="jg-copy">Copy</button>
+			<button class="btn" id="jg-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out jg-token" id="jg-token"></pre>
 	</section>
 	<section class="panel" id="jg-pub-panel" hidden>
 		<div class="panel-head">
 			<span>Public key, for verifiers</span>
-			<button class="btn" id="jg-pub-copy">Copy</button>
+			<button class="btn" id="jg-pub-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out jg-token" id="jg-pub"></pre>
 	</section>
@@ -104,7 +126,12 @@ const payload = JSON.stringify({ sub: 'user_4821', name: 'Ada Lovelace', role: '
 			} catch (e) {
 				field.classList.add('invalid');
 				const code = (e as { code?: string }).code;
-				note.textContent = code === 'ERR_JWT_EXPIRED' ? '✕ Signature is valid but the token has expired' : code === 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED' ? '✕ Signature does not match this key' : `✕ ${(e as Error).message}`;
+				note.textContent =
+					code === 'ERR_JWT_EXPIRED'
+						? '✕ Signature is valid but the token has expired'
+						: code === 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED'
+							? '✕ Signature does not match this key'
+							: `✕ ${(e as Error).message}`;
 			}
 		};
 
@@ -112,7 +139,8 @@ const payload = JSON.stringify({ sub: 'user_4821', name: 'Ada Lovelace', role: '
 			const current = ++run;
 			try {
 				const claims = JSON.parse(payload.value);
-				if (hmac() && new TextEncoder().encode(key.value).length < (alg === 'HS512' ? 64 : 32)) throw new Error(`The secret should be at least ${alg === 'HS512' ? 64 : 32} bytes for ${alg}.`);
+				if (hmac() && new TextEncoder().encode(key.value).length < (alg === 'HS512' ? 64 : 32))
+					throw new Error(`The secret should be at least ${alg === 'HS512' ? 64 : 32} bytes for ${alg}.`);
 				let jwt = new SignJWT(claims).setProtectedHeader({ alg, typ: 'JWT' });
 				if (iat.checked) jwt = jwt.setIssuedAt();
 				if (Number(exp.value) > 0) jwt = jwt.setExpirationTime(`${Number(exp.value)}m`);

@@ -2,36 +2,50 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="json-formatter"
-	title="JSON Formatter"
-	description="Format, minify and validate JSON or JSON Lines. Everything updates as you type."
->
+<ToolShell slug="json-formatter" title="JSON Formatter" description="Format, minify and validate JSON or JSON Lines. Everything updates as you type.">
 	<div class="toolbar" id="json-tool">
 		<div class="seg" id="json-format" aria-label="Format">
-			<button data-value="json" aria-pressed="true">JSON</button>
-			<button data-value="jsonl" aria-pressed="false">JSONL</button>
+			<button data-value="json" aria-pressed="true">
+				JSON
+			</button>
+			<button data-value="jsonl" aria-pressed="false">
+				JSONL
+			</button>
 		</div>
 		<div class="seg" id="json-indent" aria-label="Indentation">
-			<button data-value="2" aria-pressed="true">2 spaces</button>
-			<button data-value="4" aria-pressed="false">4 spaces</button>
-			<button data-value="tab" aria-pressed="false">Tab</button>
-			<button data-value="min" aria-pressed="false">Minify</button>
+			<button data-value="2" aria-pressed="true">
+				2 spaces
+			</button>
+			<button data-value="4" aria-pressed="false">
+				4 spaces
+			</button>
+			<button data-value="tab" aria-pressed="false">
+				Tab
+			</button>
+			<button data-value="min" aria-pressed="false">
+				Minify
+			</button>
 		</div>
-		<label class="check"><input type="checkbox" id="json-sort" /> Sort keys</label>
+		<label class="check">
+			<input type="checkbox" id="json-sort" /> Sort keys
+		</label>
 		<button class="btn" id="json-convert" hidden></button>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
 			<div class="panel-head">Input</div>
-			<textarea id="json-in" spellcheck="false" aria-label="JSON input"
-				>{`{"name":"kodilo","tools":["json","base64"],"free":true,"meta":{"account":null,"version":1}}`}</textarea
-			>
+			<textarea
+				id="json-in"
+				spellcheck="false"
+				aria-label="JSON input"
+			>{`{"name":"kodilo","tools":["json","base64"],"free":true,"meta":{"account":null,"version":1}}`}</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span id="json-status">Output</span>
-				<button class="btn" id="json-copy">Copy</button>
+				<button class="btn" id="json-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="json-out"></pre>
 		</section>
@@ -49,7 +63,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			return Object.fromEntries(
 				Object.keys(value)
 					.sort()
-					.map((key) => [key, sortKeys((value as Record<string, unknown>)[key])])
+					.map((key) => [key, sortKeys((value as Record<string, unknown>)[key])]),
 			);
 		}
 		return value;
@@ -94,9 +108,7 @@ import ToolShell from '../../components/ToolShell.astro';
 
 		const setFormat = (value: string) => {
 			format = value;
-			formatGroup
-				.querySelectorAll('button')
-				.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === value)));
+			formatGroup.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === value)));
 			render();
 		};
 
@@ -133,9 +145,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			const { records, errors } = parseLines(input.value);
 			const prepared = records.map(prepare);
 			output.textContent =
-				indent === 'min'
-					? prepared.map((r) => JSON.stringify(r)).join('\n')
-					: prepared.map((r) => JSON.stringify(r, null, space())).join('\n\n');
+				indent === 'min' ? prepared.map((r) => JSON.stringify(r)).join('\n') : prepared.map((r) => JSON.stringify(r, null, space())).join('\n\n');
 			status.textContent = errors.length
 				? `${errors.length} invalid line${errors.length > 1 ? 's' : ''}`
 				: `${records.length} valid record${records.length > 1 ? 's' : ''}`;

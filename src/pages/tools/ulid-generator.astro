@@ -2,21 +2,27 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="ulid-generator"
-	title="ULID Generator"
-	description="Sortable, URL-safe 26-character IDs. Generate them, or paste one to read its timestamp."
->
+<ToolShell slug="ulid-generator" title="ULID Generator" description="Sortable, URL-safe 26-character IDs. Generate them, or paste one to read its timestamp.">
 	<div class="toolbar" id="ulid-tool">
-		<label class="check">Count <input class="num" type="number" id="ulid-count" min="1" max="1000" value="5" /></label>
-		<label class="check"><input type="checkbox" id="ulid-mono" checked /> Monotonic</label>
-		<label class="check"><input type="checkbox" id="ulid-lower" /> Lowercase</label>
-		<button class="btn primary" id="ulid-regen">Regenerate</button>
+		<label class="check">
+			Count <input class="num" type="number" id="ulid-count" min="1" max="1000" value="5" />
+		</label>
+		<label class="check">
+			<input type="checkbox" id="ulid-mono" checked /> Monotonic
+		</label>
+		<label class="check">
+			<input type="checkbox" id="ulid-lower" /> Lowercase
+		</label>
+		<button class="btn primary" id="ulid-regen">
+			Regenerate
+		</button>
 	</div>
 	<section class="panel">
 		<div class="panel-head">
 			<span>ULIDs</span>
-			<button class="btn" id="ulid-copy">Copy all</button>
+			<button class="btn" id="ulid-copy">
+				Copy all
+			</button>
 		</div>
 		<pre class="out" id="ulid-out"></pre>
 	</section>

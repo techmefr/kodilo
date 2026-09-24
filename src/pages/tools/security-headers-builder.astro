@@ -9,7 +9,9 @@ import ToolShell from '../../components/ToolShell.astro';
 >
 	<div class="toolbar" id="sh-tool">
 		<div class="seg" id="sh-format">
-			<button data-value="raw" aria-pressed="true">HTTP</button>
+			<button data-value="raw" aria-pressed="true">
+				HTTP
+			</button>
 			<button data-value="nginx">Nginx</button>
 			<button data-value="apache">Apache</button>
 			<button data-value="caddy">Caddy</button>
@@ -20,7 +22,9 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span id="sh-count"></span>
-			<button class="btn" id="sh-copy">Copy</button>
+			<button class="btn" id="sh-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="sh-out"></pre>
 	</section>
@@ -31,15 +35,86 @@ import ToolShell from '../../components/ToolShell.astro';
 
 	type Header = { name: string; on: boolean; options: [string, string][]; hint: string };
 	const HEADERS: Header[] = [
-		{ name: 'Strict-Transport-Security', on: true, hint: 'Forces HTTPS. Only add preload once every subdomain serves HTTPS.', options: [['1 year + subdomains', 'max-age=31536000; includeSubDomains'], ['1 year + preload', 'max-age=31536000; includeSubDomains; preload'], ['Test: 5 minutes', 'max-age=300']] },
-		{ name: 'Content-Security-Policy', on: true, hint: 'Controls where scripts, styles and frames may load from. Test in report-only first.', options: [['Strict self', "default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"], ['Self + Google Fonts', "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'"], ['Upgrade only', 'upgrade-insecure-requests']] },
+		{
+			name: 'Strict-Transport-Security',
+			on: true,
+			hint: 'Forces HTTPS. Only add preload once every subdomain serves HTTPS.',
+			options: [
+				['1 year + subdomains', 'max-age=31536000; includeSubDomains'],
+				['1 year + preload', 'max-age=31536000; includeSubDomains; preload'],
+				['Test: 5 minutes', 'max-age=300'],
+			],
+		},
+		{
+			name: 'Content-Security-Policy',
+			on: true,
+			hint: 'Controls where scripts, styles and frames may load from. Test in report-only first.',
+			options: [
+				['Strict self', "default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"],
+				[
+					'Self + Google Fonts',
+					"default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'",
+				],
+				['Upgrade only', 'upgrade-insecure-requests'],
+			],
+		},
 		{ name: 'X-Content-Type-Options', on: true, hint: 'Stops browsers guessing MIME types.', options: [['nosniff', 'nosniff']] },
-		{ name: 'X-Frame-Options', on: true, hint: 'Legacy clickjacking guard; CSP frame-ancestors supersedes it.', options: [['DENY', 'DENY'], ['SAMEORIGIN', 'SAMEORIGIN']] },
-		{ name: 'Referrer-Policy', on: true, hint: 'How much of the URL leaks to other sites.', options: [['strict-origin-when-cross-origin', 'strict-origin-when-cross-origin'], ['no-referrer', 'no-referrer'], ['same-origin', 'same-origin']] },
-		{ name: 'Permissions-Policy', on: true, hint: 'Turns off powerful browser features you do not use.', options: [['Deny sensors', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()'], ['Self only', 'camera=(self), microphone=(self), geolocation=(self)']] },
-		{ name: 'Cross-Origin-Opener-Policy', on: false, hint: 'Isolates your window from cross-origin popups.', options: [['same-origin', 'same-origin'], ['same-origin-allow-popups', 'same-origin-allow-popups']] },
-		{ name: 'Cross-Origin-Resource-Policy', on: false, hint: 'Who may embed your resources.', options: [['same-origin', 'same-origin'], ['same-site', 'same-site'], ['cross-origin', 'cross-origin']] },
-		{ name: 'Cross-Origin-Embedder-Policy', on: false, hint: 'Needed with COOP for SharedArrayBuffer. Breaks embeds without CORP.', options: [['require-corp', 'require-corp'], ['credentialless', 'credentialless']] },
+		{
+			name: 'X-Frame-Options',
+			on: true,
+			hint: 'Legacy clickjacking guard; CSP frame-ancestors supersedes it.',
+			options: [
+				['DENY', 'DENY'],
+				['SAMEORIGIN', 'SAMEORIGIN'],
+			],
+		},
+		{
+			name: 'Referrer-Policy',
+			on: true,
+			hint: 'How much of the URL leaks to other sites.',
+			options: [
+				['strict-origin-when-cross-origin', 'strict-origin-when-cross-origin'],
+				['no-referrer', 'no-referrer'],
+				['same-origin', 'same-origin'],
+			],
+		},
+		{
+			name: 'Permissions-Policy',
+			on: true,
+			hint: 'Turns off powerful browser features you do not use.',
+			options: [
+				['Deny sensors', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()'],
+				['Self only', 'camera=(self), microphone=(self), geolocation=(self)'],
+			],
+		},
+		{
+			name: 'Cross-Origin-Opener-Policy',
+			on: false,
+			hint: 'Isolates your window from cross-origin popups.',
+			options: [
+				['same-origin', 'same-origin'],
+				['same-origin-allow-popups', 'same-origin-allow-popups'],
+			],
+		},
+		{
+			name: 'Cross-Origin-Resource-Policy',
+			on: false,
+			hint: 'Who may embed your resources.',
+			options: [
+				['same-origin', 'same-origin'],
+				['same-site', 'same-site'],
+				['cross-origin', 'cross-origin'],
+			],
+		},
+		{
+			name: 'Cross-Origin-Embedder-Policy',
+			on: false,
+			hint: 'Needed with COOP for SharedArrayBuffer. Breaks embeds without CORP.',
+			options: [
+				['require-corp', 'require-corp'],
+				['credentialless', 'credentialless'],
+			],
+		},
 	];
 
 	onPage('sh-tool', () => {

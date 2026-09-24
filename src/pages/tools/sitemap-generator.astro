@@ -10,20 +10,42 @@ const urls = `/
 /contact`;
 ---
 
-<ToolShell slug="sitemap-generator" title="Sitemap Generator" description="Turn a list of pages into a valid sitemap.xml with last-modified dates, change frequency and priority. Paths or full URLs both work.">
+<ToolShell
+	slug="sitemap-generator"
+	title="Sitemap Generator"
+	description="Turn a list of pages into a valid sitemap.xml with last-modified dates, change frequency and priority. Paths or full URLs both work."
+>
 	<div class="fields" id="sm-tool">
-		<div class="field"><label for="sm-base">Site URL</label><input id="sm-base" value="https://example.com" spellcheck="false" /></div>
-		<div class="field"><label for="sm-date">Last modified</label><input id="sm-date" type="date" /></div>
+		<div class="field">
+			<label for="sm-base">Site URL</label>
+			<input id="sm-base" value="https://example.com" spellcheck="false" />
+		</div>
+		<div class="field">
+			<label for="sm-date">Last modified</label>
+			<input id="sm-date" type="date" />
+		</div>
 	</div>
 	<div class="toolbar">
 		<div class="seg" id="sm-freq" aria-label="Change frequency">
-			<button data-value="" aria-pressed="false">No changefreq</button>
-			<button data-value="daily" aria-pressed="false">daily</button>
-			<button data-value="weekly" aria-pressed="true">weekly</button>
-			<button data-value="monthly" aria-pressed="false">monthly</button>
+			<button data-value="" aria-pressed="false">
+				No changefreq
+			</button>
+			<button data-value="daily" aria-pressed="false">
+				daily
+			</button>
+			<button data-value="weekly" aria-pressed="true">
+				weekly
+			</button>
+			<button data-value="monthly" aria-pressed="false">
+				monthly
+			</button>
 		</div>
-		<label class="check"><input type="checkbox" id="sm-priority" checked /> Priority by depth</label>
-		<label class="check"><input type="checkbox" id="sm-slash" /> Trailing slash</label>
+		<label class="check">
+			<input type="checkbox" id="sm-priority" checked /> Priority by depth
+		</label>
+		<label class="check">
+			<input type="checkbox" id="sm-slash" /> Trailing slash
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
@@ -33,7 +55,14 @@ const urls = `/
 		<section class="panel">
 			<div class="panel-head">
 				<span id="sm-count">sitemap.xml</span>
-				<span class="sm-actions"><button class="btn" id="sm-dl">Download</button><button class="btn" id="sm-copy">Copy</button></span>
+				<span class="sm-actions">
+					<button class="btn" id="sm-dl">
+						Download
+					</button>
+					<button class="btn" id="sm-copy">
+						Copy
+					</button>
+				</span>
 			</div>
 			<pre class="out" id="sm-out"></pre>
 		</section>
@@ -61,7 +90,10 @@ const urls = `/
 			const bad: string[] = [];
 			const seen = new Set<string>();
 			const rows: string[] = [];
-			for (const line of input.value.split('\n').map((l) => l.trim()).filter(Boolean)) {
+			for (const line of input.value
+				.split('\n')
+				.map((l) => l.trim())
+				.filter(Boolean)) {
 				let u: URL;
 				try {
 					u = new URL(line, base.value.replace(/\/?$/, '/'));
@@ -82,7 +114,8 @@ const urls = `/
 			}
 			error.hidden = !bad.length;
 			error.textContent = bad.length ? `Skipped lines that are not URLs: ${bad.join(', ')}` : '';
-			byId('sm-count').textContent = `sitemap.xml · ${rows.length} URL${rows.length === 1 ? '' : 's'}${rows.length > 50000 ? ' · over the 50,000 limit, split it' : ''}`;
+			byId('sm-count').textContent =
+				`sitemap.xml · ${rows.length} URL${rows.length === 1 ? '' : 's'}${rows.length > 50000 ? ' · over the 50,000 limit, split it' : ''}`;
 			return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${rows.join('\n')}\n</urlset>\n`;
 		};
 

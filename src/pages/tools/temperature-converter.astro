@@ -17,25 +17,23 @@ const presets = [
 ];
 ---
 
-<ToolShell
-	slug="temperature-converter"
-	title="Temperature"
-	description="Edit any scale, the others follow."
->
+<ToolShell slug="temperature-converter" title="Temperature" description="Edit any scale, the others follow.">
 	<div class="fields" id="temp-tool">
-		{
-			scales.map(([id, label, unit]) => (
-				<div class="field" id={`temp-${id}-field`}>
-					<label for={`temp-${id}`}>
-						{label} · {unit}
-					</label>
-					<input id={`temp-${id}`} inputmode="decimal" data-scale={id} />
-				</div>
-			))
-		}
+		{scales.map(([id, label, unit]) => (
+			<div class="field" id={`temp-${id}-field`}>
+				<label for={`temp-${id}`}>
+					{label} · {unit}
+				</label>
+				<input id={`temp-${id}`} inputmode="decimal" data-scale={id} />
+			</div>
+		))}
 	</div>
 	<div class="chips" id="temp-presets">
-		{presets.map(([label, c]) => <button data-c={c}>{label} · {c} °C</button>)}
+		{presets.map(([label, c]) => (
+			<button data-c={c}>
+				{label} · {c} °C
+			</button>
+		))}
 	</div>
 </ToolShell>
 
@@ -78,7 +76,7 @@ const presets = [
 				const c = byId<HTMLInputElement>('temp-c');
 				c.value = button.dataset.c!;
 				update(c);
-			})
+			}),
 		);
 		const c = byId<HTMLInputElement>('temp-c');
 		c.value = '20';

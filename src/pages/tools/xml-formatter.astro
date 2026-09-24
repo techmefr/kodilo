@@ -4,16 +4,30 @@ import ToolShell from '../../components/ToolShell.astro';
 const sample = `<?xml version="1.0" encoding="UTF-8"?><catalog><!-- spring list --><book id="bk101" lang="en"><author>Gambardella, Matthew</author><title>XML Developer's Guide</title><price currency="EUR">44.95</price><description><![CDATA[An in-depth look at <XML> & friends.]]></description></book><book id="bk102"><author>Ralls, Kim</author><title>Midnight Rain</title><price currency="EUR">5.95</price><tags/></book></catalog>`;
 ---
 
-<ToolShell slug="xml-formatter" title="XML Formatter" description="Pretty-print or minify XML, with a clear message and line number when the document is not well-formed.">
+<ToolShell
+	slug="xml-formatter"
+	title="XML Formatter"
+	description="Pretty-print or minify XML, with a clear message and line number when the document is not well-formed."
+>
 	<div class="toolbar" id="xf-tool">
 		<div class="seg" id="xf-mode" aria-label="Mode">
-			<button data-value="pretty" aria-pressed="true">Format</button>
-			<button data-value="minify" aria-pressed="false">Minify</button>
+			<button data-value="pretty" aria-pressed="true">
+				Format
+			</button>
+			<button data-value="minify" aria-pressed="false">
+				Minify
+			</button>
 		</div>
 		<div class="seg" id="xf-indent" aria-label="Indent">
-			<button data-value="2" aria-pressed="true">2 spaces</button>
-			<button data-value="4" aria-pressed="false">4 spaces</button>
-			<button data-value="tab" aria-pressed="false">Tab</button>
+			<button data-value="2" aria-pressed="true">
+				2 spaces
+			</button>
+			<button data-value="4" aria-pressed="false">
+				4 spaces
+			</button>
+			<button data-value="tab" aria-pressed="false">
+				Tab
+			</button>
 		</div>
 	</div>
 	<div class="grid-2">
@@ -24,7 +38,9 @@ const sample = `<?xml version="1.0" encoding="UTF-8"?><catalog><!-- spring list 
 		<section class="panel">
 			<div class="panel-head">
 				<span id="xf-status">Output</span>
-				<button class="btn" id="xf-copy">Copy</button>
+				<button class="btn" id="xf-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="xf-out"></pre>
 		</section>
@@ -82,14 +98,22 @@ const sample = `<?xml version="1.0" encoding="UTF-8"?><catalog><!-- spring list 
 				const text = err.textContent ?? '';
 				const line = text.match(/line (\d+)/i)?.[1];
 				const col = text.match(/column (\d+)/i)?.[1];
-				error.textContent = `Not well-formed${line ? ` at line ${line}${col ? `, column ${col}` : ''}` : ''}: ${text.split('\n').find((l) => /error|expected|mismatch|unclosed/i.test(l))?.trim() ?? 'check the tags'}`;
+				error.textContent = `Not well-formed${line ? ` at line ${line}${col ? `, column ${col}` : ''}` : ''}: ${
+					text
+						.split('\n')
+						.find((l) => /error|expected|mismatch|unclosed/i.test(l))
+						?.trim() ?? 'check the tags'
+				}`;
 				byId('xf-status').textContent = '✕ Invalid';
 				out.textContent = '';
 				return;
 			}
 			error.hidden = true;
 			const pretty = mode === 'pretty';
-			const body = [...doc.childNodes].map((n) => format(n, unit, 0, pretty)).filter(Boolean).join(pretty ? '\n' : '');
+			const body = [...doc.childNodes]
+				.map((n) => format(n, unit, 0, pretty))
+				.filter(Boolean)
+				.join(pretty ? '\n' : '');
 			out.textContent = (decl ? decl + (pretty ? '\n' : '') : '') + body;
 			byId('xf-status').textContent = `✓ Well-formed · ${out.textContent.length.toLocaleString('en-US')} characters`;
 		};

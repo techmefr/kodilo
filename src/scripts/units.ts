@@ -13,7 +13,10 @@ export const BYTE_UNITS: [string, number][] = [
 ];
 
 export function parseBytes(text: string): number | null {
-	const match = text.trim().replace(/,/g, '.').match(/^(\d+(?:\.\d+)?(?:e\d+)?)\s*([a-z]*)$/i);
+	const match = text
+		.trim()
+		.replace(/,/g, '.')
+		.match(/^(\d+(?:\.\d+)?(?:e\d+)?)\s*([a-z]*)$/i);
 	if (!match) return null;
 	const unit = match[2] || 'B';
 	const found = BYTE_UNITS.find(([u]) => u.toLowerCase() === unit.toLowerCase() || u.toLowerCase() === `${unit}b`.toLowerCase());

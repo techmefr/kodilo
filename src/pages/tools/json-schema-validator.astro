@@ -15,14 +15,20 @@ const schema = JSON.stringify(
 		additionalProperties: false,
 	},
 	null,
-	2
+	2,
 );
 const data = JSON.stringify({ id: 12, email: 'not-an-email', age: 16, tags: ['a', 'a'], nickname: 'ada' }, null, 2);
 ---
 
-<ToolShell slug="json-schema-validator" title="JSON Schema Validator" description="Check JSON data against a JSON Schema (draft-07 and 2020-12) and see every error with its path, or generate a schema from a sample.">
+<ToolShell
+	slug="json-schema-validator"
+	title="JSON Schema Validator"
+	description="Check JSON data against a JSON Schema (draft-07 and 2020-12) and see every error with its path, or generate a schema from a sample."
+>
 	<div class="toolbar" id="js-tool">
-		<button class="btn" id="js-infer">Generate schema from the data</button>
+		<button class="btn" id="js-infer">
+			Generate schema from the data
+		</button>
 		<span class="field-note">Formats such as email, uri, date and uuid are checked.</span>
 	</div>
 	<div class="grid-2">
@@ -36,7 +42,9 @@ const data = JSON.stringify({ id: 12, email: 'not-an-email', age: 16, tags: ['a'
 		</section>
 	</div>
 	<section class="panel">
-		<div class="panel-head"><span id="js-status">Result</span></div>
+		<div class="panel-head">
+			<span id="js-status">Result</span>
+		</div>
 		<ul class="js-list" id="js-list"></ul>
 	</section>
 </ToolShell>
@@ -127,9 +135,10 @@ const data = JSON.stringify({ id: 12, email: 'not-an-email', age: 16, tags: ['a'
 			status.textContent = `✕ ${errors.length} error${errors.length > 1 ? 's' : ''}`;
 			list.replaceChildren(
 				...errors.map((e) => {
-					const extra = e.keyword === 'additionalProperties' ? ` "${(e.params as { additionalProperty: string }).additionalProperty}"` : e.keyword === 'required' ? '' : '';
+					const extra =
+						e.keyword === 'additionalProperties' ? ` "${(e.params as { additionalProperty: string }).additionalProperty}"` : e.keyword === 'required' ? '' : '';
 					return row(e.instancePath || '/', `${e.message}${extra}`, 'bad');
-				})
+				}),
 			);
 		};
 

@@ -26,12 +26,20 @@ const right = `server {
 <ToolShell slug="diff-checker" title="Diff Checker" description="Compare two texts line by line with word-level highlights, split or unified view.">
 	<div class="toolbar" id="dc-tool">
 		<div class="seg" id="dc-view">
-			<button data-value="split" aria-pressed="true">Split</button>
+			<button data-value="split" aria-pressed="true">
+				Split
+			</button>
 			<button data-value="unified">Unified</button>
 		</div>
-		<label class="check"><input type="checkbox" id="dc-ws" /> Ignore whitespace</label>
-		<label class="check"><input type="checkbox" id="dc-case" /> Ignore case</label>
-		<button class="btn" id="dc-swap">Swap</button>
+		<label class="check">
+			<input type="checkbox" id="dc-ws" /> Ignore whitespace
+		</label>
+		<label class="check">
+			<input type="checkbox" id="dc-case" /> Ignore case
+		</label>
+		<button class="btn" id="dc-swap">
+			Swap
+		</button>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
@@ -49,8 +57,6 @@ const right = `server {
 
 <script>
 	import { byId, onPage, segmented } from '../../scripts/ui';
-
-	type Op = ['=' | '-' | '+', string, string?];
 
 	function lcs<T>(a: T[], b: T[], eq: (x: T, y: T) => boolean): ['=' | '-' | '+', number, number][] {
 		const n = a.length;
@@ -139,7 +145,7 @@ const right = `server {
 					row.className = 'dc-line';
 					row.append(
 						...cell(r.left ? (r.type === 'same' ? '' : 'dc-del') : 'dc-empty', r.left?.[0], wa, r.left && r.type !== 'same' ? '−' : ' '),
-						...cell(r.right ? (r.type === 'same' ? '' : 'dc-add') : 'dc-empty', r.right?.[0], wb, r.right && r.type !== 'same' ? '+' : ' ')
+						...cell(r.right ? (r.type === 'same' ? '' : 'dc-add') : 'dc-empty', r.right?.[0], wb, r.right && r.type !== 'same' ? '+' : ' '),
 					);
 					lines.push(row);
 				} else {

@@ -16,16 +16,29 @@ IQCPbJbzlwEbCXc0zw69xIwVsGLRf8uNk8y9rK710jMBvw==
 -----END CERTIFICATE-----`;
 ---
 
-<ToolShell slug="x509-certificate-decoder" title="X.509 Certificate Decoder" description="Paste a PEM certificate to read its subject, issuer, SANs, validity, key and fingerprints. Nothing leaves your browser.">
+<ToolShell
+	slug="x509-certificate-decoder"
+	title="X.509 Certificate Decoder"
+	description="Paste a PEM certificate to read its subject, issuer, SANs, validity, key and fingerprints. Nothing leaves your browser."
+>
 	<section class="panel" id="xc-tool">
 		<div class="panel-head">PEM certificate</div>
 		<textarea id="xc-in" spellcheck="false" aria-label="PEM certificate">{sample}</textarea>
 	</section>
 	<p class="error" id="xc-error" hidden></p>
 	<div class="stats" id="xc-stats">
-		<div class="stat"><b id="xc-status">—</b><span>Status</span></div>
-		<div class="stat"><b id="xc-days">—</b><span>Days left</span></div>
-		<div class="stat"><b id="xc-key">—</b><span>Public key</span></div>
+		<div class="stat">
+			<b id="xc-status">—</b>
+			<span>Status</span>
+		</div>
+		<div class="stat">
+			<b id="xc-days">—</b>
+			<span>Days left</span>
+		</div>
+		<div class="stat">
+			<b id="xc-key">—</b>
+			<span>Public key</span>
+		</div>
 	</div>
 	<section class="panel">
 		<div class="panel-head">Details</div>
@@ -54,7 +67,11 @@ IQCPbJbzlwEbCXc0zw69xIwVsGLRf8uNk8y9rK710jMBvw==
 		'1.3.6.1.5.5.7.3.9': 'OCSP signing',
 	};
 	const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0').toUpperCase()).join(':');
-	const date = (d: Date) => d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
+	const date = (d: Date) =>
+		d
+			.toISOString()
+			.replace('T', ' ')
+			.replace(/\.\d+Z$/, ' UTC');
 
 	onPage('xc-tool', () => {
 		const input = byId<HTMLTextAreaElement>('xc-in');
@@ -70,7 +87,9 @@ IQCPbJbzlwEbCXc0zw69xIwVsGLRf8uNk8y9rK710jMBvw==
 				cert = new X509Certificate(pem);
 			} catch (e) {
 				error.hidden = false;
-				error.textContent = (e as Error).message.startsWith('No') ? (e as Error).message : 'This certificate could not be decoded. Check that the PEM block is complete.';
+				error.textContent = (e as Error).message.startsWith('No')
+					? (e as Error).message
+					: 'This certificate could not be decoded. Check that the PEM block is complete.';
 				byId('xc-list').replaceChildren();
 				return;
 			}
@@ -104,7 +123,11 @@ IQCPbJbzlwEbCXc0zw69xIwVsGLRf8uNk8y9rK710jMBvw==
 				['Valid from', date(cert.notBefore)],
 				['Valid until', date(cert.notAfter)],
 				['Serial number', cert.serialNumber.toUpperCase()],
-				['Signature', (cert.signatureAlgorithm as { name: string; hash?: { name: string } }).name + ((cert.signatureAlgorithm as { hash?: { name: string } }).hash ? ` with ${(cert.signatureAlgorithm as { hash: { name: string } }).hash.name}` : '')],
+				[
+					'Signature',
+					(cert.signatureAlgorithm as { name: string; hash?: { name: string } }).name +
+						((cert.signatureAlgorithm as { hash?: { name: string } }).hash ? ` with ${(cert.signatureAlgorithm as { hash: { name: string } }).hash.name}` : ''),
+				],
 				['Certificate authority', bc ? (bc.ca ? `Yes${bc.pathLength !== undefined ? `, path length ${bc.pathLength}` : ''}` : 'No') : 'Not stated'],
 				['Key usage', usages || 'Not stated'],
 				['Extended key usage', eku ? eku.usages.map((u) => EKU[String(u)] ?? String(u)).join(', ') : 'Not stated'],
@@ -118,7 +141,7 @@ IQCPbJbzlwEbCXc0zw69xIwVsGLRf8uNk8y9rK710jMBvw==
 					const dd = document.createElement('dd');
 					dd.textContent = v;
 					return [dt, dd];
-				})
+				}),
 			);
 		};
 

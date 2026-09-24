@@ -14,19 +14,33 @@ const sample = JSON.stringify(
 		],
 	},
 	null,
-	2
+	2,
 );
 ---
 
-<ToolShell slug="json-to-typescript" title="JSON to TypeScript" description="Paste a JSON sample and get TypeScript interfaces or types. Arrays of objects are merged, and keys missing from some items become optional.">
+<ToolShell
+	slug="json-to-typescript"
+	title="JSON to TypeScript"
+	description="Paste a JSON sample and get TypeScript interfaces or types. Arrays of objects are merged, and keys missing from some items become optional."
+>
 	<div class="toolbar" id="jt-tool">
 		<div class="seg" id="jt-kind" aria-label="Declaration">
-			<button data-value="interface" aria-pressed="true">interface</button>
-			<button data-value="type" aria-pressed="false">type</button>
+			<button data-value="interface" aria-pressed="true">
+				interface
+			</button>
+			<button data-value="type" aria-pressed="false">
+				type
+			</button>
 		</div>
-		<label class="check">Root name <input class="jt-name" id="jt-name" value="User" spellcheck="false" /></label>
-		<label class="check"><input type="checkbox" id="jt-export" checked /> export</label>
-		<label class="check"><input type="checkbox" id="jt-readonly" /> readonly</label>
+		<label class="check">
+			Root name <input class="jt-name" id="jt-name" value="User" spellcheck="false" />
+		</label>
+		<label class="check">
+			<input type="checkbox" id="jt-export" checked /> export
+		</label>
+		<label class="check">
+			<input type="checkbox" id="jt-readonly" /> readonly
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
@@ -36,7 +50,9 @@ const sample = JSON.stringify(
 		<section class="panel">
 			<div class="panel-head">
 				<span>TypeScript</span>
-				<button class="btn" id="jt-copy">Copy</button>
+				<button class="btn" id="jt-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="jt-out"></pre>
 		</section>
@@ -53,7 +69,11 @@ const sample = JSON.stringify(
 		const p = s.replace(/[^A-Za-z0-9]+(.)?/g, (_, c) => (c ? c.toUpperCase() : '')).replace(/^./, (c) => c.toUpperCase());
 		return /^[A-Za-z_]/.test(p) ? p : `T${p}`;
 	};
-	const singular = (s: string) => s.replace(/ies$/, 'y').replace(/(ss|us)$/, '$1').replace(/s$/, '');
+	const singular = (s: string) =>
+		s
+			.replace(/ies$/, 'y')
+			.replace(/(ss|us)$/, '$1')
+			.replace(/s$/, '');
 	const key = (k: string) => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k));
 
 	function generate(root: unknown, rootName: string, o: Opts): string {
@@ -94,7 +114,10 @@ const sample = JSON.stringify(
 			const lines = keys.map((k) => {
 				const present = objs.filter((x) => k in x);
 				const optional = present.length < objs.length ? '?' : '';
-				return `  ${ro}${key(k)}${optional}: ${typeOf(present.map((x) => x[k]), k)};`;
+				return `  ${ro}${key(k)}${optional}: ${typeOf(
+					present.map((x) => x[k]),
+					k,
+				)};`;
 			});
 			const exp = o.exp ? 'export ' : '';
 			const body = lines.length ? `{\n${lines.join('\n')}\n}` : 'Record<string, unknown>';

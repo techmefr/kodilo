@@ -10,7 +10,11 @@ const css = `.card {
 }`;
 ---
 
-<ToolShell slug="px-rem-converter" title="px, rem & em Converter" description="Convert between px, rem, em, pt and percent for any root font size, or convert every px value in a CSS snippet to rem at once.">
+<ToolShell
+	slug="px-rem-converter"
+	title="px, rem & em Converter"
+	description="Convert between px, rem, em, pt and percent for any root font size, or convert every px value in a CSS snippet to rem at once."
+>
 	<div class="fields" id="pr-tool">
 		<div class="field">
 			<label for="pr-root">Root font size (px)</label>
@@ -22,11 +26,26 @@ const css = `.card {
 		</div>
 	</div>
 	<div class="pr-units" id="pr-units">
-		<label class="field"><span>px</span><input data-unit="px" value="24" /></label>
-		<label class="field"><span>rem</span><input data-unit="rem" /></label>
-		<label class="field"><span>em</span><input data-unit="em" /></label>
-		<label class="field"><span>pt</span><input data-unit="pt" /></label>
-		<label class="field"><span>%</span><input data-unit="%" /></label>
+		<label class="field">
+			<span>px</span>
+			<input data-unit="px" value="24" />
+		</label>
+		<label class="field">
+			<span>rem</span>
+			<input data-unit="rem" />
+		</label>
+		<label class="field">
+			<span>em</span>
+			<input data-unit="em" />
+		</label>
+		<label class="field">
+			<span>pt</span>
+			<input data-unit="pt" />
+		</label>
+		<label class="field">
+			<span>%</span>
+			<input data-unit="%" />
+		</label>
 	</div>
 	<section class="panel">
 		<div class="panel-head">Scale at this root size</div>
@@ -40,12 +59,16 @@ const css = `.card {
 		<section class="panel">
 			<div class="panel-head">
 				<span>Converted to rem</span>
-				<button class="btn" id="pr-copy">Copy</button>
+				<button class="btn" id="pr-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="pr-out"></pre>
 		</section>
 	</div>
-	<label class="check"><input type="checkbox" id="pr-keep1" checked /> Keep 1px values (borders, hairlines)</label>
+	<label class="check">
+		<input type="checkbox" id="pr-keep1" checked /> Keep 1px values (borders, hairlines)
+	</label>
 </ToolShell>
 
 <script>
@@ -63,8 +86,20 @@ const css = `.card {
 
 		const r = () => Number(root.value) || 16;
 		const p = () => Number(parent.value) || 16;
-		const toPx: Record<string, (v: number) => number> = { px: (v) => v, rem: (v) => v * r(), em: (v) => v * p(), pt: (v) => (v * 96) / 72, '%': (v) => (v / 100) * p() };
-		const fromPx: Record<string, (v: number) => number> = { px: (v) => v, rem: (v) => v / r(), em: (v) => v / p(), pt: (v) => (v * 72) / 96, '%': (v) => (v / p()) * 100 };
+		const toPx: Record<string, (v: number) => number> = {
+			px: (v) => v,
+			rem: (v) => v * r(),
+			em: (v) => v * p(),
+			pt: (v) => (v * 96) / 72,
+			'%': (v) => (v / 100) * p(),
+		};
+		const fromPx: Record<string, (v: number) => number> = {
+			px: (v) => v,
+			rem: (v) => v / r(),
+			em: (v) => v / p(),
+			pt: (v) => (v * 72) / 96,
+			'%': (v) => (v / p()) * 100,
+		};
 
 		const paint = (skip?: HTMLInputElement) => {
 			for (const i of inputs) if (i !== skip) i.value = fmt(fromPx[i.dataset.unit!](px));
@@ -75,10 +110,12 @@ const css = `.card {
 					b.innerHTML = `<b>${v}px</b> <span>${fmt(v / r())}rem</span>`;
 					b.addEventListener('click', () => ((px = v), paint()));
 					return b;
-				})
+				}),
 			);
 			const k = keep1.checked;
-			byId('pr-out').textContent = css.value.replace(/(-?\d*\.?\d+)px\b/g, (m, n) => (k && Math.abs(Number(n)) === 1) || Number(n) === 0 ? m : `${fmt(Number(n) / r())}rem`);
+			byId('pr-out').textContent = css.value.replace(/(-?\d*\.?\d+)px\b/g, (m, n) =>
+				(k && Math.abs(Number(n)) === 1) || Number(n) === 0 ? m : `${fmt(Number(n) / r())}rem`,
+			);
 		};
 
 		for (const i of inputs)

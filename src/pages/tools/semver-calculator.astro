@@ -42,7 +42,10 @@ import ToolShell from '../../components/ToolShell.astro';
 	type Comparator = { op: string; v: Version };
 
 	function parse(text: string): Version | null {
-		const m = text.trim().replace(/^[v=]/, '').match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/);
+		const m = text
+			.trim()
+			.replace(/^[v=]/, '')
+			.match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/);
 		return m ? { major: +m[1], minor: +m[2], patch: +m[3], pre: m[4] ? m[4].split('.') : [] } : null;
 	}
 
@@ -68,7 +71,10 @@ import ToolShell from '../../components/ToolShell.astro';
 	const str = (x: Version) => `${x.major}.${x.minor}.${x.patch}${x.pre.length ? `-${x.pre.join('.')}` : ''}`;
 
 	function partial(text: string) {
-		const m = text.trim().replace(/^v/, '').match(/^(\d+|[x*])(?:\.(\d+|[x*]))?(?:\.(\d+|[x*]))?(?:-([0-9A-Za-z.-]+))?$/i);
+		const m = text
+			.trim()
+			.replace(/^v/, '')
+			.match(/^(\d+|[x*])(?:\.(\d+|[x*]))?(?:\.(\d+|[x*]))?(?:-([0-9A-Za-z.-]+))?$/i);
 		if (!m) return null;
 		const n = (s?: string) => (s === undefined || /[x*]/i.test(s) ? undefined : +s);
 		return { major: n(m[1]), minor: n(m[2]), patch: n(m[3]), pre: m[4] ? m[4].split('.') : [] };
@@ -86,16 +92,31 @@ import ToolShell from '../../components/ToolShell.astro';
 		const pa = p.patch ?? 0;
 		const low = v(M, mi, pa, p.pre);
 		if (op === '^') {
-			const high = M > 0 ? v(M + 1, 0, 0) : p.minor === undefined ? v(1, 0, 0) : mi > 0 ? v(0, mi + 1, 0) : p.patch === undefined ? v(0, 1, 0) : v(0, 0, pa + 1);
-			return [{ op: '>=', v: low }, { op: '<', v: { ...high, pre: ['0'] } }];
+			const high =
+				M > 0 ? v(M + 1, 0, 0) : p.minor === undefined ? v(1, 0, 0) : mi > 0 ? v(0, mi + 1, 0) : p.patch === undefined ? v(0, 1, 0) : v(0, 0, pa + 1);
+			return [
+				{ op: '>=', v: low },
+				{ op: '<', v: { ...high, pre: ['0'] } },
+			];
 		}
 		if (op === '~') {
 			const high = p.minor === undefined ? v(M + 1, 0, 0) : v(M, mi + 1, 0);
-			return [{ op: '>=', v: low }, { op: '<', v: { ...high, pre: ['0'] } }];
+			return [
+				{ op: '>=', v: low },
+				{ op: '<', v: { ...high, pre: ['0'] } },
+			];
 		}
 		if (op === '' || op === '=') {
-			if (p.minor === undefined) return [{ op: '>=', v: low }, { op: '<', v: v(M + 1, 0, 0, ['0']) }];
-			if (p.patch === undefined) return [{ op: '>=', v: low }, { op: '<', v: v(M, mi + 1, 0, ['0']) }];
+			if (p.minor === undefined)
+				return [
+					{ op: '>=', v: low },
+					{ op: '<', v: v(M + 1, 0, 0, ['0']) },
+				];
+			if (p.patch === undefined)
+				return [
+					{ op: '>=', v: low },
+					{ op: '<', v: v(M, mi + 1, 0, ['0']) },
+				];
 			return [{ op: '=', v: low }];
 		}
 		return [{ op, v: low }];
@@ -104,7 +125,13 @@ import ToolShell from '../../components/ToolShell.astro';
 	function parseRange(text: string): Comparator[][] | null {
 		const sets = text.split('||').map((set) => {
 			const hyphen = set.trim().match(/^(\S+)\s+-\s+(\S+)$/);
-			const tokens = hyphen ? [`>=${hyphen[1]}`, `<=${hyphen[2]}`] : set.trim().replace(/(>=|<=|>|<|=|\^|~)\s+/g, '$1').split(/\s+/).filter(Boolean);
+			const tokens = hyphen
+				? [`>=${hyphen[1]}`, `<=${hyphen[2]}`]
+				: set
+						.trim()
+						.replace(/(>=|<=|>|<|=|\^|~)\s+/g, '$1')
+						.split(/\s+/)
+						.filter(Boolean);
 			const all: Comparator[] = [];
 			for (const t of tokens.length ? tokens : ['*']) {
 				const c = expand(t);
@@ -141,7 +168,13 @@ import ToolShell from '../../components/ToolShell.astro';
 			byId('sv-range-note').textContent = range ? `Means ${describe(range)}` : 'Try ^1.2.3, ~1.2, 1.x, >=1.0.0 <2.0.0 or 1.2 - 1.4.';
 			const version = parse(versionIn.value);
 			byId('sv-version-field').classList.toggle('invalid', !version);
-			byId('sv-version-note').textContent = !version ? 'Use MAJOR.MINOR.PATCH, e.g. 1.9.0 or 2.0.0-rc.1.' : range ? (satisfies(version, range) ? '✓ Satisfies the range' : '✗ Outside the range') : '';
+			byId('sv-version-note').textContent = !version
+				? 'Use MAJOR.MINOR.PATCH, e.g. 1.9.0 or 2.0.0-rc.1.'
+				: range
+					? satisfies(version, range)
+						? '✓ Satisfies the range'
+						: '✗ Outside the range'
+					: '';
 
 			const bumps = byId('sv-bumps');
 			bumps.replaceChildren();
@@ -151,7 +184,12 @@ import ToolShell from '../../components/ToolShell.astro';
 					['Major', v(version.major + 1, 0, 0)],
 					['Minor', v(version.major, version.minor + 1, 0)],
 					['Patch', version.pre.length ? base : v(version.major, version.minor, version.patch + 1)],
-					['Pre-release', version.pre.length ? { ...version, pre: version.pre.map((p, i, a) => (i === a.length - 1 && /^\d+$/.test(p) ? String(+p + 1) : p)) } : v(version.major, version.minor, version.patch + 1, ['rc', '0'])],
+					[
+						'Pre-release',
+						version.pre.length
+							? { ...version, pre: version.pre.map((p, i, a) => (i === a.length - 1 && /^\d+$/.test(p) ? String(+p + 1) : p)) }
+							: v(version.major, version.minor, version.patch + 1, ['rc', '0']),
+					],
 				];
 				next.forEach(([label, value]) => {
 					const btn = document.createElement('button');
@@ -164,7 +202,10 @@ import ToolShell from '../../components/ToolShell.astro';
 				});
 			}
 
-			const items = list.value.split('\n').map((l) => l.trim()).filter(Boolean);
+			const items = list.value
+				.split('\n')
+				.map((l) => l.trim())
+				.filter(Boolean);
 			const parsed = items.map((text) => ({ text, ver: parse(text) }));
 			const sorted = [...parsed].sort((a, b) => (a.ver && b.ver ? compare(a.ver, b.ver) : a.ver ? -1 : 1));
 			byId('sv-results').replaceChildren(
@@ -176,7 +217,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					li.querySelector('code')!.textContent = text;
 					li.querySelector('span')!.textContent = state === 'bad' ? 'Invalid' : state === 'ok' ? 'Matches' : 'No match';
 					return li;
-				})
+				}),
 			);
 		};
 

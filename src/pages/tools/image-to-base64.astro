@@ -12,22 +12,36 @@ import ToolShell from '../../components/ToolShell.astro';
 		<span id="img-drop-label">Drop an image here, click to choose, or paste with ⌘V / Ctrl+V</span>
 	</label>
 	<div class="img-result" id="img-result" hidden>
-		<div class="img-preview"><img id="img-preview" alt="Selected image preview" /></div>
+		<div class="img-preview">
+			<img id="img-preview" alt="Selected image preview" />
+		</div>
 		<div class="stats" id="img-stats"></div>
 	</div>
 	<div class="toolbar" id="img-formats-bar" hidden>
 		<div class="seg" id="img-format" aria-label="Output">
-			<button data-value="uri" aria-pressed="true">Data URI</button>
-			<button data-value="raw" aria-pressed="false">Base64</button>
-			<button data-value="css" aria-pressed="false">CSS</button>
-			<button data-value="html" aria-pressed="false">HTML</button>
-			<button data-value="md" aria-pressed="false">Markdown</button>
+			<button data-value="uri" aria-pressed="true">
+				Data URI
+			</button>
+			<button data-value="raw" aria-pressed="false">
+				Base64
+			</button>
+			<button data-value="css" aria-pressed="false">
+				CSS
+			</button>
+			<button data-value="html" aria-pressed="false">
+				HTML
+			</button>
+			<button data-value="md" aria-pressed="false">
+				Markdown
+			</button>
 		</div>
 	</div>
 	<section class="panel" id="img-out-panel" hidden>
 		<div class="panel-head">
 			<span id="img-size-note">Output</span>
-			<button class="btn" id="img-copy">Copy</button>
+			<button class="btn" id="img-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out img-out" id="img-out"></pre>
 	</section>
@@ -88,7 +102,7 @@ import ToolShell from '../../components/ToolShell.astro';
 							el.querySelector('b')!.textContent = value;
 							el.querySelector('span')!.textContent = label;
 							return el;
-						})
+						}),
 					);
 				};
 				byId('img-drop-label').textContent = `${blob.name} · drop or paste another image to replace it`;

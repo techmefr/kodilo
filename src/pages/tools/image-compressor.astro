@@ -2,25 +2,37 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="image-compressor" title="Image Compressor" description="Shrink JPG, PNG and WebP images with a quality slider, an optional max width and a before/after comparison. Nothing is uploaded.">
+<ToolShell
+	slug="image-compressor"
+	title="Image Compressor"
+	description="Shrink JPG, PNG and WebP images with a quality slider, an optional max width and a before/after comparison. Nothing is uploaded."
+>
 	<label class="drop" id="ic-tool">
 		<input type="file" id="ic-file" accept="image/*" multiple hidden />
 		<span>Drop images here or click to choose. A sample is loaded.</span>
 	</label>
 	<div class="toolbar">
 		<div class="seg" id="ic-format">
-			<button data-value="image/webp" aria-pressed="true">WebP</button>
+			<button data-value="image/webp" aria-pressed="true">
+				WebP
+			</button>
 			<button data-value="image/jpeg">JPG</button>
 			<button data-value="same">Keep format</button>
 		</div>
-		<label class="check">Quality <input type="range" id="ic-q" min="10" max="100" value="75" /> <b id="ic-q-value">75</b></label>
-		<label class="check">Max width <input class="num" id="ic-max" type="number" min="0" placeholder="none" /></label>
+		<label class="check">
+			Quality <input type="range" id="ic-q" min="10" max="100" value="75" /> <b id="ic-q-value">75</b>
+		</label>
+		<label class="check">
+			Max width <input class="num" id="ic-max" type="number" min="0" placeholder="none" />
+		</label>
 	</div>
 	<div class="stats" id="ic-stats"></div>
 	<ul class="ic-list" id="ic-list"></ul>
 	<div class="ic-compare" id="ic-compare" hidden>
 		<img id="ic-before" alt="Original" />
-		<div class="ic-after-wrap" id="ic-after-wrap"><img id="ic-after" alt="Compressed" /></div>
+		<div class="ic-after-wrap" id="ic-after-wrap">
+			<img id="ic-after" alt="Compressed" />
+		</div>
 		<input type="range" id="ic-split" min="0" max="100" value="50" aria-label="Compare before and after" />
 		<span class="ic-tag ic-tag-l">Original</span>
 		<span class="ic-tag ic-tag-r">Compressed</span>
@@ -42,7 +54,12 @@ import ToolShell from '../../components/ToolShell.astro';
 		const stats = () => {
 			const before = items.reduce((a, i) => a + i.file.size, 0);
 			const after = items.reduce((a, i) => a + i.out, 0);
-			const s: [string, string][] = [['Images', String(items.length)], ['Before', humanSize(before)], ['After', humanSize(after)], ['Saved', before ? `${Math.max(0, Math.round((1 - after / before) * 100))}%` : '—']];
+			const s: [string, string][] = [
+				['Images', String(items.length)],
+				['Before', humanSize(before)],
+				['After', humanSize(after)],
+				['Saved', before ? `${Math.max(0, Math.round((1 - after / before) * 100))}%` : '—'],
+			];
 			byId('ic-stats').replaceChildren(
 				...s.map(([label, value]) => {
 					const el = document.createElement('div');
@@ -51,7 +68,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					el.querySelector('b')!.textContent = value;
 					el.querySelector('span')!.textContent = label;
 					return el;
-				})
+				}),
 			);
 		};
 
@@ -76,7 +93,8 @@ import ToolShell from '../../components/ToolShell.astro';
 			a.href = item.url;
 			a.download = `${item.name.replace(/\.[^.]+$/, '')}.${type.split('/')[1].replace('jpeg', 'jpg')}`;
 			const pct = Math.round((1 - blob.size / item.file.size) * 100);
-			item.li.querySelector('span')!.textContent = `${w} × ${h} · ${humanSize(item.file.size)} → ${humanSize(blob.size)} · ${pct >= 0 ? `−${pct}%` : `+${-pct}% (larger, try another format)`}`;
+			item.li.querySelector('span')!.textContent =
+				`${w} × ${h} · ${humanSize(item.file.size)} → ${humanSize(blob.size)} · ${pct >= 0 ? `−${pct}%` : `+${-pct}% (larger, try another format)`}`;
 			if (current === item) byId<HTMLImageElement>('ic-after').src = item.url;
 			stats();
 		};
@@ -123,7 +141,9 @@ import ToolShell from '../../components/ToolShell.astro';
 			all();
 		});
 		max.addEventListener('input', all);
-		byId<HTMLInputElement>('ic-split').addEventListener('input', (e) => byId('ic-after-wrap').style.setProperty('--split', `${(e.target as HTMLInputElement).value}%`));
+		byId<HTMLInputElement>('ic-split').addEventListener('input', (e) =>
+			byId('ic-after-wrap').style.setProperty('--split', `${(e.target as HTMLInputElement).value}%`),
+		);
 		sampleImage().then((b) => add(b, 'sample.png'));
 	});
 </script>

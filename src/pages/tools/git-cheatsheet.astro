@@ -3,16 +3,108 @@ import Cheatsheet from '../../components/Cheatsheet.astro';
 import ToolShell from '../../components/ToolShell.astro';
 
 const sections: [string, [string, string][]][] = [
-	['Setup', [['git config --global user.name "Your Name"', 'Set your name'], ['git config --global user.email you@example.com', 'Set your email'], ['git config --global init.defaultBranch main', 'Default branch for new repos'], ['git config --global pull.rebase true', 'Rebase instead of merge on pull']]],
-	['Start', [['git init', 'Create a repository here'], ['git clone <url>', 'Copy a remote repository'], ['git clone --depth 1 <url>', 'Shallow clone, latest commit only']]],
-	['Everyday', [['git status -sb', 'Short status with branch'], ['git add -p', 'Stage changes hunk by hunk'], ['git commit -m "message"', 'Commit staged changes'], ['git commit --amend --no-edit', 'Add staged changes to the last commit'], ['git diff --staged', 'See what will be committed'], ['git restore <file>', 'Discard unstaged changes in a file'], ['git restore --staged <file>', 'Unstage a file']]],
-	['Branches', [['git switch -c <branch>', 'Create and switch to a branch'], ['git switch <branch>', 'Switch branch'], ['git branch -d <branch>', 'Delete a merged branch'], ['git branch -vv', 'Branches with their upstream'], ['git merge <branch>', 'Merge a branch into the current one'], ['git rebase main', 'Replay your commits on top of main']]],
-	['Remote', [['git fetch --prune', 'Fetch and drop deleted remote branches'], ['git pull', 'Fetch and integrate'], ['git push -u origin <branch>', 'Push and set upstream'], ['git push --force-with-lease', 'Force push, but only if nobody else pushed'], ['git remote -v', 'List remotes']]],
-	['History', [['git log --oneline --graph --all', 'Compact graph of every branch'], ['git log -p <file>', 'History of a file with diffs'], ['git blame <file>', 'Who changed each line'], ['git show <commit>', 'Show one commit'], ['git log -S "text"', 'Commits that added or removed text']]],
-	['Undo', [['git revert <commit>', 'New commit that undoes another'], ['git reset --soft HEAD~1', 'Undo last commit, keep changes staged'], ['git reset --hard HEAD~1', 'Drop the last commit and its changes'], ['git reflog', 'Find lost commits'], ['git cherry-pick <commit>', 'Copy a commit onto this branch']]],
-	['Stash', [['git stash push -m "wip"', 'Shelve changes'], ['git stash list', 'List stashes'], ['git stash pop', 'Reapply and drop the latest stash'], ['git stash -u', 'Include untracked files']]],
-	['Worktrees', [['git worktree add ../app-fix fix/login', 'Check out an existing branch in a second folder'], ['git worktree add -b feat/search ../app-search main', 'New branch from main in its own folder'], ['git worktree add --detach ../app-review <commit>', 'Folder at a commit, no branch, for a quick review'], ['git worktree list', 'Every worktree with its branch and commit'], ['git worktree remove ../app-fix', 'Delete a worktree folder (must be clean)'], ['git worktree remove --force ../app-fix', 'Delete it even with local changes'], ['git worktree prune', 'Forget worktrees whose folder was deleted by hand'], ['git worktree move ../app-fix ../hotfix', 'Move or rename a worktree folder'], ['git worktree lock ../app-fix', 'Protect a worktree on a removable drive from pruning']]],
-	['Tags & more', [['git tag -a v1.0.0 -m "v1.0.0"', 'Annotated tag'], ['git push --tags', 'Push tags'], ['git bisect start', 'Binary search for the commit that broke things'], ['git clean -fdn', 'Preview removing untracked files']]],
+	[
+		'Setup',
+		[
+			['git config --global user.name "Your Name"', 'Set your name'],
+			['git config --global user.email you@example.com', 'Set your email'],
+			['git config --global init.defaultBranch main', 'Default branch for new repos'],
+			['git config --global pull.rebase true', 'Rebase instead of merge on pull'],
+		],
+	],
+	[
+		'Start',
+		[
+			['git init', 'Create a repository here'],
+			['git clone <url>', 'Copy a remote repository'],
+			['git clone --depth 1 <url>', 'Shallow clone, latest commit only'],
+		],
+	],
+	[
+		'Everyday',
+		[
+			['git status -sb', 'Short status with branch'],
+			['git add -p', 'Stage changes hunk by hunk'],
+			['git commit -m "message"', 'Commit staged changes'],
+			['git commit --amend --no-edit', 'Add staged changes to the last commit'],
+			['git diff --staged', 'See what will be committed'],
+			['git restore <file>', 'Discard unstaged changes in a file'],
+			['git restore --staged <file>', 'Unstage a file'],
+		],
+	],
+	[
+		'Branches',
+		[
+			['git switch -c <branch>', 'Create and switch to a branch'],
+			['git switch <branch>', 'Switch branch'],
+			['git branch -d <branch>', 'Delete a merged branch'],
+			['git branch -vv', 'Branches with their upstream'],
+			['git merge <branch>', 'Merge a branch into the current one'],
+			['git rebase main', 'Replay your commits on top of main'],
+		],
+	],
+	[
+		'Remote',
+		[
+			['git fetch --prune', 'Fetch and drop deleted remote branches'],
+			['git pull', 'Fetch and integrate'],
+			['git push -u origin <branch>', 'Push and set upstream'],
+			['git push --force-with-lease', 'Force push, but only if nobody else pushed'],
+			['git remote -v', 'List remotes'],
+		],
+	],
+	[
+		'History',
+		[
+			['git log --oneline --graph --all', 'Compact graph of every branch'],
+			['git log -p <file>', 'History of a file with diffs'],
+			['git blame <file>', 'Who changed each line'],
+			['git show <commit>', 'Show one commit'],
+			['git log -S "text"', 'Commits that added or removed text'],
+		],
+	],
+	[
+		'Undo',
+		[
+			['git revert <commit>', 'New commit that undoes another'],
+			['git reset --soft HEAD~1', 'Undo last commit, keep changes staged'],
+			['git reset --hard HEAD~1', 'Drop the last commit and its changes'],
+			['git reflog', 'Find lost commits'],
+			['git cherry-pick <commit>', 'Copy a commit onto this branch'],
+		],
+	],
+	[
+		'Stash',
+		[
+			['git stash push -m "wip"', 'Shelve changes'],
+			['git stash list', 'List stashes'],
+			['git stash pop', 'Reapply and drop the latest stash'],
+			['git stash -u', 'Include untracked files'],
+		],
+	],
+	[
+		'Worktrees',
+		[
+			['git worktree add ../app-fix fix/login', 'Check out an existing branch in a second folder'],
+			['git worktree add -b feat/search ../app-search main', 'New branch from main in its own folder'],
+			['git worktree add --detach ../app-review <commit>', 'Folder at a commit, no branch, for a quick review'],
+			['git worktree list', 'Every worktree with its branch and commit'],
+			['git worktree remove ../app-fix', 'Delete a worktree folder (must be clean)'],
+			['git worktree remove --force ../app-fix', 'Delete it even with local changes'],
+			['git worktree prune', 'Forget worktrees whose folder was deleted by hand'],
+			['git worktree move ../app-fix ../hotfix', 'Move or rename a worktree folder'],
+			['git worktree lock ../app-fix', 'Protect a worktree on a removable drive from pruning'],
+		],
+	],
+	[
+		'Tags & more',
+		[
+			['git tag -a v1.0.0 -m "v1.0.0"', 'Annotated tag'],
+			['git push --tags', 'Push tags'],
+			['git bisect start', 'Binary search for the commit that broke things'],
+			['git clean -fdn', 'Preview removing untracked files'],
+		],
+	],
 ];
 ---
 

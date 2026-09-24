@@ -2,21 +2,27 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="hash-text"
-	title="Hash"
-	description="MD5, SHA-1, SHA-256, SHA-384 and SHA-512 of text or a file, all at once. Nothing leaves your browser."
->
+<ToolShell slug="hash-text" title="Hash" description="MD5, SHA-1, SHA-256, SHA-384 and SHA-512 of text or a file, all at once. Nothing leaves your browser.">
 	<div class="toolbar" id="hash-tool">
 		<div class="seg" id="hash-source" aria-label="Source">
-			<button data-value="text" aria-pressed="true">Text</button>
-			<button data-value="file" aria-pressed="false">File</button>
+			<button data-value="text" aria-pressed="true">
+				Text
+			</button>
+			<button data-value="file" aria-pressed="false">
+				File
+			</button>
 		</div>
 		<div class="seg" id="hash-enc" aria-label="Encoding">
-			<button data-value="hex" aria-pressed="true">Hex</button>
-			<button data-value="base64" aria-pressed="false">Base64</button>
+			<button data-value="hex" aria-pressed="true">
+				Hex
+			</button>
+			<button data-value="base64" aria-pressed="false">
+				Base64
+			</button>
 		</div>
-		<label class="check"><input type="checkbox" id="hash-upper" /> Uppercase</label>
+		<label class="check">
+			<input type="checkbox" id="hash-upper" /> Uppercase
+		</label>
 	</div>
 	<section class="panel" id="hash-text-panel">
 		<div class="panel-head">Text</div>
@@ -48,9 +54,7 @@ import ToolShell from '../../components/ToolShell.astro';
 		const render = async () => {
 			const current = ++run;
 			const digests = await Promise.all(
-				ALGORITHMS.map(async (name) =>
-					name === 'MD5' ? md5(bytes) : new Uint8Array(await crypto.subtle.digest(name, bytes))
-				)
+				ALGORITHMS.map(async (name) => (name === 'MD5' ? md5(bytes) : new Uint8Array(await crypto.subtle.digest(name, bytes)))),
 			);
 			if (current !== run) return;
 			list.replaceChildren(
@@ -70,7 +74,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					});
 					li.append(button);
 					return li;
-				})
+				}),
 			);
 		};
 

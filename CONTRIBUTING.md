@@ -18,11 +18,18 @@ npm ci
 npm run dev
 ```
 
-The site runs at http://localhost:4321/kodilo/. Before opening a pull request, make sure this passes:
+The site runs at http://localhost:4321/kodilo/. Before opening a pull request, make sure these pass, as CI runs the same steps:
 
 ```bash
+npm run format:check
+npm run lint
+npm run check
 npm run build
+npm run test:install
+npm test
 ```
+
+`npm test` runs Playwright: every tool page is loaded on desktop, mobile and dark mode, and must render with no console error and no horizontal scroll. Add a functional test in `tests/tools.spec.ts` when your tool computes something with a known answer.
 
 ## Adding a tool
 

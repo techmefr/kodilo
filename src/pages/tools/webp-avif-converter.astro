@@ -2,20 +2,36 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="webp-avif-converter" title="WebP & AVIF Converter" description="Convert images to WebP, JPG or PNG, and to AVIF where your browser can encode it. Compare the file sizes. Everything happens in your browser.">
+<ToolShell
+	slug="webp-avif-converter"
+	title="WebP & AVIF Converter"
+	description="Convert images to WebP, JPG or PNG, and to AVIF where your browser can encode it. Compare the file sizes. Everything happens in your browser."
+>
 	<label class="drop" id="wa-tool">
 		<input type="file" id="wa-file" accept="image/*" multiple hidden />
 		<span id="wa-drop">Drop images here or click to choose. A sample is loaded.</span>
 	</label>
 	<div class="toolbar">
 		<div class="seg" id="wa-format" aria-label="Format">
-			<button data-value="image/webp" aria-pressed="true">WebP</button>
-			<button data-value="image/avif" aria-pressed="false">AVIF</button>
-			<button data-value="image/jpeg" aria-pressed="false">JPG</button>
-			<button data-value="image/png" aria-pressed="false">PNG</button>
+			<button data-value="image/webp" aria-pressed="true">
+				WebP
+			</button>
+			<button data-value="image/avif" aria-pressed="false">
+				AVIF
+			</button>
+			<button data-value="image/jpeg" aria-pressed="false">
+				JPG
+			</button>
+			<button data-value="image/png" aria-pressed="false">
+				PNG
+			</button>
 		</div>
-		<label class="check">Quality <input type="range" id="wa-q" min="10" max="100" value="80" /> <b id="wa-q-v">80</b></label>
-		<button class="btn primary" id="wa-all">Download all</button>
+		<label class="check">
+			Quality <input type="range" id="wa-q" min="10" max="100" value="80" /> <b id="wa-q-v">80</b>
+		</label>
+		<button class="btn primary" id="wa-all">
+			Download all
+		</button>
 	</div>
 	<p class="field-note" id="wa-note"></p>
 	<ul class="wa-list" id="wa-list"></ul>
@@ -93,7 +109,7 @@ import ToolShell from '../../components/ToolShell.astro';
 		q.addEventListener('change', convert);
 		q.addEventListener('input', () => (byId('wa-q-v').textContent = q.value));
 		byId('wa-all').addEventListener('click', () =>
-			items.forEach((it, i) => it.out && setTimeout(() => saveBlob(it.out!, it.name.replace(/\.[^.]+$/, '') + '.' + EXT[type]), i * 250))
+			items.forEach((it, i) => it.out && setTimeout(() => saveBlob(it.out!, it.name.replace(/\.[^.]+$/, '') + '.' + EXT[type]), i * 250)),
 		);
 
 		toBlob(sampleCanvas(1600, 1000), 'image/png').then(async (b) => {

@@ -12,27 +12,43 @@ import ToolShell from '../../components/ToolShell.astro';
 		<span id="ir-drop-text">Drop an image, paste one or click to choose. A sample is loaded.</span>
 	</label>
 	<div class="toolbar">
-		<label class="check">Width <input class="num" id="ir-w" type="number" min="1" /></label>
-		<label class="check">Height <input class="num" id="ir-h" type="number" min="1" /></label>
-		<label class="check"><input type="checkbox" id="ir-lock" checked /> Keep ratio</label>
+		<label class="check">
+			Width <input class="num" id="ir-w" type="number" min="1" />
+		</label>
+		<label class="check">
+			Height <input class="num" id="ir-h" type="number" min="1" />
+		</label>
+		<label class="check">
+			<input type="checkbox" id="ir-lock" checked /> Keep ratio
+		</label>
 		<div class="seg" id="ir-pct">
 			<button data-value="25">25%</button>
 			<button data-value="50">50%</button>
 			<button data-value="75">75%</button>
-			<button data-value="100" aria-pressed="true">100%</button>
+			<button data-value="100" aria-pressed="true">
+				100%
+			</button>
 		</div>
 	</div>
 	<div class="toolbar">
 		<div class="seg" id="ir-format">
-			<button data-value="image/png" aria-pressed="true">PNG</button>
+			<button data-value="image/png" aria-pressed="true">
+				PNG
+			</button>
 			<button data-value="image/jpeg">JPG</button>
 			<button data-value="image/webp">WebP</button>
 		</div>
-		<label class="check" id="ir-q-wrap">Quality <input type="range" id="ir-q" min="10" max="100" value="85" /> <b id="ir-q-value">85</b></label>
-		<a class="btn primary" id="ir-download" download>Download</a>
+		<label class="check" id="ir-q-wrap">
+			Quality <input type="range" id="ir-q" min="10" max="100" value="85" /> <b id="ir-q-value">85</b>
+		</label>
+		<a class="btn primary" id="ir-download" download>
+			Download
+		</a>
 	</div>
 	<p class="ir-info" id="ir-info"></p>
-	<div class="ir-preview"><img id="ir-img" alt="Resized preview" /></div>
+	<div class="ir-preview">
+		<img id="ir-img" alt="Resized preview" />
+	</div>
 </ToolShell>
 
 <script>

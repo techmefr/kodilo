@@ -8,20 +8,44 @@ import ToolShell from '../../components/ToolShell.astro';
 	description="Title, description, canonical, robots, theme color and icons for the head of your page, with a search result preview."
 >
 	<div class="fields" id="mt-tool">
-		<div class="field wide"><label for="mt-title">Title</label><input id="mt-title" value="kodilo — Free developer tools, no sign-up" /><span class="field-note" id="mt-title-note"></span></div>
-		<div class="field wide"><label for="mt-desc">Description</label><input id="mt-desc" value="A collection of open-source tools for developers. Everything runs in your browser, nothing is uploaded." /><span class="field-note" id="mt-desc-note"></span></div>
-		<div class="field"><label for="mt-url">Canonical URL</label><input id="mt-url" spellcheck="false" value="https://techmefr.github.io/kodilo/" /></div>
-		<div class="field"><label for="mt-author">Author</label><input id="mt-author" value="" placeholder="Jane Doe" /></div>
-		<div class="field"><label for="mt-lang">Language</label><input id="mt-lang" spellcheck="false" value="en" /></div>
-		<div class="field"><label for="mt-color">Theme color</label><input id="mt-color" spellcheck="false" value="#6d4fe0" /></div>
+		<div class="field wide">
+			<label for="mt-title">Title</label>
+			<input id="mt-title" value="kodilo — Free developer tools, no sign-up" />
+			<span class="field-note" id="mt-title-note"></span>
+		</div>
+		<div class="field wide">
+			<label for="mt-desc">Description</label>
+			<input id="mt-desc" value="A collection of open-source tools for developers. Everything runs in your browser, nothing is uploaded." />
+			<span class="field-note" id="mt-desc-note"></span>
+		</div>
+		<div class="field">
+			<label for="mt-url">Canonical URL</label>
+			<input id="mt-url" spellcheck="false" value="https://techmefr.github.io/kodilo/" />
+		</div>
+		<div class="field">
+			<label for="mt-author">Author</label>
+			<input id="mt-author" value="" placeholder="Jane Doe" />
+		</div>
+		<div class="field">
+			<label for="mt-lang">Language</label>
+			<input id="mt-lang" spellcheck="false" value="en" />
+		</div>
+		<div class="field">
+			<label for="mt-color">Theme color</label>
+			<input id="mt-color" spellcheck="false" value="#6d4fe0" />
+		</div>
 	</div>
 	<div class="toolbar">
 		<div class="seg" id="mt-robots">
-			<button data-value="index, follow" aria-pressed="true">index, follow</button>
+			<button data-value="index, follow" aria-pressed="true">
+				index, follow
+			</button>
 			<button data-value="noindex, follow">noindex</button>
 			<button data-value="noindex, nofollow">noindex, nofollow</button>
 		</div>
-		<label class="check"><input type="checkbox" id="mt-icons" checked /> Icons</label>
+		<label class="check">
+			<input type="checkbox" id="mt-icons" checked /> Icons
+		</label>
 	</div>
 	<section class="panel mt-serp">
 		<div class="panel-head">Search result preview</div>
@@ -34,7 +58,9 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span>HTML</span>
-			<button class="btn" id="mt-copy">Copy</button>
+			<button class="btn" id="mt-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="mt-out"></pre>
 	</section>
@@ -70,14 +96,24 @@ import ToolShell from '../../components/ToolShell.astro';
 				...(val('mt-author') ? [`<meta name="author" content="${esc(val('mt-author'))}" />`] : []),
 				...(val('mt-color') ? [`<meta name="theme-color" content="${esc(val('mt-color'))}" />`] : []),
 				...(byId<HTMLInputElement>('mt-icons').checked
-					? ['<link rel="icon" href="/favicon.ico" sizes="32x32" />', '<link rel="icon" href="/icon.svg" type="image/svg+xml" />', '<link rel="apple-touch-icon" href="/apple-touch-icon.png" />', '<link rel="manifest" href="/manifest.webmanifest" />']
+					? [
+							'<link rel="icon" href="/favicon.ico" sizes="32x32" />',
+							'<link rel="icon" href="/icon.svg" type="image/svg+xml" />',
+							'<link rel="apple-touch-icon" href="/apple-touch-icon.png" />',
+							'<link rel="manifest" href="/manifest.webmanifest" />',
+						]
 					: []),
 			];
 			byId('mt-out').textContent = `<html lang="${esc(val('mt-lang') || 'en')}">\n<head>\n${lines.map((l) => `  ${l}`).join('\n')}\n</head>`;
 			let host = url;
 			try {
 				const u = new URL(url);
-				host = `${u.hostname}${u.pathname.replace(/\/$/, '').split('/').filter(Boolean).map((p) => ` › ${p}`).join('')}`;
+				host = `${u.hostname}${u.pathname
+					.replace(/\/$/, '')
+					.split('/')
+					.filter(Boolean)
+					.map((p) => ` › ${p}`)
+					.join('')}`;
 			} catch {}
 			byId('mt-p-url').textContent = host;
 			byId('mt-p-title').textContent = cut(title, 60);

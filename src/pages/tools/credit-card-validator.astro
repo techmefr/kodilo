@@ -24,7 +24,9 @@ const samples = [
 	</div>
 	<div class="stats" id="cc-stats"></div>
 	<div class="chips" id="cc-samples">
-		{samples.map(([label, number]) => <button data-number={number}>{label} test card</button>)}
+		{samples.map(([label, number]) => (
+			<button data-number={number}>{label} test card</button>
+		))}
 	</div>
 </ToolShell>
 
@@ -97,7 +99,7 @@ const samples = [
 					el.querySelector('b')!.textContent = value;
 					el.querySelector('span')!.textContent = label;
 					return el;
-				})
+				}),
 			);
 		};
 
@@ -107,7 +109,7 @@ const samples = [
 			button.addEventListener('click', () => {
 				input.value = button.dataset.number!;
 				render();
-			})
+			}),
 		);
 		render();
 	});
