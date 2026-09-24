@@ -1,0 +1,109 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="ipv6-ula-generator"
+	title="IPv6 ULA Generator"
+	description="Generate a random RFC 4193 unique local prefix (fd00::/8) and ready-to-use /64 subnets."
+>
+	<div class="toolbar" id="ula-tool">
+		<button class="btn primary" id="ula-new">Generate</button>
+		<label class="check">Subnets <input class="num" id="ula-count" type="number" min="1" max="256" value="4" aria-label="How many subnets" /></label>
+	</div>
+	<ul class="ula-list" id="ula-main"></ul>
+	<section class="panel">
+		<div class="panel-head">
+			<span>/64 subnets</span>
+			<button class="btn" id="ula-copy">Copy</button>
+		</div>
+		<pre class="out" id="ula-subnets"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const hex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+	onPage('ula-tool', () => {
+		const count = byId<HTMLInputElement>('ula-count');
+		let globalId = crypto.getRandomValues(new Uint8Array(5));
+
+		const render = () => {
+			const g = hex(globalId);
+			const prefix = `fd${g.slice(0, 2)}:${g.slice(2, 6)}:${g.slice(6, 10)}`;
+			const rows: [string, string][] = [
+				['Global ID', g],
+				['Prefix /48', `${prefix}::/48`],
+				['First /64', `${prefix}:0000::/64`.replace(':0000::', '::')],
+				['Example host', `${prefix}::1`],
+			];
+			byId('ula-main').replaceChildren(
+				...rows.map(([label, value]) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<button><span></span><code></code><em>Copy</em></button>';
+					li.querySelector('span')!.textContent = label;
+					li.querySelector('code')!.textContent = value;
+					const btn = li.querySelector('button')!;
+					btn.addEventListener('click', () => {
+						navigator.clipboard.writeText(value);
+						li.querySelector('em')!.textContent = 'Copied';
+						setTimeout(() => (li.querySelector('em')!.textContent = 'Copy'), 1200);
+					});
+					return li;
+				})
+			);
+			const n = Math.min(256, Math.max(1, Number(count.value) || 1));
+			byId('ula-subnets').textContent = Array.from({ length: n }, (_, i) => `${prefix}:${i.toString(16)}::/64`).join('\n');
+		};
+
+		byId('ula-new').addEventListener('click', () => {
+			globalId = crypto.getRandomValues(new Uint8Array(5));
+			render();
+		});
+		count.addEventListener('input', render);
+		copyButton(byId('ula-copy'), () => byId('ula-subnets').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.ula-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 8px;
+	}
+	.ula-list :global(button) {
+		width: 100%;
+		display: grid;
+		grid-template-columns: 120px 1fr auto;
+		gap: 12px;
+		align-items: center;
+		text-align: left;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		padding: 10px 14px;
+		color: var(--ink);
+		font: inherit;
+		cursor: pointer;
+	}
+	.ula-list :global(span) {
+		font-size: 12px;
+		color: var(--ink-soft);
+		font-weight: 700;
+	}
+	.ula-list :global(code) {
+		font-family: var(--mono);
+		font-size: 14px;
+		overflow-wrap: anywhere;
+	}
+	.ula-list :global(em) {
+		font-style: normal;
+		font-size: 12px;
+		color: var(--accent-strong);
+	}
+</style>

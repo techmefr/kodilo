@@ -374,11 +374,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'ipv4-range-expander',
+				built: true,
 				name: 'IPv4 Range Expander',
 				description: 'Expand an IPv4 range or CIDR into individual addresses.',
 			},
 			{
 				slug: 'ipv6-ula-generator',
+				built: true,
 				name: 'IPv6 ULA Generator',
 				description: 'Generate a unique local IPv6 address prefix.',
 			},
