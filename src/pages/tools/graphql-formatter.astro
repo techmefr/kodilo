@@ -1,0 +1,71 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `query GetUser($id: ID!, $first: Int = 10) { user(id: $id) { id name email ...Avatar posts(first: $first, orderBy: {field: CREATED_AT, direction: DESC}) { edges { node { id title createdAt } } pageInfo { hasNextPage endCursor } } } }
+fragment Avatar on User { avatar(size: 64) { url } }`;
+---
+
+<ToolShell slug="graphql-formatter" title="GraphQL Formatter" description="Format or minify GraphQL queries, mutations, fragments and schemas. Syntax errors show the line and column.">
+	<div class="toolbar" id="gq-tool">
+		<div class="seg" id="gq-mode" aria-label="Mode">
+			<button data-value="pretty" aria-pressed="true">Format</button>
+			<button data-value="minify" aria-pressed="false">Minify</button>
+		</div>
+		<span class="field-note" id="gq-summary"></span>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">GraphQL</div>
+			<textarea id="gq-in" spellcheck="false" aria-label="GraphQL input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Output</span>
+				<button class="btn" id="gq-copy">Copy</button>
+			</div>
+			<pre class="out" id="gq-out"></pre>
+		</section>
+	</div>
+	<p class="error" id="gq-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { parse, print, stripIgnoredCharacters } from 'graphql';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('gq-tool', () => {
+		const input = byId<HTMLTextAreaElement>('gq-in');
+		const out = byId('gq-out');
+		const error = byId('gq-error');
+		let mode = 'pretty';
+
+		const render = () => {
+			try {
+				const doc = parse(input.value);
+				out.textContent = mode === 'pretty' ? print(doc) : stripIgnoredCharacters(input.value);
+				error.hidden = true;
+				const kinds = doc.definitions.map((d) => ('operation' in d ? d.operation : d.kind.replace(/Definition$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()));
+				const counts = kinds.reduce<Record<string, number>>((a, k) => ((a[k] = (a[k] ?? 0) + 1), a), {});
+				byId('gq-summary').textContent = Object.entries(counts).map(([k, n]) => `${n} ${k}${n > 1 ? 's' : ''}`).join(', ');
+			} catch (e) {
+				const err = e as Error & { locations?: { line: number; column: number }[] };
+				const at = err.locations?.[0];
+				error.hidden = false;
+				error.textContent = at ? `Line ${at.line}, column ${at.column}: ${err.message.replace(/^Syntax Error: /, '')}` : err.message;
+				out.textContent = '';
+				byId('gq-summary').textContent = '';
+			}
+		};
+
+		segmented(byId('gq-mode'), (v) => ((mode = v), render()));
+		input.addEventListener('input', render);
+		copyButton(byId('gq-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#gq-in {
+		min-height: 360px;
+	}
+</style>

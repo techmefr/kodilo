@@ -1,0 +1,151 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = JSON.stringify(
+	{
+		id: 4821,
+		email: 'ada@example.com',
+		active: true,
+		roles: ['admin', 'editor'],
+		profile: { firstName: 'Ada', lastName: 'Lovelace', avatar: null },
+		orders: [
+			{ id: 'ord_1', total: 49.9, items: [{ sku: 'KB-01', qty: 1 }] },
+			{ id: 'ord_2', total: 12, coupon: 'WELCOME', items: [] },
+		],
+	},
+	null,
+	2
+);
+---
+
+<ToolShell slug="json-to-typescript" title="JSON to TypeScript" description="Paste a JSON sample and get TypeScript interfaces or types. Arrays of objects are merged, and keys missing from some items become optional.">
+	<div class="toolbar" id="jt-tool">
+		<div class="seg" id="jt-kind" aria-label="Declaration">
+			<button data-value="interface" aria-pressed="true">interface</button>
+			<button data-value="type" aria-pressed="false">type</button>
+		</div>
+		<label class="check">Root name <input class="jt-name" id="jt-name" value="User" spellcheck="false" /></label>
+		<label class="check"><input type="checkbox" id="jt-export" checked /> export</label>
+		<label class="check"><input type="checkbox" id="jt-readonly" /> readonly</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">JSON</div>
+			<textarea id="jt-in" spellcheck="false" aria-label="JSON input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>TypeScript</span>
+				<button class="btn" id="jt-copy">Copy</button>
+			</div>
+			<pre class="out" id="jt-out"></pre>
+		</section>
+	</div>
+	<p class="error" id="jt-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Opts = { kind: string; exp: boolean; ro: boolean };
+
+	const pascal = (s: string) => {
+		const p = s.replace(/[^A-Za-z0-9]+(.)?/g, (_, c) => (c ? c.toUpperCase() : '')).replace(/^./, (c) => c.toUpperCase());
+		return /^[A-Za-z_]/.test(p) ? p : `T${p}`;
+	};
+	const singular = (s: string) => s.replace(/ies$/, 'y').replace(/(ss|us)$/, '$1').replace(/s$/, '');
+	const key = (k: string) => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k));
+
+	function generate(root: unknown, rootName: string, o: Opts): string {
+		const decls: string[] = [];
+		const used = new Set<string>();
+		const unique = (n: string) => {
+			let name = n;
+			let i = 2;
+			while (used.has(name)) name = `${n}${i++}`;
+			used.add(name);
+			return name;
+		};
+
+		const typeOf = (values: unknown[], hint: string): string => {
+			const parts = new Set<string>();
+			const objects = values.filter((v) => v && typeof v === 'object' && !Array.isArray(v)) as Record<string, unknown>[];
+			const arrays = values.filter(Array.isArray) as unknown[][];
+			for (const v of values) {
+				if (v === null) parts.add('null');
+				else if (typeof v === 'string') parts.add('string');
+				else if (typeof v === 'number') parts.add('number');
+				else if (typeof v === 'boolean') parts.add('boolean');
+			}
+			if (objects.length) parts.add(object(objects, hint));
+			if (arrays.length) {
+				const items = arrays.flat();
+				const inner = items.length ? typeOf(items, singular(hint)) : 'unknown';
+				parts.add(/[|&]/.test(inner) ? `(${inner})[]` : `${inner}[]`);
+			}
+			const list = [...parts];
+			return list.length ? list.join(' | ') : 'unknown';
+		};
+
+		const object = (objs: Record<string, unknown>[], hint: string): string => {
+			const name = unique(pascal(hint));
+			const keys = [...new Set(objs.flatMap((x) => Object.keys(x)))];
+			const ro = o.ro ? 'readonly ' : '';
+			const lines = keys.map((k) => {
+				const present = objs.filter((x) => k in x);
+				const optional = present.length < objs.length ? '?' : '';
+				return `  ${ro}${key(k)}${optional}: ${typeOf(present.map((x) => x[k]), k)};`;
+			});
+			const exp = o.exp ? 'export ' : '';
+			const body = lines.length ? `{\n${lines.join('\n')}\n}` : 'Record<string, unknown>';
+			decls.push(o.kind === 'interface' && lines.length ? `${exp}interface ${name} ${body}` : `${exp}type ${name} = ${body};`);
+			return name;
+		};
+
+		const t = typeOf([root], rootName);
+		if (!root || typeof root !== 'object' || Array.isArray(root)) decls.push(`${o.exp ? 'export ' : ''}type ${unique(pascal(rootName))} = ${t};`);
+		return decls.reverse().join('\n\n') + '\n';
+	}
+
+	onPage('jt-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jt-in');
+		const name = byId<HTMLInputElement>('jt-name');
+		const exp = byId<HTMLInputElement>('jt-export');
+		const ro = byId<HTMLInputElement>('jt-readonly');
+		const out = byId('jt-out');
+		const error = byId('jt-error');
+		let kind = 'interface';
+
+		const render = () => {
+			try {
+				out.textContent = generate(JSON.parse(input.value), name.value || 'Root', { kind, exp: exp.checked, ro: ro.checked });
+				error.hidden = true;
+			} catch (e) {
+				error.hidden = false;
+				error.textContent = `Invalid JSON: ${(e as Error).message}`;
+			}
+		};
+
+		segmented(byId('jt-kind'), (v) => ((kind = v), render()));
+		[input, name].forEach((el) => el.addEventListener('input', render));
+		[exp, ro].forEach((el) => el.addEventListener('change', render));
+		copyButton(byId('jt-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#jt-in {
+		min-height: 380px;
+	}
+	.jt-name {
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--ink);
+		border-radius: 8px;
+		padding: 5px 8px;
+		font-family: var(--mono);
+		font-size: 13px;
+		width: 120px;
+	}
+</style>
