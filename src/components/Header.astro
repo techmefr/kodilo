@@ -1,0 +1,602 @@
+---
+import { builtCategories as categories } from '../data/tools';
+import { icon } from '../scripts/icons';
+
+interface Props {
+	activeSlug?: string;
+}
+
+const { activeSlug } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const index = categories.flatMap((c) => c.tools.map((t) => ({ n: t.name, d: t.description, c: c.name, u: `${base}tools/${t.slug}/` })));
+const total = index.length;
+---
+
+<header class="site-header" transition:name="site-header">
+	<div class="bar">
+		<a class="brand" href={base}>kodilo</a>
+		<nav class="cats" aria-label="Tool categories">
+			{
+				categories.map((c, i) => (
+					<button
+						type="button"
+						class="cat-btn"
+						aria-expanded="false"
+						aria-controls={`mega-${i}`}
+						data-index={i}
+						data-active={c.tools.some((t) => t.slug === activeSlug) ? 'true' : undefined}
+					>
+						<span class="cat-btn-icon" set:html={icon(c.icon)} />
+						{c.name}
+					</button>
+				))
+			}
+		</nav>
+		<button type="button" class="search-btn" id="search-open" aria-label="Search tools">
+			<span set:html={icon('search')} />
+			<span class="search-label">Search {total} tools</span>
+			<kbd id="search-kbd">⌘K</kbd>
+		</button>
+		<button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+			<span class="icon-sun" set:html={icon('sun')} />
+			<span class="icon-moon" set:html={icon('moon')} />
+		</button>
+	</div>
+	{
+		categories.map((c, i) => (
+			<div class="mega" id={`mega-${i}`} hidden>
+				<div class="mega-inner">
+					<div class="mega-intro">
+						<span class="mega-icon" set:html={icon(c.icon)} />
+						<b>{c.name}</b>
+						<p>{c.blurb}</p>
+						<span class="mega-count">
+							{c.tools.length} tool{c.tools.length === 1 ? '' : 's'}
+						</span>
+					</div>
+					<ul class="mega-grid">
+						{c.tools.map((t) => (
+							<li>
+								<a href={`${base}tools/${t.slug}/`} aria-current={t.slug === activeSlug ? 'page' : undefined}>
+									<b>{t.name}</b>
+									<span>{t.description}</span>
+								</a>
+							</li>
+						))}
+					</ul>
+				</div>
+			</div>
+		))
+	}
+	<div class="mega-scrim" id="mega-scrim" hidden></div>
+</header>
+
+<dialog class="palette" id="palette" aria-label="Search tools">
+	<div class="palette-box">
+		<div class="palette-input">
+			<span set:html={icon('search')} />
+			<input id="palette-q" type="search" placeholder="Search tools, e.g. jwt, base64, cron…" autocomplete="off" spellcheck="false" aria-controls="palette-list" />
+			<kbd>Esc</kbd>
+		</div>
+		<ul class="palette-list" id="palette-list" role="listbox" data-index={JSON.stringify(index)}></ul>
+		<div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> to move</span><span><kbd>↵</kbd> to open</span></div>
+	</div>
+</dialog>
+
+<script>
+	import { navigate } from 'astro:transitions/client';
+
+	type Entry = { n: string; d: string; c: string; u: string };
+
+	const open = () => {
+		const dialog = document.getElementById('palette') as HTMLDialogElement | null;
+		if (!dialog || dialog.open) return;
+		closeMega();
+		dialog.showModal();
+		const q = document.getElementById('palette-q') as HTMLInputElement;
+		q.value = '';
+		q.dispatchEvent(new Event('input'));
+		q.focus();
+	};
+
+	function closeMega() {
+		document.querySelectorAll<HTMLElement>('.mega').forEach((m) => (m.hidden = true));
+		document.querySelectorAll('.cat-btn').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+		const scrim = document.getElementById('mega-scrim');
+		if (scrim) scrim.hidden = true;
+	}
+
+	document.addEventListener('keydown', (e) => {
+		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+			e.preventDefault();
+			open();
+		} else if (e.key === '/' && !(e.target as HTMLElement).closest('input, textarea, [contenteditable]')) {
+			e.preventDefault();
+			open();
+		} else if (e.key === 'Escape') closeMega();
+	});
+
+	function score(entry: Entry, terms: string[]): number {
+		const name = entry.n.toLowerCase();
+		const hay = `${name} ${entry.d.toLowerCase()} ${entry.c.toLowerCase()}`;
+		let s = 0;
+		for (const t of terms) {
+			if (name.startsWith(t)) s += 10;
+			else if (name.split(/[\s/-]+/).some((w) => w.startsWith(t))) s += 6;
+			else if (name.includes(t)) s += 4;
+			else if (hay.includes(t)) s += 1;
+			else {
+				let k = 0;
+				for (const ch of name) if (ch === t[k]) k++;
+				if (k < t.length) return 0;
+				s += 0.5;
+			}
+		}
+		return s;
+	}
+
+	document.addEventListener('astro:page-load', () => {
+		const buttons = [...document.querySelectorAll<HTMLButtonElement>('.cat-btn')];
+		const scrim = document.getElementById('mega-scrim')!;
+		let hoverTimer: number | undefined;
+		let moved = false;
+		document.addEventListener('pointermove', () => (moved = true), { once: true });
+		const show = (btn: HTMLButtonElement) => {
+			const panel = document.getElementById(btn.getAttribute('aria-controls')!)!;
+			const wasOpen = !panel.hidden;
+			closeMega();
+			if (wasOpen) return;
+			panel.hidden = false;
+			scrim.hidden = false;
+			btn.setAttribute('aria-expanded', 'true');
+		};
+		buttons.forEach((btn) => {
+			btn.addEventListener('click', () => show(btn));
+			btn.addEventListener('mouseenter', () => {
+				if (!moved || !matchMedia('(hover: hover)').matches) return;
+				clearTimeout(hoverTimer);
+				hoverTimer = window.setTimeout(() => {
+					if (btn.getAttribute('aria-expanded') !== 'true') show(btn);
+				}, 120);
+			});
+			btn.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
+		});
+		document.querySelector('.site-header')!.addEventListener('mouseleave', () => {
+			if (matchMedia('(hover: hover)').matches) closeMega();
+		});
+		scrim.addEventListener('click', closeMega);
+		document.querySelectorAll('.mega a').forEach((a) => a.addEventListener('click', closeMega));
+
+		const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+		document.getElementById('search-kbd')!.textContent = isMac ? '⌘K' : 'Ctrl K';
+		document.getElementById('search-open')!.addEventListener('click', open);
+
+		const dialog = document.getElementById('palette') as HTMLDialogElement;
+		const q = document.getElementById('palette-q') as HTMLInputElement;
+		const list = document.getElementById('palette-list')!;
+		const entries: Entry[] = JSON.parse(list.dataset.index!);
+		let results: Entry[] = [];
+		let active = 0;
+
+		const paint = () => {
+			list.querySelectorAll('li').forEach((li, i) => {
+				li.setAttribute('aria-selected', String(i === active));
+				if (i === active) li.scrollIntoView({ block: 'nearest' });
+			});
+		};
+		const go = (entry?: Entry) => {
+			if (!entry) return;
+			dialog.close();
+			navigate(entry.u);
+		};
+
+		q.addEventListener('input', () => {
+			const terms = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+			results = terms.length
+				? entries
+						.map((e) => [e, score(e, terms)] as const)
+						.filter(([, s]) => s > 0)
+						.sort((a, b) => b[1] - a[1] || a[0].n.localeCompare(b[0].n))
+						.map(([e]) => e)
+						.slice(0, 50)
+				: entries;
+			active = 0;
+			if (!results.length) {
+				const li = document.createElement('li');
+				li.className = 'palette-empty';
+				li.textContent = `No tool matches “${q.value.trim()}”.`;
+				list.replaceChildren(li);
+				return;
+			}
+			list.replaceChildren(
+				...results.map((e, i) => {
+					const li = document.createElement('li');
+					li.setAttribute('role', 'option');
+					li.innerHTML = '<div><b></b><span></span></div><em></em>';
+					li.querySelector('b')!.textContent = e.n;
+					li.querySelector('span')!.textContent = e.d;
+					li.querySelector('em')!.textContent = e.c;
+					li.addEventListener('click', () => go(e));
+					li.addEventListener('mousemove', () => {
+						if (active !== i) {
+							active = i;
+							paint();
+						}
+					});
+					return li;
+				})
+			);
+			paint();
+		});
+		q.addEventListener('keydown', (e) => {
+			if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+				e.preventDefault();
+				if (!results.length) return;
+				active = (active + (e.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length;
+				paint();
+			} else if (e.key === 'Enter') {
+				e.preventDefault();
+				go(results[active]);
+			}
+		});
+		dialog.addEventListener('click', (e) => {
+			if (e.target === dialog) dialog.close();
+		});
+
+		document.getElementById('theme-toggle')!.addEventListener('click', () => {
+			const root = document.documentElement;
+			const current = root.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+			const next = current === 'dark' ? 'light' : 'dark';
+			root.dataset.theme = next;
+			try {
+				localStorage.setItem('kodilo-theme', next);
+			} catch {}
+		});
+	});
+</script>
+
+<style>
+	.site-header {
+		position: sticky;
+		top: 0;
+		z-index: 50;
+		background: var(--bg);
+		border-bottom: 1px solid var(--border);
+	}
+	.bar {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		height: 56px;
+		padding: 0 16px;
+	}
+	.brand {
+		font-size: 16px;
+		font-weight: 800;
+		letter-spacing: -0.02em;
+		color: var(--accent-strong);
+		text-decoration: none;
+		flex-shrink: 0;
+	}
+	.cats {
+		display: flex;
+		gap: 2px;
+		flex: 1;
+		min-width: 0;
+		overflow-x: auto;
+		scrollbar-width: none;
+		mask-image: linear-gradient(90deg, #000 92%, transparent);
+	}
+	.cats::-webkit-scrollbar {
+		display: none;
+	}
+	.cat-btn {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		flex-shrink: 0;
+		border: 0;
+		background: none;
+		color: var(--ink-soft);
+		font: inherit;
+		font-size: 13px;
+		font-weight: 600;
+		padding: 7px 10px;
+		border-radius: 8px;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.cat-btn:hover,
+	.cat-btn[aria-expanded='true'] {
+		background: var(--surface-2);
+		color: var(--ink);
+	}
+	.cat-btn[data-active='true'] {
+		color: var(--accent-strong);
+	}
+	.cat-btn-icon {
+		display: flex;
+		color: var(--accent-strong);
+	}
+	.cat-btn-icon :global(svg) {
+		width: 15px;
+		height: 15px;
+	}
+	.search-btn {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-shrink: 0;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--ink-soft);
+		font: inherit;
+		font-size: 13px;
+		padding: 6px 8px 6px 10px;
+		border-radius: 9px;
+		cursor: pointer;
+	}
+	.search-btn:hover {
+		border-color: var(--accent-strong);
+	}
+	.search-btn :global(svg),
+	.palette-input :global(svg) {
+		width: 15px;
+		height: 15px;
+		display: block;
+	}
+	kbd {
+		font-family: var(--mono);
+		font-size: 11px;
+		padding: 1px 6px;
+		border: 1px solid var(--border);
+		border-bottom-width: 2px;
+		border-radius: 5px;
+		background: var(--surface-2);
+		color: var(--ink-soft);
+	}
+	.theme-toggle {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		flex-shrink: 0;
+		border: 1px solid var(--border);
+		border-radius: 9px;
+		background: var(--surface);
+		color: var(--ink-soft);
+		cursor: pointer;
+		padding: 0;
+	}
+	.theme-toggle:hover {
+		background: var(--surface-2);
+	}
+	.theme-toggle :global(svg) {
+		width: 15px;
+		height: 15px;
+	}
+	.icon-moon {
+		display: none;
+	}
+	:root[data-theme='dark'] .theme-toggle .icon-sun {
+		display: none;
+	}
+	:root[data-theme='dark'] .theme-toggle .icon-moon {
+		display: flex;
+	}
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-theme='light']) .theme-toggle .icon-sun {
+			display: none;
+		}
+		:root:not([data-theme='light']) .theme-toggle .icon-moon {
+			display: flex;
+		}
+	}
+	@media (max-width: 1280px) {
+		.cat-btn-icon {
+			display: none;
+		}
+	}
+	@media (max-width: 720px) {
+		.search-label,
+		.search-btn kbd {
+			display: none;
+		}
+	}
+	.mega {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 100%;
+		z-index: 2;
+		background: var(--surface);
+		border-bottom: 1px solid var(--border);
+		box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.25);
+		max-height: calc(100vh - 56px);
+		overflow-y: auto;
+	}
+	.mega-inner {
+		display: grid;
+		grid-template-columns: 220px 1fr;
+		gap: 24px;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 24px 16px 28px;
+	}
+	.mega-intro {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.mega-icon {
+		display: flex;
+		width: 36px;
+		height: 36px;
+		align-items: center;
+		justify-content: center;
+		border-radius: 10px;
+		background: var(--accent);
+		color: var(--accent-strong);
+	}
+	.mega-icon :global(svg) {
+		width: 18px;
+		height: 18px;
+	}
+	.mega-intro b {
+		font-size: 18px;
+		font-weight: 800;
+	}
+	.mega-intro p {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.mega-count {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.mega-grid {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+		gap: 4px 12px;
+	}
+	.mega-grid a {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 10px 12px;
+		border-radius: 10px;
+		text-decoration: none;
+		color: var(--ink);
+	}
+	.mega-grid a:hover,
+	.mega-grid a:focus-visible {
+		background: var(--surface-2);
+	}
+	.mega-grid a[aria-current='page'] {
+		background: var(--accent);
+	}
+	.mega-grid b {
+		font-size: 14px;
+		font-weight: 700;
+	}
+	.mega-grid span {
+		font-size: 12.5px;
+		line-height: 1.4;
+		color: var(--ink-soft);
+	}
+	@media (max-width: 720px) {
+		.mega-inner {
+			grid-template-columns: 1fr;
+			gap: 12px;
+		}
+		.mega-intro p,
+		.mega-icon {
+			display: none;
+		}
+	}
+	.mega-scrim {
+		position: fixed;
+		inset: 56px 0 0;
+		z-index: 1;
+		background: rgba(0, 0, 0, 0.25);
+	}
+	.palette {
+		border: 0;
+		padding: 0;
+		background: transparent;
+		width: min(640px, calc(100vw - 32px));
+		max-height: none;
+		margin: 12vh auto auto;
+		color: var(--ink);
+	}
+	.palette::backdrop {
+		background: rgba(0, 0, 0, 0.45);
+		backdrop-filter: blur(2px);
+	}
+	.palette-box {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 16px;
+		overflow: hidden;
+		box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+	}
+	.palette-input {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 12px 16px;
+		border-bottom: 1px solid var(--border);
+		color: var(--ink-soft);
+	}
+	.palette-input input {
+		flex: 1;
+		min-width: 0;
+		border: 0;
+		outline: 0;
+		background: transparent;
+		color: var(--ink);
+		font: inherit;
+		font-size: 16px;
+	}
+	.palette-list {
+		list-style: none;
+		margin: 0;
+		padding: 6px;
+		max-height: 52vh;
+		overflow-y: auto;
+	}
+	.palette-list :global(li) {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 9px 12px;
+		border-radius: 10px;
+		cursor: pointer;
+	}
+	.palette-list :global(li[aria-selected='true']) {
+		background: var(--accent);
+	}
+	.palette-list :global(li div) {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		flex: 1;
+		min-width: 0;
+	}
+	.palette-list :global(li b) {
+		font-size: 14px;
+	}
+	.palette-list :global(li span) {
+		font-size: 12.5px;
+		color: var(--ink-soft);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.palette-list :global(li em) {
+		font-style: normal;
+		font-size: 11px;
+		color: var(--ink-soft);
+		white-space: nowrap;
+	}
+	.palette-list :global(.palette-empty) {
+		color: var(--ink-soft);
+		cursor: default;
+	}
+	.palette-foot {
+		display: flex;
+		gap: 16px;
+		padding: 8px 16px;
+		border-top: 1px solid var(--border);
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.palette-foot kbd {
+		margin-right: 3px;
+	}
+</style>

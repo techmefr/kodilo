@@ -99,7 +99,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - **Math Evaluator** (`/tools/math-evaluator/`) — calculator notepad with variables
 - **Kubernetes Manifest Generator** (`/tools/kubernetes-manifest-generator/`) — Deployment, Service and Ingress YAML
 - **Nginx Config Generator** (`/tools/nginx-config-generator/`) — proxy, SPA, static or PHP with HTTPS
-- More tools land as separate categories in the sidebar — see `src/data/tools.ts`.
+- More tools land as new categories in the header mega menu and the ⌘K / Ctrl K search — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
 

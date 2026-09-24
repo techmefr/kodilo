@@ -1,43 +1,159 @@
 ---
+import Header from '../components/Header.astro';
+import { builtCategories as categories } from '../data/tools';
 import Base from '../layouts/Base.astro';
-import Sidebar from '../components/Sidebar.astro';
+import { icon } from '../scripts/icons';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const total = categories.reduce((a, c) => a + c.tools.length, 0);
 ---
 
-<Base title="kodilo">
-	<div class="shell">
-		<Sidebar />
-		<main class="main">
+<Base title="kodilo — Developer tools, no sign-up">
+	<Header />
+	<main class="home">
+		<section class="hero">
 			<h1>kodilo</h1>
-			<p class="tagline">
-				A collection of open-source tools for developers without sign, account.
-			</p>
-			<p class="hint">Pick a tool in the sidebar to get started.</p>
-		</main>
-	</div>
+			<p>{total} open-source tools for developers. No sign-up, no account, nothing leaves your browser.</p>
+			<button type="button" class="hero-search" id="hero-search">
+				<span set:html={icon('search')} />
+				Search a tool
+				<kbd>⌘K</kbd>
+			</button>
+		</section>
+		{
+			categories.map((c) => (
+				<section class="home-cat">
+					<h2>
+						<span class="home-icon" set:html={icon(c.icon)} />
+						{c.name}
+						<small>{c.blurb}</small>
+					</h2>
+					<ul>
+						{c.tools.map((t) => (
+							<li>
+								<a href={`${base}tools/${t.slug}/`}>
+									<b>{t.name}</b>
+									<span>{t.description}</span>
+								</a>
+							</li>
+						))}
+					</ul>
+				</section>
+			))
+		}
+	</main>
 </Base>
 
+<script>
+	document.addEventListener('astro:page-load', () => {
+		document.getElementById('hero-search')?.addEventListener('click', () => document.getElementById('search-open')?.click());
+	});
+</script>
+
 <style>
-	.shell {
+	.home {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 40px 16px 64px;
 		display: flex;
-		min-height: 100vh;
+		flex-direction: column;
+		gap: 36px;
 	}
-	.main {
-		flex: 1;
-		padding: 40px 32px;
-		max-width: 720px;
+	.hero h1 {
+		margin: 0;
+		font-size: 40px;
+		font-weight: 800;
+		letter-spacing: -0.03em;
 	}
-	h1 {
-		margin: 0 0 8px;
-		font-size: 28px;
-		letter-spacing: -0.01em;
-	}
-	.tagline {
+	.hero p {
+		margin: 8px 0 18px;
+		font-size: 16px;
 		color: var(--ink-soft);
+		max-width: 60ch;
+	}
+	.hero-search {
+		display: inline-flex;
+		align-items: center;
+		gap: 10px;
+		width: min(420px, 100%);
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--ink-soft);
+		font: inherit;
 		font-size: 15px;
-		margin: 0 0 24px;
+		padding: 11px 14px;
+		border-radius: 12px;
+		cursor: pointer;
 	}
-	.hint {
+	.hero-search:hover {
+		border-color: var(--accent-strong);
+	}
+	.hero-search kbd {
+		margin-left: auto;
+		font-family: var(--mono);
+		font-size: 11px;
+		padding: 1px 6px;
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		background: var(--surface-2);
+	}
+	.hero-search :global(svg) {
+		width: 16px;
+		height: 16px;
+		display: block;
+	}
+	.home-cat h2 {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin: 0 0 10px;
+		font-size: 18px;
+		font-weight: 800;
+	}
+	.home-cat small {
+		font-size: 13px;
+		font-weight: 500;
 		color: var(--ink-soft);
-		font-size: 13.5px;
+	}
+	.home-icon {
+		display: flex;
+		color: var(--accent-strong);
+	}
+	.home-icon :global(svg) {
+		width: 18px;
+		height: 18px;
+	}
+	.home-cat ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+		gap: 10px;
+	}
+	.home-cat a {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		height: 100%;
+		box-sizing: border-box;
+		padding: 12px 14px;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: var(--surface);
+		color: var(--ink);
+		text-decoration: none;
+	}
+	.home-cat a:hover {
+		border-color: var(--accent-strong);
+	}
+	.home-cat b {
+		font-size: 14px;
+	}
+	.home-cat span {
+		font-size: 12.5px;
+		line-height: 1.4;
+		color: var(--ink-soft);
 	}
 </style>
