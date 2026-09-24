@@ -71,11 +71,13 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'html-formatter',
+				built: true,
 				name: 'HTML Formatter',
 				description: 'Beautify and format HTML code.',
 			},
 			{
 				slug: 'css-formatter',
+				built: true,
 				name: 'CSS Formatter & Minifier',
 				description: 'Format and minify CSS stylesheets.',
 			},
@@ -112,11 +114,13 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'markdown-to-html',
+				built: true,
 				name: 'Markdown to HTML',
 				description: 'Convert Markdown to HTML.',
 			},
 			{
 				slug: 'markdown-previewer',
+				built: true,
 				name: 'Markdown Previewer',
 				description: 'Write Markdown and preview the rendered result live.',
 			},
@@ -523,11 +527,13 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'sql-prettify',
+				built: true,
 				name: 'SQL Prettify',
 				description: 'Format SQL queries.',
 			},
 			{
 				slug: 'math-evaluator',
+				built: true,
 				name: 'Math Evaluator',
 				description: 'Evaluate a math expression on the fly.',
 			},
@@ -562,6 +568,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'docker-cheatsheet',
+				built: true,
 				name: 'Docker Cheatsheet',
 				description: 'Quick reference for common Docker commands.',
 			},
@@ -573,6 +580,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'npm-cheatsheet',
+				built: true,
 				name: 'NPM Cheatsheet',
 				description: 'Quick reference for common npm/pnpm/yarn commands.',
 			},
@@ -609,6 +617,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'kubernetes-manifest-generator',
+				built: true,
 				name: 'Kubernetes Manifest Generator',
 				description: 'Deployment, Service and Ingress YAML from a short form.',
 			},
@@ -625,6 +634,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'nginx-config-generator',
+				built: true,
 				name: 'Nginx Config Generator',
 				description: 'Reverse proxy, static site, SPA fallback, HTTPS redirect and gzip in a few clicks.',
 			},

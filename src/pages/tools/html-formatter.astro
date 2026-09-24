@@ -1,0 +1,184 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Demo</title><style>body{margin:0}</style></head><body><header class="top"><nav><a href="/">Home</a><a href="/tools/">Tools</a></nav></header><main><h1>Hello <em>world</em></h1><p>Some <strong>inline</strong> text with a <a href="#">link</a>.</p><ul><li>One</li><li>Two</li></ul><pre>  keep
+    this as is</pre><img src="a.png" alt="A"><!-- a comment --></main><script>console.log("hi")</script></body></html>`;
+---
+
+<ToolShell slug="html-formatter" title="HTML Formatter" description="Beautify or minify HTML. Keeps inline elements on one line, leaves pre, textarea, script and style content untouched.">
+	<div class="toolbar" id="hf-tool">
+		<div class="seg" id="hf-mode">
+			<button data-value="beautify" aria-pressed="true">Beautify</button>
+			<button data-value="minify">Minify</button>
+		</div>
+		<div class="seg" id="hf-indent">
+			<button data-value="2" aria-pressed="true">2 spaces</button>
+			<button data-value="4">4 spaces</button>
+			<button data-value="tab">Tab</button>
+		</div>
+		<label class="check"><input type="checkbox" id="hf-comments" /> Strip comments</label>
+		<span class="hf-size" id="hf-size"></span>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="hf-in" spellcheck="false" aria-label="HTML input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Output</span>
+				<button class="btn" id="hf-copy">Copy</button>
+			</div>
+			<pre class="out" id="hf-out"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const VOID = new Set('area base br col embed hr img input link meta source track wbr'.split(' '));
+	const INLINE = new Set('a abbr b bdi bdo br cite code data dfn em i kbd label mark q s samp small span strong sub sup time u var img input button select'.split(' '));
+	const RAW = new Set(['pre', 'textarea', 'script', 'style']);
+
+	type Tok = { kind: 'open' | 'close' | 'text' | 'comment' | 'doctype' | 'raw'; name?: string; v: string };
+
+	function lex(html: string): Tok[] {
+		const out: Tok[] = [];
+		const re = /<!--[\s\S]*?-->|<!doctype[^>]*>|<\/?([a-zA-Z][\w:-]*)(?:\s(?:[^>"']|"[^"]*"|'[^']*')*)?\s*\/?>|[^<]+|</gi;
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(html))) {
+			const v = m[0];
+			if (v.startsWith('<!--')) out.push({ kind: 'comment', v });
+			else if (/^<!doctype/i.test(v)) out.push({ kind: 'doctype', v: '<!doctype html>' });
+			else if (m[1]) {
+				const name = m[1].toLowerCase();
+				if (v[1] === '/') out.push({ kind: 'close', name, v });
+				else {
+					out.push({ kind: 'open', name, v });
+					if (RAW.has(name) && !v.endsWith('/>')) {
+						const end = html.toLowerCase().indexOf(`</${name}`, re.lastIndex);
+						const stop = end < 0 ? html.length : end;
+						out.push({ kind: 'raw', v: html.slice(re.lastIndex, stop) });
+						re.lastIndex = stop;
+					}
+				}
+			} else out.push({ kind: 'text', v });
+		}
+		return out;
+	}
+
+	function beautify(html: string, unit: string, strip: boolean): string {
+		const toks = lex(html);
+		const lines: string[] = [];
+		let depth = 0;
+		let line = '';
+		const pad = () => unit.repeat(depth);
+		const flush = () => {
+			if (line.trim()) lines.push(pad() + line.trim());
+			line = '';
+		};
+		for (let k = 0; k < toks.length; k++) {
+			const t = toks[k];
+			if (t.kind === 'comment') {
+				if (strip) continue;
+				flush();
+				lines.push(pad() + t.v);
+			} else if (t.kind === 'doctype') {
+				flush();
+				lines.push(t.v);
+			} else if (t.kind === 'text') {
+				line += t.v.replace(/\s+/g, ' ');
+			} else if (t.kind === 'raw') {
+				const prev = toks[k - 1].name!;
+				if (prev === 'pre' || prev === 'textarea') line += t.v;
+				else if (t.v.trim()) {
+					flush();
+					const body = t.v.replace(/^\n+|\s+$/g, '');
+					const min = Math.min(...body.split('\n').filter((l) => l.trim()).map((l) => l.match(/^\s*/)![0].length));
+					body.split('\n').forEach((l) => lines.push(pad() + l.slice(min)));
+				}
+			} else if (t.kind === 'open' && (INLINE.has(t.name!) || (line.trim() && RAW.has(t.name!) === false && INLINE.has(t.name!)))) {
+				line += t.v;
+			} else if (t.kind === 'close' && INLINE.has(t.name!)) {
+				line += t.v;
+			} else if (t.kind === 'open') {
+				flush();
+				if (RAW.has(t.name!) && (t.name === 'pre' || t.name === 'textarea')) {
+					line = t.v;
+					continue;
+				}
+				lines.push(pad() + t.v);
+				if (!VOID.has(t.name!) && !t.v.endsWith('/>')) depth++;
+			} else {
+				if ((t.name === 'pre' || t.name === 'textarea') && line) {
+					line += t.v;
+					lines.push(pad() + line);
+					line = '';
+					continue;
+				}
+				const last = lines[lines.length - 1] ?? '';
+				const openOnly = !line.trim() && new RegExp(`^\\s*<${t.name}[\\s>]`, 'i').test(last) && depth > 0;
+				if (line.trim() && !lines.length) flush();
+				if (line.trim() && new RegExp(`^\\s*<${t.name}[\\s>]`, 'i').test(last) && !last.includes('</')) {
+					lines[lines.length - 1] = last + line.trim() + t.v;
+					line = '';
+					depth = Math.max(0, depth - 1);
+					continue;
+				}
+				flush();
+				depth = Math.max(0, depth - 1);
+				if (openOnly) lines[lines.length - 1] = last + t.v;
+				else lines.push(pad() + t.v);
+			}
+		}
+		flush();
+		return lines.join('\n');
+	}
+
+	function minify(html: string): string {
+		return lex(html)
+			.map((t, k, all) => {
+				if (t.kind === 'comment') return /^<!--\[if/.test(t.v) ? t.v : '';
+				if (t.kind === 'raw') {
+					const tag = all[k - 1].name;
+					return tag === 'pre' || tag === 'textarea' ? t.v : t.v.trim().replace(/\n\s*/g, tag === 'style' ? '' : '\n');
+				}
+				if (t.kind === 'text') return t.v.replace(/\s+/g, ' ');
+				return t.v.replace(/\s+/g, ' ').replace(/\s*(\/?)>$/, '$1>');
+			})
+			.join('')
+			.replace(/>\s+</g, (m, off, s) => (INLINE.has((s.slice(off).match(/^>\s+<\/?([a-z]+)/i)?.[1] ?? '').toLowerCase()) ? '> <' : '><'))
+			.trim();
+	}
+
+	onPage('hf-tool', () => {
+		const input = byId<HTMLTextAreaElement>('hf-in');
+		const strip = byId<HTMLInputElement>('hf-comments');
+		let mode = 'beautify';
+		let indent = '  ';
+
+		const render = () => {
+			const result = mode === 'beautify' ? beautify(input.value, indent, strip.checked) : minify(input.value);
+			byId('hf-out').textContent = result;
+			const a = new Blob([input.value]).size;
+			const b = new Blob([result]).size;
+			byId('hf-size').textContent = `${a.toLocaleString('en')} → ${b.toLocaleString('en')} bytes`;
+		};
+
+		segmented(byId('hf-mode'), (v) => ((mode = v), render()));
+		segmented(byId('hf-indent'), (v) => ((indent = v === 'tab' ? '\t' : ' '.repeat(Number(v))), render()));
+		[input, strip].forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('hf-copy'), () => byId('hf-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.hf-size {
+		margin-left: auto;
+		font-size: 13px;
+		color: var(--ink-soft);
+		font-variant-numeric: tabular-nums;
+	}
+</style>

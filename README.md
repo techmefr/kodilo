@@ -89,6 +89,16 @@ Live at **https://techmefr.github.io/kodilo/**
 - **RSA Key Pair Generator** (`/tools/rsa-key-pair-generator/`) — PEM or JWK, 2048 to 4096 bits
 - **Image Compressor** (`/tools/image-compressor/`) — quality, max width, before/after slider
 - **Git Cheatsheet** (`/tools/git-cheatsheet/`) — commands by task, click to copy
+- **Docker Cheatsheet** (`/tools/docker-cheatsheet/`) — containers, images, compose, cleanup
+- **NPM Cheatsheet** (`/tools/npm-cheatsheet/`) — npm, pnpm, Yarn and Bun side by side
+- **Markdown to HTML** (`/tools/markdown-to-html/`) — GFM to HTML, tables, tasks, anchors
+- **Markdown Previewer** (`/tools/markdown-previewer/`) — live preview, outline, saved draft
+- **CSS Formatter & Minifier** (`/tools/css-formatter/`) — beautify or minify CSS
+- **HTML Formatter** (`/tools/html-formatter/`) — beautify or minify HTML
+- **SQL Prettify** (`/tools/sql-prettify/`) — one clause per line, keyword case
+- **Math Evaluator** (`/tools/math-evaluator/`) — calculator notepad with variables
+- **Kubernetes Manifest Generator** (`/tools/kubernetes-manifest-generator/`) — Deployment, Service and Ingress YAML
+- **Nginx Config Generator** (`/tools/nginx-config-generator/`) — proxy, SPA, static or PHP with HTTPS
 - More tools land as separate categories in the sidebar — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -100,12 +110,8 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **JSON**
 
 **HTML / CSS**
-- HTML Formatter
-- CSS Formatter & Minifier
 
 **Markdown**
-- Markdown to HTML
-- Markdown Previewer
 
 **SEO**
 
@@ -137,16 +143,10 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - JPG to PDF
 
 **Dev Utilities**
-- SQL Prettify
-- Math Evaluator
 - REST API Tester
-- Docker Cheatsheet
-- NPM Cheatsheet
 
 **DevOps & Sysadmin**
-- Kubernetes Manifest Generator
 - YAML Validator & Formatter
-- Nginx Config Generator
 - htpasswd Generator
 - X.509 Certificate Decoder
 
