@@ -1,0 +1,149 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="docker-run-to-compose"
+	title="docker run to Compose"
+	description="Paste a docker run command and get the matching compose.yaml service: ports, volumes, env, networks, restart, healthcheck and more."
+>
+	<div class="grid-2" id="drc-tool">
+		<section class="panel">
+			<div class="panel-head">docker run</div>
+			<textarea id="drc-in" spellcheck="false" aria-label="docker run command">docker run -d --name postgres \
+  --restart unless-stopped \
+  -p 5432:5432 \
+  -e POSTGRES_USER=app -e POSTGRES_PASSWORD=secret \
+  -v pgdata:/var/lib/postgresql/data \
+  --network backend \
+  --memory 1g --cpus 1.5 \
+  --health-cmd "pg_isready -U app" --health-interval 10s \
+  postgres:17-alpine -c max_connections=200</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>compose.yaml</span>
+				<button class="btn" id="drc-copy">Copy</button>
+			</div>
+			<pre class="out" id="drc-out"></pre>
+		</section>
+	</div>
+	<p class="error" id="drc-error" hidden></p>
+	<p class="drc-skipped" id="drc-skipped" hidden></p>
+</ToolShell>
+
+<script>
+	import { shellSplit } from '../../scripts/shell';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const LISTS: Record<string, string> = {
+		'-p': 'ports', '--publish': 'ports', '-v': 'volumes', '--volume': 'volumes', '-e': 'environment', '--env': 'environment',
+		'--env-file': 'env_file', '--network': 'networks', '--net': 'networks', '--add-host': 'extra_hosts', '--dns': 'dns',
+		'--cap-add': 'cap_add', '--cap-drop': 'cap_drop', '--device': 'devices', '-l': 'labels', '--label': 'labels',
+		'--tmpfs': 'tmpfs', '--security-opt': 'security_opt', '--link': 'links', '--expose': 'expose',
+	};
+	const SCALARS: Record<string, string> = {
+		'--name': 'container_name', '--restart': 'restart', '-h': 'hostname', '--hostname': 'hostname', '-u': 'user', '--user': 'user',
+		'-w': 'working_dir', '--workdir': 'working_dir', '--entrypoint': 'entrypoint', '--memory': 'mem_limit', '-m': 'mem_limit',
+		'--cpus': 'cpus', '--shm-size': 'shm_size', '--platform': 'platform', '--pid': 'pid', '--ipc': 'ipc', '--stop-signal': 'stop_signal',
+		'--log-driver': 'logging.driver', '--health-cmd': 'healthcheck.test', '--health-interval': 'healthcheck.interval',
+		'--health-timeout': 'healthcheck.timeout', '--health-retries': 'healthcheck.retries', '--health-start-period': 'healthcheck.start_period',
+	};
+	const FLAGS: Record<string, string> = { '--privileged': 'privileged', '--init': 'init', '--read-only': 'read_only', '-t': 'tty', '--tty': 'tty', '-i': 'stdin_open', '--interactive': 'stdin_open' };
+	const IGNORED = new Set(['-d', '--detach', '--rm', '-it', '-ti', '-dit']);
+
+	const q = (s: string) => (/^[\w./:@-]+$/.test(s) && !/^(true|false|yes|no|null|on|off|\d+)$/i.test(s) ? s : JSON.stringify(s));
+
+	onPage('drc-tool', () => {
+		const input = byId<HTMLTextAreaElement>('drc-in');
+
+		const render = () => {
+			const error = byId('drc-error');
+			try {
+				const args = shellSplit(input.value);
+				let i = args[0] === 'docker' ? 1 : 0;
+				if (args[i] === 'container') i++;
+				if (args[i] !== 'run') throw new Error('Start with docker run.');
+				i++;
+				const svc: Record<string, unknown> = {};
+				const skipped: string[] = [];
+				while (i < args.length && args[i].startsWith('-')) {
+					let flag = args[i];
+					let value: string | undefined;
+					if (flag.includes('=') && flag.startsWith('--')) [flag, value] = [flag.slice(0, flag.indexOf('=')), flag.slice(flag.indexOf('=') + 1)];
+					i++;
+					if (IGNORED.has(flag)) continue;
+					if (FLAGS[flag]) {
+						svc[FLAGS[flag]] = true;
+						continue;
+					}
+					const key = LISTS[flag] ?? SCALARS[flag];
+					if (value === undefined) value = args[i++];
+					if (value === undefined) throw new Error(`${flag} needs a value.`);
+					if (!key) {
+						skipped.push(`${flag} ${value}`);
+						continue;
+					}
+					if (LISTS[flag]) ((svc[key] ??= []) as string[]).push(value);
+					else if (key.includes('.')) {
+						const [a, b] = key.split('.');
+						((svc[a] ??= {}) as Record<string, string>)[b] = value;
+					} else svc[key] = value;
+				}
+				const image = args[i++];
+				if (!image) throw new Error('No image found after the options.');
+				const command = args.slice(i);
+				const name = String(svc.container_name ?? image.split('/').pop()!.split(':')[0]).replace(/[^\w-]/g, '-');
+				const lines = ['services:', `  ${name}:`, `    image: ${q(image)}`];
+				const order = ['container_name', 'restart', 'hostname', 'user', 'working_dir', 'entrypoint', 'platform'];
+				for (const k of order) if (svc[k]) lines.push(`    ${k}: ${q(String(svc[k]))}`);
+				if (command.length) lines.push(`    command: [${command.map((c) => JSON.stringify(c)).join(', ')}]`);
+				for (const k of ['ports', 'expose', 'volumes', 'env_file', 'extra_hosts', 'dns', 'cap_add', 'cap_drop', 'devices', 'tmpfs', 'security_opt', 'links']) {
+					const list = svc[k] as string[] | undefined;
+					if (list) lines.push(`    ${k}:`, ...list.map((v) => `      - ${JSON.stringify(v)}`));
+				}
+				for (const k of ['environment', 'labels']) {
+					const list = svc[k] as string[] | undefined;
+					if (list) lines.push(`    ${k}:`, ...list.map((v) => (v.includes('=') ? `      ${v.slice(0, v.indexOf('='))}: ${JSON.stringify(v.slice(v.indexOf('=') + 1))}` : `      ${v}: null`)));
+				}
+				if (svc.networks) lines.push('    networks:', ...(svc.networks as string[]).map((n) => `      - ${n}`));
+				for (const k of ['mem_limit', 'cpus', 'shm_size', 'pid', 'ipc', 'stop_signal']) if (svc[k]) lines.push(`    ${k}: ${q(String(svc[k]))}`);
+				for (const k of ['privileged', 'init', 'read_only', 'tty', 'stdin_open']) if (svc[k]) lines.push(`    ${k}: true`);
+				if (svc.logging) lines.push('    logging:', `      driver: ${(svc.logging as Record<string, string>).driver}`);
+				const hc = svc.healthcheck as Record<string, string> | undefined;
+				if (hc) {
+					lines.push('    healthcheck:');
+					if (hc.test) lines.push(`      test: ["CMD-SHELL", ${JSON.stringify(hc.test)}]`);
+					for (const k of ['interval', 'timeout', 'retries', 'start_period']) if (hc[k]) lines.push(`      ${k}: ${hc[k]}`);
+				}
+				const namedVolumes = ((svc.volumes as string[]) ?? []).map((v) => v.split(':')[0]).filter((v) => v && !/^[./~$]/.test(v) && !v.startsWith('/'));
+				const nets = ((svc.networks as string[]) ?? []).filter((n) => !['host', 'bridge', 'none'].includes(n));
+				if (namedVolumes.length) lines.push('', 'volumes:', ...namedVolumes.map((v) => `  ${v}:`));
+				if (nets.length) lines.push('', 'networks:', ...nets.map((n) => `  ${n}:`));
+				byId('drc-out').textContent = lines.join('\n');
+				error.hidden = true;
+				const sk = byId('drc-skipped');
+				sk.hidden = !skipped.length;
+				sk.textContent = `Not converted: ${skipped.join(', ')}`;
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+			}
+		};
+
+		input.addEventListener('input', render);
+		copyButton(byId('drc-copy'), () => byId('drc-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#drc-in {
+		min-height: 280px;
+	}
+	.drc-skipped {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+</style>

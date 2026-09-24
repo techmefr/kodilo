@@ -1,0 +1,176 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="image-resizer"
+	title="Image Resizer"
+	description="Resize an image by pixels or percentage, keep the aspect ratio, pick the output format. Nothing leaves your browser."
+>
+	<label class="drop" id="ir-tool">
+		<input type="file" id="ir-file" accept="image/*" hidden />
+		<span id="ir-drop-text">Drop an image, paste one or click to choose. A sample is loaded.</span>
+	</label>
+	<div class="toolbar">
+		<label class="check">Width <input class="num" id="ir-w" type="number" min="1" /></label>
+		<label class="check">Height <input class="num" id="ir-h" type="number" min="1" /></label>
+		<label class="check"><input type="checkbox" id="ir-lock" checked /> Keep ratio</label>
+		<div class="seg" id="ir-pct">
+			<button data-value="25">25%</button>
+			<button data-value="50">50%</button>
+			<button data-value="75">75%</button>
+			<button data-value="100" aria-pressed="true">100%</button>
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="ir-format">
+			<button data-value="image/png" aria-pressed="true">PNG</button>
+			<button data-value="image/jpeg">JPG</button>
+			<button data-value="image/webp">WebP</button>
+		</div>
+		<label class="check" id="ir-q-wrap">Quality <input type="range" id="ir-q" min="10" max="100" value="85" /> <b id="ir-q-value">85</b></label>
+		<a class="btn primary" id="ir-download" download>Download</a>
+	</div>
+	<p class="ir-info" id="ir-info"></p>
+	<div class="ir-preview"><img id="ir-img" alt="Resized preview" /></div>
+</ToolShell>
+
+<script>
+	import { humanSize, loadImage, render, sampleImage } from '../../scripts/image';
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	let pasteHandler: ((file: File) => void) | null = null;
+	document.addEventListener('paste', (e) => {
+		const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
+		if (file && pasteHandler && document.getElementById('ir-tool')) pasteHandler(file);
+	});
+
+	onPage('ir-tool', () => {
+		const w = byId<HTMLInputElement>('ir-w');
+		const h = byId<HTMLInputElement>('ir-h');
+		const lock = byId<HTMLInputElement>('ir-lock');
+		const q = byId<HTMLInputElement>('ir-q');
+		let img: HTMLImageElement | null = null;
+		let name = 'image';
+		let originalSize = 0;
+		let format = 'image/png';
+		let url = '';
+		let pending = 0;
+
+		const update = async () => {
+			if (!img) return;
+			const width = Math.max(1, Math.round(Number(w.value) || img.naturalWidth));
+			const height = Math.max(1, Math.round(Number(h.value) || img.naturalHeight));
+			const id = ++pending;
+			const blob = await render(img, width, height, format, Number(q.value) / 100, format === 'image/jpeg' ? '#ffffff' : undefined);
+			if (id !== pending) return;
+			if (url) URL.revokeObjectURL(url);
+			url = URL.createObjectURL(blob);
+			byId<HTMLImageElement>('ir-img').src = url;
+			const link = byId<HTMLAnchorElement>('ir-download');
+			link.href = url;
+			link.download = `${name}-${width}x${height}.${format.split('/')[1].replace('jpeg', 'jpg')}`;
+			byId('ir-info').textContent = `${img.naturalWidth} × ${img.naturalHeight} · ${humanSize(originalSize)} → ${width} × ${height} · ${humanSize(blob.size)}`;
+			byId('ir-q-value').textContent = q.value;
+		};
+
+		const load = async (file: Blob, fileName: string) => {
+			try {
+				img = await loadImage(file);
+				name = fileName.replace(/\.[^.]+$/, '') || 'image';
+				originalSize = file.size;
+				w.value = String(img.naturalWidth);
+				h.value = String(img.naturalHeight);
+				byId('ir-drop-text').textContent = `${fileName} — drop or paste another image to replace it.`;
+				update();
+			} catch (e) {
+				byId('ir-drop-text').textContent = (e as Error).message;
+			}
+		};
+
+		pasteHandler = (file) => load(file, file.name);
+		byId<HTMLInputElement>('ir-file').addEventListener('change', (e) => {
+			const f = (e.target as HTMLInputElement).files?.[0];
+			if (f) load(f, f.name);
+		});
+		const drop = byId('ir-tool');
+		drop.addEventListener('dragover', (e) => {
+			e.preventDefault();
+			drop.classList.add('over');
+		});
+		drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+		drop.addEventListener('drop', (e) => {
+			e.preventDefault();
+			drop.classList.remove('over');
+			const f = e.dataTransfer?.files[0];
+			if (f) load(f, f.name);
+		});
+
+		w.addEventListener('input', () => {
+			if (img && lock.checked) h.value = String(Math.round((Number(w.value) * img.naturalHeight) / img.naturalWidth));
+			update();
+		});
+		h.addEventListener('input', () => {
+			if (img && lock.checked) w.value = String(Math.round((Number(h.value) * img.naturalWidth) / img.naturalHeight));
+			update();
+		});
+		segmented(byId('ir-pct'), (v) => {
+			if (!img) return;
+			w.value = String(Math.round((img.naturalWidth * Number(v)) / 100));
+			h.value = String(Math.round((img.naturalHeight * Number(v)) / 100));
+			update();
+		});
+		segmented(byId('ir-format'), (v) => {
+			format = v;
+			byId('ir-q-wrap').hidden = v === 'image/png';
+			update();
+		});
+		q.addEventListener('input', update);
+		byId('ir-q-wrap').hidden = true;
+		sampleImage().then((b) => load(b, 'sample.png'));
+	});
+</script>
+
+<style>
+	.drop {
+		display: grid;
+		place-items: center;
+		min-height: 90px;
+		border: 2px dashed var(--border);
+		border-radius: 14px;
+		background: var(--surface);
+		color: var(--ink-soft);
+		font-size: 14px;
+		text-align: center;
+		padding: 16px;
+		cursor: pointer;
+	}
+	.drop:global(.over) {
+		border-color: var(--accent-strong);
+		background: var(--accent);
+	}
+	#ir-q {
+		accent-color: var(--accent-strong);
+	}
+	.ir-info {
+		margin: 0;
+		font-size: 14px;
+		font-variant-numeric: tabular-nums;
+	}
+	.ir-preview {
+		overflow: auto;
+		max-height: 520px;
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 20px 20px;
+		padding: 12px;
+	}
+	.ir-preview img {
+		display: block;
+		max-width: 100%;
+		margin: 0 auto;
+	}
+	a.btn {
+		text-decoration: none;
+	}
+</style>

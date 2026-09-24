@@ -124,11 +124,13 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'meta-tag-generator',
+				built: true,
 				name: 'Meta Tag Generator',
 				description: 'Generate HTML meta tags.',
 			},
 			{
 				slug: 'open-graph-generator',
+				built: true,
 				name: 'Open Graph Generator',
 				description: 'Generate Open Graph tags for link previews.',
 			},
@@ -322,6 +324,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'crontab-generator',
+				built: true,
 				name: 'Crontab Generator',
 				description: 'Build and explain a cron expression.',
 			},
@@ -449,6 +452,7 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'image-resizer',
+				built: true,
 				name: 'Image Resizer',
 				description: 'Resize images entirely in the browser.',
 			},
@@ -459,6 +463,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'png-to-jpg',
+				built: true,
 				name: 'PNG to JPG Converter',
 				description: 'Convert PNG images to JPG.',
 			},
@@ -519,6 +524,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'docker-run-to-compose',
+				built: true,
 				name: 'Docker Run to Compose Converter',
 				description: 'Convert a docker run command to a docker-compose.yml.',
 			},
@@ -660,11 +666,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'json-log-viewer',
+				built: true,
 				name: 'JSON Log Viewer',
 				description: 'Paste structured logs, filter by level and field, read them as a table.',
 			},
 			{
 				slug: 'curl-converter',
+				built: true,
 				name: 'curl Converter',
 				description: 'Turn a curl command into fetch, axios, Python requests or HTTPie.',
 			},
@@ -699,6 +707,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'unit-converter',
+				built: true,
 				name: 'Unit Converter',
 				description: 'Convert length, weight, speed and other units.',
 			},
@@ -711,6 +720,7 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'pomodoro-timer',
+				built: true,
 				name: 'Pomodoro Timer',
 				description: 'A simple focus timer with work/break intervals.',
 			},

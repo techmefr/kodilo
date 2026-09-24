@@ -1,0 +1,145 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="open-graph-generator"
+	title="Open Graph Generator"
+	description="Open Graph and Twitter card tags with a live link preview, the way Slack, LinkedIn or X will show it."
+>
+	<div class="fields" id="og-tool">
+		<div class="field wide"><label for="og-title">Title</label><input id="og-title" value="kodilo — Free developer tools" /></div>
+		<div class="field wide"><label for="og-desc">Description</label><input id="og-desc" value="Formatters, converters, generators and validators that run in your browser. No account, no upload." /></div>
+		<div class="field"><label for="og-url">URL</label><input id="og-url" spellcheck="false" value="https://techmefr.github.io/kodilo/" /></div>
+		<div class="field"><label for="og-image">Image URL · 1200 × 630</label><input id="og-image" spellcheck="false" placeholder="https://example.com/og.png" /></div>
+		<div class="field"><label for="og-site">Site name</label><input id="og-site" value="kodilo" /></div>
+		<div class="field"><label for="og-twitter">X / Twitter handle</label><input id="og-twitter" spellcheck="false" placeholder="@handle" /></div>
+		<div class="field"><label for="og-locale">Locale</label><input id="og-locale" spellcheck="false" value="en_US" /></div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="og-type">
+			<button data-value="website" aria-pressed="true">website</button>
+			<button data-value="article">article</button>
+			<button data-value="product">product</button>
+			<button data-value="profile">profile</button>
+		</div>
+		<div class="seg" id="og-card">
+			<button data-value="summary_large_image" aria-pressed="true">Large image card</button>
+			<button data-value="summary">Summary card</button>
+		</div>
+	</div>
+	<div class="og-card" id="og-preview">
+		<div class="og-img" id="og-p-img"><span>1200 × 630</span></div>
+		<div class="og-text">
+			<span id="og-p-host"></span>
+			<b id="og-p-title"></b>
+			<p id="og-p-desc"></p>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>HTML</span>
+			<button class="btn" id="og-copy">Copy</button>
+		</div>
+		<pre class="out" id="og-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+	onPage('og-tool', () => {
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		let type = 'website';
+		let card = 'summary_large_image';
+
+		const render = () => {
+			const tags: [string, string, string][] = [
+				['property', 'og:type', type],
+				['property', 'og:title', val('og-title')],
+				['property', 'og:description', val('og-desc')],
+				['property', 'og:url', val('og-url')],
+				['property', 'og:image', val('og-image')],
+				['property', 'og:image:width', val('og-image') ? '1200' : ''],
+				['property', 'og:image:height', val('og-image') ? '630' : ''],
+				['property', 'og:image:alt', val('og-image') ? val('og-title') : ''],
+				['property', 'og:site_name', val('og-site')],
+				['property', 'og:locale', val('og-locale')],
+				['name', 'twitter:card', card],
+				['name', 'twitter:title', val('og-title')],
+				['name', 'twitter:description', val('og-desc')],
+				['name', 'twitter:image', val('og-image')],
+				['name', 'twitter:site', val('og-twitter')],
+			];
+			byId('og-out').textContent = tags.filter(([, , v]) => v).map(([attr, key, v]) => `<meta ${attr}="${key}" content="${esc(v)}" />`).join('\n');
+			let host = val('og-url');
+			try {
+				host = new URL(host).hostname;
+			} catch {}
+			byId('og-p-host').textContent = host;
+			byId('og-p-title').textContent = val('og-title');
+			byId('og-p-desc').textContent = val('og-desc');
+			const img = byId('og-p-img');
+			img.style.backgroundImage = val('og-image') ? `url("${val('og-image').replace(/"/g, '')}")` : '';
+			img.querySelector('span')!.hidden = !!val('og-image');
+			byId('og-preview').classList.toggle('og-small', card === 'summary');
+		};
+
+		segmented(byId('og-type'), (v) => ((type = v), render()));
+		segmented(byId('og-card'), (v) => ((card = v), render()));
+		document.querySelectorAll('#og-tool input').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('og-copy'), () => byId('og-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.og-card {
+		max-width: 520px;
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		overflow: hidden;
+		background: var(--surface);
+	}
+	.og-img {
+		aspect-ratio: 1200 / 630;
+		max-width: 100%;
+		background: linear-gradient(135deg, var(--accent), var(--surface-2)) center / cover;
+		display: grid;
+		place-items: center;
+		color: var(--ink-soft);
+		font-size: 13px;
+	}
+	.og-text {
+		padding: 12px 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+	}
+	.og-text span {
+		font-size: 12px;
+		text-transform: uppercase;
+		color: var(--ink-soft);
+	}
+	.og-text b {
+		font-size: 16px;
+	}
+	.og-text p {
+		margin: 0;
+		font-size: 14px;
+		color: var(--ink-soft);
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+	.og-card.og-small {
+		display: grid;
+		grid-template-columns: 120px 1fr;
+	}
+	.og-card.og-small .og-img {
+		aspect-ratio: 1;
+	}
+</style>

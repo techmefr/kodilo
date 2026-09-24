@@ -69,6 +69,16 @@ Live at **https://techmefr.github.io/kodilo/**
 - **.env Tool** (`/tools/env-file-tool/`) — validate, diff with .env.example, export to JSON, docker, Compose, Secret
 - **systemd Unit Generator** (`/tools/systemd-unit-generator/`) — service and timer units with hardening
 - **SSH Config Generator** (`/tools/ssh-config-generator/`) — Host blocks with jump hosts and forwarding
+- **Meta Tag Generator** (`/tools/meta-tag-generator/`) — title, description, robots, icons with a search preview
+- **Open Graph Generator** (`/tools/open-graph-generator/`) — Open Graph and Twitter cards with a link preview
+- **Crontab Generator** (`/tools/crontab-generator/`) — cron in plain English and the next runs
+- **Docker Run to Compose Converter** (`/tools/docker-run-to-compose/`) — docker run command to a compose.yaml service
+- **curl Converter** (`/tools/curl-converter/`) — curl to fetch, axios, Python, HTTPie or PHP
+- **JSON Log Viewer** (`/tools/json-log-viewer/`) — filter structured logs by level and field
+- **Unit Converter** (`/tools/unit-converter/`) — length, mass, speed, area, volume, time, pressure, energy, power
+- **Pomodoro Timer** (`/tools/pomodoro-timer/`) — focus and break intervals with sound
+- **Image Resizer** (`/tools/image-resizer/`) — resize by pixels or percentage, PNG/JPG/WebP
+- **PNG to JPG Converter** (`/tools/png-to-jpg/`) — batch PNG to JPG with quality and background
 - More tools land as separate categories in the sidebar — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -93,8 +103,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Markdown Previewer
 
 **SEO**
-- Meta Tag Generator
-- Open Graph Generator
 
 **Text**
 - Diff Checker
@@ -108,7 +116,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **Generators**
 - QR Code Generator
 - WiFi QR Code Generator
-- Crontab Generator
 
 **Converters**
 
@@ -119,9 +126,7 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **Validators**
 
 **Images**
-- Image Resizer
 - Image Compressor
-- PNG to JPG Converter
 
 **PDF**
 - PDF Merge
@@ -133,7 +138,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **Dev Utilities**
 - SQL Prettify
 - Math Evaluator
-- Docker Run to Compose Converter
 - REST API Tester
 - Docker Cheatsheet
 - Git Cheatsheet
@@ -145,16 +149,12 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Nginx Config Generator
 - htpasswd Generator
 - X.509 Certificate Decoder
-- JSON Log Viewer
-- curl Converter
 
 **Calculators**
 - Developer Calculator
 - Currency Converter
-- Unit Converter
 
 **Productivity**
-- Pomodoro Timer
 
 **Testing** — not started
 **Design** — not started

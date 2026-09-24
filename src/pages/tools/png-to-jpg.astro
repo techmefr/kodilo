@@ -1,0 +1,153 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="png-to-jpg"
+	title="PNG to JPG"
+	description="Convert one or many PNG images to JPG, pick the quality and the color that replaces transparency. Nothing is uploaded."
+>
+	<label class="drop" id="pj-tool">
+		<input type="file" id="pj-file" accept="image/png,image/webp,image/gif,image/bmp,image/avif" multiple hidden />
+		<span>Drop PNG files here or click to choose. A sample is loaded.</span>
+	</label>
+	<div class="toolbar">
+		<label class="check">Quality <input type="range" id="pj-q" min="10" max="100" value="90" /> <b id="pj-q-value">90</b></label>
+		<label class="check">Background <input type="color" id="pj-bg" value="#ffffff" /></label>
+		<button class="btn" id="pj-clear">Clear</button>
+	</div>
+	<ul class="pj-list" id="pj-list"></ul>
+</ToolShell>
+
+<script>
+	import { humanSize, loadImage, render, sampleImage } from '../../scripts/image';
+	import { byId, onPage } from '../../scripts/ui';
+
+	onPage('pj-tool', () => {
+		const q = byId<HTMLInputElement>('pj-q');
+		const bg = byId<HTMLInputElement>('pj-bg');
+		const list = byId('pj-list');
+		type Item = { name: string; size: number; img: HTMLImageElement; li: HTMLLIElement; url: string };
+		let items: Item[] = [];
+
+		const convert = async (item: Item) => {
+			const blob = await render(item.img, item.img.naturalWidth, item.img.naturalHeight, 'image/jpeg', Number(q.value) / 100, bg.value);
+			if (item.url) URL.revokeObjectURL(item.url);
+			item.url = URL.createObjectURL(blob);
+			item.li.querySelector('img')!.src = item.url;
+			const a = item.li.querySelector('a')!;
+			a.href = item.url;
+			a.download = `${item.name.replace(/\.[^.]+$/, '')}.jpg`;
+			const diff = Math.round((1 - blob.size / item.size) * 100);
+			item.li.querySelector('span')!.textContent = `${item.img.naturalWidth} × ${item.img.naturalHeight} · ${humanSize(item.size)} → ${humanSize(blob.size)}${diff > 0 ? ` (−${diff}%)` : ''}`;
+		};
+
+		const add = async (file: Blob, name: string) => {
+			try {
+				const img = await loadImage(file);
+				const li = document.createElement('li');
+				li.innerHTML = '<img alt="" /><div><b></b><span></span></div><a class="btn">Download</a>';
+				li.querySelector('b')!.textContent = name;
+				list.append(li);
+				const item = { name, size: file.size, img, li, url: '' };
+				items.push(item);
+				convert(item);
+			} catch (e) {
+				const li = document.createElement('li');
+				li.textContent = `${name}: ${(e as Error).message}`;
+				list.append(li);
+			}
+		};
+
+		byId<HTMLInputElement>('pj-file').addEventListener('change', (e) => {
+			[...((e.target as HTMLInputElement).files ?? [])].forEach((f) => add(f, f.name));
+		});
+		const drop = byId('pj-tool');
+		drop.addEventListener('dragover', (e) => {
+			e.preventDefault();
+			drop.classList.add('over');
+		});
+		drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+		drop.addEventListener('drop', (e) => {
+			e.preventDefault();
+			drop.classList.remove('over');
+			[...(e.dataTransfer?.files ?? [])].forEach((f) => add(f, f.name));
+		});
+		q.addEventListener('input', () => {
+			byId('pj-q-value').textContent = q.value;
+			items.forEach(convert);
+		});
+		bg.addEventListener('input', () => items.forEach(convert));
+		byId('pj-clear').addEventListener('click', () => {
+			items.forEach((i) => URL.revokeObjectURL(i.url));
+			items = [];
+			list.replaceChildren();
+		});
+		sampleImage().then((b) => add(b, 'sample.png'));
+	});
+</script>
+
+<style>
+	.drop {
+		display: grid;
+		place-items: center;
+		min-height: 90px;
+		border: 2px dashed var(--border);
+		border-radius: 14px;
+		background: var(--surface);
+		color: var(--ink-soft);
+		font-size: 14px;
+		text-align: center;
+		padding: 16px;
+		cursor: pointer;
+	}
+	.drop:global(.over) {
+		border-color: var(--accent-strong);
+		background: var(--accent);
+	}
+	#pj-q {
+		accent-color: var(--accent-strong);
+	}
+	.pj-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 8px;
+	}
+	.pj-list :global(li) {
+		display: grid;
+		grid-template-columns: 64px 1fr auto;
+		gap: 12px;
+		align-items: center;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		padding: 8px 12px;
+	}
+	.pj-list :global(img) {
+		width: 64px;
+		height: 48px;
+		object-fit: cover;
+		border-radius: 6px;
+	}
+	.pj-list :global(div) {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+	.pj-list :global(b) {
+		font-size: 14px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.pj-list :global(span) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.pj-list :global(a) {
+		text-decoration: none;
+	}
+</style>

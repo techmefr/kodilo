@@ -1,0 +1,86 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="unit-converter"
+	title="Unit Converter"
+	description="Length, mass, speed, area, volume, time, pressure, energy and power. Type in any unit, every other one updates."
+>
+	<div class="toolbar" id="uc-tool">
+		<div class="seg" id="uc-kind">
+			<button data-value="length" aria-pressed="true">Length</button>
+			<button data-value="mass">Mass</button>
+			<button data-value="speed">Speed</button>
+			<button data-value="area">Area</button>
+			<button data-value="volume">Volume</button>
+			<button data-value="time">Time</button>
+			<button data-value="pressure">Pressure</button>
+			<button data-value="energy">Energy</button>
+			<button data-value="power">Power</button>
+		</div>
+	</div>
+	<div class="fields" id="uc-fields"></div>
+</ToolShell>
+
+<script>
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	const UNITS: Record<string, [string, number][]> = {
+		length: [['Meter (m)', 1], ['Kilometer (km)', 1000], ['Centimeter (cm)', 0.01], ['Millimeter (mm)', 0.001], ['Micrometer (µm)', 1e-6], ['Inch (in)', 0.0254], ['Foot (ft)', 0.3048], ['Yard (yd)', 0.9144], ['Mile (mi)', 1609.344], ['Nautical mile', 1852]],
+		mass: [['Kilogram (kg)', 1], ['Gram (g)', 0.001], ['Milligram (mg)', 1e-6], ['Tonne (t)', 1000], ['Pound (lb)', 0.45359237], ['Ounce (oz)', 0.028349523125], ['Stone (st)', 6.35029318]],
+		speed: [['Meter/second (m/s)', 1], ['Kilometer/hour (km/h)', 1 / 3.6], ['Mile/hour (mph)', 0.44704], ['Knot (kn)', 1852 / 3600], ['Foot/second (ft/s)', 0.3048]],
+		area: [['Square meter (m²)', 1], ['Square kilometer (km²)', 1e6], ['Hectare (ha)', 1e4], ['Square foot (ft²)', 0.09290304], ['Square inch (in²)', 0.00064516], ['Acre', 4046.8564224], ['Square mile (mi²)', 2589988.110336]],
+		volume: [['Liter (L)', 1], ['Milliliter (mL)', 0.001], ['Cubic meter (m³)', 1000], ['US gallon', 3.785411784], ['UK gallon', 4.54609], ['US fluid ounce', 0.0295735295625], ['US cup', 0.2365882365], ['Cubic foot (ft³)', 28.316846592]],
+		time: [['Second (s)', 1], ['Millisecond (ms)', 0.001], ['Minute (min)', 60], ['Hour (h)', 3600], ['Day (d)', 86400], ['Week', 604800], ['Year (365.25 d)', 31557600]],
+		pressure: [['Pascal (Pa)', 1], ['Kilopascal (kPa)', 1000], ['Bar', 1e5], ['Millibar (mbar)', 100], ['Atmosphere (atm)', 101325], ['PSI', 6894.757293168], ['mmHg', 133.322387415]],
+		energy: [['Joule (J)', 1], ['Kilojoule (kJ)', 1000], ['Calorie (cal)', 4.184], ['Kilocalorie (kcal)', 4184], ['Watt-hour (Wh)', 3600], ['Kilowatt-hour (kWh)', 3.6e6], ['BTU', 1055.05585262], ['Electronvolt (eV)', 1.602176634e-19]],
+		power: [['Watt (W)', 1], ['Kilowatt (kW)', 1000], ['Megawatt (MW)', 1e6], ['Horsepower (hp)', 745.69987158227], ['Metric horsepower (PS)', 735.49875], ['BTU/hour', 0.29307107017]],
+	};
+	const SAMPLE: Record<string, [number, number]> = { length: [1, 1], mass: [1, 1], speed: [100, 1], area: [1, 2], volume: [1, 0], time: [1, 4], pressure: [1, 2], energy: [1, 5], power: [100, 1] };
+
+	const fmt = (n: number) => {
+		if (!Number.isFinite(n)) return '';
+		if (n !== 0 && (Math.abs(n) >= 1e12 || Math.abs(n) < 1e-6)) return n.toExponential(6).replace(/\.?0+e/, 'e');
+		return String(Number(n.toPrecision(10)));
+	};
+
+	onPage('uc-tool', () => {
+		const box = byId('uc-fields');
+
+		const build = (kind: string) => {
+			const units = UNITS[kind];
+			const inputs = units.map(([label], i) => {
+				const field = document.createElement('div');
+				field.className = 'field';
+				field.innerHTML = '<label></label><input inputmode="decimal" />';
+				const input = field.querySelector('input')!;
+				input.id = `uc-${kind}-${i}`;
+				field.querySelector('label')!.textContent = label;
+				field.querySelector('label')!.htmlFor = input.id;
+				box.append(field);
+				return input;
+			});
+			const update = (from: number) => {
+				const raw = inputs[from].value.replace(/\s/g, '').replace(',', '.');
+				const n = Number(raw);
+				inputs[from].parentElement!.classList.toggle('invalid', raw !== '' && Number.isNaN(n));
+				if (raw === '' || Number.isNaN(n)) return;
+				const base = n * units[from][1];
+				inputs.forEach((input, i) => {
+					if (i !== from) input.value = fmt(base / units[i][1]);
+				});
+			};
+			inputs.forEach((input, i) => input.addEventListener('input', () => update(i)));
+			const [value, index] = SAMPLE[kind];
+			inputs[index].value = String(value);
+			update(index);
+		};
+
+		segmented(byId('uc-kind'), (kind) => {
+			box.replaceChildren();
+			build(kind);
+		});
+		build('length');
+	});
+</script>

@@ -1,0 +1,212 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="pomodoro-timer"
+	title="Pomodoro Timer"
+	description="Focus and break intervals with a long break every few rounds, a sound at the end and the time left in the tab title."
+>
+	<div class="pomo" id="pomo-tool">
+		<div class="seg" id="pomo-phase">
+			<button data-value="focus" aria-pressed="true">Focus</button>
+			<button data-value="short">Short break</button>
+			<button data-value="long">Long break</button>
+		</div>
+		<div class="pomo-ring">
+			<svg viewBox="0 0 120 120" aria-hidden="true">
+				<circle cx="60" cy="60" r="54" class="pomo-track"></circle>
+				<circle cx="60" cy="60" r="54" class="pomo-bar" id="pomo-bar"></circle>
+			</svg>
+			<div class="pomo-center">
+				<b id="pomo-time" role="timer" aria-live="off">25:00</b>
+				<span id="pomo-round"></span>
+			</div>
+		</div>
+		<div class="toolbar pomo-actions">
+			<button class="btn primary" id="pomo-start">Start</button>
+			<button class="btn" id="pomo-reset">Reset</button>
+			<button class="btn" id="pomo-skip">Skip</button>
+		</div>
+		<div class="toolbar pomo-settings">
+			<label class="check">Focus <input class="num" id="pomo-focus" type="number" min="1" max="120" value="25" /> min</label>
+			<label class="check">Short <input class="num" id="pomo-short" type="number" min="1" max="60" value="5" /> min</label>
+			<label class="check">Long <input class="num" id="pomo-long" type="number" min="1" max="60" value="15" /> min</label>
+			<label class="check">Long break every <input class="num" id="pomo-every" type="number" min="2" max="10" value="4" /> rounds</label>
+			<label class="check"><input type="checkbox" id="pomo-sound" checked /> Sound</label>
+			<label class="check"><input type="checkbox" id="pomo-auto" /> Auto-start next</label>
+		</div>
+		<p class="pomo-done" id="pomo-done"></p>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	let timer: number | undefined;
+	let baseTitle = '';
+
+	document.addEventListener('astro:before-swap', () => {
+		clearInterval(timer);
+		timer = undefined;
+	});
+
+	onPage('pomo-tool', () => {
+		baseTitle = document.title;
+		const LABELS: Record<string, string> = { focus: 'Focus', short: 'Short break', long: 'Long break' };
+		let phase = 'focus';
+		let round = 1;
+		let done = 0;
+		let remaining = 0;
+		let total = 0;
+		let endAt = 0;
+
+		const minutes = (p: string) => Math.max(1, Number(byId<HTMLInputElement>(`pomo-${p}`).value) || 1) * 60;
+		const running = () => timer !== undefined;
+
+		const draw = () => {
+			const s = Math.max(0, Math.ceil(remaining));
+			const text = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+			byId('pomo-time').textContent = text;
+			byId('pomo-round').textContent = `${LABELS[phase]} · round ${round}`;
+			const c = 2 * Math.PI * 54;
+			const bar = byId('pomo-bar');
+			bar.style.strokeDasharray = String(c);
+			bar.style.strokeDashoffset = String(c * (1 - remaining / total));
+			bar.classList.toggle('pomo-break', phase !== 'focus');
+			document.title = running() ? `${text} · ${LABELS[phase]}` : baseTitle;
+			byId('pomo-start').textContent = running() ? 'Pause' : remaining < total ? 'Resume' : 'Start';
+			byId('pomo-done').textContent = `${done} focus session${done === 1 ? '' : 's'} completed in this session.`;
+			document.querySelectorAll<HTMLButtonElement>('#pomo-phase button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === phase)));
+		};
+
+		const setPhase = (p: string) => {
+			stop();
+			phase = p;
+			total = remaining = minutes(p);
+			draw();
+		};
+
+		const beep = () => {
+			if (!byId<HTMLInputElement>('pomo-sound').checked) return;
+			try {
+				const ctx = new AudioContext();
+				[0, 0.25, 0.5].forEach((t) => {
+					const o = ctx.createOscillator();
+					const g = ctx.createGain();
+					o.frequency.value = 880;
+					g.gain.setValueAtTime(0.2, ctx.currentTime + t);
+					g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.2);
+					o.connect(g).connect(ctx.destination);
+					o.start(ctx.currentTime + t);
+					o.stop(ctx.currentTime + t + 0.2);
+				});
+			} catch {}
+		};
+
+		const stop = () => {
+			clearInterval(timer);
+			timer = undefined;
+		};
+
+		const next = () => {
+			if (phase === 'focus') {
+				done++;
+				setPhase(round % Math.max(2, Number(byId<HTMLInputElement>('pomo-every').value) || 4) === 0 ? 'long' : 'short');
+			} else {
+				round++;
+				setPhase('focus');
+			}
+		};
+
+		const start = () => {
+			endAt = Date.now() + remaining * 1000;
+			timer = window.setInterval(() => {
+				remaining = (endAt - Date.now()) / 1000;
+				if (remaining <= 0) {
+					beep();
+					next();
+					if (byId<HTMLInputElement>('pomo-auto').checked) start();
+				}
+				draw();
+			}, 250);
+			draw();
+		};
+
+		byId('pomo-start').addEventListener('click', () => {
+			if (running()) stop();
+			else start();
+			draw();
+		});
+		byId('pomo-reset').addEventListener('click', () => setPhase(phase));
+		byId('pomo-skip').addEventListener('click', next);
+		document.querySelectorAll<HTMLButtonElement>('#pomo-phase button').forEach((b) => b.addEventListener('click', () => setPhase(b.dataset.value!)));
+		['focus', 'short', 'long'].forEach((p) =>
+			byId(`pomo-${p}`).addEventListener('input', () => {
+				if (p === phase && !running()) setPhase(p);
+			})
+		);
+		setPhase('focus');
+	});
+</script>
+
+<style>
+	.pomo {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 20px;
+	}
+	.pomo-ring {
+		position: relative;
+		width: min(280px, 80vw);
+		aspect-ratio: 1;
+	}
+	.pomo-ring svg {
+		width: 100%;
+		height: 100%;
+		transform: rotate(-90deg);
+	}
+	.pomo-track,
+	.pomo-bar {
+		fill: none;
+		stroke-width: 8;
+	}
+	.pomo-track {
+		stroke: var(--surface-2);
+	}
+	.pomo-bar {
+		stroke: var(--accent-strong);
+		stroke-linecap: round;
+	}
+	.pomo-bar:global(.pomo-break) {
+		stroke: var(--ok);
+	}
+	.pomo-center {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 4px;
+	}
+	.pomo-center b {
+		font-size: 56px;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+	}
+	.pomo-center span {
+		font-size: 14px;
+		color: var(--ink-soft);
+	}
+	.pomo-actions,
+	.pomo-settings {
+		justify-content: center;
+	}
+	.pomo-done {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+</style>
