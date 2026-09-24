@@ -47,6 +47,16 @@ Live at **https://techmefr.github.io/kodilo/**
 - **Gradient Generator** — linear, radial and conic with any number of stops.
 - **JSON to CSV** — arrays or JSON Lines, flattened keys, delimiter choice, preview and download.
 - **Image to Base64** — drop, pick or paste; data URI, raw, CSS, HTML or Markdown.
+- **Uptime / SLA Calculator** (`/tools/uptime-sla-calculator/`) — availability targets to downtime budgets, composite SLAs
+- **Byte Size Converter** (`/tools/byte-size-converter/`) — decimal and binary units side by side
+- **Transfer Time Calculator** (`/tools/transfer-time-calculator/`) — transfer duration and bandwidth needed for a deadline
+- **Kubernetes Resource Units** (`/tools/kubernetes-resource-units/`) — CPU millicores and memory Mi vs M, resources block
+- **Well-Known Ports** (`/tools/well-known-ports/`) — searchable TCP/UDP port reference
+- **Linux Signals & Exit Codes** (`/tools/linux-signals-exit-codes/`) — decode exit codes like 137 and a signal table
+- **.gitignore Generator** (`/tools/gitignore-generator/`) — pick a stack, get a deduplicated .gitignore
+- **SemVer Calculator** (`/tools/semver-calculator/`) — range matching, sorting and next versions
+- **DNS Record Builder** (`/tools/dns-record-builder/`) — zone file lines for A, MX, SPF, DMARC, CAA, SRV and more
+- **Security Headers Builder** (`/tools/security-headers-builder/`) — HSTS, CSP and friends for Nginx, Apache, Caddy, Netlify
 - More tools land as separate categories in the sidebar — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -127,10 +137,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - NPM Cheatsheet
 
 **DevOps & Sysadmin**
-- Uptime / SLA Calculator
-- Byte Size Converter
-- Transfer Time Calculator
-- Kubernetes Resource Units
 - Kubernetes Manifest Generator
 - .env Tool
 - YAML Validator & Formatter
@@ -138,15 +144,9 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - systemd Unit Generator
 - SSH Config Generator
 - htpasswd Generator
-- DNS Record Builder
-- Security Headers Builder
 - X.509 Certificate Decoder
-- SemVer Calculator
-- .gitignore Generator
 - JSON Log Viewer
 - curl Converter
-- Well-Known Ports
-- Linux Signals & Exit Codes
 
 **Calculators**
 - Developer Calculator

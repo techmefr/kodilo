@@ -1,0 +1,177 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="well-known-ports"
+	title="Well-Known Ports"
+	description="Search common TCP and UDP ports by number, service or category."
+>
+	<div class="toolbar" id="ports-tool">
+		<input class="ports-search" id="ports-q" type="search" placeholder="443, postgres, mail…" aria-label="Search ports" />
+		<div class="seg" id="ports-cat">
+			<button data-value="all" aria-pressed="true">All</button>
+			<button data-value="web">Web</button>
+			<button data-value="db">Databases</button>
+			<button data-value="mail">Mail</button>
+			<button data-value="infra">Infra</button>
+			<button data-value="remote">Remote</button>
+		</div>
+	</div>
+	<p class="ports-count" id="ports-count"></p>
+	<div class="ports-wrap">
+		<table class="ports-table">
+			<thead><tr><th>Port</th><th>Proto</th><th>Service</th><th>Notes</th></tr></thead>
+			<tbody id="ports-body"></tbody>
+		</table>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	type Port = [number, string, string, string, string];
+	const PORTS: Port[] = [
+		[20, 'TCP', 'FTP data', 'remote', 'Active mode data channel'],
+		[21, 'TCP', 'FTP', 'remote', 'Control channel, plain text'],
+		[22, 'TCP', 'SSH / SFTP / SCP', 'remote', 'Secure shell'],
+		[23, 'TCP', 'Telnet', 'remote', 'Plain text, avoid'],
+		[25, 'TCP', 'SMTP', 'mail', 'Server to server relay'],
+		[53, 'TCP/UDP', 'DNS', 'infra', 'TCP for zone transfers and large answers'],
+		[67, 'UDP', 'DHCP server', 'infra', ''],
+		[68, 'UDP', 'DHCP client', 'infra', ''],
+		[69, 'UDP', 'TFTP', 'infra', 'PXE boot'],
+		[80, 'TCP', 'HTTP', 'web', ''],
+		[110, 'TCP', 'POP3', 'mail', ''],
+		[123, 'UDP', 'NTP', 'infra', 'Time sync'],
+		[143, 'TCP', 'IMAP', 'mail', ''],
+		[161, 'UDP', 'SNMP', 'infra', 'Polling'],
+		[162, 'UDP', 'SNMP trap', 'infra', ''],
+		[389, 'TCP', 'LDAP', 'infra', ''],
+		[443, 'TCP/UDP', 'HTTPS', 'web', 'UDP for HTTP/3 (QUIC)'],
+		[445, 'TCP', 'SMB', 'infra', 'Windows file sharing'],
+		[465, 'TCP', 'SMTPS', 'mail', 'Implicit TLS submission'],
+		[514, 'UDP', 'Syslog', 'infra', ''],
+		[587, 'TCP', 'SMTP submission', 'mail', 'STARTTLS, for mail clients'],
+		[636, 'TCP', 'LDAPS', 'infra', ''],
+		[853, 'TCP', 'DNS over TLS', 'infra', ''],
+		[873, 'TCP', 'rsync', 'remote', ''],
+		[993, 'TCP', 'IMAPS', 'mail', ''],
+		[995, 'TCP', 'POP3S', 'mail', ''],
+		[1080, 'TCP', 'SOCKS proxy', 'infra', ''],
+		[1194, 'UDP', 'OpenVPN', 'remote', ''],
+		[1433, 'TCP', 'SQL Server', 'db', ''],
+		[1521, 'TCP', 'Oracle DB', 'db', ''],
+		[1883, 'TCP', 'MQTT', 'infra', '8883 with TLS'],
+		[2049, 'TCP/UDP', 'NFS', 'infra', ''],
+		[2375, 'TCP', 'Docker API', 'infra', 'Unencrypted, never expose'],
+		[2376, 'TCP', 'Docker API (TLS)', 'infra', ''],
+		[2379, 'TCP', 'etcd client', 'infra', '2380 for peers'],
+		[3000, 'TCP', 'Dev server / Grafana', 'web', 'Node, Rails, Grafana'],
+		[3306, 'TCP', 'MySQL / MariaDB', 'db', ''],
+		[3389, 'TCP/UDP', 'RDP', 'remote', 'Windows remote desktop'],
+		[4222, 'TCP', 'NATS', 'infra', ''],
+		[5000, 'TCP', 'Docker registry / Flask', 'web', ''],
+		[5173, 'TCP', 'Vite dev server', 'web', ''],
+		[5432, 'TCP', 'PostgreSQL', 'db', ''],
+		[5672, 'TCP', 'RabbitMQ (AMQP)', 'infra', '15672 for the admin UI'],
+		[5900, 'TCP', 'VNC', 'remote', ''],
+		[6379, 'TCP', 'Redis / Valkey', 'db', ''],
+		[6443, 'TCP', 'Kubernetes API', 'infra', ''],
+		[7700, 'TCP', 'Meilisearch', 'db', ''],
+		[8080, 'TCP', 'HTTP alternate', 'web', 'Proxies, Tomcat, Jenkins'],
+		[8443, 'TCP', 'HTTPS alternate', 'web', ''],
+		[9000, 'TCP', 'PHP-FPM / MinIO', 'web', ''],
+		[9090, 'TCP', 'Prometheus', 'infra', ''],
+		[9092, 'TCP', 'Kafka', 'infra', ''],
+		[9100, 'TCP', 'Node exporter', 'infra', ''],
+		[9200, 'TCP', 'Elasticsearch / OpenSearch', 'db', '9300 for cluster transport'],
+		[10250, 'TCP', 'Kubelet API', 'infra', ''],
+		[11211, 'TCP/UDP', 'Memcached', 'db', ''],
+		[27017, 'TCP', 'MongoDB', 'db', ''],
+		[51820, 'UDP', 'WireGuard', 'remote', ''],
+	];
+
+	onPage('ports-tool', () => {
+		const q = byId<HTMLInputElement>('ports-q');
+		let cat = 'all';
+
+		const render = () => {
+			const term = q.value.trim().toLowerCase();
+			const rows = PORTS.filter(
+				([port, proto, name, c, notes]) =>
+					(cat === 'all' || c === cat) &&
+					(!term || String(port).startsWith(term) || `${name} ${proto} ${notes}`.toLowerCase().includes(term))
+			);
+			byId('ports-count').textContent = `${rows.length} of ${PORTS.length} ports`;
+			byId('ports-body').replaceChildren(
+				...rows.map((cells) => {
+					const tr = document.createElement('tr');
+					[cells[0], cells[1], cells[2], cells[4]].forEach((value, i) => {
+						const td = document.createElement('td');
+						td.textContent = String(value);
+						if (i === 0) td.className = 'ports-num';
+						tr.append(td);
+					});
+					return tr;
+				})
+			);
+		};
+
+		q.addEventListener('input', render);
+		segmented(byId('ports-cat'), (value) => {
+			cat = value;
+			render();
+		});
+		render();
+	});
+</script>
+
+<style>
+	.ports-search {
+		flex: 1 1 220px;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 8px 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font: inherit;
+	}
+	.ports-count {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.ports-wrap {
+		overflow-x: auto;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.ports-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 14px;
+	}
+	.ports-table th {
+		text-align: left;
+		font-size: 12px;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--ink-soft);
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+	}
+	.ports-table :global(td) {
+		padding: 9px 14px;
+		border-bottom: 1px solid var(--border);
+	}
+	.ports-table :global(tr:last-child td) {
+		border-bottom: 0;
+	}
+	.ports-table :global(.ports-num) {
+		font-family: var(--mono);
+		font-weight: 700;
+		color: var(--accent-strong);
+	}
+</style>

@@ -1,0 +1,149 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="kubernetes-resource-units"
+	title="Kubernetes Resource Units"
+	description="What 250m of CPU or 512Mi of memory really means, and the M vs Mi trap."
+>
+	<div class="fields" id="k8s-tool">
+		<div class="field" id="k8s-cpu-field">
+			<label for="k8s-cpu">CPU</label>
+			<input id="k8s-cpu" spellcheck="false" value="250m" />
+			<span class="field-note" id="k8s-cpu-note"></span>
+		</div>
+		<div class="field" id="k8s-mem-field">
+			<label for="k8s-mem">Memory</label>
+			<input id="k8s-mem" spellcheck="false" value="512Mi" />
+			<span class="field-note" id="k8s-mem-note"></span>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">CPU</div>
+			<ul class="k8s-list" id="k8s-cpu-list"></ul>
+		</section>
+		<section class="panel">
+			<div class="panel-head">Memory</div>
+			<ul class="k8s-list" id="k8s-mem-list"></ul>
+		</section>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>resources block</span>
+			<button class="btn" id="k8s-copy">Copy</button>
+		</div>
+		<pre class="out k8s-yaml" id="k8s-yaml"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { formatNumber } from '../../scripts/units';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const SUFFIX: Record<string, number> = {
+		'': 1, m: 1e-3, k: 1e3, M: 1e6, G: 1e9, T: 1e12, P: 1e15, E: 1e18,
+		Ki: 1024, Mi: 1024 ** 2, Gi: 1024 ** 3, Ti: 1024 ** 4, Pi: 1024 ** 5, Ei: 1024 ** 6,
+	};
+
+	function parseQuantity(text: string): { value: number; suffix: string } | null {
+		const m = text.trim().match(/^(\d+(?:\.\d+)?)(e\d+|m|k|Ki|Mi|Gi|Ti|Pi|Ei|M|G|T|P|E)?$/);
+		if (!m) return null;
+		const suffix = m[2] ?? '';
+		if (suffix.startsWith('e')) return { value: Number(m[1]) * 10 ** Number(suffix.slice(1)), suffix: '' };
+		return { value: Number(m[1]) * SUFFIX[suffix], suffix };
+	}
+
+	const row = (list: HTMLElement, label: string, value: string) => {
+		const li = document.createElement('li');
+		li.innerHTML = '<span></span><code></code>';
+		li.querySelector('span')!.textContent = label;
+		li.querySelector('code')!.textContent = value;
+		list.append(li);
+	};
+
+	onPage('k8s-tool', () => {
+		const cpu = byId<HTMLInputElement>('k8s-cpu');
+		const mem = byId<HTMLInputElement>('k8s-mem');
+
+		const render = () => {
+			const c = parseQuantity(cpu.value);
+			const cpuBad = !c || !['', 'm'].includes(c.suffix);
+			byId('k8s-cpu-field').classList.toggle('invalid', cpuBad);
+			byId('k8s-cpu-note').textContent = cpuBad ? 'CPU uses cores (0.5, 2) or millicores (250m).' : '';
+			const cpuList = byId('k8s-cpu-list');
+			cpuList.replaceChildren();
+			if (!cpuBad) {
+				row(cpuList, 'Cores', formatNumber(c!.value, 3));
+				row(cpuList, 'Millicores', `${formatNumber(c!.value * 1000, 0)}m`);
+				row(cpuList, 'Share of a 4-core node', `${formatNumber((c!.value / 4) * 100, 1)}%`);
+				if (c!.value * 1000 < 1) row(cpuList, 'Warning', 'Below 1m, Kubernetes rounds up to 1m.');
+			}
+
+			const m = parseQuantity(mem.value);
+			byId('k8s-mem-field').classList.toggle('invalid', !m);
+			const memList = byId('k8s-mem-list');
+			memList.replaceChildren();
+			byId('k8s-mem-note').textContent = !m
+				? 'Use bytes or a suffix: 512Mi, 1Gi, 500M, 2G.'
+				: m.suffix === 'm'
+					? '⚠ "m" means milli: this is a fraction of a byte. You probably meant Mi.'
+					: /^[MGTPE]$/.test(m.suffix)
+						? `Decimal unit: ${mem.value.trim()} is ${formatNumber((SUFFIX[m.suffix] / SUFFIX[m.suffix + 'i']) * 100, 1)}% of ${mem.value.trim().replace(/[A-Z]$/, (s) => s + 'i')}.`
+						: '';
+			if (m) {
+				row(memList, 'Bytes', Math.round(m.value).toLocaleString('en'));
+				row(memList, 'MiB (Mi)', formatNumber(m.value / 1024 ** 2, 2));
+				row(memList, 'GiB (Gi)', formatNumber(m.value / 1024 ** 3, 3));
+				row(memList, 'MB (M)', formatNumber(m.value / 1e6, 2));
+				row(memList, 'GB (G)', formatNumber(m.value / 1e9, 3));
+			}
+
+			const limitCpu = c && !cpuBad ? `${Math.round(c.value * 2000)}m` : '500m';
+			const limitMem = m ? `${Math.round((m.value * 1.5) / 1024 ** 2)}Mi` : '768Mi';
+			byId('k8s-yaml').textContent = `resources:
+  requests:
+    cpu: "${cpu.value.trim()}"
+    memory: "${mem.value.trim()}"
+  limits:
+    cpu: "${limitCpu}"
+    memory: "${limitMem}"`;
+		};
+
+		[cpu, mem].forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('k8s-copy'), () => byId('k8s-yaml').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.k8s-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.k8s-list :global(li) {
+		display: flex;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+		font-size: 14px;
+	}
+	.k8s-list :global(li:last-child) {
+		border-bottom: 0;
+	}
+	.k8s-list :global(span) {
+		color: var(--ink-soft);
+		font-weight: 600;
+		font-size: 13px;
+	}
+	.k8s-list :global(code) {
+		font-family: var(--mono);
+		text-align: right;
+	}
+	.k8s-yaml {
+		min-height: auto !important;
+	}
+</style>

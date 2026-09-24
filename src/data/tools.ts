@@ -560,21 +560,25 @@ export const categories: Category[] = [
 		tools: [
 			{
 				slug: 'uptime-sla-calculator',
+				built: true,
 				name: 'Uptime / SLA Calculator',
 				description: 'Turn 99.9% into allowed downtime per day, month and year, and back.',
 			},
 			{
 				slug: 'byte-size-converter',
+				built: true,
 				name: 'Byte Size Converter',
 				description: 'B, KB, KiB, MB, MiB, GB, GiB, TB, TiB: decimal and binary units side by side.',
 			},
 			{
 				slug: 'transfer-time-calculator',
+				built: true,
 				name: 'Transfer Time Calculator',
 				description: 'How long a file takes to move over a given bandwidth, and the bandwidth a deadline needs.',
 			},
 			{
 				slug: 'kubernetes-resource-units',
+				built: true,
 				name: 'Kubernetes Resource Units',
 				description: 'CPU millicores and memory quantities (Mi, Gi, M, G) converted and explained.',
 			},
@@ -615,11 +619,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'dns-record-builder',
+				built: true,
 				name: 'DNS Record Builder',
 				description: 'SPF, DMARC, CAA and MX records built and explained, ready to paste.',
 			},
 			{
 				slug: 'security-headers-builder',
+				built: true,
 				name: 'Security Headers Builder',
 				description: 'Content-Security-Policy, HSTS, Permissions-Policy and friends, for Nginx, Apache or a meta tag.',
 			},
@@ -630,11 +636,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'semver-calculator',
+				built: true,
 				name: 'SemVer Calculator',
 				description: 'Compare versions and test ranges like ^1.2.0, ~2.3 or >=1 <2.',
 			},
 			{
 				slug: 'gitignore-generator',
+				built: true,
 				name: '.gitignore Generator',
 				description: 'Combine templates for languages, frameworks, editors and operating systems.',
 			},
@@ -650,11 +658,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'well-known-ports',
+				built: true,
 				name: 'Well-Known Ports',
 				description: 'Searchable reference of common TCP and UDP ports and the services behind them.',
 			},
 			{
 				slug: 'linux-signals-exit-codes',
+				built: true,
 				name: 'Linux Signals & Exit Codes',
 				description: 'What SIGTERM, SIGKILL or exit code 137 actually mean.',
 			},

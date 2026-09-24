@@ -1,0 +1,147 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="linux-signals-exit-codes"
+	title="Linux Signals & Exit Codes"
+	description="Decode an exit status like 137 or 143, and look up what each signal does."
+>
+	<div class="fields" id="sig-tool">
+		<div class="field wide" id="sig-field">
+			<label for="sig-in">Exit code</label>
+			<input id="sig-in" inputmode="numeric" value="137" />
+			<span class="field-note" id="sig-note"></span>
+		</div>
+	</div>
+	<section class="panel sig-answer" id="sig-answer"></section>
+	<div class="ports-wrap">
+		<table class="sig-table">
+			<thead><tr><th>#</th><th>Signal</th><th>Default</th><th>Meaning</th></tr></thead>
+			<tbody id="sig-body"></tbody>
+		</table>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const SIGNALS: [number, string, string, string][] = [
+		[1, 'SIGHUP', 'Terminate', 'Terminal closed; daemons often reload their config'],
+		[2, 'SIGINT', 'Terminate', 'Ctrl+C'],
+		[3, 'SIGQUIT', 'Core dump', 'Ctrl+\\'],
+		[4, 'SIGILL', 'Core dump', 'Illegal CPU instruction'],
+		[5, 'SIGTRAP', 'Core dump', 'Debugger breakpoint'],
+		[6, 'SIGABRT', 'Core dump', 'abort(), failed assertion'],
+		[7, 'SIGBUS', 'Core dump', 'Bad memory access alignment'],
+		[8, 'SIGFPE', 'Core dump', 'Arithmetic error, e.g. division by zero'],
+		[9, 'SIGKILL', 'Terminate', 'Cannot be caught; OOM killer, kill -9, docker kill'],
+		[10, 'SIGUSR1', 'Terminate', 'User defined'],
+		[11, 'SIGSEGV', 'Core dump', 'Segmentation fault'],
+		[12, 'SIGUSR2', 'Terminate', 'User defined'],
+		[13, 'SIGPIPE', 'Terminate', 'Write to a closed pipe or socket'],
+		[14, 'SIGALRM', 'Terminate', 'alarm() timer'],
+		[15, 'SIGTERM', 'Terminate', 'Polite stop; kill, docker stop, Kubernetes pod shutdown'],
+		[17, 'SIGCHLD', 'Ignore', 'Child process stopped or exited'],
+		[18, 'SIGCONT', 'Continue', 'Resume a stopped process'],
+		[19, 'SIGSTOP', 'Stop', 'Cannot be caught'],
+		[20, 'SIGTSTP', 'Stop', 'Ctrl+Z'],
+		[21, 'SIGTTIN', 'Stop', 'Background read from terminal'],
+		[22, 'SIGTTOU', 'Stop', 'Background write to terminal'],
+		[24, 'SIGXCPU', 'Core dump', 'CPU time limit exceeded'],
+		[25, 'SIGXFSZ', 'Core dump', 'File size limit exceeded'],
+		[28, 'SIGWINCH', 'Ignore', 'Terminal resized'],
+	];
+
+	const CODES: Record<number, string> = {
+		0: 'Success.',
+		1: 'General error. The program failed; check its logs.',
+		2: 'Misuse of a shell builtin or invalid arguments.',
+		126: 'Command found but not executable. Check permissions or the shebang.',
+		127: 'Command not found. Check PATH or a typo.',
+		128: 'Invalid argument to exit.',
+		255: 'Exit status out of range, or exit(-1).',
+	};
+
+	onPage('sig-tool', () => {
+		const input = byId<HTMLInputElement>('sig-in');
+
+		const render = () => {
+			const code = Number(input.value);
+			const valid = /^\d+$/.test(input.value.trim()) && code <= 255;
+			byId('sig-field').classList.toggle('invalid', !valid);
+			byId('sig-note').textContent = valid ? '' : 'Exit codes range from 0 to 255.';
+			const answer = byId('sig-answer');
+			const signal = code > 128 ? SIGNALS.find(([n]) => n === code - 128) : undefined;
+			const title = !valid ? '—' : signal ? `Killed by ${signal[1]} (128 + ${signal[0]})` : code > 128 ? `Killed by signal ${code - 128}` : CODES[code] ? `Exit ${code}` : `Exit ${code}: application defined`;
+			const detail = !valid
+				? ''
+				: signal
+					? `${signal[3]}.${signal[0] === 9 ? ' In a container this is very often the OOM killer: check memory limits.' : ''}`
+					: CODES[code] ?? 'The program chose this code. Look it up in its documentation.';
+			answer.innerHTML = '<b></b><p></p>';
+			answer.querySelector('b')!.textContent = title;
+			answer.querySelector('p')!.textContent = detail;
+			byId('sig-body').replaceChildren(
+				...SIGNALS.map(([n, name, action, meaning]) => {
+					const tr = document.createElement('tr');
+					if (signal && signal[0] === n) tr.className = 'sig-hit';
+					[n, name, action, meaning].forEach((v) => {
+						const td = document.createElement('td');
+						td.textContent = String(v);
+						tr.append(td);
+					});
+					return tr;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		render();
+	});
+</script>
+
+<style>
+	.sig-answer {
+		padding: 16px 18px;
+	}
+	.sig-answer :global(b) {
+		font-size: 20px;
+		font-weight: 800;
+	}
+	.sig-answer :global(p) {
+		margin: 6px 0 0;
+		color: var(--ink-soft);
+	}
+	.ports-wrap {
+		overflow-x: auto;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.sig-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 14px;
+	}
+	.sig-table th {
+		text-align: left;
+		font-size: 12px;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--ink-soft);
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+	}
+	.sig-table :global(td) {
+		padding: 9px 14px;
+		border-bottom: 1px solid var(--border);
+	}
+	.sig-table :global(td:nth-child(-n + 2)) {
+		font-family: var(--mono);
+		font-weight: 700;
+	}
+	.sig-table :global(.sig-hit) {
+		background: var(--accent);
+	}
+</style>
