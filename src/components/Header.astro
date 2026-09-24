@@ -1,4 +1,5 @@
 ---
+import Logo from './Logo.astro';
 import { builtCategories as categories } from '../data/tools';
 import { icon } from '../scripts/icons';
 
@@ -13,7 +14,8 @@ const total = index.length;
 ---
 
 <div class="mobile-bar">
-	<a class="brand" href={base}>
+	<a class="brand" href={base} aria-label="kodilo home">
+		<Logo />
 		kodilo
 	</a>
 	<button type="button" class="icon-btn" id="mobile-search" aria-label="Search tools">
@@ -26,7 +28,8 @@ const total = index.length;
 
 <aside class="site-header" id="site-nav" transition:name="site-nav">
 	<div class="brand-row">
-		<a class="brand" href={base}>
+		<a class="brand" href={base} aria-label="kodilo home">
+			<Logo />
 			kodilo
 		</a>
 		<button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Toggle theme">
@@ -328,6 +331,9 @@ const total = index.length;
 		padding: 0 6px;
 	}
 	.brand {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
 		font-size: 17px;
 		font-weight: 800;
 		letter-spacing: -0.02em;

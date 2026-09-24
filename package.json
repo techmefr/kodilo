@@ -16,9 +16,11 @@
 		"format:check": "prettier --check .",
 		"test": "playwright test",
 		"test:install": "playwright install --with-deps chromium",
-		"oui": "node scripts/build-oui.mjs"
+		"oui": "node scripts/build-oui.mjs",
+		"brand": "node scripts/build-brand.mjs"
 	},
 	"dependencies": {
+		"@astrojs/sitemap": "^3.7.4",
 		"@peculiar/x509": "^2.1.0",
 		"@scure/bip39": "^2.4.0",
 		"ajv": "^8.20.0",
