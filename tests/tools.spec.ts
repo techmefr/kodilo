@@ -175,3 +175,14 @@ test('case converter produces snake and camel case', async ({ page }) => {
 	await expect(page.locator('#case-list')).toContainText('hello_big_world');
 	await expect(page.locator('#case-list')).toContainText('helloBigWorld');
 });
+
+for (const client of ['outlook-desktop', 'outlook-com', 'gmail', 'apple-mail', 'thunderbird']) {
+	test(`inbox tester renders ${client} in dark mode`, async ({ page }) => {
+		await page.goto('tools/inbox-tester/');
+		await page.locator(`[data-tab-id="${client}"]`).click();
+		await page.locator('#subtab-desktop-dark').click();
+		await expect(page.locator('#darkNote')).toBeVisible();
+		const frame = page.frameLocator('#preview');
+		await expect(frame.locator('body')).toHaveCSS('background-color', /rgb\((\d|[1-4]\d), (\d|[1-4]\d), (\d|[1-4]\d)\)/);
+	});
+}
