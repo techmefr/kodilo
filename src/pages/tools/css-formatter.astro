@@ -1,0 +1,162 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `@import url("theme.css");:root{--accent:#6d4fe0;--radius:12px}.card,.panel{display:flex;gap:12px;padding:16px 20px;border-radius:var(--radius);background:linear-gradient(135deg,#fff 0%,#f0eef6 100%)}/* hover state */.card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.12)}@media (max-width:600px){.card{flex-direction:column;padding:12px}}`;
+---
+
+<ToolShell slug="css-formatter" title="CSS Formatter" description="Beautify or minify CSS. Handles media queries, nested rules, comments and strings, with a size comparison.">
+	<div class="toolbar" id="cf-tool">
+		<div class="seg" id="cf-mode">
+			<button data-value="beautify" aria-pressed="true">Beautify</button>
+			<button data-value="minify">Minify</button>
+		</div>
+		<div class="seg" id="cf-indent">
+			<button data-value="2" aria-pressed="true">2 spaces</button>
+			<button data-value="4">4 spaces</button>
+			<button data-value="tab">Tab</button>
+		</div>
+		<label class="check"><input type="checkbox" id="cf-comments" /> Strip comments</label>
+		<span class="cf-size" id="cf-size"></span>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="cf-in" spellcheck="false" aria-label="CSS input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Output</span>
+				<button class="btn" id="cf-copy">Copy</button>
+			</div>
+			<pre class="out" id="cf-out"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Tok = { t: 'str' | 'com' | 'ch' | 'txt'; v: string };
+
+	function tokens(css: string): Tok[] {
+		const out: Tok[] = [];
+		let buf = '';
+		const flush = () => {
+			if (buf) out.push({ t: 'txt', v: buf });
+			buf = '';
+		};
+		for (let i = 0; i < css.length; i++) {
+			const c = css[i];
+			if (c === '"' || c === "'") {
+				flush();
+				let j = i + 1;
+				while (j < css.length && css[j] !== c) j += css[j] === '\\' ? 2 : 1;
+				out.push({ t: 'str', v: css.slice(i, j + 1) });
+				i = j;
+			} else if (c === '/' && css[i + 1] === '*') {
+				flush();
+				const end = css.indexOf('*/', i + 2);
+				const j = end < 0 ? css.length : end + 2;
+				out.push({ t: 'com', v: css.slice(i, j) });
+				i = j - 1;
+			} else if ('{};'.includes(c)) {
+				flush();
+				out.push({ t: 'ch', v: c });
+			} else buf += c;
+		}
+		flush();
+		return out;
+	}
+
+	const tidy = (s: string) =>
+		s
+			.replace(/\s+/g, ' ')
+			.replace(/\s*([>+~,])\s*/g, (m, op) => (op === ',' ? ', ' : ` ${op} `))
+			.replace(/\s*:\s*/g, ': ')
+			.replace(/\(\s+/g, '(')
+			.replace(/\s+\)/g, ')')
+			.trim();
+
+	function beautify(css: string, unit: string, strip: boolean): string {
+		let depth = 0;
+		let line = '';
+		const out: string[] = [];
+		const pad = () => unit.repeat(depth);
+		for (const tok of tokens(css)) {
+			if (tok.t === 'com') {
+				if (!strip) out.push(pad() + tok.v.trim());
+				continue;
+			}
+			if (tok.t === 'str') {
+				line += tok.v;
+				continue;
+			}
+			if (tok.t === 'txt') {
+				line += tok.v;
+				continue;
+			}
+			if (tok.v === '{') {
+				const sel = tidy(line).replace(/: /g, (m, off, str) => (/^@|::?[\w-]/.test(str) ? ':' : m));
+				const selector = line.trim().startsWith('@') ? tidy(line).replace(/\(\s*([\w-]+):\s*/g, '($1: ') : tidy(line).replace(/:\s/g, ':');
+				out.push(`${pad()}${selector || sel} {`);
+				depth++;
+				line = '';
+			} else if (tok.v === ';') {
+				const d = tidy(line);
+				if (d) out.push(`${pad()}${d.startsWith('@') ? d : d.replace(/^([\w-]+)\s*:\s*/, '$1: ')};`);
+				line = '';
+			} else {
+				const d = tidy(line);
+				if (d) out.push(`${pad()}${d.replace(/^([\w-]+)\s*:\s*/, '$1: ')};`);
+				line = '';
+				depth = Math.max(0, depth - 1);
+				out.push(`${pad()}}`);
+				if (depth === 0) out.push('');
+			}
+		}
+		if (tidy(line)) out.push(tidy(line));
+		return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+	}
+
+	function minify(css: string, strip: boolean): string {
+		return tokens(css)
+			.map((tok) => {
+				if (tok.t === 'com') return strip || !tok.v.startsWith('/*!') ? '' : tok.v;
+				if (tok.t !== 'txt') return tok.v;
+				return tok.v.replace(/\s+/g, ' ').replace(/\s*([>+~,:(])\s*/g, '$1').replace(/\s*\)/g, ')').replace(/\b0\.(\d)/g, '.$1').trim().replace(/and\(/g, 'and (');
+			})
+			.join('')
+			.replace(/;}/g, '}')
+			.replace(/\s*{\s*/g, '{');
+	}
+
+	onPage('cf-tool', () => {
+		const input = byId<HTMLTextAreaElement>('cf-in');
+		const strip = byId<HTMLInputElement>('cf-comments');
+		let mode = 'beautify';
+		let indent = '  ';
+
+		const render = () => {
+			const result = mode === 'beautify' ? beautify(input.value, indent, strip.checked) : minify(input.value, true);
+			byId('cf-out').textContent = result;
+			const a = new Blob([input.value]).size;
+			const b = new Blob([result]).size;
+			byId('cf-size').textContent = `${a.toLocaleString('en')} → ${b.toLocaleString('en')} bytes${a ? ` (${b <= a ? '−' : '+'}${Math.abs(Math.round((1 - b / a) * 100))}%)` : ''}`;
+		};
+
+		segmented(byId('cf-mode'), (v) => ((mode = v), render()));
+		segmented(byId('cf-indent'), (v) => ((indent = v === 'tab' ? '\t' : ' '.repeat(Number(v))), render()));
+		[input, strip].forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('cf-copy'), () => byId('cf-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.cf-size {
+		margin-left: auto;
+		font-size: 13px;
+		color: var(--ink-soft);
+		font-variant-numeric: tabular-nums;
+	}
+</style>

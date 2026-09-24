@@ -1,0 +1,17 @@
+---
+import Cheatsheet from '../../components/Cheatsheet.astro';
+import ToolShell from '../../components/ToolShell.astro';
+
+const sections: [string, [string, string][]][] = [
+	['Containers', [['docker ps -a', 'All containers, running or not'], ['docker run -d --name web -p 8080:80 nginx', 'Run in the background with a port'], ['docker run --rm -it alpine sh', 'Throwaway interactive shell'], ['docker exec -it <container> sh', 'Shell into a running container'], ['docker logs -f --tail 100 <container>', 'Follow the last 100 log lines'], ['docker stop <container>', 'Graceful stop (SIGTERM, then SIGKILL)'], ['docker rm -f <container>', 'Force remove'], ['docker restart <container>', 'Restart']]],
+	['Images', [['docker images', 'List images'], ['docker build -t app:1.0 .', 'Build from the Dockerfile here'], ['docker build --no-cache -t app .', 'Build without the layer cache'], ['docker pull <image>', 'Download an image'], ['docker tag app:1.0 registry.example.com/app:1.0', 'Tag for a registry'], ['docker push registry.example.com/app:1.0', 'Push to a registry'], ['docker history <image>', 'Layers and their sizes'], ['docker rmi <image>', 'Remove an image']]],
+	['Compose', [['docker compose up -d', 'Start the stack in the background'], ['docker compose down', 'Stop and remove the stack'], ['docker compose down -v', 'Also remove named volumes'], ['docker compose logs -f <service>', 'Follow a service'], ['docker compose ps', 'Services and their state'], ['docker compose exec <service> sh', 'Shell into a service'], ['docker compose pull && docker compose up -d', 'Update images and restart'], ['docker compose config', 'Show the resolved config']]],
+	['Inspect & debug', [['docker inspect <container>', 'Full JSON details'], ['docker stats', 'Live CPU and memory usage'], ['docker top <container>', 'Processes inside a container'], ['docker port <container>', 'Published ports'], ['docker cp <container>:/path ./local', 'Copy files out of a container'], ['docker events', 'Stream daemon events']]],
+	['Volumes & networks', [['docker volume ls', 'List volumes'], ['docker volume inspect <volume>', 'Where a volume lives'], ['docker network ls', 'List networks'], ['docker network create backend', 'Create a network'], ['docker network connect backend <container>', 'Attach a container to a network']]],
+	['Cleanup', [['docker system df', 'Disk space used by Docker'], ['docker system prune', 'Remove stopped containers, unused networks and dangling images'], ['docker image prune -a', 'Remove every unused image'], ['docker volume prune', 'Remove unused volumes'], ['docker builder prune', 'Clear the build cache']]],
+];
+---
+
+<ToolShell slug="docker-cheatsheet" title="Docker Cheatsheet" description="Docker and Compose commands grouped by task. Filter them, click one to copy it.">
+	<Cheatsheet id="dk-tool" placeholder="logs, prune, compose…" sections={sections} />
+</ToolShell>

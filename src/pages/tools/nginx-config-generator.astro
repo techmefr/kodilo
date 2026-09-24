@@ -1,0 +1,104 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="nginx-config-generator" title="Nginx Config Generator" description="Reverse proxy, static site or SPA, HTTPS redirect, gzip, caching and security headers, in a few clicks.">
+	<div class="toolbar" id="ng-tool">
+		<div class="seg" id="ng-kind">
+			<button data-value="proxy" aria-pressed="true">Reverse proxy</button>
+			<button data-value="spa">SPA</button>
+			<button data-value="static">Static site</button>
+			<button data-value="php">PHP-FPM</button>
+		</div>
+	</div>
+	<div class="fields">
+		<div class="field"><label for="ng-domain">Domain(s)</label><input id="ng-domain" spellcheck="false" value="example.com www.example.com" /></div>
+		<div class="field" id="ng-upstream-field"><label for="ng-upstream">Upstream</label><input id="ng-upstream" spellcheck="false" value="127.0.0.1:3000" /></div>
+		<div class="field" id="ng-root-field"><label for="ng-root">Root</label><input id="ng-root" spellcheck="false" value="/var/www/example/dist" /></div>
+		<div class="field"><label for="ng-body">Max upload size</label><input id="ng-body" spellcheck="false" value="20m" /></div>
+	</div>
+	<div class="toolbar">
+		<label class="check"><input type="checkbox" id="ng-https" checked /> HTTPS (Let's Encrypt paths)</label>
+		<label class="check"><input type="checkbox" id="ng-redirect" checked /> Redirect HTTP → HTTPS</label>
+		<label class="check"><input type="checkbox" id="ng-www" /> Redirect www → apex</label>
+		<label class="check"><input type="checkbox" id="ng-gzip" checked /> gzip</label>
+		<label class="check"><input type="checkbox" id="ng-cache" checked /> Cache static assets</label>
+		<label class="check"><input type="checkbox" id="ng-headers" checked /> Security headers</label>
+		<label class="check" id="ng-ws-wrap"><input type="checkbox" id="ng-ws" checked /> WebSockets</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="ng-file"></span>
+			<button class="btn" id="ng-copy">Copy</button>
+		</div>
+		<pre class="out" id="ng-out"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Enable it</span>
+			<button class="btn" id="ng-cmd-copy">Copy</button>
+		</div>
+		<pre class="out ng-cmd" id="ng-cmd"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('ng-tool', () => {
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const on = (id: string) => byId<HTMLInputElement>(id).checked;
+		let kind = 'proxy';
+
+		const render = () => {
+			const domains = val('ng-domain').split(/[\s,]+/).filter(Boolean);
+			const main = domains[0] ?? 'example.com';
+			const apex = main.replace(/^www\./, '');
+			const https = on('ng-https');
+			const names = on('ng-www') ? [apex] : domains;
+			byId('ng-upstream-field').hidden = kind !== 'proxy';
+			byId('ng-ws-wrap').hidden = kind !== 'proxy';
+			byId('ng-root-field').hidden = kind === 'proxy';
+			const blocks: string[] = [];
+			if (https && on('ng-redirect')) blocks.push(`server {\n    listen 80;\n    listen [::]:80;\n    server_name ${domains.join(' ')};\n\n    location /.well-known/acme-challenge/ {\n        root /var/www/certbot;\n    }\n\n    location / {\n        return 301 https://${on('ng-www') ? apex : '$host'}$request_uri;\n    }\n}`);
+			if (on('ng-www') && domains.some((d) => d.startsWith('www.'))) {
+				blocks.push(`server {\n    listen ${https ? '443 ssl' : '80'};\n    ${https ? 'listen [::]:443 ssl;\n    http2 on;\n    ' : ''}server_name www.${apex};\n${https ? `    ssl_certificate /etc/letsencrypt/live/${apex}/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/${apex}/privkey.pem;\n` : ''}    return 301 ${https ? 'https' : 'http'}://${apex}$request_uri;\n}`);
+			}
+			const body: string[] = [];
+			body.push(https ? '    listen 443 ssl;\n    listen [::]:443 ssl;\n    http2 on;' : '    listen 80;\n    listen [::]:80;');
+			body.push(`    server_name ${names.join(' ')};`);
+			if (https) body.push(`\n    ssl_certificate /etc/letsencrypt/live/${apex}/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/${apex}/privkey.pem;\n    ssl_protocols TLSv1.2 TLSv1.3;\n    ssl_session_cache shared:SSL:10m;`);
+			body.push(`\n    client_max_body_size ${val('ng-body') || '10m'};`);
+			if (kind !== 'proxy') body.push(`    root ${val('ng-root') || '/var/www/html'};\n    index ${kind === 'php' ? 'index.php index.html' : 'index.html'};`);
+			if (on('ng-gzip')) body.push('\n    gzip on;\n    gzip_vary on;\n    gzip_min_length 1024;\n    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;');
+			if (on('ng-headers')) body.push(`\n    add_header X-Content-Type-Options "nosniff" always;\n    add_header X-Frame-Options "SAMEORIGIN" always;\n    add_header Referrer-Policy "strict-origin-when-cross-origin" always;${https ? '\n    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;' : ''}`);
+			if (kind === 'proxy') {
+				body.push(`\n    location / {\n        proxy_pass http://${val('ng-upstream') || '127.0.0.1:3000'};\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;${on('ng-ws') ? '\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection "upgrade";' : ''}\n        proxy_read_timeout 60s;\n    }`);
+			} else if (kind === 'spa') {
+				body.push('\n    location / {\n        try_files $uri $uri/ /index.html;\n    }');
+			} else if (kind === 'static') {
+				body.push('\n    location / {\n        try_files $uri $uri/ =404;\n    }\n\n    error_page 404 /404.html;');
+			} else {
+				body.push('\n    location / {\n        try_files $uri $uri/ /index.php?$query_string;\n    }\n\n    location ~ \\.php$ {\n        include fastcgi_params;\n        fastcgi_pass unix:/run/php/php8.3-fpm.sock;\n        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;\n    }\n\n    location ~ /\\.(?!well-known) {\n        deny all;\n    }');
+			}
+			if (on('ng-cache') && kind !== 'proxy') body.push('\n    location ~* \\.(?:css|js|mjs|woff2?|ttf|svg|png|jpe?g|gif|webp|avif|ico)$ {\n        expires 1y;\n        add_header Cache-Control "public, immutable";\n        access_log off;\n        try_files $uri =404;\n    }');
+			if (on('ng-cache') && kind === 'proxy') body.push('\n    location ~* \\.(?:css|js|woff2?|png|jpe?g|webp|avif|svg)$ {\n        proxy_pass http://' + (val('ng-upstream') || '127.0.0.1:3000') + ';\n        expires 7d;\n        add_header Cache-Control "public";\n    }');
+			blocks.push(`server {\n${body.join('\n')}\n}`);
+			byId('ng-file').textContent = `/etc/nginx/sites-available/${apex}`;
+			byId('ng-out').textContent = blocks.join('\n\n');
+			byId('ng-cmd').textContent = `sudo ln -s /etc/nginx/sites-available/${apex} /etc/nginx/sites-enabled/\n${https ? `sudo certbot certonly --webroot -w /var/www/certbot ${domains.map((d) => `-d ${d}`).join(' ')}\n` : ''}sudo nginx -t && sudo systemctl reload nginx`;
+		};
+
+		segmented(byId('ng-kind'), (v) => ((kind = v), render()));
+		document.querySelectorAll('#ng-tool ~ .fields input, #ng-tool ~ .toolbar input').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('ng-copy'), () => byId('ng-out').textContent ?? '');
+		copyButton(byId('ng-cmd-copy'), () => byId('ng-cmd').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.ng-cmd {
+		min-height: auto !important;
+	}
+</style>

@@ -1,0 +1,58 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+import { SAMPLE } from '../../scripts/markdown';
+---
+
+<ToolShell slug="markdown-to-html" title="Markdown to HTML" description="Convert GitHub-flavored Markdown to clean HTML: tables, task lists, fenced code, heading anchors. Optionally wrap it in a full page.">
+	<div class="toolbar" id="mh-tool">
+		<label class="check"><input type="checkbox" id="mh-page" /> Full HTML document</label>
+		<label class="check"><input type="checkbox" id="mh-ids" checked /> Heading ids</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Markdown</div>
+			<textarea id="mh-in" spellcheck="false" aria-label="Markdown">{SAMPLE}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>HTML</span>
+				<button class="btn" id="mh-copy">Copy</button>
+			</div>
+			<pre class="out mh-out" id="mh-out"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { markdown } from '../../scripts/markdown';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	onPage('mh-tool', () => {
+		const input = byId<HTMLTextAreaElement>('mh-in');
+		const page = byId<HTMLInputElement>('mh-page');
+		const ids = byId<HTMLInputElement>('mh-ids');
+
+		const render = () => {
+			let html = markdown(input.value);
+			if (!ids.checked) html = html.replace(/<h(\d) id="[^"]*">/g, '<h$1>');
+			const title = input.value.match(/^#\s+(.+)$/m)?.[1] ?? 'Document';
+			byId('mh-out').textContent = page.checked
+				? `<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1" />\n  <title>${title.replace(/</g, '&lt;')}</title>\n</head>\n<body>\n${html}\n</body>\n</html>`
+				: html;
+		};
+
+		[input, page, ids].forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('mh-copy'), () => byId('mh-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.mh-out {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	#mh-in {
+		min-height: 420px;
+	}
+</style>

@@ -1,0 +1,111 @@
+---
+interface Props {
+	id: string;
+	placeholder: string;
+	sections: [string, [string, string][]][];
+}
+const { id, placeholder, sections } = Astro.props;
+---
+
+<div class="toolbar cs-bar" id={id} data-cheatsheet>
+	<input class="cs-search" type="search" placeholder={placeholder} aria-label="Filter commands" />
+</div>
+<div class="cs-grid">
+	{
+		sections.map(([title, rows]) => (
+			<section class="panel cs-section">
+				<div class="panel-head">{title}</div>
+				<ul>
+					{rows.map(([cmd, meaning]) => (
+						<li>
+							<button data-copy={cmd}>
+								<code>{cmd}</code>
+								<span>{meaning}</span>
+							</button>
+						</li>
+					))}
+				</ul>
+			</section>
+		))
+	}
+</div>
+
+<script>
+	document.addEventListener('astro:page-load', () => {
+		const bar = document.querySelector<HTMLElement>('[data-cheatsheet]');
+		if (!bar) return;
+		const q = bar.querySelector<HTMLInputElement>('.cs-search')!;
+		q.addEventListener('input', () => {
+			const term = q.value.trim().toLowerCase();
+			document.querySelectorAll<HTMLElement>('.cs-section').forEach((section) => {
+				const title = section.querySelector('.panel-head')!.textContent!.toLowerCase();
+				let any = false;
+				section.querySelectorAll<HTMLElement>('li').forEach((li) => {
+					const hit = !term || title.includes(term) || li.textContent!.toLowerCase().includes(term);
+					li.hidden = !hit;
+					any ||= hit;
+				});
+				section.hidden = !any;
+			});
+		});
+		document.querySelectorAll<HTMLButtonElement>('.cs-section button').forEach((b) =>
+			b.addEventListener('click', () => {
+				navigator.clipboard.writeText(b.dataset.copy!);
+				const span = b.querySelector('span')!;
+				const text = span.textContent;
+				span.textContent = 'Copied';
+				setTimeout(() => (span.textContent = text), 1200);
+			})
+		);
+	});
+</script>
+
+<style>
+	.cs-search {
+		flex: 1 1 240px;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 8px 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font: inherit;
+	}
+	.cs-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+		gap: 14px;
+		align-items: start;
+	}
+	.cs-section ul {
+		list-style: none;
+		margin: 0;
+		padding: 4px 0;
+	}
+	.cs-section button {
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		text-align: left;
+		background: none;
+		border: 0;
+		padding: 7px 14px;
+		color: var(--ink);
+		font: inherit;
+		cursor: pointer;
+	}
+	.cs-section button:hover {
+		background: var(--surface-2);
+	}
+	.cs-section code {
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--accent-strong);
+		overflow-wrap: anywhere;
+	}
+	.cs-section span {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+</style>

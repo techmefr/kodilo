@@ -1,0 +1,214 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `price = 49.90
+qty = 3
+subtotal = price * qty
+tax = subtotal * 20%
+subtotal + tax
+sqrt(2) ^ 2
+round(pi * 10 ^ 2, 2)
+0xff + 0b1010
+max(3, 7, 2) / 2
+ans * 4`;
+---
+
+<ToolShell slug="math-evaluator" title="Math Evaluator" description="A calculator notepad: one expression per line, variables, percentages, functions, constants and hex or binary literals.">
+	<div class="me-grid" id="me-tool">
+		<textarea id="me-in" class="me-in" spellcheck="false" aria-label="Expressions">{sample}</textarea>
+		<ol class="me-out" id="me-out" aria-label="Results"></ol>
+	</div>
+	<p class="me-help">
+		Operators <code>+ - * / % ^ !</code> · functions <code>sqrt cbrt abs round floor ceil min max log log2 log10 ln exp sin cos tan asin acos atan</code> · constants <code>pi e tau</code> · <code>ans</code> is the previous result · <code>20%</code> means 0.2 · a total line <code>sum</code> adds everything above.
+	</p>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const FN: Record<string, (...a: number[]) => number> = {
+		sqrt: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs, floor: Math.floor, ceil: Math.ceil, exp: Math.exp, ln: Math.log, log: Math.log10, log10: Math.log10, log2: Math.log2,
+		sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan, min: Math.min, max: Math.max,
+		round: (x, d = 0) => Math.round(x * 10 ** d) / 10 ** d,
+	};
+	const CONST: Record<string, number> = { pi: Math.PI, e: Math.E, tau: Math.PI * 2 };
+
+	function evaluate(src: string, vars: Record<string, number>): number {
+		const toks = src.match(/0x[\da-f]+|0b[01]+|\d+(?:\.\d+)?(?:e[+-]?\d+)?|\.\d+|[a-z_]\w*|[-+*/%^!(),]/gi);
+		if (!toks || toks.join('') !== src.replace(/\s+/g, '').replace(/×/g, '*').replace(/÷/g, '/')) throw new Error('Unexpected character');
+		let i = 0;
+		const peek = () => toks[i];
+		const eat = (t?: string) => {
+			if (t && toks[i] !== t) throw new Error(`Expected ${t}`);
+			return toks[i++];
+		};
+		const primary = (): number => {
+			const t = eat();
+			if (t === undefined) throw new Error('Incomplete expression');
+			if (t === '(') {
+				const v = expr();
+				eat(')');
+				return v;
+			}
+			if (t === '-') return -factor();
+			if (t === '+') return factor();
+			if (/^0x/i.test(t)) return parseInt(t.slice(2), 16);
+			if (/^0b/i.test(t)) return parseInt(t.slice(2), 2);
+			if (/^[\d.]/.test(t)) return Number(t);
+			const name = t.toLowerCase();
+			if (FN[name] && peek() === '(') {
+				eat('(');
+				const args = [expr()];
+				while (peek() === ',') {
+					eat(',');
+					args.push(expr());
+				}
+				eat(')');
+				return FN[name](...args);
+			}
+			if (name in vars) return vars[name];
+			if (name in CONST) return CONST[name];
+			throw new Error(`Unknown name ${t}`);
+		};
+		const postfix = (): number => {
+			let v = primary();
+			for (;;) {
+				if (peek() === '!') {
+					eat();
+					if (v < 0 || !Number.isInteger(v) || v > 170) throw new Error('Factorial needs an integer 0–170');
+					let r = 1;
+					for (let k = 2; k <= v; k++) r *= k;
+					v = r;
+				} else if (peek() === '%' && !/^[\d.(a-z]/i.test(toks[i + 1] ?? '')) {
+					eat();
+					v /= 100;
+				} else return v;
+			}
+		};
+		const factor = (): number => {
+			const base = postfix();
+			if (peek() === '^') {
+				eat();
+				return base ** factor();
+			}
+			return base;
+		};
+		const term = (): number => {
+			let v = factor();
+			while (['*', '/', '%'].includes(peek()) || (peek() && /^[a-z(]/i.test(peek()) && !['e'].includes(peek()))) {
+				const op = /^[a-z(]/i.test(peek()) ? '*' : eat();
+				const r = factor();
+				v = op === '*' ? v * r : op === '/' ? v / r : v % r;
+			}
+			return v;
+		};
+		const expr = (): number => {
+			let v = term();
+			while (peek() === '+' || peek() === '-') v = eat() === '+' ? v + term() : v - term();
+			return v;
+		};
+		const v = expr();
+		if (i < toks.length) throw new Error(`Unexpected ${toks[i]}`);
+		return v;
+	}
+
+	const show = (n: number) => (Number.isInteger(n) && Math.abs(n) < 1e15 ? n.toLocaleString('en') : Math.abs(n) >= 1e15 || (n !== 0 && Math.abs(n) < 1e-6) ? n.toExponential(6) : Number(n.toPrecision(12)).toLocaleString('en', { maximumFractionDigits: 10 }));
+
+	onPage('me-tool', () => {
+		const input = byId<HTMLTextAreaElement>('me-in');
+
+		const render = () => {
+			const vars: Record<string, number> = {};
+			const results: number[] = [];
+			byId('me-out').replaceChildren(
+				...input.value.split('\n').map((raw) => {
+					const li = document.createElement('li');
+					const line = raw.replace(/\/\/.*$|#.*$/, '').trim();
+					if (!line) return li;
+					try {
+						let name: string | null = null;
+						let body = line;
+						const assign = line.match(/^([a-z_]\w*)\s*=\s*(.+)$/i);
+						if (assign && !FN[assign[1].toLowerCase()]) [name, body] = [assign[1].toLowerCase(), assign[2]];
+						const v = /^(sum|total)$/i.test(body) ? results.reduce((a, b) => a + b, 0) : evaluate(body, vars);
+						if (!Number.isFinite(v)) throw new Error(Number.isNaN(v) ? 'Not a number' : 'Infinity');
+						if (name) vars[name] = v;
+						vars.ans = v;
+						results.push(v);
+						li.textContent = show(v);
+						li.title = 'Click to copy';
+						li.addEventListener('click', () => navigator.clipboard.writeText(String(v)));
+					} catch (e) {
+						li.textContent = (e as Error).message;
+						li.className = 'me-err';
+					}
+					return li;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		input.addEventListener('scroll', () => (byId('me-out').scrollTop = input.scrollTop));
+		render();
+	});
+</script>
+
+<style>
+	.me-grid {
+		display: grid;
+		grid-template-columns: 1fr minmax(160px, 38%);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		overflow: hidden;
+		background: var(--surface);
+		height: 420px;
+	}
+	.me-in,
+	.me-out {
+		font-family: var(--mono);
+		font-size: 15px;
+		line-height: 28px;
+		padding: 12px 16px;
+		margin: 0;
+	}
+	.me-in {
+		border: 0;
+		resize: none;
+		background: transparent;
+		color: var(--ink);
+		white-space: pre;
+		overflow: auto;
+	}
+	.me-out {
+		list-style: none;
+		background: var(--surface-2);
+		border-left: 1px solid var(--border);
+		overflow: hidden;
+		text-align: right;
+	}
+	.me-out :global(li) {
+		height: 28px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-weight: 700;
+		color: var(--accent-strong);
+		cursor: copy;
+	}
+	.me-out :global(.me-err) {
+		color: var(--ink-soft);
+		font-weight: 400;
+		font-size: 12px;
+		cursor: default;
+	}
+	.me-help {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+		line-height: 1.7;
+	}
+	.me-help code {
+		font-family: var(--mono);
+		color: var(--ink);
+	}
+</style>

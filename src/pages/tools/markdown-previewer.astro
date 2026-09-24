@@ -1,0 +1,187 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+import { SAMPLE } from '../../scripts/markdown';
+---
+
+<ToolShell slug="markdown-previewer" title="Markdown Previewer" description="Write Markdown on the left, read the rendered page on the right. Word count, outline and scroll sync included.">
+	<div class="toolbar" id="mp-tool">
+		<div class="seg" id="mp-view">
+			<button data-value="split" aria-pressed="true">Split</button>
+			<button data-value="write">Write</button>
+			<button data-value="preview">Preview</button>
+		</div>
+		<span class="mp-stats" id="mp-stats"></span>
+		<button class="btn" id="mp-copy">Copy Markdown</button>
+	</div>
+	<div class="mp-grid" id="mp-grid">
+		<textarea id="mp-in" class="mp-in" spellcheck="true" aria-label="Markdown">{SAMPLE}</textarea>
+		<article class="mp-out" id="mp-out"></article>
+	</div>
+	<nav class="mp-outline" id="mp-outline" aria-label="Outline"></nav>
+</ToolShell>
+
+<script>
+	import { markdown } from '../../scripts/markdown';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('mp-tool', () => {
+		const input = byId<HTMLTextAreaElement>('mp-in');
+		const out = byId('mp-out');
+		let draft: string | null = null;
+		try {
+			draft = localStorage.getItem('kodilo-markdown-draft');
+		} catch {}
+		if (draft) input.value = draft;
+
+		const render = () => {
+			out.innerHTML = markdown(input.value);
+			out.querySelectorAll('a').forEach((a) => {
+				a.target = '_blank';
+				a.rel = 'noopener noreferrer';
+			});
+			const words = (input.value.match(/[\p{L}\p{N}'’-]+/gu) ?? []).length;
+			byId('mp-stats').textContent = `${words} words · ${Math.max(1, Math.round(words / 238))} min read`;
+			byId('mp-outline').replaceChildren(
+				...[...out.querySelectorAll<HTMLElement>('h1, h2, h3')].map((h) => {
+					const b = document.createElement('button');
+					b.textContent = h.textContent;
+					b.style.paddingLeft = `${(Number(h.tagName[1]) - 1) * 14 + 10}px`;
+					b.addEventListener('click', () => h.scrollIntoView({ block: 'start' }));
+					return b;
+				})
+			);
+			try {
+				localStorage.setItem('kodilo-markdown-draft', input.value);
+			} catch {}
+		};
+
+		input.addEventListener('scroll', () => {
+			const ratio = input.scrollTop / Math.max(1, input.scrollHeight - input.clientHeight);
+			out.scrollTop = ratio * (out.scrollHeight - out.clientHeight);
+		});
+		segmented(byId('mp-view'), (v) => (byId('mp-grid').dataset.view = v));
+		input.addEventListener('input', render);
+		copyButton(byId('mp-copy'), () => input.value);
+		render();
+	});
+</script>
+
+<style>
+	.mp-stats {
+		font-size: 13px;
+		color: var(--ink-soft);
+		margin-left: auto;
+	}
+	.mp-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 14px;
+		height: 560px;
+	}
+	.mp-grid[data-view='write'] {
+		grid-template-columns: 1fr;
+	}
+	.mp-grid[data-view='write'] .mp-out,
+	.mp-grid[data-view='preview'] .mp-in {
+		display: none;
+	}
+	.mp-grid[data-view='preview'] {
+		grid-template-columns: 1fr;
+	}
+	@media (max-width: 760px) {
+		.mp-grid {
+			grid-template-columns: 1fr;
+			height: auto;
+		}
+		.mp-in,
+		.mp-out {
+			height: 420px;
+		}
+	}
+	.mp-in {
+		resize: none;
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		padding: 16px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 13px;
+		line-height: 1.6;
+	}
+	.mp-out {
+		overflow: auto;
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		padding: 8px 24px 24px;
+		background: var(--surface);
+		line-height: 1.65;
+		font-size: 15px;
+	}
+	.mp-out :global(h1),
+	.mp-out :global(h2) {
+		border-bottom: 1px solid var(--border);
+		padding-bottom: 6px;
+	}
+	.mp-out :global(code) {
+		font-family: var(--mono);
+		font-size: 0.88em;
+		background: var(--surface-2);
+		padding: 1px 5px;
+		border-radius: 5px;
+	}
+	.mp-out :global(pre) {
+		background: var(--surface-2);
+		padding: 12px 14px;
+		border-radius: 10px;
+		overflow-x: auto;
+	}
+	.mp-out :global(pre code) {
+		background: none;
+		padding: 0;
+	}
+	.mp-out :global(blockquote) {
+		margin: 0;
+		padding: 2px 16px;
+		border-left: 4px solid var(--accent-strong);
+		color: var(--ink-soft);
+	}
+	.mp-out :global(table) {
+		border-collapse: collapse;
+		display: block;
+		overflow-x: auto;
+	}
+	.mp-out :global(th),
+	.mp-out :global(td) {
+		border: 1px solid var(--border);
+		padding: 6px 12px;
+	}
+	.mp-out :global(a) {
+		color: var(--accent-strong);
+	}
+	.mp-out :global(img) {
+		max-width: 100%;
+	}
+	.mp-out :global(.task) {
+		list-style: none;
+		margin-left: -20px;
+	}
+	.mp-outline {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+	}
+	.mp-outline :global(button) {
+		background: none;
+		border: 0;
+		color: var(--ink-soft);
+		font: inherit;
+		font-size: 13px;
+		padding: 3px 10px;
+		cursor: pointer;
+		text-align: left;
+	}
+	.mp-outline :global(button:hover) {
+		color: var(--accent-strong);
+	}
+</style>
