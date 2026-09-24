@@ -1,0 +1,118 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="word-counter"
+	title="Word Counter"
+	description="Words, characters, bytes, reading time and top keywords. Emoji and CJK are counted correctly."
+>
+	<section class="panel" id="wc-tool">
+		<div class="panel-head">Text</div>
+		<textarea id="wc-in" class="wc-input" aria-label="Text to analyse"
+			>Kodilo is a collection of developer tools. No sign-up, no account, no tracking — every tool runs in your browser. 🚀
+
+Paste anything here and the numbers update as you type.</textarea
+		>
+	</section>
+	<div class="stats" id="wc-stats"></div>
+	<section class="panel">
+		<div class="panel-head">Top keywords</div>
+		<ol class="wc-top" id="wc-top"></ol>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const segment = (text: string, granularity: 'word' | 'grapheme' | 'sentence') =>
+		Array.from(new Intl.Segmenter(undefined, { granularity }).segment(text));
+
+	const duration = (words: number, perMinute: number) => {
+		const seconds = Math.round((words / perMinute) * 60);
+		return seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
+	};
+
+	onPage('wc-tool', () => {
+		const input = byId<HTMLTextAreaElement>('wc-in');
+
+		const render = () => {
+			const text = input.value;
+			const words = segment(text, 'word')
+				.filter((s) => s.isWordLike)
+				.map((s) => s.segment);
+			const graphemes = segment(text, 'grapheme').length;
+			const noSpaces = segment(text.replace(/\s/g, ''), 'grapheme').length;
+			const sentences = segment(text, 'sentence').filter((s) => s.segment.trim()).length;
+			const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim()).length;
+			const bytes = new TextEncoder().encode(text).length;
+			const longest = words.reduce((a, b) => (b.length > a.length ? b : a), '');
+
+			const stats: [string, string | number][] = [
+				['Words', words.length],
+				['Characters', graphemes],
+				['Without spaces', noSpaces],
+				['Sentences', sentences],
+				['Paragraphs', paragraphs],
+				['UTF-8 bytes', bytes],
+				['Reading time', duration(words.length, 238)],
+				['Speaking time', duration(words.length, 150)],
+				['Longest word', longest || '—'],
+			];
+			byId('wc-stats').replaceChildren(
+				...stats.map(([label, value]) => {
+					const el = document.createElement('div');
+					el.className = 'stat';
+					el.innerHTML = '<b></b><span></span>';
+					el.querySelector('b')!.textContent = String(value);
+					el.querySelector('span')!.textContent = label;
+					return el;
+				})
+			);
+
+			const freq = new Map<string, number>();
+			words
+				.map((word) => word.toLocaleLowerCase())
+				.filter((word) => [...word].length > 3)
+				.forEach((word) => freq.set(word, (freq.get(word) ?? 0) + 1));
+			const top = [...freq].sort((a, b) => b[1] - a[1]).slice(0, 10);
+			byId('wc-top').replaceChildren(
+				...top.map(([word, n]) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<span></span><b></b>';
+					li.querySelector('span')!.textContent = word;
+					li.querySelector('b')!.textContent = `${n} · ${Math.round((n / words.length) * 100)}%`;
+					return li;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		render();
+	});
+</script>
+
+<style>
+	.wc-input {
+		font-family: var(--sans) !important;
+		font-size: 15px !important;
+		min-height: 180px !important;
+	}
+	.stat :global(b) {
+		overflow-wrap: anywhere;
+	}
+	.wc-top {
+		margin: 0;
+		padding: 6px 14px 10px 38px;
+		font-size: 14px;
+	}
+	.wc-top :global(li) {
+		padding: 5px 0;
+	}
+	.wc-top :global(li b) {
+		float: right;
+		font-weight: 600;
+		color: var(--ink-soft);
+		font-variant-numeric: tabular-nums;
+	}
+</style>

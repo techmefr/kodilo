@@ -1,0 +1,182 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+import { corpora } from '../../data/lorem';
+
+const groups = ['Rendering', 'Fun'] as const;
+---
+
+<ToolShell
+	slug="lorem-ipsum-generator"
+	title="Lorem Ipsum"
+	description="Placeholder text that stresses real layouts: accents, very long words, right-to-left, no-space scripts, emoji. Or just cats."
+>
+	<div id="lorem-tool" class="lorem-controls">
+		{
+			groups.map((group) => (
+				<div class="lorem-group">
+					<span class="lorem-group-label">{group}</span>
+					<div class="chips lorem-corpora">
+						{corpora
+							.filter((c) => c.group === group)
+							.map((c) => (
+								<button data-value={c.id} aria-pressed={String(c.id === 'latin')}>
+									{c.label}
+								</button>
+							))}
+					</div>
+				</div>
+			))
+		}
+		<div class="toolbar">
+			<input class="num" type="number" id="lorem-count" min="1" max="100" value="3" aria-label="How many" />
+			<div class="seg" id="lorem-unit" aria-label="Unit">
+				<button data-value="paragraphs" aria-pressed="true">Paragraphs</button>
+				<button data-value="sentences" aria-pressed="false">Sentences</button>
+				<button data-value="words" aria-pressed="false">Words</button>
+			</div>
+			<div class="seg" id="lorem-format" aria-label="Output format">
+				<button data-value="text" aria-pressed="true">Text</button>
+				<button data-value="html" aria-pressed="false">HTML</button>
+			</div>
+			<label class="check" id="lorem-opening-wrap"
+				><input type="checkbox" id="lorem-opening" checked /> Start with “Lorem ipsum”</label
+			>
+			<button class="btn primary" id="lorem-regen">Regenerate</button>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="lorem-stats">Preview</span>
+			<button class="btn" id="lorem-copy">Copy</button>
+		</div>
+		<div class="lorem-out" id="lorem-out"></div>
+	</section>
+</ToolShell>
+
+<script>
+	import { corpora, type Corpus } from '../../data/lorem';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)];
+	const between = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
+
+	function sentence(c: Corpus): string {
+		const sep = c.separator ?? ' ';
+		const comma = c.comma ?? ',';
+		const length = between(6, 14);
+		const commaAt = length > 8 ? between(3, length - 3) : -1;
+		const parts = Array.from({ length }, (_, i) => pick(c.words) + (i === commaAt ? comma : ''));
+		const text = parts.join(sep);
+		return text.charAt(0).toLocaleUpperCase(c.lang) + text.slice(1) + (c.end ?? '.');
+	}
+
+	function paragraph(c: Corpus): string[] {
+		return Array.from({ length: between(3, 6) }, () => sentence(c));
+	}
+
+	onPage('lorem-tool', () => {
+		const out = byId('lorem-out');
+		const count = byId<HTMLInputElement>('lorem-count');
+		const opening = byId<HTMLInputElement>('lorem-opening');
+		const openingWrap = byId('lorem-opening-wrap');
+		const corpusButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.lorem-corpora button'));
+		let corpus = corpora[0];
+		let unit = 'paragraphs';
+		let format = 'text';
+		let paragraphs: string[][] = [];
+
+		const generate = () => {
+			const n = Math.min(100, Math.max(1, Number(count.value) || 1));
+			const sep = corpus.separator ?? ' ';
+			if (unit === 'paragraphs') paragraphs = Array.from({ length: n }, () => paragraph(corpus));
+			else if (unit === 'sentences') paragraphs = [Array.from({ length: n }, () => sentence(corpus))];
+			else paragraphs = [[Array.from({ length: n }, () => pick(corpus.words)).join(sep)]];
+			if (corpus.opening && opening.checked && unit !== 'words') paragraphs[0][0] = corpus.opening;
+			show();
+		};
+
+		const asText = () => {
+			const sep = corpus.separator ?? ' ';
+			const blocks = paragraphs.map((p) => p.join(sep));
+			return format === 'html' ? blocks.map((b) => `<p>${b}</p>`).join('\n') : blocks.join('\n\n');
+		};
+
+		const show = () => {
+			const sep = corpus.separator ?? ' ';
+			out.lang = corpus.lang;
+			out.dir = corpus.dir ?? 'ltr';
+			out.classList.toggle('code', format === 'html');
+			if (format === 'html') {
+				out.textContent = asText();
+			} else {
+				out.replaceChildren(
+					...paragraphs.map((p) => {
+						const el = document.createElement('p');
+						el.textContent = p.join(sep);
+						return el;
+					})
+				);
+			}
+			const text = paragraphs.map((p) => p.join(sep)).join('\n\n');
+			const words = text.split(/\s+/).filter(Boolean);
+			const longest = words.reduce((a, b) => (b.length > a.length ? b : a), '');
+			byId('lorem-stats').textContent = `${[...text].length} characters · longest word ${[...longest.replace(/[.,،。、]/g, '')].length}`;
+		};
+
+		corpusButtons.forEach((button) =>
+			button.addEventListener('click', () => {
+				corpusButtons.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+				corpus = corpora.find((c) => c.id === button.dataset.value)!;
+				openingWrap.hidden = !corpus.opening;
+				generate();
+			})
+		);
+		segmented(byId('lorem-unit'), (value) => {
+			unit = value;
+			generate();
+		});
+		segmented(byId('lorem-format'), (value) => {
+			format = value;
+			show();
+		});
+		count.addEventListener('input', generate);
+		opening.addEventListener('change', generate);
+		byId('lorem-regen').addEventListener('click', generate);
+		copyButton(byId('lorem-copy'), asText);
+		generate();
+	});
+</script>
+
+<style>
+	.lorem-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
+	.lorem-group {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.lorem-group-label {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.lorem-out {
+		padding: 6px 18px;
+		font-size: 15px;
+		line-height: 1.7;
+		overflow-wrap: anywhere;
+		max-height: 60vh;
+		overflow-y: auto;
+	}
+	.lorem-out.code {
+		font-family: var(--mono);
+		font-size: 13px;
+		white-space: pre-wrap;
+		padding: 14px 18px;
+	}
+</style>

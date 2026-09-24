@@ -1,0 +1,98 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const bases = [
+	['2', 'Binary'],
+	['8', 'Octal'],
+	['10', 'Decimal'],
+	['16', 'Hexadecimal'],
+];
+---
+
+<ToolShell
+	slug="integer-base-converter"
+	title="Integer Base Converter"
+	description="Binary, octal, decimal, hex or any base from 2 to 36. Arbitrary size, negatives welcome."
+>
+	<div class="fields" id="base-tool">
+		{
+			bases.map(([base, label]) => (
+				<div class="field">
+					<label for={`base-${base}`}>
+						{label} · base {base}
+					</label>
+					<input id={`base-${base}`} data-base={base} spellcheck="false" />
+				</div>
+			))
+		}
+		<div class="field wide">
+			<label for="base-custom"
+				>Base <input class="num" type="number" id="base-custom-radix" min="2" max="36" value="36" /></label
+			>
+			<input id="base-custom" data-base="custom" spellcheck="false" />
+		</div>
+	</div>
+	<p class="base-note" id="base-note"></p>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
+
+	function parse(text: string, base: number): bigint | null {
+		const clean = text.trim().toLowerCase().replace(/[\s_]/g, '').replace(/^(-?)0[bxo]/, '$1');
+		const negative = clean.startsWith('-');
+		const digits = negative ? clean.slice(1) : clean;
+		if (!digits) return null;
+		let value = 0n;
+		for (const d of digits) {
+			const n = DIGITS.indexOf(d);
+			if (n < 0 || n >= base) return null;
+			value = value * BigInt(base) + BigInt(n);
+		}
+		return negative ? -value : value;
+	}
+
+	onPage('base-tool', () => {
+		const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('#base-tool input[data-base]'));
+		const radix = byId<HTMLInputElement>('base-custom-radix');
+		let current: bigint | null = 255n;
+
+		const baseOf = (input: HTMLInputElement) =>
+			input.dataset.base === 'custom' ? Math.min(36, Math.max(2, Number(radix.value) || 36)) : Number(input.dataset.base);
+
+		const fill = (except?: HTMLInputElement) => {
+			if (current === null) return;
+			inputs.forEach((input) => {
+				if (input !== except) input.value = current!.toString(baseOf(input));
+			});
+			const bits = (current < 0n ? -current : current).toString(2).length;
+			byId('base-note').textContent = `${bits} bit${bits > 1 ? 's' : ''}`;
+		};
+
+		inputs.forEach((input) =>
+			input.addEventListener('input', () => {
+				const value = parse(input.value, baseOf(input));
+				input.closest('.field')!.classList.toggle('invalid', value === null && input.value.trim() !== '');
+				if (value === null) return;
+				current = value;
+				fill(input);
+			})
+		);
+		radix.addEventListener('input', () => fill());
+		fill();
+	});
+</script>
+
+<style>
+	.field .num {
+		margin-left: 6px;
+		text-transform: none;
+	}
+	.base-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+</style>

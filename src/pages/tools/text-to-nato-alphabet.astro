@@ -1,0 +1,115 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="text-to-nato-alphabet"
+	title="NATO Alphabet"
+	description="Spell anything out loud without ambiguity: licence plates, booking codes, passwords over the phone."
+>
+	<section class="panel" id="nato-tool">
+		<div class="panel-head">Text</div>
+		<input class="nato-input" id="nato-in" spellcheck="false" aria-label="Text to spell" value="KDL-42x" />
+	</section>
+	<div class="toolbar">
+		<label class="check"><input type="checkbox" id="nato-icao" /> ICAO digits (Tree, Fife, Niner)</label>
+		<button class="btn" id="nato-copy">Copy as text</button>
+	</div>
+	<ol class="nato-list" id="nato-list"></ol>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const LETTERS = 'Alfa Bravo Charlie Delta Echo Foxtrot Golf Hotel India Juliett Kilo Lima Mike November Oscar Papa Quebec Romeo Sierra Tango Uniform Victor Whiskey X-ray Yankee Zulu'.split(' ');
+	const DIGITS = 'Zero One Two Three Four Five Six Seven Eight Nine'.split(' ');
+	const ICAO = 'Zero One Two Tree Four Fife Six Seven Eight Niner'.split(' ');
+	const SYMBOLS: Record<string, string> = { '-': 'Dash', '.': 'Stop', '/': 'Slash', '@': 'At', '_': 'Underscore', ' ': 'Space' };
+
+	onPage('nato-tool', () => {
+		const input = byId<HTMLInputElement>('nato-in');
+		const icao = byId<HTMLInputElement>('nato-icao');
+		const list = byId('nato-list');
+		let spelled: string[] = [];
+
+		const render = () => {
+			spelled = [];
+			list.replaceChildren(
+				...[...input.value].map((char) => {
+					const upper = char.toUpperCase();
+					const code = upper.charCodeAt(0);
+					let word = SYMBOLS[char] ?? char;
+					let kind = char === upper && char !== char.toLowerCase() ? 'upper' : 'lower';
+					if (code >= 65 && code <= 90) word = LETTERS[code - 65];
+					else if (/\d/.test(char)) {
+						word = (icao.checked ? ICAO : DIGITS)[Number(char)];
+						kind = 'digit';
+					} else kind = 'symbol';
+					spelled.push(kind === 'upper' ? `${word} (capital)` : word);
+					const li = document.createElement('li');
+					li.className = kind;
+					li.innerHTML = '<span class="char"></span><span class="word"></span>';
+					li.querySelector('.char')!.textContent = char === ' ' ? '␣' : char;
+					li.querySelector('.word')!.textContent = word;
+					return li;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		icao.addEventListener('change', render);
+		copyButton(byId('nato-copy'), () => spelled.join(' · '));
+		render();
+	});
+</script>
+
+<style>
+	.nato-input {
+		width: 100%;
+		border: 0;
+		padding: 14px;
+		background: transparent;
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 22px;
+		outline: none;
+	}
+	.nato-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+		gap: 8px;
+	}
+	.nato-list :global(li) {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		padding: 10px 12px;
+	}
+	.nato-list :global(.char) {
+		font-family: var(--mono);
+		font-size: 22px;
+		font-weight: 700;
+		color: var(--accent-strong);
+	}
+	.nato-list :global(.word) {
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.nato-list :global(li.upper .word::after) {
+		content: ' · capital';
+		color: var(--ink-soft);
+		font-weight: 500;
+	}
+	.nato-list :global(li.digit .char) {
+		color: var(--ok);
+	}
+	.nato-list :global(li.symbol .char) {
+		color: var(--ink-soft);
+	}
+</style>

@@ -1,0 +1,143 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const common: [string, string, string][] = [
+	['&', '&amp;', 'ampersand'],
+	['<', '&lt;', 'less than'],
+	['>', '&gt;', 'greater than'],
+	['"', '&quot;', 'double quote'],
+	["'", '&#39;', 'apostrophe'],
+	[' ', '&nbsp;', 'no-break space'],
+	['©', '&copy;', 'copyright'],
+	['®', '&reg;', 'registered'],
+	['™', '&trade;', 'trademark'],
+	['€', '&euro;', 'euro'],
+	['—', '&mdash;', 'em dash'],
+	['–', '&ndash;', 'en dash'],
+	['…', '&hellip;', 'ellipsis'],
+	['«', '&laquo;', 'left guillemet'],
+	['»', '&raquo;', 'right guillemet'],
+	['→', '&rarr;', 'right arrow'],
+];
+---
+
+<ToolShell
+	slug="html-entities"
+	title="HTML Entities"
+	description="Escape text for HTML or decode entities back. Named, decimal and hex entities are all understood."
+>
+	<div class="toolbar" id="ent-tool">
+		<div class="seg" id="ent-mode" aria-label="Direction">
+			<button data-value="encode" aria-pressed="true">Encode</button>
+			<button data-value="decode" aria-pressed="false">Decode</button>
+		</div>
+		<label class="check" id="ent-all-wrap"><input type="checkbox" id="ent-all" /> Also encode non-ASCII</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="ent-in" spellcheck="false" aria-label="Input"
+				>{`<a href="/café?x=1&y=2">Tom & Jerry’s “best” — 5 < 6</a>`}</textarea
+			>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Output</span>
+				<button class="btn" id="ent-copy">Copy</button>
+			</div>
+			<pre class="out" id="ent-out"></pre>
+		</section>
+	</div>
+	<section class="panel">
+		<div class="panel-head">Common entities · click to copy</div>
+		<div class="ent-grid">
+			{
+				common.map(([char, entity, name]) => (
+					<button class="ent-cell" data-entity={entity} title={name}>
+						<span class="ent-char">{char === ' ' ? '⍽' : char}</span>
+						<code>{entity}</code>
+					</button>
+				))
+			}
+		</div>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const BASIC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+	function encode(text: string, all: boolean): string {
+		const basic = text.replace(/[&<>"']/g, (c) => BASIC[c]);
+		return all ? basic.replace(/[^\x00-\x7f]/gu, (c) => `&#x${c.codePointAt(0)!.toString(16).toUpperCase()};`) : basic;
+	}
+
+	function decode(text: string): string {
+		const area = document.createElement('textarea');
+		area.innerHTML = text;
+		return area.value;
+	}
+
+	onPage('ent-tool', () => {
+		const input = byId<HTMLTextAreaElement>('ent-in');
+		const output = byId('ent-out');
+		const all = byId<HTMLInputElement>('ent-all');
+		let mode = 'encode';
+
+		const render = () => {
+			byId('ent-all-wrap').hidden = mode === 'decode';
+			output.textContent = mode === 'encode' ? encode(input.value, all.checked) : decode(input.value);
+		};
+
+		segmented(byId('ent-mode'), (value) => {
+			if (value !== mode) input.value = output.textContent ?? '';
+			mode = value;
+			render();
+		});
+		input.addEventListener('input', render);
+		all.addEventListener('change', render);
+		copyButton(byId('ent-copy'), () => output.textContent ?? '');
+		document.querySelectorAll<HTMLButtonElement>('.ent-cell').forEach((cell) => {
+			copyButton(cell.querySelector('code')!, () => cell.dataset.entity!);
+			cell.addEventListener('click', () => cell.querySelector('code')!.click());
+		});
+		render();
+	});
+</script>
+
+<style>
+	.ent-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+	}
+	.ent-cell {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+		padding: 12px 8px;
+		border: 0;
+		border-right: 1px solid var(--border);
+		border-bottom: 1px solid var(--border);
+		background: transparent;
+		color: var(--ink);
+		cursor: pointer;
+		font: inherit;
+	}
+	.ent-cell:hover {
+		background: var(--surface-2);
+	}
+	.ent-char {
+		font-size: 22px;
+	}
+	.ent-cell code {
+		font-family: var(--mono);
+		font-size: 12px;
+		color: var(--ink-soft);
+		pointer-events: none;
+	}
+	.ent-cell :global(code.copied) {
+		color: var(--ok);
+	}
+</style>
