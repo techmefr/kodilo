@@ -15,7 +15,8 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"test": "playwright test",
-		"test:install": "playwright install --with-deps chromium"
+		"test:install": "playwright install --with-deps chromium",
+		"oui": "node scripts/build-oui.mjs"
 	},
 	"dependencies": {
 		"@peculiar/x509": "^2.1.0",
@@ -31,7 +32,6 @@
 		"libphonenumber-js": "^1.13.14",
 		"lucide-static": "^1.47.0",
 		"otpauth": "^9.5.2",
-		"oui-data": "^2.1.28",
 		"pdf-lib": "^1.17.1",
 		"pdfjs-dist": "^6.3.289",
 		"qrcode": "^1.5.4",
@@ -53,6 +53,7 @@
 		"eslint": "^10.11.0",
 		"eslint-plugin-astro": "^3.2.1",
 		"globals": "^17.12.0",
+		"oui-data": "^2.1.28",
 		"prettier": "^3.9.9",
 		"prettier-plugin-astro": "^1.0.1",
 		"typescript": "^6.0.3",

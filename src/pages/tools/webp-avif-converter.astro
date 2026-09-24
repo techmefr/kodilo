@@ -60,6 +60,9 @@ import ToolShell from '../../components/ToolShell.astro';
 		const q = byId<HTMLInputElement>('wa-q');
 		let type = 'image/webp';
 		let run = 0;
+		supports('image/avif').then((ok) => {
+			byId('wa-format').querySelector<HTMLButtonElement>('[data-value="image/avif"]')!.hidden = !ok;
+		});
 
 		const convert = async () => {
 			const current = ++run;
