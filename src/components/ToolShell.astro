@@ -1,7 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
 import Header from './Header.astro';
-import Sidebar from './Sidebar.astro';
 
 interface Props {
 	slug: string;
@@ -13,9 +12,8 @@ const { slug, title, description } = Astro.props;
 ---
 
 <Base title={`${title} — kodilo`}>
-	<Header activeSlug={slug} />
 	<div class="shell">
-		<Sidebar activeSlug={slug} />
+		<Header activeSlug={slug} />
 		<main class="tool">
 			<header class="tool-head">
 				<h1>{title}</h1>
@@ -29,7 +27,12 @@ const { slug, title, description } = Astro.props;
 <style>
 	.shell {
 		display: flex;
-		min-height: calc(100vh - 57px);
+		min-height: 100vh;
+	}
+	@media (max-width: 760px) {
+		.shell {
+			display: block;
+		}
 	}
 	.tool {
 		flex: 1;

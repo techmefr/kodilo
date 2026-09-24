@@ -1,11 +1,11 @@
 ---
 import Base from '../../layouts/Base.astro';
-import Sidebar from '../../components/Sidebar.astro';
+import Header from '../../components/Header.astro';
 ---
 
 <Base title="Inbox Tester — kodilo">
 	<div class="shell">
-		<Sidebar activeSlug="inbox-tester" />
+		<Header activeSlug="inbox-tester" />
 		<main class="main">
 			<div class="app">
 				<div class="topbar">
@@ -587,6 +587,11 @@ import Sidebar from '../../components/Sidebar.astro';
 	.shell {
 		display: flex;
 		min-height: 100vh;
+	}
+	@media (max-width: 760px) {
+		.shell {
+			display: block;
+		}
 	}
 	.main {
 		flex: 1;

@@ -9,6 +9,7 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 ---
 
 <Base title="kodilo — Developer tools, no sign-up">
+	<div class="shell">
 	<Header />
 	<main class="home">
 		<section class="hero">
@@ -32,8 +33,11 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 						{c.tools.map((t) => (
 							<li>
 								<a href={`${base}tools/${t.slug}/`}>
-									<b>{t.name}</b>
-									<span>{t.description}</span>
+									<i class="t-icon" set:html={icon(t.icon ?? 'wrench')} />
+									<div class="t-text">
+										<b>{t.name}</b>
+										<span>{t.description}</span>
+									</div>
 								</a>
 							</li>
 						))}
@@ -42,6 +46,7 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 			))
 		}
 	</main>
+	</div>
 </Base>
 
 <script>
@@ -51,7 +56,18 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 </script>
 
 <style>
+	.shell {
+		display: flex;
+		min-height: 100vh;
+	}
+	@media (max-width: 760px) {
+		.shell {
+			display: block;
+		}
+	}
 	.home {
+		flex: 1;
+		min-width: 0;
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 40px 16px 64px;
@@ -134,8 +150,8 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 	}
 	.home-cat a {
 		display: flex;
-		flex-direction: column;
-		gap: 3px;
+		align-items: flex-start;
+		gap: 12px;
 		height: 100%;
 		box-sizing: border-box;
 		padding: 12px 14px;
@@ -151,7 +167,27 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 	.home-cat b {
 		font-size: 14px;
 	}
-	.home-cat span {
+	.t-icon {
+		flex: none;
+		display: grid;
+		place-items: center;
+		width: 32px;
+		height: 32px;
+		border-radius: 9px;
+		background: color-mix(in srgb, var(--accent-strong) 12%, transparent);
+		color: var(--accent-strong);
+	}
+	.t-icon :global(svg) {
+		width: 17px;
+		height: 17px;
+	}
+	.t-text {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		min-width: 0;
+	}
+	.home-cat .t-text span {
 		font-size: 12.5px;
 		line-height: 1.4;
 		color: var(--ink-soft);

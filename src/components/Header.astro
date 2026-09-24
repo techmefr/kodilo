@@ -12,64 +12,69 @@ const index = categories.flatMap((c) => c.tools.map((t) => ({ n: t.name, d: t.de
 const total = index.length;
 ---
 
-<header class="site-header" transition:name="site-header">
-	<div class="bar">
+<div class="mobile-bar">
+	<a class="brand" href={base}>kodilo</a>
+	<button type="button" class="icon-btn" id="mobile-search" aria-label="Search tools"><span set:html={icon('search')} /></button>
+	<button type="button" class="icon-btn" id="nav-open" aria-label="Open menu" aria-expanded="false"><span set:html={icon('menu')} /></button>
+</div>
+
+<aside class="site-header" id="site-nav" transition:name="site-nav">
+	<div class="brand-row">
 		<a class="brand" href={base}>kodilo</a>
-		<nav class="cats" aria-label="Tool categories">
-			{
-				categories.map((c, i) => (
-					<button
-						type="button"
-						class="cat-btn"
-						aria-expanded="false"
-						aria-controls={`mega-${i}`}
-						data-index={i}
-						data-active={c.tools.some((t) => t.slug === activeSlug) ? 'true' : undefined}
-					>
-						<span class="cat-btn-icon" set:html={icon(c.icon)} />
-						{c.name}
-					</button>
-				))
-			}
-		</nav>
-		<button type="button" class="search-btn" id="search-open" aria-label="Search tools">
-			<span set:html={icon('search')} />
-			<span class="search-label">Search {total} tools</span>
-			<kbd id="search-kbd">⌘K</kbd>
-		</button>
-		<button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+		<button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Toggle theme">
 			<span class="icon-sun" set:html={icon('sun')} />
 			<span class="icon-moon" set:html={icon('moon')} />
 		</button>
 	</div>
+	<button type="button" class="search-btn" id="search-open" aria-label="Search tools">
+		<span set:html={icon('search')} />
+		<span class="search-label">Search {total} tools</span>
+		<kbd id="search-kbd">⌘K</kbd>
+	</button>
+	<nav class="cats" aria-label="Tool categories">
+		{
+			categories.map((c, i) => (
+				<button type="button" class="cat-btn" aria-expanded="false" aria-controls={`mega-${i}`} data-active={c.tools.some((t) => t.slug === activeSlug) ? 'true' : undefined}>
+					<span class="cat-btn-icon" set:html={icon(c.icon)} />
+					<span class="cat-btn-text">
+						<b>{c.name}</b>
+						<small>{c.blurb}</small>
+					</span>
+					<span class="cat-count">{c.tools.length}</span>
+				</button>
+			))
+		}
+	</nav>
 	{
 		categories.map((c, i) => (
 			<div class="mega" id={`mega-${i}`} hidden>
-				<div class="mega-inner">
-					<div class="mega-intro">
-						<span class="mega-icon" set:html={icon(c.icon)} />
+				<div class="mega-intro">
+					<span class="mega-icon" set:html={icon(c.icon)} />
+					<div>
 						<b>{c.name}</b>
-						<p>{c.blurb}</p>
-						<span class="mega-count">
-							{c.tools.length} tool{c.tools.length === 1 ? '' : 's'}
-						</span>
+						<p>
+							{c.blurb} · {c.tools.length} tool{c.tools.length === 1 ? '' : 's'}
+						</p>
 					</div>
-					<ul class="mega-grid">
-						{c.tools.map((t) => (
-							<li>
-								<a href={`${base}tools/${t.slug}/`} aria-current={t.slug === activeSlug ? 'page' : undefined}>
+				</div>
+				<ul class="mega-grid">
+					{c.tools.map((t) => (
+						<li>
+							<a href={`${base}tools/${t.slug}/`} aria-current={t.slug === activeSlug ? 'page' : undefined}>
+								<i class="t-icon" set:html={icon(t.icon ?? "wrench")} />
+								<div class="t-text">
 									<b>{t.name}</b>
 									<span>{t.description}</span>
-								</a>
-							</li>
-						))}
-					</ul>
-				</div>
+								</div>
+							</a>
+						</li>
+					))}
+				</ul>
 			</div>
 		))
 	}
-	<div class="mega-scrim" id="mega-scrim" hidden></div>
-</header>
+</aside>
+<div class="mega-scrim" id="mega-scrim" hidden></div>
 
 <dialog class="palette" id="palette" aria-label="Search tools">
 	<div class="palette-box">
@@ -92,6 +97,7 @@ const total = index.length;
 		const dialog = document.getElementById('palette') as HTMLDialogElement | null;
 		if (!dialog || dialog.open) return;
 		closeMega();
+		closeDrawer();
 		dialog.showModal();
 		const q = document.getElementById('palette-q') as HTMLInputElement;
 		q.value = '';
@@ -104,6 +110,11 @@ const total = index.length;
 		document.querySelectorAll('.cat-btn').forEach((b) => b.setAttribute('aria-expanded', 'false'));
 		const scrim = document.getElementById('mega-scrim');
 		if (scrim) scrim.hidden = true;
+	}
+
+	function closeDrawer() {
+		document.getElementById('site-nav')?.classList.remove('open');
+		document.getElementById('nav-open')?.setAttribute('aria-expanded', 'false');
 	}
 
 	document.addEventListener('keydown', (e) => {
@@ -138,14 +149,15 @@ const total = index.length;
 	document.addEventListener('astro:page-load', () => {
 		const buttons = [...document.querySelectorAll<HTMLButtonElement>('.cat-btn')];
 		const scrim = document.getElementById('mega-scrim')!;
+		const hover = () => matchMedia('(hover: hover) and (min-width: 761px)').matches;
 		let hoverTimer: number | undefined;
 		let moved = false;
 		document.addEventListener('pointermove', () => (moved = true), { once: true });
-		const show = (btn: HTMLButtonElement) => {
+		const show = (btn: HTMLButtonElement, toggle = true) => {
 			const panel = document.getElementById(btn.getAttribute('aria-controls')!)!;
 			const wasOpen = !panel.hidden;
 			closeMega();
-			if (wasOpen) return;
+			if (wasOpen && toggle) return;
 			panel.hidden = false;
 			scrim.hidden = false;
 			btn.setAttribute('aria-expanded', 'true');
@@ -153,19 +165,31 @@ const total = index.length;
 		buttons.forEach((btn) => {
 			btn.addEventListener('click', () => show(btn));
 			btn.addEventListener('mouseenter', () => {
-				if (!moved || !matchMedia('(hover: hover)').matches) return;
+				if (!moved || !hover()) return;
 				clearTimeout(hoverTimer);
-				hoverTimer = window.setTimeout(() => {
-					if (btn.getAttribute('aria-expanded') !== 'true') show(btn);
-				}, 120);
+				hoverTimer = window.setTimeout(() => show(btn, false), 90);
 			});
 			btn.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
 		});
-		document.querySelector('.site-header')!.addEventListener('mouseleave', () => {
-			if (matchMedia('(hover: hover)').matches) closeMega();
+		document.getElementById('site-nav')!.addEventListener('mouseleave', () => {
+			clearTimeout(hoverTimer);
+			if (hover()) closeMega();
 		});
 		scrim.addEventListener('click', closeMega);
-		document.querySelectorAll('.mega a').forEach((a) => a.addEventListener('click', closeMega));
+		document.querySelectorAll('.mega a').forEach((a) =>
+			a.addEventListener('click', () => {
+				closeMega();
+				closeDrawer();
+			})
+		);
+
+		const navBtn = document.getElementById('nav-open')!;
+		navBtn.addEventListener('click', () => {
+			const isOpen = document.getElementById('site-nav')!.classList.toggle('open');
+			navBtn.setAttribute('aria-expanded', String(isOpen));
+			if (!isOpen) closeMega();
+		});
+		document.getElementById('mobile-search')!.addEventListener('click', open);
 
 		const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
 		document.getElementById('search-kbd')!.textContent = isMac ? '⌘K' : 'Ctrl K';
@@ -260,121 +284,52 @@ const total = index.length;
 		position: sticky;
 		top: 0;
 		z-index: 50;
+		width: 232px;
+		flex-shrink: 0;
+		height: 100vh;
+		align-self: flex-start;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 16px 10px;
 		background: var(--bg);
-		border-bottom: 1px solid var(--border);
+		border-right: 1px solid var(--border);
 	}
-	.bar {
+	.brand-row {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		height: 56px;
-		padding: 0 16px;
+		justify-content: space-between;
+		padding: 0 6px;
 	}
 	.brand {
-		font-size: 16px;
+		font-size: 17px;
 		font-weight: 800;
 		letter-spacing: -0.02em;
 		color: var(--accent-strong);
 		text-decoration: none;
-		flex-shrink: 0;
 	}
-	.cats {
-		display: flex;
-		gap: 2px;
-		flex: 1;
-		min-width: 0;
-		overflow-x: auto;
-		scrollbar-width: none;
-		mask-image: linear-gradient(90deg, #000 92%, transparent);
-	}
-	.cats::-webkit-scrollbar {
-		display: none;
-	}
-	.cat-btn {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		flex-shrink: 0;
-		border: 0;
-		background: none;
-		color: var(--ink-soft);
-		font: inherit;
-		font-size: 13px;
-		font-weight: 600;
-		padding: 7px 10px;
-		border-radius: 8px;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	.cat-btn:hover,
-	.cat-btn[aria-expanded='true'] {
-		background: var(--surface-2);
-		color: var(--ink);
-	}
-	.cat-btn[data-active='true'] {
-		color: var(--accent-strong);
-	}
-	.cat-btn-icon {
-		display: flex;
-		color: var(--accent-strong);
-	}
-	.cat-btn-icon :global(svg) {
-		width: 15px;
-		height: 15px;
-	}
-	.search-btn {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		flex-shrink: 0;
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--ink-soft);
-		font: inherit;
-		font-size: 13px;
-		padding: 6px 8px 6px 10px;
-		border-radius: 9px;
-		cursor: pointer;
-	}
-	.search-btn:hover {
-		border-color: var(--accent-strong);
-	}
-	.search-btn :global(svg),
-	.palette-input :global(svg) {
-		width: 15px;
-		height: 15px;
-		display: block;
-	}
-	kbd {
-		font-family: var(--mono);
-		font-size: 11px;
-		padding: 1px 6px;
-		border: 1px solid var(--border);
-		border-bottom-width: 2px;
-		border-radius: 5px;
-		background: var(--surface-2);
-		color: var(--ink-soft);
-	}
-	.theme-toggle {
+	.icon-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 32px;
-		height: 32px;
+		width: 30px;
+		height: 30px;
 		flex-shrink: 0;
 		border: 1px solid var(--border);
-		border-radius: 9px;
+		border-radius: 8px;
 		background: var(--surface);
 		color: var(--ink-soft);
 		cursor: pointer;
 		padding: 0;
 	}
-	.theme-toggle:hover {
+	.icon-btn:hover {
 		background: var(--surface-2);
 	}
-	.theme-toggle :global(svg) {
+	.icon-btn :global(svg) {
 		width: 15px;
 		height: 15px;
+		display: block;
 	}
 	.icon-moon {
 		display: none;
@@ -393,46 +348,127 @@ const total = index.length;
 			display: flex;
 		}
 	}
-	@media (max-width: 1280px) {
-		.cat-btn-icon {
-			display: none;
-		}
+	.search-btn {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--ink-soft);
+		font: inherit;
+		font-size: 13px;
+		padding: 7px 8px 7px 10px;
+		border-radius: 9px;
+		cursor: pointer;
 	}
-	@media (max-width: 720px) {
-		.search-label,
-		.search-btn kbd {
-			display: none;
-		}
+	.search-btn:hover {
+		border-color: var(--accent-strong);
+	}
+	.search-label {
+		flex: 1;
+		text-align: left;
+	}
+	.search-btn :global(svg),
+	.palette-input :global(svg) {
+		width: 15px;
+		height: 15px;
+		display: block;
+	}
+	kbd {
+		font-family: var(--mono);
+		font-size: 11px;
+		padding: 1px 6px;
+		border: 1px solid var(--border);
+		border-bottom-width: 2px;
+		border-radius: 5px;
+		background: var(--surface-2);
+		color: var(--ink-soft);
+	}
+	.cats {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		overflow-y: auto;
+		margin: 0 -4px;
+		padding: 0 4px;
+	}
+	.cat-btn {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		width: 100%;
+		border: 0;
+		background: none;
+		color: var(--ink);
+		font: inherit;
+		text-align: left;
+		padding: 7px 8px;
+		border-radius: 9px;
+		cursor: pointer;
+	}
+	.cat-btn:hover,
+	.cat-btn[aria-expanded='true'] {
+		background: var(--surface-2);
+	}
+	.cat-btn[data-active='true'] {
+		background: var(--accent);
+	}
+	.cat-btn-icon {
+		display: flex;
+		flex-shrink: 0;
+		color: var(--accent-strong);
+	}
+	.cat-btn-icon :global(svg) {
+		width: 16px;
+		height: 16px;
+	}
+	.cat-btn-text {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		flex: 1;
+	}
+	.cat-btn-text b {
+		font-size: 13px;
+		font-weight: 700;
+	}
+	.cat-btn-text small {
+		font-size: 11px;
+		color: var(--ink-soft);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.cat-count {
+		font-size: 11px;
+		font-weight: 700;
+		color: var(--ink-soft);
+		font-variant-numeric: tabular-nums;
 	}
 	.mega {
-		position: absolute;
-		left: 0;
-		right: 0;
-		top: 100%;
-		z-index: 2;
-		background: var(--surface);
-		border-bottom: 1px solid var(--border);
-		box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.25);
-		max-height: calc(100vh - 56px);
+		position: fixed;
+		top: 0;
+		left: 232px;
+		bottom: 0;
+		width: min(760px, calc(100vw - 232px));
+		box-sizing: border-box;
+		padding: 24px 24px 32px;
 		overflow-y: auto;
-	}
-	.mega-inner {
-		display: grid;
-		grid-template-columns: 220px 1fr;
-		gap: 24px;
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 24px 16px 28px;
+		background: var(--surface);
+		border-right: 1px solid var(--border);
+		box-shadow: 24px 0 48px -12px rgba(0, 0, 0, 0.3);
 	}
 	.mega-intro {
 		display: flex;
-		flex-direction: column;
-		gap: 6px;
+		align-items: center;
+		gap: 12px;
+		margin-bottom: 18px;
 	}
 	.mega-icon {
 		display: flex;
-		width: 36px;
-		height: 36px;
+		width: 38px;
+		height: 38px;
+		flex-shrink: 0;
 		align-items: center;
 		justify-content: center;
 		border-radius: 10px;
@@ -440,20 +476,16 @@ const total = index.length;
 		color: var(--accent-strong);
 	}
 	.mega-icon :global(svg) {
-		width: 18px;
-		height: 18px;
+		width: 19px;
+		height: 19px;
 	}
 	.mega-intro b {
-		font-size: 18px;
+		font-size: 19px;
 		font-weight: 800;
 	}
 	.mega-intro p {
-		margin: 0;
+		margin: 2px 0 0;
 		font-size: 13px;
-		color: var(--ink-soft);
-	}
-	.mega-count {
-		font-size: 12px;
 		color: var(--ink-soft);
 	}
 	.mega-grid {
@@ -461,13 +493,13 @@ const total = index.length;
 		margin: 0;
 		padding: 0;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-		gap: 4px 12px;
+		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		gap: 4px 10px;
 	}
 	.mega-grid a {
 		display: flex;
-		flex-direction: column;
-		gap: 2px;
+		align-items: flex-start;
+		gap: 10px;
 		padding: 10px 12px;
 		border-radius: 10px;
 		text-decoration: none;
@@ -489,21 +521,55 @@ const total = index.length;
 		line-height: 1.4;
 		color: var(--ink-soft);
 	}
-	@media (max-width: 720px) {
-		.mega-inner {
-			grid-template-columns: 1fr;
-			gap: 12px;
-		}
-		.mega-intro p,
-		.mega-icon {
-			display: none;
-		}
-	}
 	.mega-scrim {
 		position: fixed;
-		inset: 56px 0 0;
-		z-index: 1;
-		background: rgba(0, 0, 0, 0.25);
+		inset: 0 0 0 232px;
+		z-index: 40;
+		background: rgba(0, 0, 0, 0.3);
+	}
+	.mobile-bar {
+		display: none;
+	}
+	@media (max-width: 760px) {
+		.mobile-bar {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			position: sticky;
+			top: 0;
+			z-index: 60;
+			height: 52px;
+			padding: 0 16px;
+			background: var(--bg);
+			border-bottom: 1px solid var(--border);
+		}
+		.mobile-bar .brand {
+			margin-right: auto;
+		}
+		.site-header {
+			position: fixed;
+			top: 52px;
+			left: 0;
+			right: 0;
+			width: auto;
+			height: calc(100vh - 52px);
+			border-right: 0;
+			visibility: hidden;
+		}
+		.site-header:global(.open) {
+			visibility: visible;
+		}
+		.brand-row .brand {
+			visibility: hidden;
+		}
+		.mega {
+			top: 52px;
+			left: 0;
+			width: 100vw;
+		}
+		.mega-scrim {
+			display: none;
+		}
 	}
 	.palette {
 		border: 0;
@@ -598,5 +664,25 @@ const total = index.length;
 	}
 	.palette-foot kbd {
 		margin-right: 3px;
+	}
+	.t-icon {
+		flex: none;
+		display: grid;
+		place-items: center;
+		width: 30px;
+		height: 30px;
+		border-radius: 8px;
+		background: color-mix(in srgb, var(--accent-strong) 12%, transparent);
+		color: var(--accent-strong);
+	}
+	.t-icon :global(svg) {
+		width: 16px;
+		height: 16px;
+	}
+	.t-text {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
 	}
 </style>
