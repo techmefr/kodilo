@@ -5,7 +5,7 @@ import Header from '../../components/Header.astro';
 
 <Base
 	title="Inbox Tester — kodilo"
-	description="Preview an HTML email as Gmail, Outlook and Apple Mail would show it, on desktop and mobile, in light and dark mode."
+	description="Preview an HTML email as Gmail, Outlook, Yahoo Mail and Apple Mail would show it, on desktop and mobile, in light and dark mode."
 >
 	<div class="shell">
 		<Header activeSlug="inbox-tester" />
@@ -188,6 +188,7 @@ import Header from '../../components/Header.astro';
 				{ id: 'outlook-desktop', name: 'Outlook Desktop', engine: 'Word rendering engine', group: 'outlook', dark: 'partial' },
 				{ id: 'outlook-com', name: 'Outlook.com', engine: 'Modern webmail', group: 'outlook', dark: 'partial' },
 				{ id: 'gmail', name: 'Gmail', engine: 'Webmail (Chromium-based)', dark: 'full' },
+				{ id: 'yahoo', name: 'Yahoo Mail', engine: 'Webmail and mobile apps', dark: 'partial' },
 				{ id: 'apple-mail', name: 'Apple Mail', engine: 'WebKit (macOS / iOS)', dark: 'media' },
 				{ id: 'thunderbird', name: 'Thunderbird', engine: 'Gecko (desktop)', dark: 'media' },
 			];
@@ -204,6 +205,7 @@ import Header from '../../components/Header.astro';
 					support: {
 						'outlook-desktop': { status: 'no', note: 'Rendered as square corners.' },
 						gmail: { status: 'yes', note: '' },
+						yahoo: { status: 'yes', note: '' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'yes', note: '' },
 						thunderbird: { status: 'yes', note: '' },
@@ -216,6 +218,7 @@ import Header from '../../components/Header.astro';
 					support: {
 						'outlook-desktop': { status: 'no', note: 'Ignored entirely.' },
 						gmail: { status: 'yes', note: '' },
+						yahoo: { status: 'yes', note: '' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'yes', note: '' },
 						thunderbird: { status: 'yes', note: '' },
@@ -228,11 +231,12 @@ import Header from '../../components/Header.astro';
 					support: {
 						'outlook-desktop': { status: 'no', note: 'Word engine ignores non-static positioning.' },
 						gmail: { status: 'partial', note: 'fixed/sticky stripped, static/relative fine.' },
+						yahoo: { status: 'no', note: 'The position property is stripped.' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'partial', note: 'fixed/sticky stripped.' },
 						thunderbird: { status: 'yes', note: '' },
 					},
-					strip: { re: /position\s*:[^;"']+;?/gi, only: ['outlook-desktop'] },
+					strip: { re: /position\s*:[^;"']+;?/gi, only: ['outlook-desktop', 'yahoo'] },
 				},
 				{
 					id: 'position-fixed',
@@ -250,11 +254,12 @@ import Header from '../../components/Header.astro';
 							note: 'Common overlap trick (float a bar over a banner) collapses.',
 						},
 						gmail: { status: 'yes', note: '' },
+						yahoo: { status: 'no', note: 'Negative margins are removed by the sanitizer.' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'yes', note: '' },
 						thunderbird: { status: 'yes', note: '' },
 					},
-					strip: { re: /margin(-top|-bottom|-left|-right)?\s*:\s*-[^;"']+;?/gi, only: ['outlook-desktop'] },
+					strip: { re: /margin(-top|-bottom|-left|-right)?\s*:\s*-[^;"']+;?/gi, only: ['outlook-desktop', 'yahoo'] },
 				},
 				{
 					id: 'flex-grid',
@@ -262,6 +267,7 @@ import Header from '../../components/Header.astro';
 					support: {
 						'outlook-desktop': { status: 'no', note: 'Table layout only.' },
 						gmail: { status: 'yes', note: '' },
+						yahoo: { status: 'partial', note: 'Flex works on the web; grid and the apps are unreliable.' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'yes', note: '' },
 						thunderbird: { status: 'partial', note: 'Gecko supports it, but older ESR releases lag behind.' },
@@ -274,6 +280,7 @@ import Header from '../../components/Header.astro';
 					support: {
 						'outlook-desktop': { status: 'no', note: 'Needs a VML fallback to show at all.' },
 						gmail: { status: 'yes', note: '' },
+						yahoo: { status: 'yes', note: '' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'yes', note: '' },
 						thunderbird: { status: 'yes', note: '' },
@@ -286,11 +293,12 @@ import Header from '../../components/Header.astro';
 					support: {
 						'outlook-desktop': { status: 'no', note: 'Falls back to the next font in the stack.' },
 						gmail: { status: 'no', note: 'External stylesheets are stripped from the head.' },
+						yahoo: { status: 'no', note: 'External stylesheets are stripped from the head.' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'no', note: 'External stylesheets are stripped from the head.' },
 						thunderbird: { status: 'no', note: 'Remote content (incl. external stylesheets) is blocked by default.' },
 					},
-					strip: { link: true, only: ['outlook-desktop', 'gmail', 'outlook-com', 'thunderbird'] },
+					strip: { link: true, only: ['outlook-desktop', 'gmail', 'outlook-com', 'yahoo', 'thunderbird'] },
 				},
 				{
 					id: 'media-queries',
@@ -298,6 +306,7 @@ import Header from '../../components/Header.astro';
 					support: {
 						'outlook-desktop': { status: 'no', note: 'No responsive behaviour at all; design for the fixed width.' },
 						gmail: { status: 'yes', note: '' },
+						yahoo: { status: 'partial', note: 'Width queries work; other media features are dropped.' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'yes', note: '' },
 						thunderbird: { status: 'yes', note: '' },
@@ -310,6 +319,7 @@ import Header from '../../components/Header.astro';
 					support: {
 						'outlook-desktop': { status: 'no', note: 'Needs a VML fallback; falls back to a flat color.' },
 						gmail: { status: 'yes', note: '' },
+						yahoo: { status: 'yes', note: '' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'partial', note: 'Inconsistent across the mobile app vs. web.' },
 						thunderbird: { status: 'yes', note: '' },
@@ -321,6 +331,7 @@ import Header from '../../components/Header.astro';
 					support: {
 						'outlook-desktop': { status: 'no', note: 'No pointer interaction model.' },
 						gmail: { status: 'partial', note: 'Works on web, not in most mobile apps.' },
+						yahoo: { status: 'partial', note: 'Web only.' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'partial', note: 'Web only.' },
 						thunderbird: { status: 'yes', note: 'Desktop mouse pointer, so :hover works.' },
@@ -332,6 +343,7 @@ import Header from '../../components/Header.astro';
 					support: {
 						'outlook-desktop': { status: 'no', note: 'Use literal values, not var().' },
 						gmail: { status: 'partial', note: 'Inconsistent between app and web.' },
+						yahoo: { status: 'no', note: '' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'no', note: '' },
 						thunderbird: { status: 'partial', note: 'Supported by Gecko, but sanitizer strips some declarations.' },
@@ -343,6 +355,7 @@ import Header from '../../components/Header.astro';
 					support: {
 						'outlook-desktop': { status: 'no', note: "Always falls back to the stack's next entry." },
 						gmail: { status: 'no', note: '' },
+						yahoo: { status: 'no', note: '' },
 						'apple-mail': { status: 'yes', note: '' },
 						'outlook-com': { status: 'no', note: '' },
 						thunderbird: { status: 'no', note: 'Blocked by the same remote-content policy as web fonts.' },
