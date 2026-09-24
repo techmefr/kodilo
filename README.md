@@ -117,6 +117,16 @@ Live at **https://techmefr.github.io/kodilo/**
 - **PDF Compress** (`/tools/pdf-compress/`) — lossless repack or pages as JPEG
 - **PDF to JPG** (`/tools/pdf-to-jpg/`) — render pages as JPG or PNG at 72-300 DPI
 - **X.509 Certificate Decoder** (`/tools/x509-certificate-decoder/`) — subject, SANs, validity, key, fingerprints
+- **JSON to TypeScript** (`/tools/json-to-typescript/`) — interfaces or types, merged arrays, optional keys
+- **JSON Schema Validator** (`/tools/json-schema-validator/`) — draft-07 and 2020-12, errors with paths, schema from a sample
+- **XML Formatter** (`/tools/xml-formatter/`) — format or minify, errors with line numbers
+- **TOML Formatter & Converter** (`/tools/toml-formatter/`) — format, TOML to JSON and back
+- **GraphQL Formatter** (`/tools/graphql-formatter/`) — queries, fragments and schemas, format or minify
+- **HTML to Markdown** (`/tools/html-to-markdown/`) — headings, lists, code blocks and tables, rich text paste
+- **URL Parser** (`/tools/url-parser/`) — every part editable, query parameters as a table
+- **String Escaper** (`/tools/string-escaper/`) — JSON, JS, SQL, shell, regex, CSV, HTML both ways
+- **WCAG Contrast Checker** (`/tools/wcag-contrast-checker/`) — AA/AAA ratios, preview, nearest passing color
+- **px, rem & em Converter** (`/tools/px-rem-converter/`) — any root size, scale table, CSS px to rem
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.

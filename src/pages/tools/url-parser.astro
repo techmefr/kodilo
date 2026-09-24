@@ -1,0 +1,193 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="url-parser" title="URL Parser" description="Split a URL into protocol, host, port, path, query parameters and fragment. Edit any part or parameter and the URL is rebuilt.">
+	<div class="fields" id="up-tool">
+		<div class="field wide" id="up-field">
+			<label for="up-url">URL</label>
+			<input id="up-url" spellcheck="false" value="https://user:pa55@api.example.com:8443/v2/search?q=red%20shoes&amp;size=42&amp;sort=price&amp;tag=sale&amp;tag=new#results" />
+			<span class="field-note" id="up-note"></span>
+		</div>
+	</div>
+	<div class="up-parts" id="up-parts"></div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Query parameters</span>
+			<button class="btn" id="up-add">Add parameter</button>
+		</div>
+		<div class="up-params" id="up-params"></div>
+	</section>
+	<div class="toolbar">
+		<button class="btn" id="up-copy">Copy URL</button>
+		<button class="btn" id="up-copy-json">Copy as JSON</button>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const PARTS = ['protocol', 'username', 'password', 'hostname', 'port', 'pathname', 'hash'] as const;
+	const LABELS: Record<string, string> = { protocol: 'Protocol', username: 'Username', password: 'Password', hostname: 'Host', port: 'Port', pathname: 'Path', hash: 'Fragment' };
+
+	onPage('up-tool', () => {
+		const input = byId<HTMLInputElement>('up-url');
+		let url: URL | null = null;
+
+		const input$ = (value: string, label: string, on: (v: string) => void) => {
+			const el = document.createElement('input');
+			el.value = value;
+			el.spellcheck = false;
+			el.setAttribute('aria-label', label);
+			el.addEventListener('input', () => on(el.value));
+			return el;
+		};
+
+		const sync = () => {
+			if (!url) return;
+			input.value = url.href;
+			byId('up-note').textContent = `Origin: ${url.origin}`;
+		};
+
+		const paintParams = () => {
+			const box = byId('up-params');
+			if (!url) return box.replaceChildren();
+			const entries = [...url.searchParams.entries()];
+			const rewrite = (list: [string, string][]) => {
+				url!.search = new URLSearchParams(list).toString();
+				sync();
+			};
+			box.replaceChildren(
+				...entries.map(([k, v], i) => {
+					const row = document.createElement('div');
+					row.className = 'up-row';
+					const rm = document.createElement('button');
+					rm.className = 'btn';
+					rm.textContent = '✕';
+					rm.setAttribute('aria-label', `Remove ${k}`);
+					rm.addEventListener('click', () => {
+						entries.splice(i, 1);
+						rewrite(entries);
+						paintParams();
+					});
+					row.append(
+						input$(k, 'Name', (x) => ((entries[i][0] = x), rewrite(entries))),
+						input$(v, 'Value', (x) => ((entries[i][1] = x), rewrite(entries))),
+						rm
+					);
+					return row;
+				})
+			);
+			if (!entries.length) box.textContent = 'No query parameters.';
+		};
+
+		const paint = () => {
+			const parts = byId('up-parts');
+			if (!url) return parts.replaceChildren();
+			parts.replaceChildren(
+				...PARTS.map((p) => {
+					const field = document.createElement('label');
+					field.className = 'up-part';
+					const span = document.createElement('span');
+					span.textContent = LABELS[p];
+					field.append(
+						span,
+						input$(url![p], LABELS[p], (v) => {
+							try {
+								(url as unknown as Record<string, string>)[p] = v;
+								sync();
+							} catch {}
+						})
+					);
+					return field;
+				})
+			);
+			paintParams();
+		};
+
+		const parse = () => {
+			const field = byId('up-field');
+			try {
+				url = new URL(input.value.trim());
+				field.classList.remove('invalid');
+				byId('up-note').textContent = `Origin: ${url.origin}`;
+			} catch {
+				url = null;
+				field.classList.add('invalid');
+				byId('up-note').textContent = 'Not a full URL. Include the protocol, like https://';
+			}
+			paint();
+		};
+
+		input.addEventListener('input', parse);
+		byId('up-add').addEventListener('click', () => {
+			if (!url) return;
+			url.searchParams.append('key', 'value');
+			sync();
+			paintParams();
+		});
+		copyButton(byId('up-copy'), () => input.value);
+		copyButton(byId('up-copy-json'), () => {
+			if (!url) return '';
+			const params: Record<string, string | string[]> = {};
+			for (const [k, v] of url.searchParams) params[k] = k in params ? [params[k]].flat().concat(v) : v;
+			return JSON.stringify({ ...Object.fromEntries(PARTS.map((p) => [p, url![p]])), origin: url.origin, params }, null, 2);
+		});
+		parse();
+	});
+</script>
+
+<style>
+	.up-parts {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		gap: 8px;
+	}
+	.up-parts :global(.up-part) {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 10px 12px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+	}
+	.up-parts :global(span) {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.up-parts :global(input),
+	.up-params :global(input) {
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 14px;
+		outline: none;
+		min-width: 0;
+		width: 100%;
+	}
+	.up-params {
+		padding: 8px 14px 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		color: var(--ink-soft);
+		font-size: 13px;
+	}
+	.up-params :global(.up-row) {
+		display: grid;
+		grid-template-columns: 1fr 2fr auto;
+		gap: 8px;
+		align-items: center;
+	}
+	.up-params :global(.up-row input) {
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 7px 10px;
+		background: var(--surface-2);
+	}
+</style>

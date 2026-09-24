@@ -1,0 +1,134 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const css = `.card {
+  padding: 24px 32px;
+  font-size: 18px;
+  border-radius: 12px;
+  margin: 0 auto 48px;
+  border: 1px solid #ddd;
+}`;
+---
+
+<ToolShell slug="px-rem-converter" title="px, rem & em Converter" description="Convert between px, rem, em, pt and percent for any root font size, or convert every px value in a CSS snippet to rem at once.">
+	<div class="fields" id="pr-tool">
+		<div class="field">
+			<label for="pr-root">Root font size (px)</label>
+			<input id="pr-root" type="number" min="1" value="16" />
+		</div>
+		<div class="field">
+			<label for="pr-parent">Parent font size for em (px)</label>
+			<input id="pr-parent" type="number" min="1" value="16" />
+		</div>
+	</div>
+	<div class="pr-units" id="pr-units">
+		<label class="field"><span>px</span><input data-unit="px" value="24" /></label>
+		<label class="field"><span>rem</span><input data-unit="rem" /></label>
+		<label class="field"><span>em</span><input data-unit="em" /></label>
+		<label class="field"><span>pt</span><input data-unit="pt" /></label>
+		<label class="field"><span>%</span><input data-unit="%" /></label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">Scale at this root size</div>
+		<div class="pr-scale" id="pr-scale"></div>
+	</section>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">CSS with px</div>
+			<textarea id="pr-css" spellcheck="false" aria-label="CSS input">{css}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Converted to rem</span>
+				<button class="btn" id="pr-copy">Copy</button>
+			</div>
+			<pre class="out" id="pr-out"></pre>
+		</section>
+	</div>
+	<label class="check"><input type="checkbox" id="pr-keep1" checked /> Keep 1px values (borders, hairlines)</label>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const fmt = (n: number) => String(Math.round(n * 10000) / 10000);
+
+	onPage('pr-tool', () => {
+		const root = byId<HTMLInputElement>('pr-root');
+		const parent = byId<HTMLInputElement>('pr-parent');
+		const inputs = [...document.querySelectorAll<HTMLInputElement>('#pr-units input')];
+		const css = byId<HTMLTextAreaElement>('pr-css');
+		const keep1 = byId<HTMLInputElement>('pr-keep1');
+		let px = 24;
+
+		const r = () => Number(root.value) || 16;
+		const p = () => Number(parent.value) || 16;
+		const toPx: Record<string, (v: number) => number> = { px: (v) => v, rem: (v) => v * r(), em: (v) => v * p(), pt: (v) => (v * 96) / 72, '%': (v) => (v / 100) * p() };
+		const fromPx: Record<string, (v: number) => number> = { px: (v) => v, rem: (v) => v / r(), em: (v) => v / p(), pt: (v) => (v * 72) / 96, '%': (v) => (v / p()) * 100 };
+
+		const paint = (skip?: HTMLInputElement) => {
+			for (const i of inputs) if (i !== skip) i.value = fmt(fromPx[i.dataset.unit!](px));
+			byId('pr-scale').replaceChildren(
+				...[10, 12, 14, 16, 18, 20, 24, 32, 40, 48, 64].map((v) => {
+					const b = document.createElement('button');
+					b.className = 'btn';
+					b.innerHTML = `<b>${v}px</b> <span>${fmt(v / r())}rem</span>`;
+					b.addEventListener('click', () => ((px = v), paint()));
+					return b;
+				})
+			);
+			const k = keep1.checked;
+			byId('pr-out').textContent = css.value.replace(/(-?\d*\.?\d+)px\b/g, (m, n) => (k && Math.abs(Number(n)) === 1) || Number(n) === 0 ? m : `${fmt(Number(n) / r())}rem`);
+		};
+
+		for (const i of inputs)
+			i.addEventListener('input', () => {
+				const v = Number(i.value);
+				if (!Number.isFinite(v) || i.value.trim() === '') return;
+				px = toPx[i.dataset.unit!](v);
+				paint(i);
+			});
+		[root, parent, css].forEach((el) => el.addEventListener('input', () => paint()));
+		keep1.addEventListener('change', () => paint());
+		copyButton(byId('pr-copy'), () => byId('pr-out').textContent ?? '');
+		paint();
+	});
+</script>
+
+<style>
+	.pr-units {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+		gap: 10px;
+	}
+	.pr-units span {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.pr-units input {
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 20px;
+		outline: none;
+		width: 100%;
+		min-width: 0;
+	}
+	.pr-scale {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		padding: 10px 14px 14px;
+	}
+	.pr-scale :global(span) {
+		color: var(--ink-soft);
+		font-weight: 400;
+	}
+	#pr-css {
+		min-height: 180px;
+	}
+</style>

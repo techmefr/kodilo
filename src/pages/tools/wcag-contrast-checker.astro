@@ -1,0 +1,248 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="wcag-contrast-checker" title="WCAG Contrast Checker" description="Check the contrast ratio between a text color and its background against WCAG 2.2 AA and AAA, as required by RGAA. Get the nearest passing color when it fails.">
+	<div class="fields" id="wc-tool">
+		<div class="field">
+			<label for="wc-fg">Text color</label>
+			<div class="wc-pick"><input type="color" id="wc-fg-pick" value="#6b7280" aria-label="Pick text color" /><input id="wc-fg" value="#6b7280" spellcheck="false" /></div>
+		</div>
+		<div class="field">
+			<label for="wc-bg">Background</label>
+			<div class="wc-pick"><input type="color" id="wc-bg-pick" value="#f3f4f6" aria-label="Pick background" /><input id="wc-bg" value="#f3f4f6" spellcheck="false" /></div>
+		</div>
+	</div>
+	<div class="toolbar"><button class="btn" id="wc-swap">Swap colors</button></div>
+	<div class="wc-preview" id="wc-preview">
+		<p class="wc-large">Large text, 24px regular or 18.66px bold</p>
+		<p>Normal body text at 16px. The quick brown fox jumps over the lazy dog.</p>
+		<button type="button" class="wc-ui" tabindex="-1">Button border</button>
+	</div>
+	<div class="stats">
+		<div class="stat"><b id="wc-ratio">—</b><span>Contrast ratio</span></div>
+		<div class="stat"><b id="wc-aa">—</b><span>AA normal text, 4.5:1</span></div>
+		<div class="stat"><b id="wc-aa-large">—</b><span>AA large text and UI, 3:1</span></div>
+		<div class="stat"><b id="wc-aaa">—</b><span>AAA normal text, 7:1</span></div>
+		<div class="stat"><b id="wc-aaa-large">—</b><span>AAA large text, 4.5:1</span></div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">Nearest passing text colors, same hue</div>
+		<ul class="wc-fix" id="wc-fix"></ul>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	type RGB = [number, number, number];
+
+	function parse(s: string): RGB | null {
+		const v = s.trim();
+		let m = v.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+		if (m) {
+			const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
+			return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as RGB;
+		}
+		m = v.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i);
+		if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
+		const probe = document.createElement('span');
+		probe.style.color = v;
+		if (!probe.style.color) return null;
+		document.body.append(probe);
+		const c = getComputedStyle(probe).color.match(/\d+/g)!.map(Number);
+		probe.remove();
+		return [c[0], c[1], c[2]];
+	}
+	const hex = (c: RGB) => '#' + c.map((x) => Math.round(x).toString(16).padStart(2, '0')).join('');
+	const lum = (c: RGB) => {
+		const [r, g, b] = c.map((x) => {
+			const s = x / 255;
+			return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+		});
+		return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+	};
+	const ratio = (a: RGB, b: RGB) => {
+		const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+		return (x + 0.05) / (y + 0.05);
+	};
+
+	function toHsl([r, g, b]: RGB): RGB {
+		const [R, G, B] = [r / 255, g / 255, b / 255];
+		const max = Math.max(R, G, B);
+		const min = Math.min(R, G, B);
+		const l = (max + min) / 2;
+		if (max === min) return [0, 0, l];
+		const d = max - min;
+		const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+		const h = max === R ? (G - B) / d + (G < B ? 6 : 0) : max === G ? (B - R) / d + 2 : (R - G) / d + 4;
+		return [h * 60, s, l];
+	}
+	function fromHsl([h, s, l]: RGB): RGB {
+		const k = (n: number) => (n + h / 30) % 12;
+		const a = s * Math.min(l, 1 - l);
+		const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+		return [f(0) * 255, f(8) * 255, f(4) * 255];
+	}
+	function nearest(fg: RGB, bg: RGB, target: number): RGB | null {
+		const [h, s, l] = toHsl(fg);
+		let best: RGB | null = null;
+		let dist = Infinity;
+		for (let i = 0; i <= 200; i++) {
+			const nl = i / 200;
+			const c = fromHsl([h, s, nl]).map(Math.round) as RGB;
+			if (ratio(c, bg) >= target && Math.abs(nl - l) < dist) {
+				dist = Math.abs(nl - l);
+				best = c;
+			}
+		}
+		return best;
+	}
+
+	onPage('wc-tool', () => {
+		const fg = byId<HTMLInputElement>('wc-fg');
+		const bg = byId<HTMLInputElement>('wc-bg');
+		const fgPick = byId<HTMLInputElement>('wc-fg-pick');
+		const bgPick = byId<HTMLInputElement>('wc-bg-pick');
+
+		const badge = (id: string, ok: boolean) => {
+			const el = byId(id);
+			el.textContent = ok ? 'Pass' : 'Fail';
+			el.dataset.ok = String(ok);
+		};
+
+		const render = () => {
+			const a = parse(fg.value);
+			const b = parse(bg.value);
+			fg.closest('.field')!.classList.toggle('invalid', !a);
+			bg.closest('.field')!.classList.toggle('invalid', !b);
+			if (!a || !b) return;
+			fgPick.value = hex(a);
+			bgPick.value = hex(b);
+			const r = ratio(a, b);
+			const preview = byId('wc-preview');
+			preview.style.color = hex(a);
+			preview.style.background = hex(b);
+			preview.style.setProperty('--wc-fg', hex(a));
+			byId('wc-ratio').textContent = `${(Math.floor(r * 100) / 100).toFixed(2)}:1`;
+			badge('wc-aa', r >= 4.5);
+			badge('wc-aa-large', r >= 3);
+			badge('wc-aaa', r >= 7);
+			badge('wc-aaa-large', r >= 4.5);
+			const fixes: [string, number][] = [
+				['AA normal text', 4.5],
+				['AAA normal text', 7],
+			];
+			byId('wc-fix').replaceChildren(
+				...fixes.map(([label, t]) => {
+					const li = document.createElement('li');
+					const c = r >= t ? a : nearest(a, b, t);
+					li.innerHTML = '<i></i><b></b><span></span>';
+					if (c) {
+						(li.querySelector('i') as HTMLElement).style.background = hex(c);
+						li.querySelector('b')!.textContent = hex(c);
+						li.querySelector('span')!.textContent = r >= t ? `${label}: already passes` : `${label}: ${ratio(c, b).toFixed(2)}:1. Click to use it.`;
+						if (r < t)
+							li.addEventListener('click', () => {
+								fg.value = hex(c);
+								render();
+							});
+					} else li.querySelector('span')!.textContent = `${label}: no shade of this hue reaches ${t}:1 on this background.`;
+					return li;
+				})
+			);
+		};
+
+		fgPick.addEventListener('input', () => ((fg.value = fgPick.value), render()));
+		bgPick.addEventListener('input', () => ((bg.value = bgPick.value), render()));
+		[fg, bg].forEach((el) => el.addEventListener('input', render));
+		byId('wc-swap').addEventListener('click', () => {
+			[fg.value, bg.value] = [bg.value, fg.value];
+			render();
+		});
+		render();
+	});
+</script>
+
+<style>
+	.wc-pick {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.wc-pick input[type='color'] {
+		width: 36px;
+		height: 36px;
+		border: 0;
+		padding: 0;
+		background: none;
+		cursor: pointer;
+	}
+	.wc-pick input:not([type='color']) {
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 20px;
+		outline: none;
+		width: 100%;
+		min-width: 0;
+	}
+	.wc-preview {
+		border-radius: 14px;
+		border: 1px solid var(--border);
+		padding: 20px 22px;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		align-items: flex-start;
+	}
+	.wc-preview p {
+		margin: 0;
+		font-size: 16px;
+	}
+	.wc-preview .wc-large {
+		font-size: 24px;
+	}
+	.wc-ui {
+		border: 2px solid var(--wc-fg);
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		padding: 6px 14px;
+		border-radius: 8px;
+	}
+	.stat b[data-ok='true'] {
+		color: #16a34a;
+	}
+	.stat b[data-ok='false'] {
+		color: #dc2626;
+	}
+	.wc-fix {
+		list-style: none;
+		margin: 0;
+		padding: 6px 14px 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.wc-fix :global(li) {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		cursor: pointer;
+		font-size: 14px;
+	}
+	.wc-fix :global(i) {
+		width: 22px;
+		height: 22px;
+		border-radius: 6px;
+		border: 1px solid var(--border);
+	}
+	.wc-fix :global(b) {
+		font-family: var(--mono);
+	}
+	.wc-fix :global(span) {
+		color: var(--ink-soft);
+	}
+</style>

@@ -1,0 +1,187 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const schema = JSON.stringify(
+	{
+		$schema: 'http://json-schema.org/draft-07/schema#',
+		type: 'object',
+		required: ['id', 'email', 'age'],
+		properties: {
+			id: { type: 'integer', minimum: 1 },
+			email: { type: 'string', format: 'email' },
+			age: { type: 'integer', minimum: 18 },
+			tags: { type: 'array', items: { type: 'string' }, uniqueItems: true },
+		},
+		additionalProperties: false,
+	},
+	null,
+	2
+);
+const data = JSON.stringify({ id: 12, email: 'not-an-email', age: 16, tags: ['a', 'a'], nickname: 'ada' }, null, 2);
+---
+
+<ToolShell slug="json-schema-validator" title="JSON Schema Validator" description="Check JSON data against a JSON Schema (draft-07 and 2020-12) and see every error with its path, or generate a schema from a sample.">
+	<div class="toolbar" id="js-tool">
+		<button class="btn" id="js-infer">Generate schema from the data</button>
+		<span class="field-note">Formats such as email, uri, date and uuid are checked.</span>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Schema</div>
+			<textarea id="js-schema" spellcheck="false" aria-label="JSON Schema">{schema}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">Data</div>
+			<textarea id="js-data" spellcheck="false" aria-label="JSON data">{data}</textarea>
+		</section>
+	</div>
+	<section class="panel">
+		<div class="panel-head"><span id="js-status">Result</span></div>
+		<ul class="js-list" id="js-list"></ul>
+	</section>
+</ToolShell>
+
+<script>
+	import Ajv from 'ajv';
+	import Ajv2020 from 'ajv/dist/2020';
+	import { byId, onPage } from '../../scripts/ui';
+
+	const FORMATS: Record<string, RegExp> = {
+		email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+		uri: /^[a-z][a-z0-9+.-]*:\S+$/i,
+		url: /^https?:\/\/\S+$/i,
+		date: /^\d{4}-\d{2}-\d{2}$/,
+		'date-time': /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/,
+		time: /^\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/,
+		uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+		ipv4: /^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/,
+		hostname: /^(?=.{1,253}$)([a-z0-9-]{1,63}\.)*[a-z0-9-]{1,63}$/i,
+	};
+
+	function infer(v: unknown): Record<string, unknown> {
+		if (v === null) return { type: 'null' };
+		if (Array.isArray(v)) return v.length ? { type: 'array', items: infer(v[0]) } : { type: 'array' };
+		if (typeof v === 'object') {
+			const o = v as Record<string, unknown>;
+			return { type: 'object', required: Object.keys(o), properties: Object.fromEntries(Object.entries(o).map(([k, x]) => [k, infer(x)])) };
+		}
+		if (typeof v === 'number') return { type: Number.isInteger(v) ? 'integer' : 'number' };
+		if (typeof v === 'string') {
+			const f = Object.entries(FORMATS).find(([, re]) => re.test(v))?.[0];
+			return f && f !== 'hostname' ? { type: 'string', format: f } : { type: 'string' };
+		}
+		return { type: typeof v };
+	}
+
+	onPage('js-tool', () => {
+		const schemaIn = byId<HTMLTextAreaElement>('js-schema');
+		const dataIn = byId<HTMLTextAreaElement>('js-data');
+		const list = byId('js-list');
+		const status = byId('js-status');
+
+		const row = (path: string, msg: string, kind: string) => {
+			const li = document.createElement('li');
+			li.dataset.kind = kind;
+			li.innerHTML = '<code></code><span></span>';
+			li.querySelector('code')!.textContent = path;
+			li.querySelector('span')!.textContent = msg;
+			return li;
+		};
+
+		const render = () => {
+			let schema: Record<string, unknown>;
+			let data: unknown;
+			try {
+				schema = JSON.parse(schemaIn.value);
+			} catch (e) {
+				status.textContent = 'Schema is not valid JSON';
+				list.replaceChildren(row('schema', (e as Error).message, 'bad'));
+				return;
+			}
+			try {
+				data = JSON.parse(dataIn.value);
+			} catch (e) {
+				status.textContent = 'Data is not valid JSON';
+				list.replaceChildren(row('data', (e as Error).message, 'bad'));
+				return;
+			}
+			const is2020 = String(schema.$schema ?? '').includes('2020-12');
+			const ajv = is2020 ? new Ajv2020({ allErrors: true, strict: false }) : new Ajv({ allErrors: true, strict: false });
+			for (const [name, re] of Object.entries(FORMATS)) ajv.addFormat(name, re);
+			let validate;
+			try {
+				validate = ajv.compile(schema);
+			} catch (e) {
+				status.textContent = 'The schema itself is invalid';
+				list.replaceChildren(row('schema', (e as Error).message, 'bad'));
+				return;
+			}
+			if (validate(data)) {
+				status.textContent = '✓ The data matches the schema';
+				status.dataset.ok = 'true';
+				list.replaceChildren(row('/', 'No errors', 'ok'));
+				return;
+			}
+			status.dataset.ok = 'false';
+			const errors = validate.errors ?? [];
+			status.textContent = `✕ ${errors.length} error${errors.length > 1 ? 's' : ''}`;
+			list.replaceChildren(
+				...errors.map((e) => {
+					const extra = e.keyword === 'additionalProperties' ? ` "${(e.params as { additionalProperty: string }).additionalProperty}"` : e.keyword === 'required' ? '' : '';
+					return row(e.instancePath || '/', `${e.message}${extra}`, 'bad');
+				})
+			);
+		};
+
+		byId('js-infer').addEventListener('click', () => {
+			try {
+				schemaIn.value = JSON.stringify({ $schema: 'http://json-schema.org/draft-07/schema#', ...infer(JSON.parse(dataIn.value)) }, null, 2);
+				render();
+			} catch {
+				status.textContent = 'Data is not valid JSON';
+			}
+		});
+		[schemaIn, dataIn].forEach((el) => el.addEventListener('input', render));
+		render();
+	});
+</script>
+
+<style>
+	#js-schema,
+	#js-data {
+		min-height: 320px;
+	}
+	#js-status[data-ok='true'] {
+		color: #16a34a;
+	}
+	#js-status[data-ok='false'] {
+		color: #dc2626;
+	}
+	.js-list {
+		list-style: none;
+		margin: 0;
+		padding: 4px 14px 10px;
+	}
+	.js-list :global(li) {
+		display: grid;
+		grid-template-columns: minmax(90px, 200px) 1fr;
+		gap: 12px;
+		padding: 8px 0;
+		border-bottom: 1px solid var(--border);
+		font-size: 14px;
+	}
+	.js-list :global(li:last-child) {
+		border-bottom: 0;
+	}
+	.js-list :global(code) {
+		font-family: var(--mono);
+		color: var(--ink-soft);
+		overflow-wrap: anywhere;
+	}
+	.js-list :global(li[data-kind='bad'] span) {
+		color: #dc2626;
+	}
+	.js-list :global(li[data-kind='ok'] span) {
+		color: #16a34a;
+	}
+</style>

@@ -1,0 +1,110 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `<h1>Release notes</h1>
+<p>Version <strong>2.4</strong> ships <em>faster builds</em> and a new <a href="https://example.com/cli">CLI</a>.</p>
+<h2>Highlights</h2>
+<ul>
+  <li>Incremental cache, up to <code>3x</code> faster</li>
+  <li>Dark mode for the dashboard</li>
+</ul>
+<blockquote>Upgrade with a single command.</blockquote>
+<pre><code class="language-bash">npm install app@2.4</code></pre>
+<table>
+  <tr><th>Build</th><th>Before</th><th>After</th></tr>
+  <tr><td>Cold</td><td>42 s</td><td>18 s</td></tr>
+</table>`;
+---
+
+<ToolShell slug="html-to-markdown" title="HTML to Markdown" description="Convert HTML into clean Markdown, with headings, lists, links, code blocks and tables. Paste rich text copied from a web page too.">
+	<div class="toolbar" id="hm-tool">
+		<div class="seg" id="hm-heading" aria-label="Headings">
+			<button data-value="atx" aria-pressed="true"># Headings</button>
+			<button data-value="setext" aria-pressed="false">Underlined</button>
+		</div>
+		<div class="seg" id="hm-bullet" aria-label="Bullet">
+			<button data-value="-" aria-pressed="true">- list</button>
+			<button data-value="*" aria-pressed="false">* list</button>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">HTML <span class="field-note">or paste rich text</span></div>
+			<textarea id="hm-in" spellcheck="false" aria-label="HTML input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Markdown</span>
+				<button class="btn" id="hm-copy">Copy</button>
+			</div>
+			<pre class="out" id="hm-out"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import TurndownService from 'turndown';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	function tables(td: TurndownService) {
+		td.addRule('tableCell', {
+			filter: ['th', 'td'],
+			replacement: (content) => ` ${content.trim().replace(/\|/g, '\\|').replace(/\n+/g, ' ')} |`,
+		});
+		td.addRule('tableRow', {
+			filter: 'tr',
+			replacement: (content, node) => {
+				const row = `|${content}\n`;
+				const el = node as HTMLElement;
+				const first = el.parentElement?.firstElementChild === el && !el.closest('tbody')?.previousElementSibling;
+				return first ? row + `|${' --- |'.repeat(el.children.length)}\n` : row;
+			},
+		});
+		td.addRule('table', {
+			filter: 'table',
+			replacement: (content) => `\n\n${content.trim()}\n\n`,
+		});
+		td.addRule('tableSection', { filter: ['thead', 'tbody', 'tfoot'], replacement: (c) => c });
+	}
+
+	onPage('hm-tool', () => {
+		const input = byId<HTMLTextAreaElement>('hm-in');
+		const out = byId('hm-out');
+		let heading: 'atx' | 'setext' = 'atx';
+		let bullet: '-' | '*' = '-';
+
+		const render = () => {
+			const td = new TurndownService({ headingStyle: heading, bulletListMarker: bullet, codeBlockStyle: 'fenced', emDelimiter: '_' });
+			td.remove(['script', 'style']);
+			tables(td);
+			td.addRule('fencedLang', {
+				filter: (n) => n.nodeName === 'PRE' && n.firstChild?.nodeName === 'CODE',
+				replacement: (_, n) => {
+					const code = n.firstChild as HTMLElement;
+					const lang = code.className.match(/language-(\S+)/)?.[1] ?? '';
+					return `\n\n\`\`\`${lang}\n${code.textContent?.replace(/\n$/, '')}\n\`\`\`\n\n`;
+				},
+			});
+			out.textContent = td.turndown(input.value).replace(/^(\s*)([-*]|\d+\.)\s{2,}/gm, '$1$2 ');
+		};
+
+		input.addEventListener('paste', (e) => {
+			const html = e.clipboardData?.getData('text/html');
+			if (!html) return;
+			e.preventDefault();
+			input.value = html.replace(/^[\s\S]*<!--StartFragment-->|<!--EndFragment-->[\s\S]*$/g, '');
+			render();
+		});
+		segmented(byId('hm-heading'), (v) => ((heading = v as 'atx'), render()));
+		segmented(byId('hm-bullet'), (v) => ((bullet = v as '-'), render()));
+		input.addEventListener('input', render);
+		copyButton(byId('hm-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#hm-in {
+		min-height: 380px;
+	}
+</style>
