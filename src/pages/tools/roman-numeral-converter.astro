@@ -1,0 +1,140 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="roman-numeral-converter"
+	title="Roman Numerals"
+	description="Type in either field. Strict validation, from I to MMMCMXCIX."
+>
+	<div class="fields" id="roman-tool">
+		<div class="field" id="roman-num-field">
+			<label for="roman-num">Number</label>
+			<input id="roman-num" inputmode="numeric" value="2026" />
+			<span class="field-note" id="roman-num-note"></span>
+		</div>
+		<div class="field" id="roman-rom-field">
+			<label for="roman-rom">Roman</label>
+			<input id="roman-rom" spellcheck="false" autocapitalize="characters" />
+			<span class="field-note" id="roman-rom-note"></span>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">Breakdown</div>
+		<div class="roman-parts" id="roman-parts"></div>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const TABLE: [number, string][] = [
+		[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
+		[50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+	];
+	const STRICT = /^M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
+
+	function parts(n: number): [number, string][] {
+		const result: [number, string][] = [];
+		for (const [value, symbol] of TABLE) {
+			while (n >= value) {
+				result.push([value, symbol]);
+				n -= value;
+			}
+		}
+		return result;
+	}
+
+	function fromRoman(roman: string): number {
+		let total = 0;
+		let rest = roman;
+		for (const [value, symbol] of TABLE) {
+			while (rest.startsWith(symbol)) {
+				total += value;
+				rest = rest.slice(symbol.length);
+			}
+		}
+		return total;
+	}
+
+	onPage('roman-tool', () => {
+		const num = byId<HTMLInputElement>('roman-num');
+		const rom = byId<HTMLInputElement>('roman-rom');
+
+		const showParts = (n: number) => {
+			byId('roman-parts').replaceChildren(
+				...parts(n).map(([value, symbol]) => {
+					const el = document.createElement('div');
+					el.innerHTML = '<b></b><span></span>';
+					el.querySelector('b')!.textContent = symbol;
+					el.querySelector('span')!.textContent = String(value);
+					return el;
+				})
+			);
+		};
+
+		const setState = (field: string, note: string) => {
+			byId(`roman-${field}-field`).classList.toggle('invalid', Boolean(note));
+			byId(`roman-${field}-note`).textContent = note;
+		};
+
+		const fromNumber = () => {
+			setState('rom', '');
+			const n = Number(num.value);
+			if (!/^\d+$/.test(num.value.trim()) || n < 1 || n > 3999) {
+				setState('num', 'Enter a whole number between 1 and 3999.');
+				return;
+			}
+			setState('num', '');
+			rom.value = parts(n).map(([, s]) => s).join('');
+			showParts(n);
+		};
+
+		const fromRomanInput = () => {
+			setState('num', '');
+			const value = rom.value.trim().toUpperCase();
+			if (!value || !STRICT.test(value)) {
+				setState('rom', 'Not a valid Roman numeral (e.g. IIII should be IV).');
+				return;
+			}
+			setState('rom', '');
+			const n = fromRoman(value);
+			num.value = String(n);
+			showParts(n);
+		};
+
+		num.addEventListener('input', fromNumber);
+		rom.addEventListener('input', fromRomanInput);
+		fromNumber();
+	});
+</script>
+
+<style>
+	#roman-rom {
+		text-transform: uppercase;
+	}
+	.roman-parts {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		padding: 14px;
+	}
+	.roman-parts :global(div) {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		min-width: 56px;
+		padding: 8px 10px;
+		border-radius: 10px;
+		background: var(--surface-2);
+	}
+	.roman-parts :global(b) {
+		font-family: var(--mono);
+		font-size: 20px;
+		color: var(--accent-strong);
+	}
+	.roman-parts :global(span) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+</style>

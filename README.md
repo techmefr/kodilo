@@ -15,6 +15,18 @@ Live at **https://techmefr.github.io/kodilo/**
 - **URL Encoder** — component or full-URL encode/decode, plus a breakdown of every URL part.
 - **UUID Generator** — v4 or time-ordered v7, bulk up to 1000, uppercase, no hyphens.
 - **Case Converter** — every case at once (camel, Pascal, snake, CONSTANT, kebab, dot, path, title…), click to copy.
+- **Lorem Ipsum** — 14 corpora: Latin, French accents, Malagasy long words, German compounds, Cyrillic,
+  Arabic (RTL), Japanese (no spaces), emoji and ZWJ sequences, an all-scripts stress test, plus cat, dog,
+  Elvish, pirate and robot. Paragraphs, sentences or words, as text or HTML.
+- **Word Counter** — words, characters (grapheme-aware), UTF-8 bytes, sentences, reading and speaking time, top keywords.
+- **Slugify** — URL slugs with transliteration, custom separator and max length, one per line.
+- **Text to Binary** — UTF-8 bytes as binary, hex, octal or decimal, both ways.
+- **NATO Alphabet** — spell text out, with optional ICAO digit pronunciation.
+- **Numeronym Generator** — internationalization → i18n.
+- **HTML Entities** — escape and unescape, optional non-ASCII encoding, common entities reference.
+- **Roman Numerals** — both ways with strict validation and a breakdown.
+- **Temperature** — Celsius, Fahrenheit, Kelvin and Rankine, with presets.
+- **Integer Base Converter** — bases 2 to 36, arbitrary precision, negatives.
 - More tools land as separate categories in the sidebar — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -48,17 +60,10 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **Text**
 - Regex Tester
 - Diff Checker
-- Word Counter
-- Slugify
-- Lorem Ipsum Generator
-- Text to Binary
-- Text to NATO Alphabet
 - Text Statistics
-- Numeronym Generator
 
 **Encoding & Security**
 - JWT Decoder
-- HTML Entities
 - Hash Text
 - HMAC Generator
 - Bcrypt
@@ -80,9 +85,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **Converters**
 - Date/Time Converter
 - Color Converter
-- Integer Base Converter
-- Roman Numeral Converter
-- Temperature Converter
 
 **Network**
 - IPv4 Subnet Calculator

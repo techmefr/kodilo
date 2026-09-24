@@ -1,0 +1,87 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="numeronym-generator"
+	title="Numeronym Generator"
+	description="internationalization → i18n. First letter, number of letters in between, last letter."
+>
+	<div class="grid-2" id="num-tool">
+		<section class="panel">
+			<div class="panel-head">Words</div>
+			<textarea id="num-in" spellcheck="false" aria-label="Words"
+				>internationalization localization accessibility Kubernetes observability canonicalization</textarea
+			>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Numeronyms</span>
+				<button class="btn" id="num-copy">Copy</button>
+			</div>
+			<ul class="num-list" id="num-list"></ul>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const numeronym = (word: string) => {
+		const chars = [...word];
+		return chars.length < 4 ? word : `${chars[0]}${chars.length - 2}${chars[chars.length - 1]}`;
+	};
+
+	onPage('num-tool', () => {
+		const input = byId<HTMLTextAreaElement>('num-in');
+		const list = byId('num-list');
+		let pairs: [string, string][] = [];
+
+		const render = () => {
+			pairs = input.value
+				.split(/[^\p{L}\p{N}]+/u)
+				.filter(Boolean)
+				.map((word) => [word, numeronym(word)]);
+			list.replaceChildren(
+				...pairs.map(([word, short]) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<b></b><span></span>';
+					li.querySelector('b')!.textContent = short;
+					li.querySelector('span')!.textContent = word;
+					return li;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		copyButton(byId('num-copy'), () => pairs.map(([, short]) => short).join(' '));
+		render();
+	});
+</script>
+
+<style>
+	.num-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.num-list :global(li) {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+	}
+	.num-list :global(b) {
+		font-family: var(--mono);
+		font-size: 18px;
+		color: var(--accent-strong);
+	}
+	.num-list :global(span) {
+		font-size: 13px;
+		color: var(--ink-soft);
+		overflow-wrap: anywhere;
+		text-align: right;
+	}
+</style>

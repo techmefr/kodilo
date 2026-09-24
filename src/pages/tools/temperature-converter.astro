@@ -1,0 +1,87 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const scales = [
+	['c', 'Celsius', '°C'],
+	['f', 'Fahrenheit', '°F'],
+	['k', 'Kelvin', 'K'],
+	['r', 'Rankine', '°R'],
+];
+const presets = [
+	['Absolute zero', '-273.15'],
+	['Water freezes', '0'],
+	['Room', '20'],
+	['Body', '37'],
+	['Water boils', '100'],
+	['Oven', '180'],
+];
+---
+
+<ToolShell
+	slug="temperature-converter"
+	title="Temperature"
+	description="Edit any scale, the others follow."
+>
+	<div class="fields" id="temp-tool">
+		{
+			scales.map(([id, label, unit]) => (
+				<div class="field" id={`temp-${id}-field`}>
+					<label for={`temp-${id}`}>
+						{label} · {unit}
+					</label>
+					<input id={`temp-${id}`} inputmode="decimal" data-scale={id} />
+				</div>
+			))
+		}
+	</div>
+	<div class="chips" id="temp-presets">
+		{presets.map(([label, c]) => <button data-c={c}>{label} · {c} °C</button>)}
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const toKelvin: Record<string, (v: number) => number> = {
+		c: (v) => v + 273.15,
+		f: (v) => ((v - 32) * 5) / 9 + 273.15,
+		k: (v) => v,
+		r: (v) => (v * 5) / 9,
+	};
+	const fromKelvin: Record<string, (k: number) => number> = {
+		c: (k) => k - 273.15,
+		f: (k) => ((k - 273.15) * 9) / 5 + 32,
+		k: (k) => k,
+		r: (k) => (k * 9) / 5,
+	};
+
+	const format = (v: number) => String(Math.round(v * 100) / 100);
+
+	onPage('temp-tool', () => {
+		const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('#temp-tool input'));
+
+		const update = (source: HTMLInputElement) => {
+			const value = Number(source.value.replace(',', '.'));
+			const valid = source.value.trim() !== '' && Number.isFinite(value);
+			const kelvin = valid ? toKelvin[source.dataset.scale!](value) : NaN;
+			const belowZero = kelvin < 0;
+			source.closest('.field')!.classList.toggle('invalid', !valid || belowZero);
+			if (!valid || belowZero) return;
+			inputs.forEach((input) => {
+				if (input !== source) input.value = format(fromKelvin[input.dataset.scale!](kelvin));
+			});
+		};
+
+		inputs.forEach((input) => input.addEventListener('input', () => update(input)));
+		document.querySelectorAll<HTMLButtonElement>('#temp-presets button').forEach((button) =>
+			button.addEventListener('click', () => {
+				const c = byId<HTMLInputElement>('temp-c');
+				c.value = button.dataset.c!;
+				update(c);
+			})
+		);
+		const c = byId<HTMLInputElement>('temp-c');
+		c.value = '20';
+		update(c);
+	});
+</script>

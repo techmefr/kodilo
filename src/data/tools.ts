@@ -154,26 +154,31 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'word-counter',
+				built: true,
 				name: 'Word Counter',
 				description: 'Count words, characters and lines.',
 			},
 			{
 				slug: 'slugify',
+				built: true,
 				name: 'Slugify',
 				description: 'Turn text into a URL-friendly slug.',
 			},
 			{
 				slug: 'lorem-ipsum-generator',
+				built: true,
 				name: 'Lorem Ipsum Generator',
 				description: 'Generate placeholder text.',
 			},
 			{
 				slug: 'text-to-binary',
+				built: true,
 				name: 'Text to Binary',
 				description: 'Convert text to and from binary.',
 			},
 			{
 				slug: 'text-to-nato-alphabet',
+				built: true,
 				name: 'Text to NATO Alphabet',
 				description: 'Spell out text using the NATO phonetic alphabet.',
 			},
@@ -184,6 +189,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'numeronym-generator',
+				built: true,
 				name: 'Numeronym Generator',
 				description: 'Generate numeronyms like i18n or a11y from a word.',
 			},
@@ -213,6 +219,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'html-entities',
+				built: true,
 				name: 'HTML Entities',
 				description: 'Encode and decode HTML entities.',
 			},
@@ -323,16 +330,19 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'integer-base-converter',
+				built: true,
 				name: 'Integer Base Converter',
 				description: 'Convert numbers between binary, octal, decimal and hex.',
 			},
 			{
 				slug: 'roman-numeral-converter',
+				built: true,
 				name: 'Roman Numeral Converter',
 				description: 'Convert numbers to and from Roman numerals.',
 			},
 			{
 				slug: 'temperature-converter',
+				built: true,
 				name: 'Temperature Converter',
 				description: 'Convert between Celsius, Fahrenheit and Kelvin.',
 			},
