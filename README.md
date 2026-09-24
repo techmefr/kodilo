@@ -1,6 +1,6 @@
 # kodilo
 
-A collection of open-source tools for developers without sign, account.
+A collection of open-source tools for developers with no sign-up and no account.
 
 Live at **https://techmefr.github.io/kodilo/**
 
@@ -116,48 +116,9 @@ Live at **https://techmefr.github.io/kodilo/**
 - **PDF Compress** (`/tools/pdf-compress/`) — lossless repack or pages as JPEG
 - **PDF to JPG** (`/tools/pdf-to-jpg/`) — render pages as JPG or PNG at 72-300 DPI
 - **X.509 Certificate Decoder** (`/tools/x509-certificate-decoder/`) — subject, SANs, validity, key, fingerprints
-- More tools land as new categories in the sidebar mega menu and the ⌘K / Ctrl K search — see `src/data/tools.ts`.
+- Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
-
-## Roadmap
-
-Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
-
-**JSON**
-
-**HTML / CSS**
-
-**Markdown**
-
-**SEO**
-
-**Text**
-
-**Encoding & Security**
-
-**Generators**
-
-**Converters**
-
-**Network**
-
-**Validators**
-
-**Images**
-
-**PDF**
-
-**Dev Utilities**
-
-**DevOps & Sysadmin**
-
-**Calculators**
-
-**Productivity**
-
-**Testing** — not started
-**Design** — not started
 
 Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools),
 [it-tools.tech](https://it-tools.tech/) (its live deployment), [devbench.site](https://devbench.site/),
@@ -195,6 +156,10 @@ Node version is pinned via `.nvmrc` (`lts/*`).
    library (e.g. for PDF or image manipulation) is fine when a tool genuinely needs one.
    No sign-up, no server, no tracking either way.
 
+## Contributing
+
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first, and report security problems as described in [SECURITY.md](SECURITY.md).
+
 ## License
 
-MIT
+[MIT](LICENSE)
