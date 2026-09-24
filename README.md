@@ -10,7 +10,7 @@ Live at **https://techmefr.github.io/kodilo/**
   renders across Outlook Desktop, Outlook.com, Gmail, Apple Mail and Thunderbird
   (client CSS-support quirks are simulated, not pixel-perfect), and check a
   caniemail-style support grid for common CSS features.
-- **JSON Formatter** — format (2/4 spaces, tab), minify, sort keys, errors with line and column.
+- **JSON Formatter** — JSON and JSON Lines (per-line errors, array ↔ JSONL conversion), format (2/4 spaces, tab), minify, sort keys, errors with line and column.
 - **Base64** — UTF-8 safe encode/decode, URL-safe alphabet.
 - **URL Encoder** — component or full-URL encode/decode, plus a breakdown of every URL part.
 - **UUID Generator** — v4 or time-ordered v7, bulk up to 1000, uppercase, no hyphens.

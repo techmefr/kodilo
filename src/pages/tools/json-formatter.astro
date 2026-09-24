@@ -5,9 +5,13 @@ import ToolShell from '../../components/ToolShell.astro';
 <ToolShell
 	slug="json-formatter"
 	title="JSON Formatter"
-	description="Format, minify and validate JSON. Everything updates as you type."
+	description="Format, minify and validate JSON or JSON Lines. Everything updates as you type."
 >
 	<div class="toolbar" id="json-tool">
+		<div class="seg" id="json-format" aria-label="Format">
+			<button data-value="json" aria-pressed="true">JSON</button>
+			<button data-value="jsonl" aria-pressed="false">JSONL</button>
+		</div>
 		<div class="seg" id="json-indent" aria-label="Indentation">
 			<button data-value="2" aria-pressed="true">2 spaces</button>
 			<button data-value="4" aria-pressed="false">4 spaces</button>
@@ -15,6 +19,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			<button data-value="min" aria-pressed="false">Minify</button>
 		</div>
 		<label class="check"><input type="checkbox" id="json-sort" /> Sort keys</label>
+		<button class="btn" id="json-convert" hidden></button>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
@@ -32,6 +37,7 @@ import ToolShell from '../../components/ToolShell.astro';
 		</section>
 	</div>
 	<div class="error" id="json-error" hidden></div>
+	<p class="hint" id="json-hint" hidden></p>
 </ToolShell>
 
 <script>
@@ -56,42 +62,133 @@ import ToolShell from '../../components/ToolShell.astro';
 		return `${message} (line ${before.length}, column ${before[before.length - 1].length + 1})`;
 	}
 
+	function parseLines(text: string) {
+		const records: unknown[] = [];
+		const errors: string[] = [];
+		text.split('\n').forEach((line, i) => {
+			if (!line.trim()) return;
+			try {
+				records.push(JSON.parse(line));
+			} catch (e) {
+				errors.push(`Line ${i + 1}: ${(e as Error).message}`);
+			}
+		});
+		return { records, errors };
+	}
+
 	onPage('json-tool', () => {
 		const input = byId<HTMLTextAreaElement>('json-in');
 		const output = byId('json-out');
 		const error = byId('json-error');
+		const hint = byId('json-hint');
 		const status = byId('json-status');
 		const sort = byId<HTMLInputElement>('json-sort');
+		const convert = byId<HTMLButtonElement>('json-convert');
+		const formatGroup = byId('json-format');
 		let indent = '2';
+		let format = 'json';
+		let convertTo: (() => void) | null = null;
 
-		const render = () => {
-			if (!input.value.trim()) {
-				output.textContent = '';
-				error.hidden = true;
-				status.textContent = 'Output';
-				return;
-			}
+		const space = () => (indent === 'min' ? undefined : indent === 'tab' ? '\t' : Number(indent));
+		const prepare = (value: unknown) => (sort.checked ? sortKeys(value) : value);
+
+		const setFormat = (value: string) => {
+			format = value;
+			formatGroup
+				.querySelectorAll('button')
+				.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === value)));
+			render();
+		};
+
+		const offerConversion = (label: string, action: () => void) => {
+			convert.textContent = label;
+			convert.hidden = false;
+			convertTo = action;
+		};
+
+		const renderJson = () => {
 			try {
-				let parsed = JSON.parse(input.value);
-				if (sort.checked) parsed = sortKeys(parsed);
-				const space = indent === 'min' ? undefined : indent === 'tab' ? '\t' : Number(indent);
-				output.textContent = JSON.stringify(parsed, null, space);
-				error.hidden = true;
+				const parsed = prepare(JSON.parse(input.value));
+				output.textContent = JSON.stringify(parsed, null, space());
 				status.textContent = 'Valid JSON';
+				if (Array.isArray(parsed)) {
+					offerConversion('Convert to JSONL', () => {
+						input.value = parsed.map((r) => JSON.stringify(r)).join('\n');
+						setFormat('jsonl');
+					});
+				}
 			} catch (e) {
 				error.textContent = locate(input.value, (e as Error).message);
 				error.hidden = false;
 				status.textContent = 'Invalid JSON';
+				const lines = parseLines(input.value);
+				if (lines.records.length > 1 && !lines.errors.length) {
+					hint.textContent = 'This looks like JSON Lines (one record per line). Switch to JSONL.';
+					hint.hidden = false;
+				}
 			}
 		};
 
+		const renderJsonl = () => {
+			const { records, errors } = parseLines(input.value);
+			const prepared = records.map(prepare);
+			output.textContent =
+				indent === 'min'
+					? prepared.map((r) => JSON.stringify(r)).join('\n')
+					: prepared.map((r) => JSON.stringify(r, null, space())).join('\n\n');
+			status.textContent = errors.length
+				? `${errors.length} invalid line${errors.length > 1 ? 's' : ''}`
+				: `${records.length} valid record${records.length > 1 ? 's' : ''}`;
+			if (errors.length) {
+				error.textContent = errors.join('\n');
+				error.hidden = false;
+			}
+			if (indent !== 'min' && records.length) {
+				hint.textContent = 'Pretty output is for reading. Pick Minify to get valid JSONL, one record per line.';
+				hint.hidden = false;
+			}
+			if (records.length && !errors.length) {
+				offerConversion('Convert to JSON array', () => {
+					input.value = JSON.stringify(records, null, 2);
+					setFormat('json');
+				});
+			}
+		};
+
+		function render() {
+			error.hidden = true;
+			hint.hidden = true;
+			convert.hidden = true;
+			convertTo = null;
+			if (!input.value.trim()) {
+				output.textContent = '';
+				status.textContent = 'Output';
+				return;
+			}
+			if (format === 'jsonl') renderJsonl();
+			else renderJson();
+		}
+
+		segmented(formatGroup, setFormat);
 		segmented(byId('json-indent'), (value) => {
 			indent = value;
 			render();
 		});
+		convert.addEventListener('click', () => convertTo?.());
 		input.addEventListener('input', render);
 		sort.addEventListener('change', render);
 		copyButton(byId('json-copy'), () => output.textContent ?? '');
 		render();
 	});
 </script>
+
+<style>
+	#json-error {
+		white-space: pre-wrap;
+	}
+	.hint {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+</style>
