@@ -1,0 +1,193 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const who = [
+	['owner', 'Owner'],
+	['group', 'Group'],
+	['others', 'Others'],
+];
+const perms = [
+	['r', 'Read', 4],
+	['w', 'Write', 2],
+	['x', 'Execute', 1],
+];
+---
+
+<ToolShell
+	slug="chmod-calculator"
+	title="Chmod Calculator"
+	description="Tick permissions or type an octal mode like 755. Symbolic notation and the command update together."
+>
+	<section class="panel" id="chmod-tool">
+		<table class="chmod-grid">
+			<thead>
+				<tr>
+					<th></th>
+					{perms.map(([, label, value]) => <th>{label} · {value}</th>)}
+				</tr>
+			</thead>
+			<tbody>
+				{
+					who.map(([id, label]) => (
+						<tr>
+							<th scope="row">{label}</th>
+							{perms.map(([perm, permLabel]) => (
+								<td>
+									<input
+										type="checkbox"
+										class="chmod-box"
+										data-who={id}
+										data-perm={perm}
+										aria-label={`${label} ${permLabel}`}
+									/>
+								</td>
+							))}
+						</tr>
+					))
+				}
+			</tbody>
+		</table>
+	</section>
+	<div class="toolbar">
+		<label class="check"><input type="checkbox" class="chmod-special" data-bit="4" /> setuid</label>
+		<label class="check"><input type="checkbox" class="chmod-special" data-bit="2" /> setgid</label>
+		<label class="check"><input type="checkbox" class="chmod-special" data-bit="1" /> sticky</label>
+	</div>
+	<div class="fields">
+		<div class="field" id="chmod-octal-field">
+			<label for="chmod-octal">Octal</label>
+			<input id="chmod-octal" inputmode="numeric" value="755" />
+		</div>
+		<div class="field">
+			<label>Symbolic</label>
+			<output class="chmod-symbolic" id="chmod-symbolic"></output>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Command</span>
+			<button class="btn" id="chmod-copy">Copy</button>
+		</div>
+		<pre class="out chmod-cmd" id="chmod-cmd"></pre>
+	</section>
+	<div class="chips" id="chmod-presets">
+		<button data-mode="644">644 · files</button>
+		<button data-mode="755">755 · folders, scripts</button>
+		<button data-mode="600">600 · private keys</button>
+		<button data-mode="700">700 · private folder</button>
+		<button data-mode="775">775 · shared group</button>
+		<button data-mode="1777">1777 · /tmp</button>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const WHO = ['owner', 'group', 'others'];
+	const PERM: Record<string, number> = { r: 4, w: 2, x: 1 };
+
+	onPage('chmod-tool', () => {
+		const boxes = Array.from(document.querySelectorAll<HTMLInputElement>('.chmod-box'));
+		const specials = Array.from(document.querySelectorAll<HTMLInputElement>('.chmod-special'));
+		const octal = byId<HTMLInputElement>('chmod-octal');
+
+		const digits = () => {
+			const special = specials.filter((s) => s.checked).reduce((sum, s) => sum + Number(s.dataset.bit), 0);
+			const base = WHO.map((w) =>
+				boxes.filter((b) => b.dataset.who === w && b.checked).reduce((sum, b) => sum + PERM[b.dataset.perm!], 0)
+			);
+			return { special, base };
+		};
+
+		const symbolic = (special: number, base: number[]) =>
+			base
+				.map((d, i) => {
+					const exec = (d & 1) === 1;
+					const specialBit = [4, 2, 1][i];
+					const hasSpecial = (special & specialBit) !== 0;
+					const x = hasSpecial ? (i === 2 ? (exec ? 't' : 'T') : exec ? 's' : 'S') : exec ? 'x' : '-';
+					return `${d & 4 ? 'r' : '-'}${d & 2 ? 'w' : '-'}${x}`;
+				})
+				.join('');
+
+		const show = (fromOctal = false) => {
+			const { special, base } = digits();
+			const mode = `${special ? special : ''}${base.join('')}`;
+			if (!fromOctal) octal.value = mode;
+			byId('chmod-symbolic').textContent = symbolic(special, base);
+			byId('chmod-cmd').textContent = `chmod ${mode} file`;
+		};
+
+		const applyOctal = (value: string) => {
+			const field = byId('chmod-octal-field');
+			if (!/^[0-7]{3,4}$/.test(value)) {
+				field.classList.add('invalid');
+				return;
+			}
+			field.classList.remove('invalid');
+			const padded = value.padStart(4, '0');
+			const special = Number(padded[0]);
+			specials.forEach((s) => (s.checked = (special & Number(s.dataset.bit)) !== 0));
+			WHO.forEach((w, i) => {
+				const d = Number(padded[i + 1]);
+				boxes.filter((b) => b.dataset.who === w).forEach((b) => (b.checked = (d & PERM[b.dataset.perm!]) !== 0));
+			});
+		};
+
+		[...boxes, ...specials].forEach((el) => el.addEventListener('change', () => show()));
+		octal.addEventListener('input', () => {
+			applyOctal(octal.value.trim());
+			show(true);
+		});
+		document.querySelectorAll<HTMLButtonElement>('#chmod-presets button').forEach((button) =>
+			button.addEventListener('click', () => {
+				applyOctal(button.dataset.mode!);
+				show();
+			})
+		);
+		copyButton(byId('chmod-copy'), () => byId('chmod-cmd').textContent ?? '');
+		applyOctal(octal.value);
+		show();
+	});
+</script>
+
+<style>
+	.chmod-grid {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 14px;
+	}
+	.chmod-grid th,
+	.chmod-grid td {
+		padding: 12px 14px;
+		text-align: center;
+		border-bottom: 1px solid var(--border);
+	}
+	.chmod-grid thead th {
+		font-size: 12px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--ink-soft);
+	}
+	.chmod-grid tbody th {
+		text-align: left;
+		font-weight: 600;
+	}
+	.chmod-grid tr:last-child > * {
+		border-bottom: 0;
+	}
+	.chmod-box {
+		width: 20px;
+		height: 20px;
+		accent-color: var(--accent-strong);
+		cursor: pointer;
+	}
+	.chmod-symbolic {
+		font-family: var(--mono);
+		font-size: 20px;
+	}
+	.chmod-cmd {
+		min-height: auto !important;
+	}
+</style>

@@ -1,0 +1,74 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="token-generator"
+	title="Token Generator"
+	description="Random API keys, secrets and nonces from the browser's secure random generator."
+>
+	<div class="toolbar" id="tok-tool">
+		<div class="seg" id="tok-format" aria-label="Format">
+			<button data-value="alnum" aria-pressed="true">Alphanumeric</button>
+			<button data-value="hex" aria-pressed="false">Hex</button>
+			<button data-value="base64url" aria-pressed="false">Base64url</button>
+		</div>
+		<label class="check">Length <input class="num" type="number" id="tok-length" min="4" max="512" value="32" /></label>
+		<label class="check">Count <input class="num" type="number" id="tok-count" min="1" max="100" value="5" /></label>
+		<label class="check">Prefix <input class="num tok-prefix" id="tok-prefix" placeholder="sk_live_" /></label>
+		<button class="btn primary" id="tok-regen">Regenerate</button>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="tok-label">Tokens</span>
+			<button class="btn" id="tok-copy">Copy all</button>
+		</div>
+		<pre class="out" id="tok-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { randomIndex } from '../../scripts/crypto';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const ALPHABETS: Record<string, string> = {
+		alnum: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+		hex: '0123456789abcdef',
+		base64url: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_',
+	};
+
+	onPage('tok-tool', () => {
+		const out = byId('tok-out');
+		const length = byId<HTMLInputElement>('tok-length');
+		const count = byId<HTMLInputElement>('tok-count');
+		const prefix = byId<HTMLInputElement>('tok-prefix');
+		let format = 'alnum';
+
+		const render = () => {
+			const alphabet = ALPHABETS[format];
+			const n = Math.min(512, Math.max(4, Number(length.value) || 32));
+			const c = Math.min(100, Math.max(1, Number(count.value) || 1));
+			out.textContent = Array.from(
+				{ length: c },
+				() => prefix.value + Array.from({ length: n }, () => alphabet[randomIndex(alphabet.length)]).join('')
+			).join('\n');
+			byId('tok-label').textContent = `${c} × ${n} chars · ${Math.round(n * Math.log2(alphabet.length))} bits each`;
+		};
+
+		segmented(byId('tok-format'), (value) => {
+			format = value;
+			render();
+		});
+		[length, count, prefix].forEach((el) => el.addEventListener('input', render));
+		byId('tok-regen').addEventListener('click', render);
+		copyButton(byId('tok-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.tok-prefix {
+		width: 110px;
+		font-family: var(--mono);
+	}
+</style>

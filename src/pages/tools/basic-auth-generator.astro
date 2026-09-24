@@ -1,0 +1,93 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="basic-auth-generator"
+	title="Basic Auth"
+	description="Build an HTTP Basic Authorization header, or paste one to read it back."
+>
+	<div class="fields" id="auth-tool">
+		<div class="field">
+			<label for="auth-user">Username</label>
+			<input id="auth-user" spellcheck="false" autocomplete="off" value="admin" />
+		</div>
+		<div class="field">
+			<label for="auth-pass">Password</label>
+			<input id="auth-pass" spellcheck="false" autocomplete="off" value="s3cr3t-pässword" />
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Header</span>
+			<button class="btn" id="auth-copy">Copy</button>
+		</div>
+		<pre class="out auth-out" id="auth-out"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>curl</span>
+			<button class="btn" id="auth-copy-curl">Copy</button>
+		</div>
+		<pre class="out auth-out" id="auth-curl"></pre>
+	</section>
+	<div class="fields">
+		<div class="field wide" id="auth-decode-field">
+			<label for="auth-decode">Decode a header</label>
+			<input id="auth-decode" spellcheck="false" placeholder="Basic YWRtaW46c2VjcmV0" />
+			<span class="field-note" id="auth-decode-note"></span>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { base64UrlDecode, encodeBytes } from '../../scripts/crypto';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	onPage('auth-tool', () => {
+		const user = byId<HTMLInputElement>('auth-user');
+		const pass = byId<HTMLInputElement>('auth-pass');
+		const out = byId('auth-out');
+		const curl = byId('auth-curl');
+		const decode = byId<HTMLInputElement>('auth-decode');
+
+		const render = () => {
+			const token = encodeBytes(new TextEncoder().encode(`${user.value}:${pass.value}`), 'base64');
+			out.textContent = `Authorization: Basic ${token}`;
+			curl.textContent = `curl -H "Authorization: Basic ${token}" https://example.com`;
+		};
+
+		const read = () => {
+			const field = byId('auth-decode-field');
+			const note = byId('auth-decode-note');
+			const raw = decode.value.trim().replace(/^Authorization:\s*/i, '').replace(/^Basic\s+/i, '');
+			if (!raw) {
+				field.classList.remove('invalid');
+				note.textContent = '';
+				return;
+			}
+			try {
+				const text = new TextDecoder('utf-8', { fatal: true }).decode(base64UrlDecode(raw));
+				const split = text.indexOf(':');
+				if (split < 0) throw new Error();
+				field.classList.remove('invalid');
+				note.textContent = `Username: ${text.slice(0, split)} · Password: ${text.slice(split + 1)}`;
+			} catch {
+				field.classList.add('invalid');
+				note.textContent = 'Not a valid Basic credential (base64 of username:password).';
+			}
+		};
+
+		[user, pass].forEach((el) => el.addEventListener('input', render));
+		decode.addEventListener('input', read);
+		copyButton(byId('auth-copy'), () => out.textContent ?? '');
+		copyButton(byId('auth-copy-curl'), () => curl.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.auth-out {
+		min-height: auto !important;
+	}
+</style>

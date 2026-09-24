@@ -1,0 +1,179 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const codes: [number, string, string][] = [
+	[100, 'Continue', 'Client should continue sending the request body.'],
+	[101, 'Switching Protocols', 'Server is switching protocols, e.g. to WebSocket.'],
+	[103, 'Early Hints', 'Preload resources while the final response is prepared.'],
+	[200, 'OK', 'The request succeeded.'],
+	[201, 'Created', 'A new resource was created, usually after POST.'],
+	[202, 'Accepted', 'Accepted for processing, not completed yet.'],
+	[204, 'No Content', 'Success with no body, common for DELETE.'],
+	[206, 'Partial Content', 'Only part of the resource, answering a Range header.'],
+	[301, 'Moved Permanently', 'The resource has a new permanent URL.'],
+	[302, 'Found', 'Temporary redirect; method may change to GET.'],
+	[303, 'See Other', 'Redirect to another URL with GET, e.g. after a form POST.'],
+	[304, 'Not Modified', 'Cached version is still valid.'],
+	[307, 'Temporary Redirect', 'Temporary redirect keeping the same method.'],
+	[308, 'Permanent Redirect', 'Permanent redirect keeping the same method.'],
+	[400, 'Bad Request', 'Malformed syntax or invalid parameters.'],
+	[401, 'Unauthorized', 'Authentication is missing or invalid.'],
+	[403, 'Forbidden', 'Authenticated but not allowed.'],
+	[404, 'Not Found', 'No resource at this URL.'],
+	[405, 'Method Not Allowed', 'The HTTP method is not supported here.'],
+	[406, 'Not Acceptable', 'No representation matches the Accept headers.'],
+	[408, 'Request Timeout', 'The client took too long to send the request.'],
+	[409, 'Conflict', 'Conflicts with the current state, e.g. a duplicate.'],
+	[410, 'Gone', 'Permanently removed, with no forwarding address.'],
+	[411, 'Length Required', 'A Content-Length header is required.'],
+	[412, 'Precondition Failed', 'An If-* precondition did not hold.'],
+	[413, 'Content Too Large', 'The request body is too big.'],
+	[414, 'URI Too Long', 'The URL is longer than the server accepts.'],
+	[415, 'Unsupported Media Type', 'The Content-Type is not supported.'],
+	[416, 'Range Not Satisfiable', 'The requested range is outside the resource.'],
+	[418, "I'm a teapot", 'An April Fools’ joke from RFC 2324, still around.'],
+	[422, 'Unprocessable Content', 'Well-formed but semantically invalid, e.g. validation errors.'],
+	[425, 'Too Early', 'Refusing to process a request that might be replayed.'],
+	[426, 'Upgrade Required', 'Switch to a different protocol to continue.'],
+	[428, 'Precondition Required', 'The request must be conditional.'],
+	[429, 'Too Many Requests', 'Rate limited; check Retry-After.'],
+	[431, 'Request Header Fields Too Large', 'Headers are too big.'],
+	[451, 'Unavailable For Legal Reasons', 'Blocked for legal reasons.'],
+	[500, 'Internal Server Error', 'An unexpected error on the server.'],
+	[501, 'Not Implemented', 'The server does not support this functionality.'],
+	[502, 'Bad Gateway', 'An upstream server returned an invalid response.'],
+	[503, 'Service Unavailable', 'Overloaded or down for maintenance.'],
+	[504, 'Gateway Timeout', 'An upstream server did not answer in time.'],
+	[505, 'HTTP Version Not Supported', 'The HTTP version is not supported.'],
+	[507, 'Insufficient Storage', 'The server cannot store the representation.'],
+	[511, 'Network Authentication Required', 'Log in to the network first, e.g. a captive portal.'],
+];
+const classes = [
+	['all', 'All'],
+	['1', '1xx Info'],
+	['2', '2xx Success'],
+	['3', '3xx Redirect'],
+	['4', '4xx Client'],
+	['5', '5xx Server'],
+];
+---
+
+<ToolShell
+	slug="http-status-codes"
+	title="HTTP Status Codes"
+	description="Every status code you will meet, searchable by number, name or meaning."
+>
+	<div class="fields" id="http-tool">
+		<div class="field wide">
+			<label for="http-search">Search</label>
+			<input id="http-search" spellcheck="false" placeholder="404, rate limit, redirect…" />
+		</div>
+	</div>
+	<div class="chips" id="http-classes">
+		{classes.map(([value, label]) => <button data-value={value} aria-pressed={String(value === 'all')}>{label}</button>)}
+	</div>
+	<ul class="http-list" id="http-list">
+		{
+			codes.map(([code, name, text]) => (
+				<li data-class={String(code)[0]} data-search={`${code} ${name} ${text}`.toLowerCase()}>
+					<b class={`c${String(code)[0]}`}>{code}</b>
+					<span class="http-name">{name}</span>
+					<span class="http-text">{text}</span>
+				</li>
+			))
+		}
+	</ul>
+	<p class="http-empty" id="http-empty" hidden>No status code matches.</p>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	onPage('http-tool', () => {
+		const search = byId<HTMLInputElement>('http-search');
+		const items = Array.from(document.querySelectorAll<HTMLElement>('#http-list li'));
+		const chips = Array.from(document.querySelectorAll<HTMLButtonElement>('#http-classes button'));
+		let active = 'all';
+
+		const filter = () => {
+			const query = search.value.trim().toLowerCase();
+			let visible = 0;
+			items.forEach((item) => {
+				const show = (active === 'all' || item.dataset.class === active) && item.dataset.search!.includes(query);
+				item.hidden = !show;
+				if (show) visible++;
+			});
+			byId('http-empty').hidden = visible > 0;
+		};
+
+		chips.forEach((chip) =>
+			chip.addEventListener('click', () => {
+				chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+				active = chip.dataset.value!;
+				filter();
+			})
+		);
+		search.addEventListener('input', filter);
+	});
+</script>
+
+<style>
+	.http-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		overflow: hidden;
+	}
+	.http-list li {
+		display: grid;
+		grid-template-columns: 56px 220px 1fr;
+		gap: 12px;
+		align-items: baseline;
+		padding: 11px 14px;
+		border-bottom: 1px solid var(--border);
+		font-size: 14px;
+	}
+	.http-list li:last-child {
+		border-bottom: 0;
+	}
+	.http-list b {
+		font-family: var(--mono);
+		font-size: 15px;
+	}
+	.c1 {
+		color: var(--ink-soft);
+	}
+	.c2 {
+		color: var(--ok);
+	}
+	.c3 {
+		color: var(--accent-strong);
+	}
+	.c4 {
+		color: var(--partial);
+	}
+	.c5 {
+		color: var(--warn);
+	}
+	.http-name {
+		font-weight: 600;
+	}
+	.http-text {
+		color: var(--ink-soft);
+	}
+	.http-empty {
+		color: var(--ink-soft);
+		font-size: 14px;
+	}
+	@media (max-width: 640px) {
+		.http-list li {
+			grid-template-columns: 56px 1fr;
+		}
+		.http-text {
+			grid-column: 2;
+		}
+	}
+</style>

@@ -1,0 +1,128 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="jwt-decoder"
+	title="JWT Decoder"
+	description="Read the header, claims and expiry of a JSON Web Token. Decoding only — the signature is not verified."
+>
+	<section class="panel" id="jwt-tool">
+		<div class="panel-head">Token</div>
+		<textarea id="jwt-in" class="jwt-in" spellcheck="false" aria-label="JWT"
+			>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IktvZGlsbyBVc2VyIiwicm9sZSI6ImRldmVsb3BlciIsImlhdCI6MTc1ODcwMDAwMCwiZXhwIjo0MTAyNDQ0ODAwfQ.c2lnbmF0dXJlLW5vdC12ZXJpZmllZA</textarea
+		>
+	</section>
+	<div class="error" id="jwt-error" hidden></div>
+	<div class="chips" id="jwt-times"></div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">
+				<span>Header</span>
+				<button class="btn" id="jwt-copy-header">Copy</button>
+			</div>
+			<pre class="out jwt-part" id="jwt-header"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Payload</span>
+				<button class="btn" id="jwt-copy-payload">Copy</button>
+			</div>
+			<pre class="out jwt-part" id="jwt-payload"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { base64UrlDecode } from '../../scripts/crypto';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const CLAIMS: Record<string, string> = { iat: 'Issued', nbf: 'Valid from', exp: 'Expires' };
+
+	const relative = (seconds: number) => {
+		const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+		const units: [Intl.RelativeTimeFormatUnit, number][] = [
+			['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1],
+		];
+		const [unit, size] = units.find(([, s]) => Math.abs(seconds) >= s) ?? units[units.length - 1];
+		return rtf.format(Math.round(seconds / size), unit);
+	};
+
+	const decodePart = (part: string) => JSON.parse(new TextDecoder().decode(base64UrlDecode(part)));
+
+	onPage('jwt-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jwt-in');
+		const header = byId('jwt-header');
+		const payload = byId('jwt-payload');
+		const error = byId('jwt-error');
+		const times = byId('jwt-times');
+
+		const render = () => {
+			header.textContent = '';
+			payload.textContent = '';
+			times.replaceChildren();
+			const parts = input.value.trim().replace(/^Bearer\s+/i, '').split('.');
+			if (!input.value.trim()) {
+				error.hidden = true;
+				return;
+			}
+			try {
+				if (parts.length !== 3) throw new Error('A JWT has three parts separated by dots.');
+				const head = decodePart(parts[0]);
+				const body = decodePart(parts[1]);
+				header.textContent = JSON.stringify(head, null, 2);
+				payload.textContent = JSON.stringify(body, null, 2);
+				error.hidden = true;
+				const now = Date.now() / 1000;
+				Object.entries(CLAIMS).forEach(([claim, label]) => {
+					if (typeof body[claim] !== 'number') return;
+					const chip = document.createElement('span');
+					chip.className = 'jwt-time';
+					const expired = claim === 'exp' && body[claim] < now;
+					const pending = claim === 'nbf' && body[claim] > now;
+					chip.dataset.state = expired || pending ? 'bad' : 'ok';
+					chip.textContent = `${expired ? 'Expired' : label} ${relative(body[claim] - now)} · ${new Date(body[claim] * 1000).toLocaleString()}`;
+					times.append(chip);
+				});
+				const alg = document.createElement('span');
+				alg.className = 'jwt-time';
+				alg.dataset.state = head.alg === 'none' ? 'bad' : 'info';
+				alg.textContent = head.alg === 'none' ? 'alg: none — unsigned token' : `Signed with ${head.alg}`;
+				times.append(alg);
+			} catch (e) {
+				error.textContent = e instanceof SyntaxError || e instanceof DOMException ? 'This token is not valid base64url JSON.' : (e as Error).message;
+				error.hidden = false;
+			}
+		};
+
+		input.addEventListener('input', render);
+		copyButton(byId('jwt-copy-header'), () => header.textContent ?? '');
+		copyButton(byId('jwt-copy-payload'), () => payload.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.jwt-in {
+		min-height: 110px !important;
+	}
+	.jwt-part {
+		min-height: 160px !important;
+	}
+	.chips :global(.jwt-time) {
+		font-size: 13px;
+		font-weight: 600;
+		padding: 6px 12px;
+		border-radius: 999px;
+		background: var(--ok-bg);
+		color: var(--ok);
+	}
+	.chips :global(.jwt-time[data-state='bad']) {
+		background: var(--warn-bg);
+		color: var(--warn);
+	}
+	.chips :global(.jwt-time[data-state='info']) {
+		background: var(--accent);
+		color: var(--accent-strong);
+	}
+</style>
