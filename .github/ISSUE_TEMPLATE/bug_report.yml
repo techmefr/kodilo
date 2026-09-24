@@ -1,0 +1,30 @@
+name: Bug report
+description: A tool gives a wrong result, breaks or looks wrong.
+labels: [bug]
+body:
+  - type: input
+    id: tool
+    attributes:
+      label: Tool
+      description: Name or URL of the tool.
+      placeholder: https://techmefr.github.io/kodilo/tools/jwt-decoder/
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The input you used and what you clicked. Never paste real secrets, keys or personal data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual result
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: Firefox 131 on macOS, Chrome on Android
