@@ -40,6 +40,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'json-to-yaml',
+				built: true,
 				name: 'JSON to YAML',
 				description: 'Convert JSON to YAML.',
 			},
@@ -51,11 +52,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'json-diff',
+				built: true,
 				name: 'JSON Diff',
 				description: 'Compare two JSON documents and highlight what changed.',
 			},
 			{
 				slug: 'json-viewer',
+				built: true,
 				name: 'JSON Viewer',
 				description: 'Explore a JSON document as a collapsible tree.',
 			},
@@ -90,11 +93,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'css-grid-generator',
+				built: true,
 				name: 'CSS Grid Generator',
 				description: 'Build a CSS grid layout visually and copy the code.',
 			},
 			{
 				slug: 'flexbox-generator',
+				built: true,
 				name: 'Flexbox Generator',
 				description: 'Build a CSS flexbox layout visually and copy the code.',
 			},
@@ -149,6 +154,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'diff-checker',
+				built: true,
 				name: 'Diff Checker',
 				description: 'Compare two texts side by side.',
 			},
@@ -262,11 +268,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'rsa-key-pair-generator',
+				built: true,
 				name: 'RSA Key Pair Generator',
 				description: 'Generate an RSA public/private key pair.',
 			},
 			{
 				slug: 'text-encryption',
+				built: true,
 				name: 'Text Encryption',
 				description: 'Encrypt and decrypt text with AES and a passphrase.',
 			},
@@ -458,6 +466,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'image-compressor',
+				built: true,
 				name: 'Image Compressor',
 				description: 'Compress images without uploading them anywhere.',
 			},
@@ -558,6 +567,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'git-cheatsheet',
+				built: true,
 				name: 'Git Cheatsheet',
 				description: 'Quick reference for common Git commands.',
 			},

@@ -1,0 +1,239 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="image-compressor" title="Image Compressor" description="Shrink JPG, PNG and WebP images with a quality slider, an optional max width and a before/after comparison. Nothing is uploaded.">
+	<label class="drop" id="ic-tool">
+		<input type="file" id="ic-file" accept="image/*" multiple hidden />
+		<span>Drop images here or click to choose. A sample is loaded.</span>
+	</label>
+	<div class="toolbar">
+		<div class="seg" id="ic-format">
+			<button data-value="image/webp" aria-pressed="true">WebP</button>
+			<button data-value="image/jpeg">JPG</button>
+			<button data-value="same">Keep format</button>
+		</div>
+		<label class="check">Quality <input type="range" id="ic-q" min="10" max="100" value="75" /> <b id="ic-q-value">75</b></label>
+		<label class="check">Max width <input class="num" id="ic-max" type="number" min="0" placeholder="none" /></label>
+	</div>
+	<div class="stats" id="ic-stats"></div>
+	<ul class="ic-list" id="ic-list"></ul>
+	<div class="ic-compare" id="ic-compare" hidden>
+		<img id="ic-before" alt="Original" />
+		<div class="ic-after-wrap" id="ic-after-wrap"><img id="ic-after" alt="Compressed" /></div>
+		<input type="range" id="ic-split" min="0" max="100" value="50" aria-label="Compare before and after" />
+		<span class="ic-tag ic-tag-l">Original</span>
+		<span class="ic-tag ic-tag-r">Compressed</span>
+	</div>
+</ToolShell>
+
+<script>
+	import { humanSize, loadImage, render, sampleImage } from '../../scripts/image';
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	onPage('ic-tool', () => {
+		const q = byId<HTMLInputElement>('ic-q');
+		const max = byId<HTMLInputElement>('ic-max');
+		type Item = { name: string; file: Blob; img: HTMLImageElement; li: HTMLLIElement; url: string; out: number; src: string };
+		const items: Item[] = [];
+		let format = 'image/webp';
+		let current: Item | null = null;
+
+		const stats = () => {
+			const before = items.reduce((a, i) => a + i.file.size, 0);
+			const after = items.reduce((a, i) => a + i.out, 0);
+			const s: [string, string][] = [['Images', String(items.length)], ['Before', humanSize(before)], ['After', humanSize(after)], ['Saved', before ? `${Math.max(0, Math.round((1 - after / before) * 100))}%` : '—']];
+			byId('ic-stats').replaceChildren(
+				...s.map(([label, value]) => {
+					const el = document.createElement('div');
+					el.className = 'stat';
+					el.innerHTML = '<b></b><span></span>';
+					el.querySelector('b')!.textContent = value;
+					el.querySelector('span')!.textContent = label;
+					return el;
+				})
+			);
+		};
+
+		const select = (item: Item) => {
+			current = item;
+			byId('ic-compare').hidden = false;
+			byId<HTMLImageElement>('ic-before').src = item.src;
+			byId<HTMLImageElement>('ic-after').src = item.url;
+		};
+
+		const compress = async (item: Item) => {
+			const limit = Number(max.value) || 0;
+			const scale = limit && item.img.naturalWidth > limit ? limit / item.img.naturalWidth : 1;
+			const w = Math.round(item.img.naturalWidth * scale);
+			const h = Math.round(item.img.naturalHeight * scale);
+			const type = format === 'same' ? (['image/png', 'image/jpeg', 'image/webp'].includes(item.file.type) ? item.file.type : 'image/png') : format;
+			const blob = await render(item.img, w, h, type, Number(q.value) / 100, type === 'image/jpeg' ? '#ffffff' : undefined);
+			if (item.url) URL.revokeObjectURL(item.url);
+			item.url = URL.createObjectURL(blob);
+			item.out = blob.size;
+			const a = item.li.querySelector('a')!;
+			a.href = item.url;
+			a.download = `${item.name.replace(/\.[^.]+$/, '')}.${type.split('/')[1].replace('jpeg', 'jpg')}`;
+			const pct = Math.round((1 - blob.size / item.file.size) * 100);
+			item.li.querySelector('span')!.textContent = `${w} × ${h} · ${humanSize(item.file.size)} → ${humanSize(blob.size)} · ${pct >= 0 ? `−${pct}%` : `+${-pct}% (larger, try another format)`}`;
+			if (current === item) byId<HTMLImageElement>('ic-after').src = item.url;
+			stats();
+		};
+
+		const add = async (file: Blob, name: string) => {
+			try {
+				const img = await loadImage(file);
+				const li = document.createElement('li');
+				li.innerHTML = '<img alt="" /><div><b></b><span></span></div><a class="btn">Download</a>';
+				li.querySelector('b')!.textContent = name;
+				const src = img.src;
+				li.querySelector('img')!.src = src;
+				byId('ic-list').append(li);
+				const item: Item = { name, file, img, li, url: '', out: 0, src };
+				li.addEventListener('click', (e) => {
+					if (!(e.target as HTMLElement).closest('a')) select(item);
+				});
+				items.push(item);
+				await compress(item);
+				if (!current) select(item);
+			} catch (e) {
+				const li = document.createElement('li');
+				li.textContent = `${name}: ${(e as Error).message}`;
+				byId('ic-list').append(li);
+			}
+		};
+
+		const all = () => items.forEach(compress);
+		byId<HTMLInputElement>('ic-file').addEventListener('change', (e) => [...((e.target as HTMLInputElement).files ?? [])].forEach((f) => add(f, f.name)));
+		const drop = byId('ic-tool');
+		drop.addEventListener('dragover', (e) => {
+			e.preventDefault();
+			drop.classList.add('over');
+		});
+		drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+		drop.addEventListener('drop', (e) => {
+			e.preventDefault();
+			drop.classList.remove('over');
+			[...(e.dataTransfer?.files ?? [])].forEach((f) => add(f, f.name));
+		});
+		segmented(byId('ic-format'), (v) => ((format = v), all()));
+		q.addEventListener('input', () => {
+			byId('ic-q-value').textContent = q.value;
+			all();
+		});
+		max.addEventListener('input', all);
+		byId<HTMLInputElement>('ic-split').addEventListener('input', (e) => byId('ic-after-wrap').style.setProperty('--split', `${(e.target as HTMLInputElement).value}%`));
+		sampleImage().then((b) => add(b, 'sample.png'));
+	});
+</script>
+
+<style>
+	.drop {
+		display: grid;
+		place-items: center;
+		min-height: 90px;
+		border: 2px dashed var(--border);
+		border-radius: 14px;
+		background: var(--surface);
+		color: var(--ink-soft);
+		font-size: 14px;
+		text-align: center;
+		padding: 16px;
+		cursor: pointer;
+	}
+	.drop:global(.over) {
+		border-color: var(--accent-strong);
+		background: var(--accent);
+	}
+	#ic-q {
+		accent-color: var(--accent-strong);
+	}
+	.ic-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 8px;
+	}
+	.ic-list :global(li) {
+		display: grid;
+		grid-template-columns: 64px 1fr auto;
+		gap: 12px;
+		align-items: center;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		padding: 8px 12px;
+		cursor: pointer;
+	}
+	.ic-list :global(img) {
+		width: 64px;
+		height: 48px;
+		object-fit: cover;
+		border-radius: 6px;
+	}
+	.ic-list :global(div) {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+	.ic-list :global(b) {
+		font-size: 14px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.ic-list :global(span) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.ic-list :global(a) {
+		text-decoration: none;
+	}
+	.ic-compare {
+		position: relative;
+		border-radius: 14px;
+		overflow: hidden;
+		border: 1px solid var(--border);
+		max-width: 100%;
+	}
+	.ic-compare > img,
+	.ic-after-wrap img {
+		display: block;
+		width: 100%;
+	}
+	.ic-after-wrap {
+		--split: 50%;
+		position: absolute;
+		inset: 0;
+		clip-path: inset(0 0 0 var(--split));
+		border-left: 2px solid #fff;
+	}
+	#ic-split {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+		cursor: ew-resize;
+		margin: 0;
+	}
+	.ic-tag {
+		position: absolute;
+		top: 10px;
+		padding: 3px 8px;
+		border-radius: 999px;
+		background: rgba(0, 0, 0, 0.55);
+		color: #fff;
+		font-size: 12px;
+		pointer-events: none;
+	}
+	.ic-tag-l {
+		left: 10px;
+	}
+	.ic-tag-r {
+		right: 10px;
+	}
+</style>

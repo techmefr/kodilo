@@ -1,0 +1,199 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="css-grid-generator" title="CSS Grid Generator" description="Define columns, rows and gaps, drag across cells to place named areas, then copy the grid CSS.">
+	<div class="fields" id="cg-tool">
+		<div class="field"><label for="cg-cols">Columns</label><input id="cg-cols" spellcheck="false" value="200px 1fr 1fr" /></div>
+		<div class="field"><label for="cg-rows">Rows</label><input id="cg-rows" spellcheck="false" value="auto 1fr auto" /></div>
+		<div class="field"><label for="cg-gap">Gap</label><input id="cg-gap" spellcheck="false" value="12px" /></div>
+	</div>
+	<div class="chips" id="cg-presets">
+		<button data-cols="200px 1fr 1fr" data-rows="auto 1fr auto" data-areas="header header header|sidebar main main|footer footer footer">Holy grail</button>
+		<button data-cols="repeat(3, 1fr)" data-rows="auto" data-areas="">3 equal columns</button>
+		<button data-cols="repeat(auto-fill, minmax(160px, 1fr))" data-rows="auto" data-areas="">Responsive cards</button>
+		<button data-cols="1fr 300px" data-rows="auto 1fr" data-areas="header header|main aside">Content + aside</button>
+	</div>
+	<div class="toolbar">
+		<label class="check">Area name <input class="cg-name" id="cg-name" spellcheck="false" value="main" /></label>
+		<span class="cg-hint">Drag across cells to assign them to this area.</span>
+		<button class="btn" id="cg-clear">Clear areas</button>
+	</div>
+	<div class="cg-stage" id="cg-stage"></div>
+	<p class="error" id="cg-error" hidden></p>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="cg-copy">Copy</button>
+		</div>
+		<pre class="out" id="cg-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const tracks = (s: string) => {
+		const out: string[] = [];
+		let depth = 0;
+		let cur = '';
+		for (const c of s.trim()) {
+			if (c === '(') depth++;
+			if (c === ')') depth--;
+			if (/\s/.test(c) && !depth) {
+				if (cur) out.push(cur);
+				cur = '';
+			} else cur += c;
+		}
+		if (cur) out.push(cur);
+		return out;
+	};
+	const count = (s: string) => {
+		const m = s.match(/^repeat\((\d+),/);
+		if (m) return Number(m[1]);
+		if (/^repeat\(auto-(fill|fit)/.test(s)) return 4;
+		return tracks(s).reduce((a, t) => a + (Number(t.match(/^repeat\((\d+),/)?.[1]) || 1), 0);
+	};
+	const HUES = [262, 330, 190, 140, 30, 60, 0, 220];
+
+	onPage('cg-tool', () => {
+		const cols = byId<HTMLInputElement>('cg-cols');
+		const rows = byId<HTMLInputElement>('cg-rows');
+		const gap = byId<HTMLInputElement>('cg-gap');
+		const name = byId<HTMLInputElement>('cg-name');
+		const stage = byId('cg-stage');
+		let grid: string[][] = [];
+		let dragStart: [number, number] | null = null;
+
+		const load = (areas: string) => {
+			const nc = count(cols.value);
+			const nr = count(rows.value);
+			const src = areas ? areas.split('|').map((r) => r.split(' ')) : [];
+			grid = Array.from({ length: nr }, (_, r) => Array.from({ length: nc }, (_, c) => src[r]?.[c] ?? '.'));
+		};
+
+		const render = () => {
+			const nc = count(cols.value);
+			const nr = count(rows.value);
+			const valid = CSS.supports('grid-template-columns', cols.value) && CSS.supports('grid-template-rows', rows.value) && CSS.supports('gap', gap.value);
+			byId('cg-error').hidden = valid;
+			byId('cg-error').textContent = 'One of the track lists or the gap is not valid CSS.';
+			if (!valid) return;
+			grid = Array.from({ length: nr }, (_, r) => Array.from({ length: nc }, (_, c) => grid[r]?.[c] ?? '.'));
+			stage.style.gridTemplateColumns = cols.value;
+			stage.style.gridTemplateRows = rows.value;
+			stage.style.gap = gap.value;
+			const names = [...new Set(grid.flat().filter((n) => n !== '.'))];
+			const cells: HTMLElement[] = [];
+			grid.forEach((row, r) =>
+				row.forEach((area, c) => {
+					const el = document.createElement('div');
+					el.className = 'cg-cell';
+					el.dataset.r = String(r);
+					el.dataset.c = String(c);
+					if (area !== '.') {
+						el.textContent = area;
+						el.style.background = `hsl(${HUES[names.indexOf(area) % HUES.length]} 70% 60% / 0.35)`;
+					}
+					cells.push(el);
+				})
+			);
+			stage.replaceChildren(...cells);
+			const hasAreas = names.length > 0;
+			const rect = names.every((n) => {
+				const pos = grid.flatMap((row, r) => row.map((a, c) => [a, r, c] as const)).filter(([a]) => a === n);
+				const rs = pos.map((p) => p[1]);
+				const cs = pos.map((p) => p[2]);
+				return pos.length === (Math.max(...rs) - Math.min(...rs) + 1) * (Math.max(...cs) - Math.min(...cs) + 1);
+			});
+			const lines = ['.container {', '  display: grid;', `  grid-template-columns: ${cols.value.trim()};`, `  grid-template-rows: ${rows.value.trim()};`, `  gap: ${gap.value.trim()};`];
+			if (hasAreas) {
+				const width = Math.max(...grid.flat().map((a) => a.length));
+				lines.push('  grid-template-areas:', ...grid.map((row, i) => `    "${row.map((a) => a.padEnd(width)).join(' ').trimEnd()}"${i === grid.length - 1 ? ';' : ''}`));
+			}
+			lines.push('}');
+			names.forEach((n) => lines.push('', `.${n} {`, `  grid-area: ${n};`, '}'));
+			byId('cg-out').textContent = lines.join('\n');
+			byId('cg-error').hidden = rect;
+			if (!rect) byId('cg-error').textContent = 'Each area must form a rectangle, otherwise browsers ignore grid-template-areas.';
+		};
+
+		const cellAt = (e: PointerEvent): [number, number] | null => {
+			const el = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>('.cg-cell');
+			return el ? [Number(el.dataset.r), Number(el.dataset.c)] : null;
+		};
+		const paint = (to: [number, number]) => {
+			if (!dragStart) return;
+			const [r0, c0] = dragStart;
+			const n = name.value.trim().replace(/[^\w-]/g, '') || '.';
+			for (let r = Math.min(r0, to[0]); r <= Math.max(r0, to[0]); r++) for (let c = Math.min(c0, to[1]); c <= Math.max(c0, to[1]); c++) grid[r][c] = n;
+			render();
+		};
+		stage.addEventListener('pointerdown', (e) => {
+			dragStart = cellAt(e);
+			if (dragStart) paint(dragStart);
+		});
+		stage.addEventListener('pointermove', (e) => {
+			if (!dragStart || !e.buttons) return;
+			const to = cellAt(e);
+			if (to) paint(to);
+		});
+		window.addEventListener('pointerup', () => (dragStart = null));
+
+		[cols, rows, gap].forEach((el) => el.addEventListener('input', render));
+		byId('cg-clear').addEventListener('click', () => {
+			load('');
+			render();
+		});
+		document.querySelectorAll<HTMLButtonElement>('#cg-presets button').forEach((b) =>
+			b.addEventListener('click', () => {
+				cols.value = b.dataset.cols!;
+				rows.value = b.dataset.rows!;
+				load(b.dataset.areas!);
+				render();
+			})
+		);
+		copyButton(byId('cg-copy'), () => byId('cg-out').textContent ?? '');
+		load('header header header|sidebar main main|footer footer footer');
+		render();
+	});
+</script>
+
+<style>
+	.cg-name {
+		width: 120px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 6px 10px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: var(--mono);
+	}
+	.cg-hint {
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.cg-stage {
+		display: grid;
+		min-height: 260px;
+		padding: 12px;
+		border: 2px dashed var(--border);
+		border-radius: 14px;
+		background: var(--surface);
+		user-select: none;
+		touch-action: none;
+		overflow-x: auto;
+	}
+	.cg-stage :global(.cg-cell) {
+		min-height: 60px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface-2);
+		display: grid;
+		place-items: center;
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+		cursor: crosshair;
+	}
+</style>

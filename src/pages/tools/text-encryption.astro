@@ -1,0 +1,129 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="text-encryption" title="Text Encryption" description="Encrypt and decrypt text with AES-256-GCM and a passphrase (PBKDF2-SHA-256, 600,000 iterations). Runs entirely in your browser.">
+	<div class="toolbar" id="te-tool">
+		<div class="seg" id="te-mode">
+			<button data-value="encrypt" aria-pressed="true">Encrypt</button>
+			<button data-value="decrypt">Decrypt</button>
+		</div>
+		<label class="check">Passphrase <input class="te-pass" id="te-pass" type="password" value="correct horse battery staple" autocomplete="off" /></label>
+		<label class="check"><input type="checkbox" id="te-show" /> Show</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head" id="te-in-label">Plain text</div>
+			<textarea id="te-in" spellcheck="false" aria-label="Input">Meet me at the usual place at 7.</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="te-out-label">Encrypted · Base64</span>
+				<button class="btn" id="te-copy">Copy</button>
+			</div>
+			<pre class="out te-out" id="te-out"></pre>
+		</section>
+	</div>
+	<p class="error" id="te-error" hidden></p>
+	<p class="te-note">The output bundles a random salt (16 bytes), a random IV (12 bytes) and the ciphertext with its authentication tag. The same text encrypts differently every time. Losing the passphrase means losing the data.</p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const ITER = 600000;
+	const enc = new TextEncoder();
+
+	const key = async (pass: string, salt: Uint8Array) => {
+		const base = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveKey']);
+		return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: ITER, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+	};
+	const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+	const unb64 = (s: string) => Uint8Array.from(atob(s.replace(/\s/g, '')), (c) => c.charCodeAt(0));
+
+	onPage('te-tool', () => {
+		const pass = byId<HTMLInputElement>('te-pass');
+		const input = byId<HTMLTextAreaElement>('te-in');
+		const out = byId('te-out');
+		const error = byId('te-error');
+		let mode = 'encrypt';
+		let run = 0;
+		let timer: number | undefined;
+
+		const render = async () => {
+			const id = ++run;
+			try {
+				if (!pass.value) throw new Error('Enter a passphrase.');
+				if (mode === 'encrypt') {
+					const salt = crypto.getRandomValues(new Uint8Array(16));
+					const iv = crypto.getRandomValues(new Uint8Array(12));
+					const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await key(pass.value, salt), enc.encode(input.value)));
+					const all = new Uint8Array(28 + ct.length);
+					all.set(salt);
+					all.set(iv, 16);
+					all.set(ct, 28);
+					if (id === run) out.textContent = b64(all);
+				} else {
+					let all: Uint8Array;
+					try {
+						all = unb64(input.value);
+					} catch {
+						throw new Error('The input is not valid Base64.');
+					}
+					if (all.length < 29) throw new Error('The input is too short to be kodilo ciphertext.');
+					try {
+						const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: all.slice(16, 28) }, await key(pass.value, all.slice(0, 16)), all.slice(28));
+						if (id === run) out.textContent = new TextDecoder().decode(pt);
+					} catch {
+						throw new Error('Wrong passphrase, or the ciphertext was modified.');
+					}
+				}
+				if (id === run) error.hidden = true;
+			} catch (e) {
+				if (id !== run) return;
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+				out.textContent = '';
+			}
+		};
+		const schedule = () => {
+			clearTimeout(timer);
+			timer = window.setTimeout(render, 250);
+		};
+
+		segmented(byId('te-mode'), (v) => {
+			if (v !== mode && out.textContent) input.value = out.textContent;
+			mode = v;
+			byId('te-in-label').textContent = v === 'encrypt' ? 'Plain text' : 'Encrypted · Base64';
+			byId('te-out-label').textContent = v === 'encrypt' ? 'Encrypted · Base64' : 'Plain text';
+			render();
+		});
+		byId<HTMLInputElement>('te-show').addEventListener('input', (e) => (pass.type = (e.target as HTMLInputElement).checked ? 'text' : 'password'));
+		[pass, input].forEach((el) => el.addEventListener('input', schedule));
+		copyButton(byId('te-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.te-pass {
+		width: 260px;
+		max-width: 100%;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 6px 10px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: var(--mono);
+	}
+	.te-out {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	.te-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+		max-width: 70ch;
+	}
+</style>

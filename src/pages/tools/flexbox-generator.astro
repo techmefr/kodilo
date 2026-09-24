@@ -1,0 +1,184 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const controls: [string, string, string[]][] = [
+	['direction', 'flex-direction', ['row', 'row-reverse', 'column', 'column-reverse']],
+	['wrap', 'flex-wrap', ['nowrap', 'wrap', 'wrap-reverse']],
+	['justify', 'justify-content', ['flex-start', 'center', 'flex-end', 'space-between', 'space-around', 'space-evenly']],
+	['align', 'align-items', ['stretch', 'flex-start', 'center', 'flex-end', 'baseline']],
+	['content', 'align-content', ['normal', 'flex-start', 'center', 'flex-end', 'space-between', 'stretch']],
+];
+---
+
+<ToolShell slug="flexbox-generator" title="Flexbox Generator" description="Set up a flex container visually, tweak each item's grow, shrink and basis, then copy the CSS.">
+	<div class="fb-controls" id="fb-tool">
+		{
+			controls.map(([id, prop, values]) => (
+				<div class="fb-control">
+					<span>{prop}</span>
+					<div class="seg" id={`fb-${id}`} data-prop={prop}>
+						{values.map((v, i) => (
+							<button data-value={v} aria-pressed={i === (id === 'justify' ? 3 : id === 'align' ? 2 : id === 'wrap' ? 1 : 0) ? 'true' : 'false'}>
+								{v}
+							</button>
+						))}
+					</div>
+				</div>
+			))
+		}
+		<div class="toolbar">
+			<label class="check">gap <input class="num" id="fb-gap" type="number" min="0" max="64" value="12" /> px</label>
+			<label class="check">Items <input class="num" id="fb-count" type="number" min="1" max="12" value="5" /></label>
+		</div>
+	</div>
+	<div class="fb-stage" id="fb-stage"></div>
+	<p class="fb-hint">Click an item to edit its flex properties.</p>
+	<div class="toolbar" id="fb-item" hidden>
+		<b id="fb-item-name"></b>
+		<label class="check">grow <input class="num" id="fb-grow" type="number" min="0" max="10" /></label>
+		<label class="check">shrink <input class="num" id="fb-shrink" type="number" min="0" max="10" /></label>
+		<label class="check">basis <input class="fb-basis" id="fb-basis" spellcheck="false" /></label>
+		<label class="check">order <input class="num" id="fb-order" type="number" min="-10" max="10" /></label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="fb-copy">Copy</button>
+		</div>
+		<pre class="out" id="fb-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Item = { grow: number; shrink: number; basis: string; order: number };
+
+	onPage('fb-tool', () => {
+		const stage = byId('fb-stage');
+		const props: Record<string, string> = {};
+		document.querySelectorAll<HTMLElement>('.fb-control .seg').forEach((seg) => {
+			props[seg.dataset.prop!] = seg.querySelector<HTMLElement>('[aria-pressed="true"]')!.dataset.value!;
+			segmented(seg, (v) => {
+				props[seg.dataset.prop!] = v;
+				render();
+			});
+		});
+		const items: Item[] = Array.from({ length: 12 }, () => ({ grow: 0, shrink: 1, basis: 'auto', order: 0 }));
+		items[1].grow = 1;
+		let selected = -1;
+
+		const render = () => {
+			const count = Math.min(12, Math.max(1, Number(byId<HTMLInputElement>('fb-count').value) || 1));
+			const gap = `${Math.max(0, Number(byId<HTMLInputElement>('fb-gap').value) || 0)}px`;
+			Object.entries(props).forEach(([k, v]) => stage.style.setProperty(k, v));
+			stage.style.gap = gap;
+			stage.replaceChildren(
+				...items.slice(0, count).map((it, i) => {
+					const el = document.createElement('button');
+					el.className = `fb-box${i === selected ? ' fb-selected' : ''}`;
+					el.textContent = String(i + 1);
+					el.style.flex = `${it.grow} ${it.shrink} ${it.basis}`;
+					el.style.order = String(it.order);
+					el.style.minHeight = `${40 + (i % 3) * 18}px`;
+					el.addEventListener('click', () => {
+						selected = i;
+						edit();
+						render();
+					});
+					return el;
+				})
+			);
+			const container = [`.container {`, `  display: flex;`, ...Object.entries(props).filter(([k, v]) => !(k === 'align-content' && v === 'normal') && !(k === 'flex-direction' && v === 'row') && !(k === 'flex-wrap' && v === 'nowrap')).map(([k, v]) => `  ${k}: ${v};`), `  gap: ${gap};`, '}'];
+			const custom = items
+				.slice(0, count)
+				.map((it, i) => [i, it] as const)
+				.filter(([, it]) => it.grow !== 0 || it.shrink !== 1 || it.basis !== 'auto' || it.order !== 0)
+				.map(([i, it]) => `\n.item:nth-child(${i + 1}) {\n  flex: ${it.grow} ${it.shrink} ${it.basis};${it.order ? `\n  order: ${it.order};` : ''}\n}`);
+			byId('fb-out').textContent = container.join('\n') + custom.join('\n');
+		};
+
+		const edit = () => {
+			const it = items[selected];
+			byId('fb-item').hidden = false;
+			byId('fb-item-name').textContent = `Item ${selected + 1}`;
+			byId<HTMLInputElement>('fb-grow').value = String(it.grow);
+			byId<HTMLInputElement>('fb-shrink').value = String(it.shrink);
+			byId<HTMLInputElement>('fb-basis').value = it.basis;
+			byId<HTMLInputElement>('fb-order').value = String(it.order);
+		};
+
+		(['grow', 'shrink', 'order'] as const).forEach((k) =>
+			byId(`fb-${k}`).addEventListener('input', (e) => {
+				if (selected < 0) return;
+				items[selected][k] = Number((e.target as HTMLInputElement).value) || 0;
+				render();
+			})
+		);
+		byId('fb-basis').addEventListener('input', (e) => {
+			if (selected < 0) return;
+			const v = (e.target as HTMLInputElement).value.trim() || 'auto';
+			items[selected].basis = CSS.supports('flex-basis', v) ? v : 'auto';
+			render();
+		});
+		['fb-gap', 'fb-count'].forEach((id) => byId(id).addEventListener('input', render));
+		copyButton(byId('fb-copy'), () => byId('fb-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.fb-controls {
+		display: grid;
+		gap: 10px;
+	}
+	.fb-control {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px;
+	}
+	.fb-control > span {
+		width: 130px;
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+	}
+	.fb-stage {
+		display: flex;
+		min-height: 240px;
+		padding: 14px;
+		border: 2px dashed var(--border);
+		border-radius: 14px;
+		background: var(--surface);
+	}
+	.fb-stage :global(.fb-box) {
+		min-width: 48px;
+		border: 0;
+		border-radius: 10px;
+		background: var(--accent-strong);
+		color: var(--accent-ink);
+		font: inherit;
+		font-weight: 800;
+		cursor: pointer;
+		padding: 8px 12px;
+	}
+	.fb-stage :global(.fb-selected) {
+		outline: 3px solid var(--warn);
+		outline-offset: 2px;
+	}
+	.fb-hint {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.fb-basis {
+		width: 90px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 5px 8px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: var(--mono);
+	}
+</style>

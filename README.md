@@ -79,6 +79,16 @@ Live at **https://techmefr.github.io/kodilo/**
 - **Pomodoro Timer** (`/tools/pomodoro-timer/`) — focus and break intervals with sound
 - **Image Resizer** (`/tools/image-resizer/`) — resize by pixels or percentage, PNG/JPG/WebP
 - **PNG to JPG Converter** (`/tools/png-to-jpg/`) — batch PNG to JPG with quality and background
+- **JSON to YAML** (`/tools/json-to-yaml/`) — safe quoting, block strings, JSON Lines as multi-doc
+- **JSON Diff** (`/tools/json-diff/`) — structural diff with paths, optional unordered arrays
+- **JSON Viewer** (`/tools/json-viewer/`) — collapsible tree, search, click to copy a path
+- **Diff Checker** (`/tools/diff-checker/`) — line and word diff, split or unified
+- **Flexbox Generator** (`/tools/flexbox-generator/`) — visual flex container and per-item settings
+- **CSS Grid Generator** (`/tools/css-grid-generator/`) — tracks, gaps and drag-painted named areas
+- **Text Encryption** (`/tools/text-encryption/`) — AES-256-GCM with a PBKDF2 passphrase
+- **RSA Key Pair Generator** (`/tools/rsa-key-pair-generator/`) — PEM or JWK, 2048 to 4096 bits
+- **Image Compressor** (`/tools/image-compressor/`) — quality, max width, before/after slider
+- **Git Cheatsheet** (`/tools/git-cheatsheet/`) — commands by task, click to copy
 - More tools land as separate categories in the sidebar — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -88,15 +98,10 @@ No sign-up, no account, no tracking. Every tool runs entirely client-side.
 Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 
 **JSON**
-- JSON to YAML
-- JSON Diff
-- JSON Viewer
 
 **HTML / CSS**
 - HTML Formatter
 - CSS Formatter & Minifier
-- CSS Grid Generator
-- Flexbox Generator
 
 **Markdown**
 - Markdown to HTML
@@ -105,12 +110,9 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **SEO**
 
 **Text**
-- Diff Checker
 
 **Encoding & Security**
 - Bcrypt
-- RSA Key Pair Generator
-- Text Encryption
 - BIP39 Generator
 
 **Generators**
@@ -126,7 +128,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **Validators**
 
 **Images**
-- Image Compressor
 
 **PDF**
 - PDF Merge
@@ -140,7 +141,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - Math Evaluator
 - REST API Tester
 - Docker Cheatsheet
-- Git Cheatsheet
 - NPM Cheatsheet
 
 **DevOps & Sysadmin**

@@ -1,0 +1,180 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = JSON.stringify(
+	{
+		user: { id: 42, name: 'Ada Lovelace', email: 'ada@example.com', verified: true, tags: ['admin', 'math'] },
+		orders: [
+			{ id: 'A-1041', total: 129.9, items: 3, shipped: true },
+			{ id: 'A-1042', total: 18.5, items: 1, shipped: false, coupon: null },
+		],
+		meta: { page: 1, perPage: 20, total: 2 },
+	},
+	null,
+	2
+);
+---
+
+<ToolShell slug="json-viewer" title="JSON Viewer" description="Explore a JSON document as a collapsible tree. Search keys and values, click a node to copy its path.">
+	<div class="toolbar" id="jv-tool">
+		<input class="jv-search" id="jv-q" type="search" placeholder="Search keys or values" aria-label="Search" />
+		<button class="btn" id="jv-expand">Expand all</button>
+		<button class="btn" id="jv-collapse">Collapse all</button>
+	</div>
+	<div class="grid-2 jv-grid">
+		<section class="panel">
+			<div class="panel-head">JSON</div>
+			<textarea id="jv-in" spellcheck="false" aria-label="JSON input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="jv-path">Click a node to copy its path</span>
+			</div>
+			<div class="jv-tree" id="jv-tree"></div>
+		</section>
+	</div>
+	<p class="error" id="jv-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const childPath = (base: string, k: string | number) => (typeof k === 'number' ? `${base}[${k}]` : /^[A-Za-z_$][\w$]*$/.test(k) ? `${base}.${k}` : `${base}[${JSON.stringify(k)}]`);
+
+	function node(key: string | number | null, value: unknown, path: string, term: string): HTMLElement {
+		const isObj = value !== null && typeof value === 'object';
+		const row = document.createElement('div');
+		row.className = 'jv-row';
+		const label = document.createElement('button');
+		label.className = 'jv-label';
+		label.dataset.path = path;
+		if (key !== null) {
+			const k = document.createElement('span');
+			k.className = 'jv-key';
+			k.textContent = typeof key === 'number' ? String(key) : `"${key}"`;
+			label.append(k, ': ');
+		}
+		if (!isObj) {
+			const v = document.createElement('span');
+			v.className = `jv-${value === null ? 'null' : typeof value}`;
+			v.textContent = JSON.stringify(value);
+			label.append(v);
+			row.append(label);
+			if (term && `${key} ${JSON.stringify(value)}`.toLowerCase().includes(term)) row.classList.add('jv-hit');
+			return row;
+		}
+		const entries: [string | number, unknown][] = Array.isArray(value) ? value.map((v, i) => [i, v]) : Object.entries(value as object);
+		const details = document.createElement('details');
+		details.open = true;
+		const summary = document.createElement('summary');
+		const count = document.createElement('span');
+		count.className = 'jv-count';
+		count.textContent = Array.isArray(value) ? `[${entries.length}]` : `{${entries.length}}`;
+		label.append(count);
+		summary.append(label);
+		details.append(summary);
+		const children = document.createElement('div');
+		children.className = 'jv-children';
+		entries.forEach(([k, v]) => children.append(node(k, v, childPath(path, k), term)));
+		details.append(children);
+		if (term && String(key).toLowerCase().includes(term)) row.classList.add('jv-hit');
+		row.append(details);
+		return row;
+	}
+
+	onPage('jv-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jv-in');
+		const q = byId<HTMLInputElement>('jv-q');
+		const tree = byId('jv-tree');
+
+		const render = () => {
+			const error = byId('jv-error');
+			try {
+				const data = JSON.parse(input.value);
+				tree.replaceChildren(node(null, data, '$', q.value.trim().toLowerCase()));
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+			}
+		};
+
+		tree.addEventListener('click', (e) => {
+			const label = (e.target as HTMLElement).closest<HTMLElement>('.jv-label');
+			if (!label) return;
+			if (label.closest('summary') && (e.target as HTMLElement).closest('.jv-count')) return;
+			e.preventDefault();
+			navigator.clipboard.writeText(label.dataset.path!);
+			byId('jv-path').textContent = `Copied ${label.dataset.path}`;
+		});
+		byId('jv-expand').addEventListener('click', () => tree.querySelectorAll('details').forEach((d) => (d.open = true)));
+		byId('jv-collapse').addEventListener('click', () => tree.querySelectorAll('details').forEach((d, i) => (d.open = i === 0)));
+		[input, q].forEach((el) => el.addEventListener('input', render));
+		render();
+	});
+</script>
+
+<style>
+	.jv-search {
+		flex: 1 1 220px;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 8px 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font: inherit;
+	}
+	.jv-grid textarea {
+		min-height: 360px;
+	}
+	.jv-tree {
+		padding: 10px 12px;
+		font-family: var(--mono);
+		font-size: 13px;
+		max-height: 520px;
+		overflow: auto;
+	}
+	.jv-tree :global(.jv-children) {
+		padding-left: 18px;
+		border-left: 1px solid var(--border);
+		margin-left: 6px;
+	}
+	.jv-tree :global(summary) {
+		cursor: pointer;
+		list-style-position: outside;
+	}
+	.jv-tree :global(.jv-label) {
+		background: none;
+		border: 0;
+		padding: 2px 4px;
+		border-radius: 4px;
+		font: inherit;
+		color: var(--ink);
+		cursor: copy;
+		text-align: left;
+	}
+	.jv-tree :global(.jv-label:hover) {
+		background: var(--surface-2);
+	}
+	.jv-tree :global(.jv-key) {
+		color: var(--accent-strong);
+	}
+	.jv-tree :global(.jv-string) {
+		color: var(--ok);
+	}
+	.jv-tree :global(.jv-number) {
+		color: var(--warn);
+	}
+	.jv-tree :global(.jv-boolean),
+	.jv-tree :global(.jv-null) {
+		color: #ff79c6;
+	}
+	.jv-tree :global(.jv-count) {
+		color: var(--ink-soft);
+	}
+	.jv-tree :global(.jv-hit > .jv-label),
+	.jv-tree :global(.jv-hit > details > summary > .jv-label) {
+		background: var(--accent);
+		outline: 1px solid var(--accent-strong);
+	}
+</style>
