@@ -1,0 +1,130 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="pdf-compress" title="PDF Compress" description="Shrink a PDF in your browser. Lossless mode repacks the file; image mode re-renders every page as a JPEG, which is much smaller but turns text into pixels.">
+	<label class="drop" id="pc-tool">
+		<input type="file" id="pc-file" accept="application/pdf" hidden />
+		<span id="pc-drop">Drop a PDF here or click to choose. A sample is loaded.</span>
+	</label>
+	<div class="toolbar">
+		<div class="seg" id="pc-mode" aria-label="Mode">
+			<button data-value="lossless" aria-pressed="false">Lossless</button>
+			<button data-value="image" aria-pressed="true">Pages as images</button>
+		</div>
+		<div class="seg" id="pc-level" aria-label="Level">
+			<button data-value="72,0.5" aria-pressed="false">Smallest</button>
+			<button data-value="110,0.65" aria-pressed="true">Balanced</button>
+			<button data-value="150,0.8" aria-pressed="false">Sharp</button>
+		</div>
+		<button class="btn primary" id="pc-go">Compress</button>
+	</div>
+	<div class="stats">
+		<div class="stat"><b id="pc-before">—</b><span>Original</span></div>
+		<div class="stat"><b id="pc-after">—</b><span>Compressed</span></div>
+		<div class="stat"><b id="pc-saved">—</b><span>Saved</span></div>
+	</div>
+	<div class="toolbar">
+		<button class="btn" id="pc-save" disabled>Download</button>
+		<span class="field-note" id="pc-note"></span>
+	</div>
+	<p class="error" id="pc-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { PDFDocument } from 'pdf-lib';
+	import { downloadBytes, humanBytes } from '../../scripts/pdf';
+	import { samplePdf } from '../../scripts/pdf-sample';
+	import { canvasBytes, openPdf, renderPage } from '../../scripts/pdfjs';
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	onPage('pc-tool', () => {
+		let src: Uint8Array | null = null;
+		let result: Uint8Array | null = null;
+		let name = 'sample';
+		let mode = 'image';
+		let level = [110, 0.65];
+		const note = byId('pc-note');
+
+		const compress = async () => {
+			if (!src) return;
+			note.textContent = 'Compressing…';
+			byId<HTMLButtonElement>('pc-save').disabled = true;
+			try {
+				if (mode === 'lossless') {
+					const doc = await PDFDocument.load(src, { ignoreEncryption: true });
+					result = await doc.save({ useObjectStreams: true });
+				} else {
+					const pdf = await openPdf(src);
+					const out = await PDFDocument.create();
+					for (let n = 1; n <= pdf.numPages; n++) {
+						const page = await pdf.getPage(n);
+						const vp = page.getViewport({ scale: 1 });
+						const canvas = await renderPage(pdf, n, level[0] / 72);
+						const img = await out.embedJpg(await canvasBytes(canvas, 'image/jpeg', level[1]));
+						out.addPage([vp.width, vp.height]).drawImage(img, { x: 0, y: 0, width: vp.width, height: vp.height });
+						note.textContent = `Page ${n} of ${pdf.numPages}…`;
+					}
+					result = await out.save();
+				}
+				byId('pc-after').textContent = humanBytes(result.length);
+				const saved = 1 - result.length / src.length;
+				byId('pc-saved').textContent = saved > 0 ? `${Math.round(saved * 100)}%` : '0%';
+				note.textContent = saved > 0 ? '' : 'This file is already compact; the original is smaller.';
+				byId<HTMLButtonElement>('pc-save').disabled = saved <= 0;
+			} catch {
+				note.textContent = '';
+				const e = byId('pc-error');
+				e.hidden = false;
+				e.textContent = 'This PDF could not be compressed. It may be encrypted or damaged.';
+			}
+		};
+
+		const load = (b: Uint8Array, n: string) => {
+			src = b;
+			name = n.replace(/\.pdf$/i, '');
+			byId('pc-error').hidden = true;
+			byId('pc-drop').textContent = `${n}. Drop another PDF to replace it.`;
+			byId('pc-before').textContent = humanBytes(b.length);
+			compress();
+		};
+
+		const zone = byId('pc-tool');
+		const input = byId<HTMLInputElement>('pc-file');
+		const take = async (f?: File) => f && load(new Uint8Array(await f.arrayBuffer()), f.name);
+		input.addEventListener('change', () => take(input.files?.[0]));
+		zone.addEventListener('dragover', (e) => (e.preventDefault(), zone.classList.add('over')));
+		zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+		zone.addEventListener('drop', (e) => {
+			e.preventDefault();
+			zone.classList.remove('over');
+			take(e.dataTransfer?.files[0]);
+		});
+		segmented(byId('pc-mode'), (v) => {
+			mode = v;
+			byId('pc-level').hidden = v === 'lossless';
+			compress();
+		});
+		segmented(byId('pc-level'), (v) => {
+			level = v.split(',').map(Number);
+			compress();
+		});
+		byId('pc-go').addEventListener('click', compress);
+		byId('pc-save').addEventListener('click', () => result && downloadBytes(result, `${name}-compressed.pdf`));
+
+		(async () => {
+			const c = document.createElement('canvas');
+			c.width = 2400;
+			c.height = 1600;
+			const g = c.getContext('2d')!;
+			for (let i = 0; i < 4000; i++) {
+				g.fillStyle = `hsl(${Math.random() * 360} 70% 55%)`;
+				g.fillRect(Math.random() * 2400, Math.random() * 1600, 40, 40);
+			}
+			const doc = await PDFDocument.load(await samplePdf(2));
+			const img = await doc.embedPng(await canvasBytes(c, 'image/png', 1));
+			doc.getPage(0).drawImage(img, { x: 50, y: 60, width: 495, height: 330 });
+			load(await doc.save(), 'sample.pdf');
+		})();
+	});
+</script>

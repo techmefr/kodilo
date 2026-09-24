@@ -1,0 +1,117 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="mac-address-lookup" title="MAC Address Lookup" description="Find the manufacturer behind a MAC address from the IEEE OUI registry, bundled in the page. Paste one address or a whole list.">
+	<section class="panel" id="ml-tool">
+		<div class="panel-head">MAC addresses, one per line</div>
+		<textarea id="ml-in" spellcheck="false" aria-label="MAC addresses">3C:22:FB:12:34:56
+00-1A-11-AB-CD-EF
+b827.eb12.3456
+02:42:ac:11:00:02</textarea>
+	</section>
+	<p class="field-note" id="ml-note">Loading the vendor registry…</p>
+	<ul class="ml-list" id="ml-list"></ul>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	let registry: Promise<Record<string, string>> | null = null;
+	const load = () => (registry ??= import('oui-data').then((m) => m.default as Record<string, string>));
+
+	onPage('ml-tool', () => {
+		const input = byId<HTMLTextAreaElement>('ml-in');
+		let db: Record<string, string> = {};
+
+		const render = () => {
+			const lines = input.value.split('\n').map((l) => l.trim()).filter(Boolean);
+			byId('ml-list').replaceChildren(
+				...lines.map((line) => {
+					const hex = line.replace(/[^0-9a-f]/gi, '').toUpperCase();
+					const li = document.createElement('li');
+					li.innerHTML = '<code></code><div><b></b><span></span></div>';
+					li.querySelector('code')!.textContent = hex.length === 12 ? hex.match(/../g)!.join(':') : line;
+					const b = li.querySelector('b')!;
+					const s = li.querySelector('span')!;
+					if (hex.length < 6) {
+						b.textContent = 'Not a MAC address';
+						li.dataset.kind = 'bad';
+						return li;
+					}
+					const first = parseInt(hex.slice(0, 2), 16);
+					const flags = [first & 1 ? 'Multicast' : 'Unicast', first & 2 ? 'Locally administered' : 'Globally unique'];
+					const entry = db[hex.slice(0, 6)];
+					if (entry) {
+						const [name, ...rest] = entry.split('\n');
+						b.textContent = name;
+						s.textContent = `${rest.at(-1) ?? ''} · ${flags.join(' · ')}`;
+					} else {
+						b.textContent = first & 2 ? 'Random or virtual address' : 'Unknown vendor';
+						s.textContent = first & 2 ? `${flags.join(' · ')}. Phones, VMs and containers make these up, so there is no vendor.` : flags.join(' · ');
+						li.dataset.kind = 'none';
+					}
+					return li;
+				})
+			);
+		};
+
+		input.addEventListener('input', render);
+		load()
+			.then((d) => {
+				db = d;
+				byId('ml-note').textContent = `${Object.keys(d).length.toLocaleString('en-US')} vendor prefixes from the IEEE registry.`;
+				render();
+			})
+			.catch(() => (byId('ml-note').textContent = 'The vendor registry could not be loaded. Reload the page.'));
+	});
+</script>
+
+<style>
+	#ml-in {
+		min-height: 120px;
+	}
+	.ml-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.ml-list :global(li) {
+		display: grid;
+		grid-template-columns: 170px 1fr;
+		gap: 14px;
+		align-items: center;
+		padding: 10px 14px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+	}
+	.ml-list :global(code) {
+		font-family: var(--mono);
+		font-size: 14px;
+	}
+	.ml-list :global(div) {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.ml-list :global(span) {
+		font-size: 12.5px;
+		color: var(--ink-soft);
+	}
+	.ml-list :global(li[data-kind='bad'] b) {
+		color: #dc2626;
+	}
+	.ml-list :global(li[data-kind='none'] b) {
+		color: var(--ink-soft);
+	}
+	@media (max-width: 520px) {
+		.ml-list :global(li) {
+			grid-template-columns: 1fr;
+			gap: 4px;
+		}
+	}
+</style>

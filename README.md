@@ -110,6 +110,12 @@ Live at **https://techmefr.github.io/kodilo/**
 - **PDF Merge** (`/tools/pdf-merge/`) — combine and reorder PDFs in the browser
 - **JPG to PDF** (`/tools/jpg-to-pdf/`) — images to a PDF, A4, Letter or fit
 - **Currency Converter** (`/tools/currency-converter/`) — ECB daily rates, 30 currencies
+- **BIP39 Generator** (`/tools/bip39-generator/`) — generate or check a mnemonic, entropy and seed
+- **MAC Address Lookup** (`/tools/mac-address-lookup/`) — vendor from the bundled IEEE OUI registry
+- **PDF Split** (`/tools/pdf-split/`) — extract a page range or one file per page
+- **PDF Compress** (`/tools/pdf-compress/`) — lossless repack or pages as JPEG
+- **PDF to JPG** (`/tools/pdf-to-jpg/`) — render pages as JPG or PNG at 72-300 DPI
+- **X.509 Certificate Decoder** (`/tools/x509-certificate-decoder/`) — subject, SANs, validity, key, fingerprints
 - More tools land as new categories in the sidebar mega menu and the ⌘K / Ctrl K search — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -129,28 +135,22 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **Text**
 
 **Encoding & Security**
-- BIP39 Generator
 
 **Generators**
 
 **Converters**
 
 **Network**
-- MAC Address Lookup
 
 **Validators**
 
 **Images**
 
 **PDF**
-- PDF Split
-- PDF Compress
-- PDF to JPG
 
 **Dev Utilities**
 
 **DevOps & Sysadmin**
-- X.509 Certificate Decoder
 
 **Calculators**
 

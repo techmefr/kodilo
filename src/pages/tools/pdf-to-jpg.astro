@@ -1,0 +1,139 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell slug="pdf-to-jpg" title="PDF to JPG" description="Render every page of a PDF as a JPG or PNG image. Pick the resolution, then save pages one by one or all at once.">
+	<label class="drop" id="pj-tool">
+		<input type="file" id="pj-file" accept="application/pdf" hidden />
+		<span id="pj-drop">Drop a PDF here or click to choose. A 3-page sample is loaded.</span>
+	</label>
+	<div class="toolbar">
+		<div class="seg" id="pj-format" aria-label="Format">
+			<button data-value="image/jpeg" aria-pressed="true">JPG</button>
+			<button data-value="image/png" aria-pressed="false">PNG</button>
+		</div>
+		<div class="seg" id="pj-dpi" aria-label="Resolution">
+			<button data-value="72" aria-pressed="false">72 DPI</button>
+			<button data-value="150" aria-pressed="true">150 DPI</button>
+			<button data-value="300" aria-pressed="false">300 DPI</button>
+		</div>
+		<button class="btn primary" id="pj-all">Download all</button>
+	</div>
+	<ul class="pj-grid" id="pj-list"></ul>
+	<p class="error" id="pj-error" hidden></p>
+</ToolShell>
+
+<script>
+	import type { PDFDocumentProxy } from 'pdfjs-dist';
+	import { humanBytes } from '../../scripts/pdf';
+	import { samplePdf } from '../../scripts/pdf-sample';
+	import { canvasBytes, openPdf, renderPage } from '../../scripts/pdfjs';
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	onPage('pj-tool', () => {
+		let pdf: PDFDocumentProxy | null = null;
+		let name = 'sample';
+		let type = 'image/jpeg';
+		let dpi = 150;
+		let run = 0;
+		const images: { url: string; file: string }[] = [];
+
+		const save = (url: string, file: string) => {
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = file;
+			a.click();
+		};
+
+		const render = async () => {
+			if (!pdf) return;
+			const current = ++run;
+			images.forEach((i) => URL.revokeObjectURL(i.url));
+			images.length = 0;
+			const list = byId('pj-list');
+			list.replaceChildren();
+			const ext = type === 'image/png' ? 'png' : 'jpg';
+			for (let n = 1; n <= pdf.numPages; n++) {
+				const canvas = await renderPage(pdf, n, dpi / 72);
+				const bytes = await canvasBytes(canvas, type, 0.9);
+				if (current !== run) return;
+				const url = URL.createObjectURL(new Blob([bytes], { type }));
+				const file = `${name}-${n}.${ext}`;
+				images.push({ url, file });
+				const li = document.createElement('li');
+				li.innerHTML = '<img alt="" /><div><span></span><button class="btn">Save</button></div>';
+				li.querySelector('img')!.src = url;
+				li.querySelector('img')!.alt = `Page ${n}`;
+				li.querySelector('span')!.textContent = `Page ${n} · ${canvas.width}×${canvas.height} · ${humanBytes(bytes.length)}`;
+				li.querySelector('button')!.addEventListener('click', () => save(url, file));
+				list.append(li);
+			}
+		};
+
+		const load = async (b: Uint8Array, n: string) => {
+			try {
+				pdf = await openPdf(b);
+				name = n.replace(/\.pdf$/i, '');
+				byId('pj-error').hidden = true;
+				byId('pj-drop').textContent = `${n} · ${pdf.numPages} pages. Drop another PDF to replace it.`;
+				render();
+			} catch {
+				const e = byId('pj-error');
+				e.hidden = false;
+				e.textContent = `${n} could not be read as a PDF.`;
+			}
+		};
+
+		const zone = byId('pj-tool');
+		const input = byId<HTMLInputElement>('pj-file');
+		const take = async (f?: File) => f && load(new Uint8Array(await f.arrayBuffer()), f.name);
+		input.addEventListener('change', () => take(input.files?.[0]));
+		zone.addEventListener('dragover', (e) => (e.preventDefault(), zone.classList.add('over')));
+		zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+		zone.addEventListener('drop', (e) => {
+			e.preventDefault();
+			zone.classList.remove('over');
+			take(e.dataTransfer?.files[0]);
+		});
+		segmented(byId('pj-format'), (v) => ((type = v), render()));
+		segmented(byId('pj-dpi'), (v) => ((dpi = Number(v)), render()));
+		byId('pj-all').addEventListener('click', () => images.forEach((i, k) => setTimeout(() => save(i.url, i.file), k * 250)));
+
+		samplePdf(3).then((b) => load(b, 'sample.pdf'));
+	});
+</script>
+
+<style>
+	.pj-grid {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+		gap: 12px;
+	}
+	.pj-grid :global(li) {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 8px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+	}
+	.pj-grid :global(img) {
+		width: 100%;
+		border-radius: 6px;
+		border: 1px solid var(--border);
+	}
+	.pj-grid :global(div) {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.pj-grid :global(span) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+</style>
