@@ -15,9 +15,9 @@ import ToolShell from '../../components/ToolShell.astro';
 		</div>
 	</div>
 	<div class="toolbar">
-		<label class="check sub-prefix"
-			>Prefix <input type="range" id="sub-range" min="0" max="32" value="24" /> <b id="sub-range-value">/24</b></label
-		>
+		<label class="check sub-prefix">
+			Prefix <input type="range" id="sub-range" min="0" max="32" value="24" /> <b id="sub-range-value">/24</b>
+		</label>
 	</div>
 	<ul class="sub-list" id="sub-list"></ul>
 </ToolShell>
@@ -26,7 +26,11 @@ import ToolShell from '../../components/ToolShell.astro';
 	import { byId, onPage } from '../../scripts/ui';
 
 	const toIp = (n: number) => [24, 16, 8, 0].map((s) => (n >>> s) & 255).join('.');
-	const toBin = (n: number) => (n >>> 0).toString(2).padStart(32, '0').replace(/(.{8})(?!$)/g, '$1.');
+	const toBin = (n: number) =>
+		(n >>> 0)
+			.toString(2)
+			.padStart(32, '0')
+			.replace(/(.{8})(?!$)/g, '$1.');
 
 	function parseIp(text: string): number | null {
 		const parts = text.split('.');
@@ -84,7 +88,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					li.querySelector('span')!.textContent = label;
 					li.querySelector('code')!.textContent = value;
 					return li;
-				})
+				}),
 			);
 		};
 

@@ -2,18 +2,16 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="word-counter"
-	title="Word Counter"
-	description="Words, characters, bytes, reading time and top keywords. Emoji and CJK are counted correctly."
->
+<ToolShell slug="word-counter" title="Word Counter" description="Words, characters, bytes, reading time and top keywords. Emoji and CJK are counted correctly.">
 	<section class="panel" id="wc-tool">
 		<div class="panel-head">Text</div>
-		<textarea id="wc-in" class="wc-input" aria-label="Text to analyse"
-			>Kodilo is a collection of developer tools. No sign-up, no account, no tracking — every tool runs in your browser. 🚀
+		<textarea
+			id="wc-in"
+			class="wc-input"
+			aria-label="Text to analyse"
+		>Kodilo is a collection of developer tools. No sign-up, no account, no tracking — every tool runs in your browser. 🚀
 
-Paste anything here and the numbers update as you type.</textarea
-		>
+Paste anything here and the numbers update as you type.</textarea>
 	</section>
 	<div class="stats" id="wc-stats"></div>
 	<section class="panel">
@@ -25,8 +23,7 @@ Paste anything here and the numbers update as you type.</textarea
 <script>
 	import { byId, onPage } from '../../scripts/ui';
 
-	const segment = (text: string, granularity: 'word' | 'grapheme' | 'sentence') =>
-		Array.from(new Intl.Segmenter(undefined, { granularity }).segment(text));
+	const segment = (text: string, granularity: 'word' | 'grapheme' | 'sentence') => Array.from(new Intl.Segmenter(undefined, { granularity }).segment(text));
 
 	const duration = (words: number, perMinute: number) => {
 		const seconds = Math.round((words / perMinute) * 60);
@@ -67,7 +64,7 @@ Paste anything here and the numbers update as you type.</textarea
 					el.querySelector('b')!.textContent = String(value);
 					el.querySelector('span')!.textContent = label;
 					return el;
-				})
+				}),
 			);
 
 			const freq = new Map<string, number>();
@@ -83,7 +80,7 @@ Paste anything here and the numbers update as you type.</textarea
 					li.querySelector('span')!.textContent = word;
 					li.querySelector('b')!.textContent = `${n} · ${Math.round((n / words.length) * 100)}%`;
 					return li;
-				})
+				}),
 			);
 		};
 

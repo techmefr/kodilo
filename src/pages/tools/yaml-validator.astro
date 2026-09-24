@@ -15,23 +15,37 @@ const sample = `services:
 `;
 ---
 
-<ToolShell slug="yaml-validator" title="YAML Validator & Formatter" description="Paste YAML to check it, with the exact line and column of any error. Reformat it or convert it to JSON.">
+<ToolShell
+	slug="yaml-validator"
+	title="YAML Validator & Formatter"
+	description="Paste YAML to check it, with the exact line and column of any error. Reformat it or convert it to JSON."
+>
 	<div class="toolbar" id="yv-tool">
 		<div class="seg" id="yv-mode" aria-label="Output">
-			<button data-value="yaml" aria-pressed="true">Formatted YAML</button>
-			<button data-value="json" aria-pressed="false">JSON</button>
+			<button data-value="yaml" aria-pressed="true">
+				Formatted YAML
+			</button>
+			<button data-value="json" aria-pressed="false">
+				JSON
+			</button>
 		</div>
-		<label class="check">Indent <input class="num" id="yv-indent" type="number" min="2" max="8" value="2" /></label>
+		<label class="check">
+			Indent <input class="num" id="yv-indent" type="number" min="2" max="8" value="2" />
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
-			<div class="panel-head">YAML <span class="yv-status" id="yv-status"></span></div>
+			<div class="panel-head">
+				YAML <span class="yv-status" id="yv-status"></span>
+			</div>
 			<textarea id="yv-in" spellcheck="false" aria-label="YAML input">{sample}</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span>Output</span>
-				<button class="btn" id="yv-copy">Copy</button>
+				<button class="btn" id="yv-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="yv-out"></pre>
 		</section>
@@ -73,9 +87,7 @@ const sample = `services:
 			const n = Math.min(8, Math.max(2, Number(indent.value) || 2));
 			const values = list.map((d) => d.toJS());
 			out.textContent =
-				mode === 'json'
-					? JSON.stringify(values.length === 1 ? values[0] : values, null, n)
-					: values.map((v) => stringify(v, { indent: n })).join('---\n');
+				mode === 'json' ? JSON.stringify(values.length === 1 ? values[0] : values, null, n) : values.map((v) => stringify(v, { indent: n })).join('---\n');
 		};
 
 		segmented(byId('yv-mode'), (v) => {

@@ -13,14 +13,22 @@ const total = index.length;
 ---
 
 <div class="mobile-bar">
-	<a class="brand" href={base}>kodilo</a>
-	<button type="button" class="icon-btn" id="mobile-search" aria-label="Search tools"><span set:html={icon('search')} /></button>
-	<button type="button" class="icon-btn" id="nav-open" aria-label="Open menu" aria-expanded="false"><span set:html={icon('menu')} /></button>
+	<a class="brand" href={base}>
+		kodilo
+	</a>
+	<button type="button" class="icon-btn" id="mobile-search" aria-label="Search tools">
+		<span set:html={icon('search')} />
+	</button>
+	<button type="button" class="icon-btn" id="nav-open" aria-label="Open menu" aria-expanded="false">
+		<span set:html={icon('menu')} />
+	</button>
 </div>
 
 <aside class="site-header" id="site-nav" transition:name="site-nav">
 	<div class="brand-row">
-		<a class="brand" href={base}>kodilo</a>
+		<a class="brand" href={base}>
+			kodilo
+		</a>
 		<button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Toggle theme">
 			<span class="icon-sun" set:html={icon('sun')} />
 			<span class="icon-moon" set:html={icon('moon')} />
@@ -32,47 +40,49 @@ const total = index.length;
 		<kbd id="search-kbd">⌘K</kbd>
 	</button>
 	<nav class="cats" aria-label="Tool categories">
-		{
-			categories.map((c, i) => (
-				<button type="button" class="cat-btn" aria-expanded="false" aria-controls={`mega-${i}`} data-active={c.tools.some((t) => t.slug === activeSlug) ? 'true' : undefined}>
-					<span class="cat-btn-icon" set:html={icon(c.icon)} />
-					<span class="cat-btn-text">
-						<b>{c.name}</b>
-						<small>{c.blurb}</small>
-					</span>
-					<span class="cat-count">{c.tools.length}</span>
-				</button>
-			))
-		}
+		{categories.map((c, i) => (
+			<button
+				type="button"
+				class="cat-btn"
+				aria-expanded="false"
+				aria-controls={`mega-${i}`}
+				data-active={c.tools.some((t) => t.slug === activeSlug) ? 'true' : undefined}
+			>
+				<span class="cat-btn-icon" set:html={icon(c.icon)} />
+				<span class="cat-btn-text">
+					<b>{c.name}</b>
+					<small>{c.blurb}</small>
+				</span>
+				<span class="cat-count">{c.tools.length}</span>
+			</button>
+		))}
 	</nav>
-	{
-		categories.map((c, i) => (
-			<div class="mega" id={`mega-${i}`} hidden>
-				<div class="mega-intro">
-					<span class="mega-icon" set:html={icon(c.icon)} />
-					<div>
-						<b>{c.name}</b>
-						<p>
-							{c.blurb} · {c.tools.length} tool{c.tools.length === 1 ? '' : 's'}
-						</p>
-					</div>
+	{categories.map((c, i) => (
+		<div class="mega" id={`mega-${i}`} hidden>
+			<div class="mega-intro">
+				<span class="mega-icon" set:html={icon(c.icon)} />
+				<div>
+					<b>{c.name}</b>
+					<p>
+						{c.blurb} · {c.tools.length} tool{c.tools.length === 1 ? '' : 's'}
+					</p>
 				</div>
-				<ul class="mega-grid">
-					{c.tools.map((t) => (
-						<li>
-							<a href={`${base}tools/${t.slug}/`} aria-current={t.slug === activeSlug ? 'page' : undefined}>
-								<i class="t-icon" set:html={icon(t.icon ?? "wrench")} />
-								<div class="t-text">
-									<b>{t.name}</b>
-									<span>{t.description}</span>
-								</div>
-							</a>
-						</li>
-					))}
-				</ul>
 			</div>
-		))
-	}
+			<ul class="mega-grid">
+				{c.tools.map((t) => (
+					<li>
+						<a href={`${base}tools/${t.slug}/`} aria-current={t.slug === activeSlug ? 'page' : undefined}>
+							<i class="t-icon" set:html={icon(t.icon ?? 'wrench')} />
+							<div class="t-text">
+								<b>{t.name}</b>
+								<span>{t.description}</span>
+							</div>
+						</a>
+					</li>
+				))}
+			</ul>
+		</div>
+	))}
 </aside>
 <div class="mega-scrim" id="mega-scrim" hidden></div>
 
@@ -80,11 +90,26 @@ const total = index.length;
 	<div class="palette-box">
 		<div class="palette-input">
 			<span set:html={icon('search')} />
-			<input id="palette-q" type="search" placeholder="Search tools, e.g. jwt, base64, cron…" autocomplete="off" spellcheck="false" aria-controls="palette-list" />
+			<input
+				id="palette-q"
+				type="search"
+				placeholder="Search tools, e.g. jwt, base64, cron…"
+				autocomplete="off"
+				spellcheck="false"
+				aria-controls="palette-list"
+			/>
 			<kbd>Esc</kbd>
 		</div>
 		<ul class="palette-list" id="palette-list" role="listbox" data-index={JSON.stringify(index)}></ul>
-		<div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> to move</span><span><kbd>↵</kbd> to open</span></div>
+		<div class="palette-foot">
+			<span>
+				<kbd>↑</kbd>
+				<kbd>↓</kbd> to move
+			</span>
+			<span>
+				<kbd>↵</kbd> to open
+			</span>
+		</div>
 	</div>
 </dialog>
 
@@ -180,7 +205,7 @@ const total = index.length;
 			a.addEventListener('click', () => {
 				closeMega();
 				closeDrawer();
-			})
+			}),
 		);
 
 		const navBtn = document.getElementById('nav-open')!;
@@ -248,7 +273,7 @@ const total = index.length;
 						}
 					});
 					return li;
-				})
+				}),
 			);
 			paint();
 		});

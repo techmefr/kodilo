@@ -27,12 +27,16 @@ const links = [
 		</div>
 	</div>
 	<div class="chips" id="tt-links">
-		{links.map(([label, bw]) => <button data-bw={bw}>{label} · {bw}</button>)}
+		{links.map(([label, bw]) => (
+			<button data-bw={bw}>
+				{label} · {bw}
+			</button>
+		))}
 	</div>
 	<div class="toolbar">
-		<label class="check tt-eff"
-			>Efficiency <input type="range" id="tt-eff" min="50" max="100" value="90" /> <b id="tt-eff-value">90%</b></label
-		>
+		<label class="check tt-eff">
+			Efficiency <input type="range" id="tt-eff" min="50" max="100" value="90" /> <b id="tt-eff-value">90%</b>
+		</label>
 	</div>
 	<div class="stats" id="tt-stats"></div>
 	<div class="fields">
@@ -49,7 +53,10 @@ const links = [
 	import { byId, onPage } from '../../scripts/ui';
 
 	function parseBandwidth(text: string): number | null {
-		const m = text.trim().replace(',', '.').match(/^(\d+(?:\.\d+)?)\s*([kmgt]?)(bps|b\/s|bit\/s|B\/s|Bps|o\/s)?$/i);
+		const m = text
+			.trim()
+			.replace(',', '.')
+			.match(/^(\d+(?:\.\d+)?)\s*([kmgt]?)(bps|b\/s|bit\/s|B\/s|Bps|o\/s)?$/i);
 		if (!m) return null;
 		const scale = { '': 1, k: 1e3, m: 1e6, g: 1e9, t: 1e12 }[m[2].toLowerCase() as '' | 'k' | 'm' | 'g' | 't'];
 		const bytesUnit = m[3] && /^(B\/s|Bps|o\/s)$/.test(m[3]);
@@ -102,7 +109,7 @@ const links = [
 						el.querySelector('b')!.textContent = value;
 						el.querySelector('span')!.textContent = label;
 						return el;
-					})
+					}),
 				);
 			}
 			const limit = parseDuration(deadline.value);
@@ -118,7 +125,7 @@ const links = [
 			b.addEventListener('click', () => {
 				bw.value = b.dataset.bw!;
 				render();
-			})
+			}),
 		);
 		render();
 	});

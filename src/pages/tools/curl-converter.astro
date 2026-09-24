@@ -22,13 +22,17 @@ const sample = [
 	<section class="panel">
 		<div class="panel-head">
 			<div class="seg" id="curl-lang">
-				<button data-value="fetch" aria-pressed="true">fetch</button>
+				<button data-value="fetch" aria-pressed="true">
+					fetch
+				</button>
 				<button data-value="axios">axios</button>
 				<button data-value="python">Python</button>
 				<button data-value="httpie">HTTPie</button>
 				<button data-value="php">PHP</button>
 			</div>
-			<button class="btn" id="curl-copy">Copy</button>
+			<button class="btn" id="curl-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="curl-out"></pre>
 	</section>
@@ -38,7 +42,15 @@ const sample = [
 	import { shellSplit } from '../../scripts/shell';
 	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
 
-	type Req = { method: string; url: string; headers: [string, string][]; body: string | null; form: [string, string][]; user: string | null; insecure: boolean };
+	type Req = {
+		method: string;
+		url: string;
+		headers: [string, string][];
+		body: string | null;
+		form: [string, string][];
+		user: string | null;
+		insecure: boolean;
+	};
 
 	function parse(cmd: string): Req {
 		const args = shellSplit(cmd);
@@ -87,7 +99,8 @@ const sample = [
 			else req.body = data.join('&');
 		}
 		if (!req.method) req.method = req.body !== null || req.form.length ? 'POST' : 'GET';
-		if (req.body !== null && !req.headers.some(([k]) => k.toLowerCase() === 'content-type')) req.headers.push(['Content-Type', 'application/x-www-form-urlencoded']);
+		if (req.body !== null && !req.headers.some(([k]) => k.toLowerCase() === 'content-type'))
+			req.headers.push(['Content-Type', 'application/x-www-form-urlencoded']);
 		return req;
 	}
 
@@ -111,8 +124,11 @@ const sample = [
 			const opts = [`method: ${JSON.stringify(r.method)}`];
 			if (headers.length) opts.push(`headers: {\n${headers.map(([k, v]) => `    ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(',\n')}\n  }`);
 			if (r.form.length) opts.push('body: form');
-			else if (r.body !== null) opts.push(`body: ${isJson(r) ? `JSON.stringify(${indent(JSON.stringify(JSON.parse(r.body), null, 2), 2)})` : JSON.stringify(r.body)}`);
-			const form = r.form.length ? `const form = new FormData();\n${r.form.map(([k, v]) => `form.append(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('\n')}\n\n` : '';
+			else if (r.body !== null)
+				opts.push(`body: ${isJson(r) ? `JSON.stringify(${indent(JSON.stringify(JSON.parse(r.body), null, 2), 2)})` : JSON.stringify(r.body)}`);
+			const form = r.form.length
+				? `const form = new FormData();\n${r.form.map(([k, v]) => `form.append(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('\n')}\n\n`
+				: '';
 			return `${form}const response = await fetch(${JSON.stringify(r.url)}, {\n  ${opts.join(',\n  ')}\n});\nconst data = await response.${r.method === 'HEAD' ? 'status' : 'json()'};`;
 		},
 		axios: (r) => {
@@ -124,7 +140,9 @@ const sample = [
 			}
 			if (r.form.length) opts.push('data: form');
 			else if (r.body !== null) opts.push(`data: ${isJson(r) ? indent(JSON.stringify(JSON.parse(r.body), null, 2), 2) : JSON.stringify(r.body)}`);
-			const form = r.form.length ? `const form = new FormData();\n${r.form.map(([k, v]) => `form.append(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('\n')}\n\n` : '';
+			const form = r.form.length
+				? `const form = new FormData();\n${r.form.map(([k, v]) => `form.append(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('\n')}\n\n`
+				: '';
 			return `import axios from 'axios';\n\n${form}const { data } = await axios({\n  ${opts.join(',\n  ')}\n});`;
 		},
 		python: (r) => {
@@ -136,11 +154,18 @@ const sample = [
 				args.push('headers=headers');
 			}
 			if (r.form.length) {
-				lines.push(`files = {\n${r.form.map(([k, v]) => `    ${pyStr(k)}: ${v.startsWith('@') ? `open(${pyStr(v.slice(1))}, "rb")` : `(None, ${pyStr(v)})`},`).join('\n')}\n}`);
+				lines.push(
+					`files = {\n${r.form.map(([k, v]) => `    ${pyStr(k)}: ${v.startsWith('@') ? `open(${pyStr(v.slice(1))}, "rb")` : `(None, ${pyStr(v)})`},`).join('\n')}\n}`,
+				);
 				args.push('files=files');
 			} else if (r.body !== null) {
 				if (isJson(r)) {
-					lines.push(`payload = ${JSON.stringify(JSON.parse(r.body), null, 4).replace(/\btrue\b/g, 'True').replace(/\bfalse\b/g, 'False').replace(/\bnull\b/g, 'None')}`);
+					lines.push(
+						`payload = ${JSON.stringify(JSON.parse(r.body), null, 4)
+							.replace(/\btrue\b/g, 'True')
+							.replace(/\bfalse\b/g, 'False')
+							.replace(/\bnull\b/g, 'None')}`,
+					);
 					args.push('json=payload');
 				} else args.push(`data=${pyStr(r.body)}`);
 			}
@@ -162,7 +187,8 @@ const sample = [
 			parts.push(r.method, `'${r.url}'`);
 			r.headers.filter(([k]) => !(k.toLowerCase() === 'content-type' && (isJson(r) || r.body !== null))).forEach(([k, v]) => parts.push(`'${k}:${v}'`));
 			if (r.form.length) r.form.forEach(([k, v]) => parts.push(v.startsWith('@') ? `'${k}@${v.slice(1)}'` : `'${k}=${v}'`));
-			else if (r.body !== null && isJson(r)) Object.entries(JSON.parse(r.body)).forEach(([k, v]) => parts.push(typeof v === 'string' ? `'${k}=${v}'` : `'${k}:=${JSON.stringify(v)}'`));
+			else if (r.body !== null && isJson(r))
+				Object.entries(JSON.parse(r.body)).forEach(([k, v]) => parts.push(typeof v === 'string' ? `'${k}=${v}'` : `'${k}:=${JSON.stringify(v)}'`));
 			else if (r.body !== null) new URLSearchParams(r.body).forEach((v, k) => parts.push(`'${k}=${v}'`));
 			return parts.join(' ');
 		},
@@ -170,7 +196,10 @@ const sample = [
 			const opts = [`CURLOPT_URL => ${phpStr(r.url)}`, 'CURLOPT_RETURNTRANSFER => true', `CURLOPT_CUSTOMREQUEST => ${phpStr(r.method)}`];
 			if (r.headers.length) opts.push(`CURLOPT_HTTPHEADER => [\n${r.headers.map(([k, v]) => `        ${phpStr(`${k}: ${v}`)},`).join('\n')}\n    ]`);
 			if (r.body !== null) opts.push(`CURLOPT_POSTFIELDS => ${phpStr(r.body)}`);
-			if (r.form.length) opts.push(`CURLOPT_POSTFIELDS => [\n${r.form.map(([k, v]) => `        ${phpStr(k)} => ${v.startsWith('@') ? `new CURLFile(${phpStr(v.slice(1))})` : phpStr(v)},`).join('\n')}\n    ]`);
+			if (r.form.length)
+				opts.push(
+					`CURLOPT_POSTFIELDS => [\n${r.form.map(([k, v]) => `        ${phpStr(k)} => ${v.startsWith('@') ? `new CURLFile(${phpStr(v.slice(1))})` : phpStr(v)},`).join('\n')}\n    ]`,
+				);
 			if (r.user) opts.push(`CURLOPT_USERPWD => ${phpStr(r.user)}`);
 			if (r.insecure) opts.push('CURLOPT_SSL_VERIFYPEER => false');
 			return `<?php\n\n$ch = curl_init();\ncurl_setopt_array($ch, [\n    ${opts.join(',\n    ')},\n]);\n$response = curl_exec($ch);\ncurl_close($ch);`;

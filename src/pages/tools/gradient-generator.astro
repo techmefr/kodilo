@@ -2,27 +2,33 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="gradient-generator"
-	title="Gradient Generator"
-	description="Linear, radial or conic gradients with as many color stops as you like."
->
+<ToolShell slug="gradient-generator" title="Gradient Generator" description="Linear, radial or conic gradients with as many color stops as you like.">
 	<div class="gr-stage" id="gr-tool"></div>
 	<div class="toolbar">
 		<div class="seg" id="gr-type" aria-label="Type">
-			<button data-value="linear" aria-pressed="true">Linear</button>
-			<button data-value="radial" aria-pressed="false">Radial</button>
-			<button data-value="conic" aria-pressed="false">Conic</button>
+			<button data-value="linear" aria-pressed="true">
+				Linear
+			</button>
+			<button data-value="radial" aria-pressed="false">
+				Radial
+			</button>
+			<button data-value="conic" aria-pressed="false">
+				Conic
+			</button>
 		</div>
-		<label class="check gr-angle" id="gr-angle-wrap"
-			>Angle <input type="range" id="gr-angle" min="0" max="360" value="135" /> <b id="gr-angle-value">135°</b></label
-		>
-		<label class="check"><input type="checkbox" id="gr-repeat" /> Repeating</label>
+		<label class="check gr-angle" id="gr-angle-wrap">
+			Angle <input type="range" id="gr-angle" min="0" max="360" value="135" /> <b id="gr-angle-value">135°</b>
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gr-repeat" /> Repeating
+		</label>
 	</div>
 	<section class="panel">
 		<div class="panel-head">
 			<span>Color stops</span>
-			<button class="btn" id="gr-add">+ Stop</button>
+			<button class="btn" id="gr-add">
+				+ Stop
+			</button>
 		</div>
 		<ul class="gr-stops" id="gr-stops"></ul>
 	</section>
@@ -36,7 +42,9 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span>CSS</span>
-			<button class="btn" id="gr-copy">Copy</button>
+			<button class="btn" id="gr-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out gr-css" id="gr-css"></pre>
 	</section>
@@ -57,7 +65,10 @@ import ToolShell from '../../components/ToolShell.astro';
 		const repeat = byId<HTMLInputElement>('gr-repeat');
 
 		const value = () => {
-			const list = [...stops].sort((a, b) => a.at - b.at).map((s) => `${s.color} ${s.at}%`).join(', ');
+			const list = [...stops]
+				.sort((a, b) => a.at - b.at)
+				.map((s) => `${s.color} ${s.at}%`)
+				.join(', ');
 			const prefix = repeat.checked ? 'repeating-' : '';
 			if (type === 'linear') return `${prefix}linear-gradient(${angle.value}deg, ${list})`;
 			if (type === 'conic') return `${prefix}conic-gradient(from ${angle.value}deg, ${list})`;
@@ -107,7 +118,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					});
 					li.append(color, at, label, remove);
 					return li;
-				})
+				}),
 			);
 			paint();
 		};
@@ -129,7 +140,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					return { color, at: Number(at) };
 				});
 				renderStops();
-			})
+			}),
 		);
 		copyButton(byId('gr-copy'), () => byId('gr-css').textContent ?? '');
 		renderStops();

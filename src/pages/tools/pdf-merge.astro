@@ -2,14 +2,20 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="pdf-merge" title="PDF Merge" description="Combine several PDFs into one. Reorder them, then download the result. Files never leave your browser.">
+<ToolShell
+	slug="pdf-merge"
+	title="PDF Merge"
+	description="Combine several PDFs into one. Reorder them, then download the result. Files never leave your browser."
+>
 	<label class="drop" id="pm-tool">
 		<input type="file" id="pm-file" accept="application/pdf" multiple hidden />
 		<span>Drop PDFs here or click to choose. Two sample PDFs are loaded.</span>
 	</label>
 	<ul class="file-list" id="pm-list"></ul>
 	<div class="toolbar">
-		<button class="btn primary" id="pm-go">Merge and download</button>
+		<button class="btn primary" id="pm-go">
+			Merge and download
+		</button>
 		<span class="field-note" id="pm-note"></span>
 	</div>
 	<p class="error" id="pm-error" hidden></p>
@@ -41,7 +47,8 @@ import ToolShell from '../../components/ToolShell.astro';
 			list.replaceChildren(
 				...items.map((it, i) => {
 					const li = document.createElement('li');
-					li.innerHTML = '<div><b></b><span></span></div><button class="btn" aria-label="Move up">↑</button><button class="btn" aria-label="Move down">↓</button><button class="btn" aria-label="Remove">✕</button>';
+					li.innerHTML =
+						'<div><b></b><span></span></div><button class="btn" aria-label="Move up">↑</button><button class="btn" aria-label="Move down">↓</button><button class="btn" aria-label="Remove">✕</button>';
 					li.querySelector('b')!.textContent = it.name;
 					li.querySelector('span')!.textContent = `${it.pages} page${it.pages > 1 ? 's' : ''} · ${humanBytes(it.bytes.length)}`;
 					const [up, down, rm] = li.querySelectorAll('button');
@@ -49,7 +56,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					down.addEventListener('click', () => (moveItem(items, i, i + 1), paint()));
 					rm.addEventListener('click', () => (items.splice(i, 1), paint()));
 					return li;
-				})
+				}),
 			);
 			const total = items.reduce((a, it) => a + it.pages, 0);
 			byId('pm-note').textContent = items.length ? `${items.length} files, ${total} pages` : 'Add at least two PDFs.';

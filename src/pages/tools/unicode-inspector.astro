@@ -4,24 +4,54 @@ import ToolShell from '../../components/ToolShell.astro';
 const sample = 'Café naïve — “smart quotes”​ zero-width here, a non‑breaking hyphen, 👩🏽‍💻 and Ⅻ';
 ---
 
-<ToolShell slug="unicode-inspector" title="Unicode Inspector" description="See every character in a string with its code point, name category, UTF-8 bytes and escapes. Invisible and look-alike characters are flagged.">
+<ToolShell
+	slug="unicode-inspector"
+	title="Unicode Inspector"
+	description="See every character in a string with its code point, name category, UTF-8 bytes and escapes. Invisible and look-alike characters are flagged."
+>
 	<section class="panel" id="un-tool">
 		<div class="panel-head">
 			<span>Text</span>
-			<button class="btn" id="un-clean">Remove invisible characters</button>
+			<button class="btn" id="un-clean">
+				Remove invisible characters
+			</button>
 		</div>
 		<textarea id="un-in" spellcheck="false" aria-label="Text">{sample}</textarea>
 	</section>
 	<div class="stats">
-		<div class="stat"><b id="un-graphemes">—</b><span>Visible characters</span></div>
-		<div class="stat"><b id="un-points">—</b><span>Code points</span></div>
-		<div class="stat"><b id="un-utf16">—</b><span>UTF-16 units (JS length)</span></div>
-		<div class="stat"><b id="un-bytes">—</b><span>UTF-8 bytes</span></div>
-		<div class="stat"><b id="un-hidden">—</b><span>Invisible or unusual</span></div>
+		<div class="stat">
+			<b id="un-graphemes">—</b>
+			<span>Visible characters</span>
+		</div>
+		<div class="stat">
+			<b id="un-points">—</b>
+			<span>Code points</span>
+		</div>
+		<div class="stat">
+			<b id="un-utf16">—</b>
+			<span>UTF-16 units (JS length)</span>
+		</div>
+		<div class="stat">
+			<b id="un-bytes">—</b>
+			<span>UTF-8 bytes</span>
+		</div>
+		<div class="stat">
+			<b id="un-hidden">—</b>
+			<span>Invisible or unusual</span>
+		</div>
 	</div>
 	<div class="un-table-wrap">
 		<table class="un-table">
-			<thead><tr><th>Char</th><th>Code point</th><th>Category</th><th>UTF-8</th><th>JS / JSON</th><th>HTML</th></tr></thead>
+			<thead>
+				<tr>
+					<th>Char</th>
+					<th>Code point</th>
+					<th>Category</th>
+					<th>UTF-8</th>
+					<th>JS / JSON</th>
+					<th>HTML</th>
+				</tr>
+			</thead>
 			<tbody id="un-rows"></tbody>
 		</table>
 	</div>
@@ -100,7 +130,14 @@ const sample = 'Café naïve — “smart quotes”​ zero-width here, a non‑
 					const hex = cp.toString(16).toUpperCase().padStart(4, '0');
 					const utf8 = [...new TextEncoder().encode(ch)].map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 					const js = cp > 0xffff ? `\\u{${hex}}` : `\\u${hex}`;
-					const cells = [/\p{C}|\p{Z}/u.test(ch) ? '·' : ch, `U+${hex}${NAMES[cp] ? ` ${NAMES[cp]}` : ''}`, category(ch) + (flag ? ` · ${flag}` : ''), utf8, js, `&#x${hex};`];
+					const cells = [
+						/\p{C}|\p{Z}/u.test(ch) ? '·' : ch,
+						`U+${hex}${NAMES[cp] ? ` ${NAMES[cp]}` : ''}`,
+						category(ch) + (flag ? ` · ${flag}` : ''),
+						utf8,
+						js,
+						`&#x${hex};`,
+					];
 					cells.forEach((c, i) => {
 						const td = document.createElement('td');
 						td.textContent = c;
@@ -108,7 +145,7 @@ const sample = 'Café naïve — “smart quotes”​ zero-width here, a non‑
 						tr.append(td);
 					});
 					return tr;
-				})
+				}),
 			);
 			byId('un-hidden').textContent = String(hidden);
 		};
@@ -117,7 +154,7 @@ const sample = 'Café naïve — “smart quotes”​ zero-width here, a non‑
 			input.value = [...input.value]
 				.filter((c) => !INVISIBLE.has(c.codePointAt(0)!))
 				.join('')
-				.replace(/[   ]/g, ' ')
+				.replace(/[\u00a0\u202f\u2009]/g, ' ')
 				.replace(/‑/g, '-');
 			render();
 		});

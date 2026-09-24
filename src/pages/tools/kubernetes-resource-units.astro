@@ -32,7 +32,9 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span>resources block</span>
-			<button class="btn" id="k8s-copy">Copy</button>
+			<button class="btn" id="k8s-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out k8s-yaml" id="k8s-yaml"></pre>
 	</section>
@@ -43,8 +45,20 @@ import ToolShell from '../../components/ToolShell.astro';
 	import { byId, copyButton, onPage } from '../../scripts/ui';
 
 	const SUFFIX: Record<string, number> = {
-		'': 1, m: 1e-3, k: 1e3, M: 1e6, G: 1e9, T: 1e12, P: 1e15, E: 1e18,
-		Ki: 1024, Mi: 1024 ** 2, Gi: 1024 ** 3, Ti: 1024 ** 4, Pi: 1024 ** 5, Ei: 1024 ** 6,
+		'': 1,
+		m: 1e-3,
+		k: 1e3,
+		M: 1e6,
+		G: 1e9,
+		T: 1e12,
+		P: 1e15,
+		E: 1e18,
+		Ki: 1024,
+		Mi: 1024 ** 2,
+		Gi: 1024 ** 3,
+		Ti: 1024 ** 4,
+		Pi: 1024 ** 5,
+		Ei: 1024 ** 6,
 	};
 
 	function parseQuantity(text: string): { value: number; suffix: string } | null {

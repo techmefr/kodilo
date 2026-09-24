@@ -10,33 +10,33 @@ const sliders = [
 ];
 ---
 
-<ToolShell
-	slug="box-shadow-generator"
-	title="Box Shadow Generator"
-	description="Stack shadow layers, tune them visually, copy the CSS."
->
+<ToolShell slug="box-shadow-generator" title="Box Shadow Generator" description="Stack shadow layers, tune them visually, copy the CSS.">
 	<div class="bs-stage" id="bs-tool">
 		<div class="bs-box" id="bs-box"></div>
 	</div>
 	<div class="toolbar">
 		<div class="chips" id="bs-layers"></div>
-		<button class="btn" id="bs-add">+ Layer</button>
-		<button class="btn" id="bs-remove">Remove layer</button>
+		<button class="btn" id="bs-add">
+			+ Layer
+		</button>
+		<button class="btn" id="bs-remove">
+			Remove layer
+		</button>
 	</div>
 	<section class="panel bs-controls">
-		{
-			sliders.map(([id, label, min, max, value]) => (
-				<label class="bs-slider">
-					<span>{label}</span>
-					<input type="range" id={`bs-${id}`} min={min} max={max} value={value} />
-					<b id={`bs-${id}-value`} />
-				</label>
-			))
-		}
+		{sliders.map(([id, label, min, max, value]) => (
+			<label class="bs-slider">
+				<span>{label}</span>
+				<input type="range" id={`bs-${id}`} min={min} max={max} value={value} />
+				<b id={`bs-${id}-value`} />
+			</label>
+		))}
 		<label class="bs-slider">
 			<span>Color</span>
 			<input type="color" id="bs-color" value="#1c1832" />
-			<label class="check"><input type="checkbox" id="bs-inset" /> Inset</label>
+			<label class="check">
+				<input type="checkbox" id="bs-inset" /> Inset
+			</label>
 		</label>
 	</section>
 	<div class="chips" id="bs-presets">
@@ -49,7 +49,9 @@ const sliders = [
 	<section class="panel">
 		<div class="panel-head">
 			<span>CSS</span>
-			<button class="btn" id="bs-copy">Copy</button>
+			<button class="btn" id="bs-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out bs-css" id="bs-css"></pre>
 	</section>
@@ -83,10 +85,7 @@ const sliders = [
 		const color = byId<HTMLInputElement>('bs-color');
 		const inset = byId<HTMLInputElement>('bs-inset');
 
-		const css = () =>
-			layers
-				.map((l) => `${l.inset ? 'inset ' : ''}${l.x}px ${l.y}px ${l.blur}px ${l.spread}px ${rgba(l.color, l.opacity)}`)
-				.join(',\n    ');
+		const css = () => layers.map((l) => `${l.inset ? 'inset ' : ''}${l.x}px ${l.y}px ${l.blur}px ${l.spread}px ${rgba(l.color, l.opacity)}`).join(',\n    ');
 
 		const sync = () => {
 			const layer = layers[active];
@@ -106,7 +105,7 @@ const sliders = [
 						sync();
 					});
 					return button;
-				})
+				}),
 			);
 			byId('bs-remove').hidden = layers.length < 2;
 			const value = css();
@@ -118,7 +117,7 @@ const sliders = [
 			byId<HTMLInputElement>(`bs-${key}`).addEventListener('input', (e) => {
 				layers[active][key] = Number((e.target as HTMLInputElement).value);
 				sync();
-			})
+			}),
 		);
 		color.addEventListener('input', () => {
 			layers[active].color = color.value;
@@ -143,7 +142,7 @@ const sliders = [
 				layers = structuredClone(PRESETS[button.dataset.preset!]);
 				active = 0;
 				sync();
-			})
+			}),
 		);
 		copyButton(byId('bs-copy'), () => byId('bs-css').textContent ?? '');
 		sync();

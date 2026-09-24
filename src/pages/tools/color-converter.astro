@@ -126,7 +126,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					});
 					li.append(button);
 					return li;
-				})
+				}),
 			);
 			const lum = luminance(c);
 			byId('color-contrast').replaceChildren(
@@ -147,7 +147,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						ratio >= 3 ? 'Large ✓' : 'Large ✕',
 					].join('  ');
 					return card;
-				})
+				}),
 			);
 		};
 

@@ -2,11 +2,19 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="url-parser" title="URL Parser" description="Split a URL into protocol, host, port, path, query parameters and fragment. Edit any part or parameter and the URL is rebuilt.">
+<ToolShell
+	slug="url-parser"
+	title="URL Parser"
+	description="Split a URL into protocol, host, port, path, query parameters and fragment. Edit any part or parameter and the URL is rebuilt."
+>
 	<div class="fields" id="up-tool">
 		<div class="field wide" id="up-field">
 			<label for="up-url">URL</label>
-			<input id="up-url" spellcheck="false" value="https://user:pa55@api.example.com:8443/v2/search?q=red%20shoes&amp;size=42&amp;sort=price&amp;tag=sale&amp;tag=new#results" />
+			<input
+				id="up-url"
+				spellcheck="false"
+				value="https://user:pa55@api.example.com:8443/v2/search?q=red%20shoes&amp;size=42&amp;sort=price&amp;tag=sale&amp;tag=new#results"
+			/>
 			<span class="field-note" id="up-note"></span>
 		</div>
 	</div>
@@ -14,13 +22,19 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span>Query parameters</span>
-			<button class="btn" id="up-add">Add parameter</button>
+			<button class="btn" id="up-add">
+				Add parameter
+			</button>
 		</div>
 		<div class="up-params" id="up-params"></div>
 	</section>
 	<div class="toolbar">
-		<button class="btn" id="up-copy">Copy URL</button>
-		<button class="btn" id="up-copy-json">Copy as JSON</button>
+		<button class="btn" id="up-copy">
+			Copy URL
+		</button>
+		<button class="btn" id="up-copy-json">
+			Copy as JSON
+		</button>
 	</div>
 </ToolShell>
 
@@ -28,7 +42,15 @@ import ToolShell from '../../components/ToolShell.astro';
 	import { byId, copyButton, onPage } from '../../scripts/ui';
 
 	const PARTS = ['protocol', 'username', 'password', 'hostname', 'port', 'pathname', 'hash'] as const;
-	const LABELS: Record<string, string> = { protocol: 'Protocol', username: 'Username', password: 'Password', hostname: 'Host', port: 'Port', pathname: 'Path', hash: 'Fragment' };
+	const LABELS: Record<string, string> = {
+		protocol: 'Protocol',
+		username: 'Username',
+		password: 'Password',
+		hostname: 'Host',
+		port: 'Port',
+		pathname: 'Path',
+		hash: 'Fragment',
+	};
 
 	onPage('up-tool', () => {
 		const input = byId<HTMLInputElement>('up-url');
@@ -73,10 +95,10 @@ import ToolShell from '../../components/ToolShell.astro';
 					row.append(
 						input$(k, 'Name', (x) => ((entries[i][0] = x), rewrite(entries))),
 						input$(v, 'Value', (x) => ((entries[i][1] = x), rewrite(entries))),
-						rm
+						rm,
 					);
 					return row;
-				})
+				}),
 			);
 			if (!entries.length) box.textContent = 'No query parameters.';
 		};
@@ -97,10 +119,10 @@ import ToolShell from '../../components/ToolShell.astro';
 								(url as unknown as Record<string, string>)[p] = v;
 								sync();
 							} catch {}
-						})
+						}),
 					);
 					return field;
-				})
+				}),
 			);
 			paintParams();
 		};

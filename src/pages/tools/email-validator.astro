@@ -10,16 +10,16 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel" id="mail-tool">
 		<div class="panel-head">
 			<span>Addresses</span>
-			<button class="btn" id="mail-copy">Copy valid</button>
+			<button class="btn" id="mail-copy">
+				Copy valid
+			</button>
 		</div>
-		<textarea id="mail-in" spellcheck="false" aria-label="Email addresses"
-			>jane.doe@gmail.com
+		<textarea id="mail-in" spellcheck="false" aria-label="Email addresses">jane.doe@gmail.com
 john@gmial.com
 first..last@example.com
 hello@mailinator.com
 no-at-sign.example.com
-dev+tag@sub.company.io</textarea
-		>
+dev+tag@sub.company.io</textarea>
 	</section>
 	<p class="mail-summary" id="mail-summary"></p>
 	<ul class="mail-list" id="mail-list"></ul>
@@ -28,8 +28,39 @@ dev+tag@sub.company.io</textarea
 <script>
 	import { byId, copyButton, onPage } from '../../scripts/ui';
 
-	const POPULAR = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'live.com', 'aol.com', 'proton.me', 'protonmail.com', 'orange.fr', 'free.fr', 'wanadoo.fr', 'laposte.net', 'sfr.fr', 'gmx.com', 'yahoo.fr', 'hotmail.fr'];
-	const DISPOSABLE = ['mailinator.com', 'yopmail.com', 'guerrillamail.com', '10minutemail.com', 'tempmail.com', 'temp-mail.org', 'trashmail.com', 'sharklasers.com', 'getnada.com', 'throwawaymail.com', 'maildrop.cc', 'dispostable.com'];
+	const POPULAR = [
+		'gmail.com',
+		'yahoo.com',
+		'hotmail.com',
+		'outlook.com',
+		'icloud.com',
+		'live.com',
+		'aol.com',
+		'proton.me',
+		'protonmail.com',
+		'orange.fr',
+		'free.fr',
+		'wanadoo.fr',
+		'laposte.net',
+		'sfr.fr',
+		'gmx.com',
+		'yahoo.fr',
+		'hotmail.fr',
+	];
+	const DISPOSABLE = [
+		'mailinator.com',
+		'yopmail.com',
+		'guerrillamail.com',
+		'10minutemail.com',
+		'tempmail.com',
+		'temp-mail.org',
+		'trashmail.com',
+		'sharklasers.com',
+		'getnada.com',
+		'throwawaymail.com',
+		'maildrop.cc',
+		'dispostable.com',
+	];
 
 	function distance(a: string, b: string): number {
 		const row = Array.from({ length: b.length + 1 }, (_, i) => i);
@@ -76,7 +107,11 @@ dev+tag@sub.company.io</textarea
 		let results: Result[] = [];
 
 		const render = () => {
-			results = input.value.split('\n').map((l) => l.trim()).filter(Boolean).map(check);
+			results = input.value
+				.split('\n')
+				.map((l) => l.trim())
+				.filter(Boolean)
+				.map(check);
 			list.replaceChildren(
 				...results.map((r) => {
 					const li = document.createElement('li');
@@ -86,14 +121,20 @@ dev+tag@sub.company.io</textarea
 					li.querySelector('code')!.textContent = r.email;
 					li.querySelector('.msg')!.textContent = r.message;
 					return li;
-				})
+				}),
 			);
 			const count = (s: string) => results.filter((r) => r.status === s).length;
-			byId('mail-summary').textContent = `${count('ok')} valid · ${count('warn')} to review · ${count('bad')} invalid. Syntax only — no message is sent and no server is contacted.`;
+			byId('mail-summary').textContent =
+				`${count('ok')} valid · ${count('warn')} to review · ${count('bad')} invalid. Syntax only — no message is sent and no server is contacted.`;
 		};
 
 		input.addEventListener('input', render);
-		copyButton(byId('mail-copy'), () => results.filter((r) => r.status !== 'bad').map((r) => r.email).join('\n'));
+		copyButton(byId('mail-copy'), () =>
+			results
+				.filter((r) => r.status !== 'bad')
+				.map((r) => r.email)
+				.join('\n'),
+		);
 		render();
 	});
 </script>

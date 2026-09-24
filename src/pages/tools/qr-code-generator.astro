@@ -2,27 +2,47 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="qr-code-generator" title="QR Code Generator" description="Turn text or a URL into a QR code. Pick the colors and error correction, then download it as PNG or SVG.">
+<ToolShell
+	slug="qr-code-generator"
+	title="QR Code Generator"
+	description="Turn text or a URL into a QR code. Pick the colors and error correction, then download it as PNG or SVG."
+>
 	<section class="panel" id="qr-tool">
 		<div class="panel-head">Text or URL</div>
 		<textarea id="qr-text" spellcheck="false" aria-label="Text or URL">https://techmefr.github.io/kodilo/</textarea>
 	</section>
 	<div class="toolbar">
 		<div class="seg" id="qr-ecc" aria-label="Error correction">
-			<button data-value="L" aria-pressed="false">Low 7%</button>
-			<button data-value="M" aria-pressed="true">Medium 15%</button>
-			<button data-value="Q" aria-pressed="false">Quartile 25%</button>
-			<button data-value="H" aria-pressed="false">High 30%</button>
+			<button data-value="L" aria-pressed="false">
+				Low 7%
+			</button>
+			<button data-value="M" aria-pressed="true">
+				Medium 15%
+			</button>
+			<button data-value="Q" aria-pressed="false">
+				Quartile 25%
+			</button>
+			<button data-value="H" aria-pressed="false">
+				High 30%
+			</button>
 		</div>
-		<label class="check">Foreground <input type="color" id="qr-dark" value="#111827" /></label>
-		<label class="check">Background <input type="color" id="qr-light" value="#ffffff" /></label>
+		<label class="check">
+			Foreground <input type="color" id="qr-dark" value="#111827" />
+		</label>
+		<label class="check">
+			Background <input type="color" id="qr-light" value="#ffffff" />
+		</label>
 	</div>
 	<div class="qr-stage">
 		<canvas id="qr-canvas" width="320" height="320" aria-label="QR code"></canvas>
 		<div class="qr-side">
 			<span class="field-note" id="qr-note"></span>
-			<button class="btn primary" id="qr-png">Download PNG</button>
-			<button class="btn" id="qr-svg">Download SVG</button>
+			<button class="btn primary" id="qr-png">
+				Download PNG
+			</button>
+			<button class="btn" id="qr-svg">
+				Download SVG
+			</button>
 		</div>
 	</div>
 </ToolShell>

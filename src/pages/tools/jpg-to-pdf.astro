@@ -2,26 +2,44 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="jpg-to-pdf" title="JPG to PDF" description="Put JPG or PNG images into one PDF, one image per page. Choose the page size and margins. Nothing is uploaded.">
+<ToolShell
+	slug="jpg-to-pdf"
+	title="JPG to PDF"
+	description="Put JPG or PNG images into one PDF, one image per page. Choose the page size and margins. Nothing is uploaded."
+>
 	<label class="drop" id="jp-tool">
 		<input type="file" id="jp-file" accept="image/jpeg,image/png" multiple hidden />
 		<span>Drop images here or click to choose. A sample image is loaded.</span>
 	</label>
 	<div class="toolbar">
 		<div class="seg" id="jp-size" aria-label="Page size">
-			<button data-value="fit" aria-pressed="false">Fit image</button>
-			<button data-value="a4" aria-pressed="true">A4</button>
-			<button data-value="letter" aria-pressed="false">Letter</button>
+			<button data-value="fit" aria-pressed="false">
+				Fit image
+			</button>
+			<button data-value="a4" aria-pressed="true">
+				A4
+			</button>
+			<button data-value="letter" aria-pressed="false">
+				Letter
+			</button>
 		</div>
 		<div class="seg" id="jp-margin" aria-label="Margin">
-			<button data-value="0" aria-pressed="false">No margin</button>
-			<button data-value="28" aria-pressed="true">Small</button>
-			<button data-value="56" aria-pressed="false">Large</button>
+			<button data-value="0" aria-pressed="false">
+				No margin
+			</button>
+			<button data-value="28" aria-pressed="true">
+				Small
+			</button>
+			<button data-value="56" aria-pressed="false">
+				Large
+			</button>
 		</div>
 	</div>
 	<ul class="jp-grid" id="jp-list"></ul>
 	<div class="toolbar">
-		<button class="btn primary" id="jp-go">Create PDF</button>
+		<button class="btn primary" id="jp-go">
+			Create PDF
+		</button>
 		<span class="field-note" id="jp-note"></span>
 	</div>
 </ToolShell>
@@ -48,7 +66,11 @@ import ToolShell from '../../components/ToolShell.astro';
 		g.font = 'bold 90px system-ui, sans-serif';
 		g.fillText('Sample image', 80, 420);
 		return new Promise((res) =>
-			c.toBlob(async (b) => res({ name: 'sample.jpg', bytes: new Uint8Array(await b!.arrayBuffer()), png: false, url: URL.createObjectURL(b!) }), 'image/jpeg', 0.9)
+			c.toBlob(
+				async (b) => res({ name: 'sample.jpg', bytes: new Uint8Array(await b!.arrayBuffer()), png: false, url: URL.createObjectURL(b!) }),
+				'image/jpeg',
+				0.9,
+			),
 		);
 	}
 
@@ -61,7 +83,8 @@ import ToolShell from '../../components/ToolShell.astro';
 			byId('jp-list').replaceChildren(
 				...items.map((it, i) => {
 					const li = document.createElement('li');
-					li.innerHTML = '<img alt="" /><span></span><div><button class="btn" aria-label="Move left">←</button><button class="btn" aria-label="Move right">→</button><button class="btn" aria-label="Remove">✕</button></div>';
+					li.innerHTML =
+						'<img alt="" /><span></span><div><button class="btn" aria-label="Move left">←</button><button class="btn" aria-label="Move right">→</button><button class="btn" aria-label="Remove">✕</button></div>';
 					li.querySelector('img')!.src = it.url;
 					li.querySelector('span')!.textContent = `${i + 1}. ${it.name}`;
 					const [l, r, rm] = li.querySelectorAll('button');
@@ -69,9 +92,11 @@ import ToolShell from '../../components/ToolShell.astro';
 					r.addEventListener('click', () => (moveItem(items, i, i + 1), paint()));
 					rm.addEventListener('click', () => (items.splice(i, 1), paint()));
 					return li;
-				})
+				}),
 			);
-			byId('jp-note').textContent = items.length ? `${items.length} page${items.length > 1 ? 's' : ''}, ${humanBytes(items.reduce((a, it) => a + it.bytes.length, 0))} of images` : 'Add at least one image.';
+			byId('jp-note').textContent = items.length
+				? `${items.length} page${items.length > 1 ? 's' : ''}, ${humanBytes(items.reduce((a, it) => a + it.bytes.length, 0))} of images`
+				: 'Add at least one image.';
 			byId<HTMLButtonElement>('jp-go').disabled = !items.length;
 		};
 

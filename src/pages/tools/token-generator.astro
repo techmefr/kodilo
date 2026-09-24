@@ -2,26 +2,38 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="token-generator"
-	title="Token Generator"
-	description="Random API keys, secrets and nonces from the browser's secure random generator."
->
+<ToolShell slug="token-generator" title="Token Generator" description="Random API keys, secrets and nonces from the browser's secure random generator.">
 	<div class="toolbar" id="tok-tool">
 		<div class="seg" id="tok-format" aria-label="Format">
-			<button data-value="alnum" aria-pressed="true">Alphanumeric</button>
-			<button data-value="hex" aria-pressed="false">Hex</button>
-			<button data-value="base64url" aria-pressed="false">Base64url</button>
+			<button data-value="alnum" aria-pressed="true">
+				Alphanumeric
+			</button>
+			<button data-value="hex" aria-pressed="false">
+				Hex
+			</button>
+			<button data-value="base64url" aria-pressed="false">
+				Base64url
+			</button>
 		</div>
-		<label class="check">Length <input class="num" type="number" id="tok-length" min="4" max="512" value="32" /></label>
-		<label class="check">Count <input class="num" type="number" id="tok-count" min="1" max="100" value="5" /></label>
-		<label class="check">Prefix <input class="num tok-prefix" id="tok-prefix" placeholder="sk_live_" /></label>
-		<button class="btn primary" id="tok-regen">Regenerate</button>
+		<label class="check">
+			Length <input class="num" type="number" id="tok-length" min="4" max="512" value="32" />
+		</label>
+		<label class="check">
+			Count <input class="num" type="number" id="tok-count" min="1" max="100" value="5" />
+		</label>
+		<label class="check">
+			Prefix <input class="num tok-prefix" id="tok-prefix" placeholder="sk_live_" />
+		</label>
+		<button class="btn primary" id="tok-regen">
+			Regenerate
+		</button>
 	</div>
 	<section class="panel">
 		<div class="panel-head">
 			<span id="tok-label">Tokens</span>
-			<button class="btn" id="tok-copy">Copy all</button>
+			<button class="btn" id="tok-copy">
+				Copy all
+			</button>
 		</div>
 		<pre class="out" id="tok-out"></pre>
 	</section>
@@ -48,10 +60,9 @@ import ToolShell from '../../components/ToolShell.astro';
 			const alphabet = ALPHABETS[format];
 			const n = Math.min(512, Math.max(4, Number(length.value) || 32));
 			const c = Math.min(100, Math.max(1, Number(count.value) || 1));
-			out.textContent = Array.from(
-				{ length: c },
-				() => prefix.value + Array.from({ length: n }, () => alphabet[randomIndex(alphabet.length)]).join('')
-			).join('\n');
+			out.textContent = Array.from({ length: c }, () => prefix.value + Array.from({ length: n }, () => alphabet[randomIndex(alphabet.length)]).join('')).join(
+				'\n',
+			);
 			byId('tok-label').textContent = `${c} × ${n} chars · ${Math.round(n * Math.log2(alphabet.length))} bits each`;
 		};
 

@@ -23,35 +23,37 @@ const perms = [
 			<thead>
 				<tr>
 					<th></th>
-					{perms.map(([, label, value]) => <th>{label} · {value}</th>)}
+					{perms.map(([, label, value]) => (
+						<th>
+							{label} · {value}
+						</th>
+					))}
 				</tr>
 			</thead>
 			<tbody>
-				{
-					who.map(([id, label]) => (
-						<tr>
-							<th scope="row">{label}</th>
-							{perms.map(([perm, permLabel]) => (
-								<td>
-									<input
-										type="checkbox"
-										class="chmod-box"
-										data-who={id}
-										data-perm={perm}
-										aria-label={`${label} ${permLabel}`}
-									/>
-								</td>
-							))}
-						</tr>
-					))
-				}
+				{who.map(([id, label]) => (
+					<tr>
+						<th scope="row">{label}</th>
+						{perms.map(([perm, permLabel]) => (
+							<td>
+								<input type="checkbox" class="chmod-box" data-who={id} data-perm={perm} aria-label={`${label} ${permLabel}`} />
+							</td>
+						))}
+					</tr>
+				))}
 			</tbody>
 		</table>
 	</section>
 	<div class="toolbar">
-		<label class="check"><input type="checkbox" class="chmod-special" data-bit="4" /> setuid</label>
-		<label class="check"><input type="checkbox" class="chmod-special" data-bit="2" /> setgid</label>
-		<label class="check"><input type="checkbox" class="chmod-special" data-bit="1" /> sticky</label>
+		<label class="check">
+			<input type="checkbox" class="chmod-special" data-bit="4" /> setuid
+		</label>
+		<label class="check">
+			<input type="checkbox" class="chmod-special" data-bit="2" /> setgid
+		</label>
+		<label class="check">
+			<input type="checkbox" class="chmod-special" data-bit="1" /> sticky
+		</label>
 	</div>
 	<div class="fields">
 		<div class="field" id="chmod-octal-field">
@@ -66,7 +68,9 @@ const perms = [
 	<section class="panel">
 		<div class="panel-head">
 			<span>Command</span>
-			<button class="btn" id="chmod-copy">Copy</button>
+			<button class="btn" id="chmod-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out chmod-cmd" id="chmod-cmd"></pre>
 	</section>
@@ -93,9 +97,7 @@ const perms = [
 
 		const digits = () => {
 			const special = specials.filter((s) => s.checked).reduce((sum, s) => sum + Number(s.dataset.bit), 0);
-			const base = WHO.map((w) =>
-				boxes.filter((b) => b.dataset.who === w && b.checked).reduce((sum, b) => sum + PERM[b.dataset.perm!], 0)
-			);
+			const base = WHO.map((w) => boxes.filter((b) => b.dataset.who === w && b.checked).reduce((sum, b) => sum + PERM[b.dataset.perm!], 0));
 			return { special, base };
 		};
 
@@ -143,7 +145,7 @@ const perms = [
 			button.addEventListener('click', () => {
 				applyOctal(button.dataset.mode!);
 				show();
-			})
+			}),
 		);
 		copyButton(byId('chmod-copy'), () => byId('chmod-cmd').textContent ?? '');
 		applyOctal(octal.value);

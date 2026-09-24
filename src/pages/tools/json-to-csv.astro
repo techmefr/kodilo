@@ -9,28 +9,38 @@ import ToolShell from '../../components/ToolShell.astro';
 >
 	<div class="toolbar" id="csv-tool">
 		<div class="seg" id="csv-delim" aria-label="Delimiter">
-			<button data-value="," aria-pressed="true">Comma</button>
-			<button data-value=";" aria-pressed="false">Semicolon</button>
-			<button data-value="&#9;" aria-pressed="false">Tab</button>
+			<button data-value="," aria-pressed="true">
+				Comma
+			</button>
+			<button data-value=";" aria-pressed="false">
+				Semicolon
+			</button>
+			<button data-value="&#9;" aria-pressed="false">
+				Tab
+			</button>
 		</div>
-		<label class="check"><input type="checkbox" id="csv-bom" /> Excel-friendly (UTF-8 BOM)</label>
-		<button class="btn primary" id="csv-download">Download .csv</button>
+		<label class="check">
+			<input type="checkbox" id="csv-bom" /> Excel-friendly (UTF-8 BOM)
+		</label>
+		<button class="btn primary" id="csv-download">
+			Download .csv
+		</button>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
 			<div class="panel-head">JSON</div>
-			<textarea id="csv-in" spellcheck="false" aria-label="JSON input"
-				>{`[
+			<textarea id="csv-in" spellcheck="false" aria-label="JSON input">{`[
   {"id": 1, "name": "Ada", "email": "ada@example.com", "address": {"city": "London"}, "tags": ["admin", "dev"]},
   {"id": 2, "name": "Linus", "email": "linus@example.com", "address": {"city": "Helsinki"}},
   {"id": 3, "name": "Grace, \\"Amazing\\" Hopper", "address": {"city": "New York"}, "active": false}
-]`}</textarea
-			>
+]`}</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span id="csv-label">CSV</span>
-				<button class="btn" id="csv-copy">Copy</button>
+				<button class="btn" id="csv-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="csv-out"></pre>
 		</section>
@@ -89,9 +99,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			try {
 				rows = parseInput(input.value).map((r) => flatten(r));
 				headers = [...new Set(rows.flatMap((r) => Object.keys(r)))];
-				output.textContent = [headers, ...rows.map((r) => headers.map((h) => r[h]))]
-					.map((line) => line.map(cell).join(delimiter))
-					.join('\n');
+				output.textContent = [headers, ...rows.map((r) => headers.map((h) => r[h]))].map((line) => line.map(cell).join(delimiter)).join('\n');
 				error.hidden = true;
 				byId('csv-label').textContent = `CSV · ${rows.length} rows · ${headers.length} columns`;
 			} catch (e) {
@@ -117,7 +125,7 @@ import ToolShell from '../../components/ToolShell.astro';
 		input.addEventListener('input', render);
 		copyButton(byId('csv-copy'), () => output.textContent ?? '');
 		byId('csv-download').addEventListener('click', () => {
-			const blob = new Blob([(bom.checked ? '﻿' : '') + (output.textContent ?? '')], { type: 'text/csv;charset=utf-8' });
+			const blob = new Blob([(bom.checked ? '\ufeff' : '') + (output.textContent ?? '')], { type: 'text/csv;charset=utf-8' });
 			const link = document.createElement('a');
 			link.href = URL.createObjectURL(blob);
 			link.download = 'data.csv';

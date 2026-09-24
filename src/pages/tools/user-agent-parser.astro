@@ -10,14 +10,22 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel" id="ua-tool">
 		<div class="panel-head">
 			<span>User-Agent</span>
-			<button class="btn" id="ua-mine">Use mine</button>
+			<button class="btn" id="ua-mine">
+				Use mine
+			</button>
 		</div>
 		<textarea id="ua-in" class="ua-in" spellcheck="false" aria-label="User-Agent string"></textarea>
 	</section>
 	<div class="chips" id="ua-samples">
-		<button data-ua="Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1">iPhone Safari</button>
-		<button data-ua="Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36">Android Chrome</button>
-		<button data-ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0">Windows Edge</button>
+		<button data-ua="Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1">
+			iPhone Safari
+		</button>
+		<button data-ua="Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36">
+			Android Chrome
+		</button>
+		<button data-ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0">
+			Windows Edge
+		</button>
 		<button data-ua="Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0">Linux Firefox</button>
 		<button data-ua="Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)">Googlebot</button>
 		<button data-ua="curl/8.11.0">curl</button>
@@ -64,10 +72,23 @@ import ToolShell from '../../components/ToolShell.astro';
 			[/CrOS/, 'ChromeOS'],
 			[/Linux/, 'Linux'],
 		]);
-		const engine = /Gecko\/\d/.test(ua) && /Firefox/.test(ua) ? 'Gecko' : /Chrome\/|CriOS|Edg/.test(ua) && !/iPhone|iPad/.test(ua) ? 'Blink' : /AppleWebKit/.test(ua) ? 'WebKit' : 'Unknown';
-		const device = bot ? 'Bot or CLI' : /iPad|Tablet/.test(ua) || (/Android/.test(ua) && !/Mobile/.test(ua)) ? 'Tablet' : /Mobi|iPhone|Android/.test(ua) ? 'Mobile' : 'Desktop';
+		const engine =
+			/Gecko\/\d/.test(ua) && /Firefox/.test(ua)
+				? 'Gecko'
+				: /Chrome\/|CriOS|Edg/.test(ua) && !/iPhone|iPad/.test(ua)
+					? 'Blink'
+					: /AppleWebKit/.test(ua)
+						? 'WebKit'
+						: 'Unknown';
+		const device = bot
+			? 'Bot or CLI'
+			: /iPad|Tablet/.test(ua) || (/Android/.test(ua) && !/Mobile/.test(ua))
+				? 'Tablet'
+				: /Mobi|iPhone|Android/.test(ua)
+					? 'Mobile'
+					: 'Desktop';
 		const arch = /x86_64|Win64|x64|amd64/i.test(ua) ? 'x86-64' : /arm64|aarch64/i.test(ua) ? 'ARM64' : '—';
-		const model = ua.match(/Android [\d.]+; ([^;)]+)/)?.[1] ?? (/(iPhone|iPad)/.exec(ua)?.[1] ?? '—');
+		const model = ua.match(/Android [\d.]+; ([^;)]+)/)?.[1] ?? /(iPhone|iPad)/.exec(ua)?.[1] ?? '—';
 		return { browser, os, engine, device, arch, model };
 	}
 
@@ -92,7 +113,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					el.querySelector('b')!.textContent = value;
 					el.querySelector('span')!.textContent = label;
 					return el;
-				})
+				}),
 			);
 		};
 
@@ -106,7 +127,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			b.addEventListener('click', () => {
 				input.value = b.dataset.ua!;
 				render();
-			})
+			}),
 		);
 		render();
 	});

@@ -17,7 +17,14 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel sig-answer" id="sig-answer"></section>
 	<div class="ports-wrap">
 		<table class="sig-table">
-			<thead><tr><th>#</th><th>Signal</th><th>Default</th><th>Meaning</th></tr></thead>
+			<thead>
+				<tr>
+					<th>#</th>
+					<th>Signal</th>
+					<th>Default</th>
+					<th>Meaning</th>
+				</tr>
+			</thead>
 			<tbody id="sig-body"></tbody>
 		</table>
 	</div>
@@ -73,12 +80,20 @@ import ToolShell from '../../components/ToolShell.astro';
 			byId('sig-note').textContent = valid ? '' : 'Exit codes range from 0 to 255.';
 			const answer = byId('sig-answer');
 			const signal = code > 128 ? SIGNALS.find(([n]) => n === code - 128) : undefined;
-			const title = !valid ? '—' : signal ? `Killed by ${signal[1]} (128 + ${signal[0]})` : code > 128 ? `Killed by signal ${code - 128}` : CODES[code] ? `Exit ${code}` : `Exit ${code}: application defined`;
+			const title = !valid
+				? '—'
+				: signal
+					? `Killed by ${signal[1]} (128 + ${signal[0]})`
+					: code > 128
+						? `Killed by signal ${code - 128}`
+						: CODES[code]
+							? `Exit ${code}`
+							: `Exit ${code}: application defined`;
 			const detail = !valid
 				? ''
 				: signal
 					? `${signal[3]}.${signal[0] === 9 ? ' In a container this is very often the OOM killer: check memory limits.' : ''}`
-					: CODES[code] ?? 'The program chose this code. Look it up in its documentation.';
+					: (CODES[code] ?? 'The program chose this code. Look it up in its documentation.');
 			answer.innerHTML = '<b></b><p></p>';
 			answer.querySelector('b')!.textContent = title;
 			answer.querySelector('p')!.textContent = detail;
@@ -92,7 +107,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						tr.append(td);
 					});
 					return tr;
-				})
+				}),
 			);
 		};
 

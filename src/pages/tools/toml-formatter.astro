@@ -22,23 +22,37 @@ concurrency = 2
 `;
 ---
 
-<ToolShell slug="toml-formatter" title="TOML Formatter & Converter" description="Validate and reformat TOML, or convert it to and from JSON. Errors point to the line and column.">
+<ToolShell
+	slug="toml-formatter"
+	title="TOML Formatter & Converter"
+	description="Validate and reformat TOML, or convert it to and from JSON. Errors point to the line and column."
+>
 	<div class="toolbar" id="tf-tool">
 		<div class="seg" id="tf-mode" aria-label="Output">
-			<button data-value="toml" aria-pressed="true">Formatted TOML</button>
-			<button data-value="json" aria-pressed="false">TOML → JSON</button>
-			<button data-value="from-json" aria-pressed="false">JSON → TOML</button>
+			<button data-value="toml" aria-pressed="true">
+				Formatted TOML
+			</button>
+			<button data-value="json" aria-pressed="false">
+				TOML → JSON
+			</button>
+			<button data-value="from-json" aria-pressed="false">
+				JSON → TOML
+			</button>
 		</div>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
-			<div class="panel-head" id="tf-in-title">TOML</div>
+			<div class="panel-head" id="tf-in-title">
+				TOML
+			</div>
 			<textarea id="tf-in" spellcheck="false" aria-label="Input">{sample}</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span id="tf-status">Output</span>
-				<button class="btn" id="tf-copy">Copy</button>
+				<button class="btn" id="tf-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="tf-out"></pre>
 		</section>

@@ -9,7 +9,9 @@ import ToolShell from '../../components/ToolShell.astro';
 >
 	<div class="toolbar" id="dns-tool">
 		<div class="seg" id="dns-type">
-			<button data-value="A" aria-pressed="true">A</button>
+			<button data-value="A" aria-pressed="true">
+				A
+			</button>
 			<button data-value="AAAA">AAAA</button>
 			<button data-value="CNAME">CNAME</button>
 			<button data-value="MX">MX</button>
@@ -21,16 +23,39 @@ import ToolShell from '../../components/ToolShell.astro';
 		</div>
 	</div>
 	<div class="fields">
-		<div class="field"><label for="dns-domain">Domain</label><input id="dns-domain" spellcheck="false" value="example.com" /></div>
-		<div class="field"><label for="dns-name">Name</label><input id="dns-name" spellcheck="false" value="@" /><span class="field-note">@ for the domain itself</span></div>
-		<div class="field"><label for="dns-ttl">TTL (seconds)</label><input id="dns-ttl" inputmode="numeric" value="3600" /></div>
-		<div class="field" id="dns-value-field"><label for="dns-value" id="dns-value-label">Value</label><input id="dns-value" spellcheck="false" /><span class="field-note" id="dns-value-note"></span></div>
-		<div class="field" id="dns-extra-field"><label for="dns-extra" id="dns-extra-label">Priority</label><input id="dns-extra" spellcheck="false" /></div>
+		<div class="field">
+			<label for="dns-domain">Domain</label>
+			<input id="dns-domain" spellcheck="false" value="example.com" />
+		</div>
+		<div class="field">
+			<label for="dns-name">Name</label>
+			<input id="dns-name" spellcheck="false" value="@" />
+			<span class="field-note">@ for the domain itself</span>
+		</div>
+		<div class="field">
+			<label for="dns-ttl">TTL (seconds)</label>
+			<input id="dns-ttl" inputmode="numeric" value="3600" />
+		</div>
+		<div class="field" id="dns-value-field">
+			<label for="dns-value" id="dns-value-label">
+				Value
+			</label>
+			<input id="dns-value" spellcheck="false" />
+			<span class="field-note" id="dns-value-note"></span>
+		</div>
+		<div class="field" id="dns-extra-field">
+			<label for="dns-extra" id="dns-extra-label">
+				Priority
+			</label>
+			<input id="dns-extra" spellcheck="false" />
+		</div>
 	</div>
 	<section class="panel">
 		<div class="panel-head">
 			<span>Zone file</span>
-			<button class="btn" id="dns-copy">Copy</button>
+			<button class="btn" id="dns-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out dns-out" id="dns-out"></pre>
 	</section>
@@ -53,13 +78,56 @@ import ToolShell from '../../components/ToolShell.astro';
 	const SPECS: Record<string, Spec> = {
 		A: { label: 'IPv4 address', sample: '203.0.113.10', note: 'Points a name to an IPv4 address.', check: (v) => IPV4.test(v) },
 		AAAA: { label: 'IPv6 address', sample: '2001:db8::10', note: 'Points a name to an IPv6 address.', check: isIpv6 },
-		CNAME: { label: 'Target host', sample: 'app.hosting.net.', name: 'www', note: 'Cannot live at the apex (@) or next to other records.', check: (v) => HOST.test(v) },
-		MX: { label: 'Mail server', sample: 'mx1.mail.example.com.', extra: ['Priority', '10'], note: 'Lower priority wins. Must point to a host, not an IP or CNAME.', check: (v) => HOST.test(v) && !IPV4.test(v) },
-		TXT: { label: 'Text', sample: 'google-site-verification=abc123', note: 'Long values are split into 255-character strings automatically.', check: (v) => v.length > 0 },
-		SPF: { label: 'Allowed senders', sample: 'include:_spf.google.com ip4:203.0.113.10', extra: ['Policy', '~all'], note: 'Only one SPF record per name. Max 10 DNS lookups.', check: (v) => !/v=spf1/i.test(v) },
-		DMARC: { label: 'Report address', sample: 'dmarc@example.com', name: '_dmarc', extra: ['Policy', 'quarantine'], note: 'Policy: none, quarantine or reject.', check: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) },
-		CAA: { label: 'Certificate authority', sample: 'letsencrypt.org', extra: ['Tag', 'issue'], note: 'Tag: issue, issuewild or iodef.', check: (v) => v.length > 0 },
-		SRV: { label: 'Target host', sample: 'sip.example.com.', name: '_sip._tcp', extra: ['Priority weight port', '10 5 5060'], note: 'Name is _service._proto.', check: (v) => HOST.test(v) },
+		CNAME: {
+			label: 'Target host',
+			sample: 'app.hosting.net.',
+			name: 'www',
+			note: 'Cannot live at the apex (@) or next to other records.',
+			check: (v) => HOST.test(v),
+		},
+		MX: {
+			label: 'Mail server',
+			sample: 'mx1.mail.example.com.',
+			extra: ['Priority', '10'],
+			note: 'Lower priority wins. Must point to a host, not an IP or CNAME.',
+			check: (v) => HOST.test(v) && !IPV4.test(v),
+		},
+		TXT: {
+			label: 'Text',
+			sample: 'google-site-verification=abc123',
+			note: 'Long values are split into 255-character strings automatically.',
+			check: (v) => v.length > 0,
+		},
+		SPF: {
+			label: 'Allowed senders',
+			sample: 'include:_spf.google.com ip4:203.0.113.10',
+			extra: ['Policy', '~all'],
+			note: 'Only one SPF record per name. Max 10 DNS lookups.',
+			check: (v) => !/v=spf1/i.test(v),
+		},
+		DMARC: {
+			label: 'Report address',
+			sample: 'dmarc@example.com',
+			name: '_dmarc',
+			extra: ['Policy', 'quarantine'],
+			note: 'Policy: none, quarantine or reject.',
+			check: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+		},
+		CAA: {
+			label: 'Certificate authority',
+			sample: 'letsencrypt.org',
+			extra: ['Tag', 'issue'],
+			note: 'Tag: issue, issuewild or iodef.',
+			check: (v) => v.length > 0,
+		},
+		SRV: {
+			label: 'Target host',
+			sample: 'sip.example.com.',
+			name: '_sip._tcp',
+			extra: ['Priority weight port', '10 5 5060'],
+			note: 'Name is _service._proto.',
+			check: (v) => HOST.test(v),
+		},
 	};
 
 	const quote = (text: string) => (text.match(/.{1,255}/g) ?? ['']).map((c) => `"${c.replace(/"/g, '\\"')}"`).join(' ');

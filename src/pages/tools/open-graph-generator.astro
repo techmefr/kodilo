@@ -8,28 +8,55 @@ import ToolShell from '../../components/ToolShell.astro';
 	description="Open Graph and Twitter card tags with a live link preview, the way Slack, LinkedIn or X will show it."
 >
 	<div class="fields" id="og-tool">
-		<div class="field wide"><label for="og-title">Title</label><input id="og-title" value="kodilo — Free developer tools" /></div>
-		<div class="field wide"><label for="og-desc">Description</label><input id="og-desc" value="Formatters, converters, generators and validators that run in your browser. No account, no upload." /></div>
-		<div class="field"><label for="og-url">URL</label><input id="og-url" spellcheck="false" value="https://techmefr.github.io/kodilo/" /></div>
-		<div class="field"><label for="og-image">Image URL · 1200 × 630</label><input id="og-image" spellcheck="false" placeholder="https://example.com/og.png" /></div>
-		<div class="field"><label for="og-site">Site name</label><input id="og-site" value="kodilo" /></div>
-		<div class="field"><label for="og-twitter">X / Twitter handle</label><input id="og-twitter" spellcheck="false" placeholder="@handle" /></div>
-		<div class="field"><label for="og-locale">Locale</label><input id="og-locale" spellcheck="false" value="en_US" /></div>
+		<div class="field wide">
+			<label for="og-title">Title</label>
+			<input id="og-title" value="kodilo — Free developer tools" />
+		</div>
+		<div class="field wide">
+			<label for="og-desc">Description</label>
+			<input id="og-desc" value="Formatters, converters, generators and validators that run in your browser. No account, no upload." />
+		</div>
+		<div class="field">
+			<label for="og-url">URL</label>
+			<input id="og-url" spellcheck="false" value="https://techmefr.github.io/kodilo/" />
+		</div>
+		<div class="field">
+			<label for="og-image">Image URL · 1200 × 630</label>
+			<input id="og-image" spellcheck="false" placeholder="https://example.com/og.png" />
+		</div>
+		<div class="field">
+			<label for="og-site">Site name</label>
+			<input id="og-site" value="kodilo" />
+		</div>
+		<div class="field">
+			<label for="og-twitter">X / Twitter handle</label>
+			<input id="og-twitter" spellcheck="false" placeholder="@handle" />
+		</div>
+		<div class="field">
+			<label for="og-locale">Locale</label>
+			<input id="og-locale" spellcheck="false" value="en_US" />
+		</div>
 	</div>
 	<div class="toolbar">
 		<div class="seg" id="og-type">
-			<button data-value="website" aria-pressed="true">website</button>
+			<button data-value="website" aria-pressed="true">
+				website
+			</button>
 			<button data-value="article">article</button>
 			<button data-value="product">product</button>
 			<button data-value="profile">profile</button>
 		</div>
 		<div class="seg" id="og-card">
-			<button data-value="summary_large_image" aria-pressed="true">Large image card</button>
+			<button data-value="summary_large_image" aria-pressed="true">
+				Large image card
+			</button>
 			<button data-value="summary">Summary card</button>
 		</div>
 	</div>
 	<div class="og-card" id="og-preview">
-		<div class="og-img" id="og-p-img"><span>1200 × 630</span></div>
+		<div class="og-img" id="og-p-img">
+			<span>1200 × 630</span>
+		</div>
 		<div class="og-text">
 			<span id="og-p-host"></span>
 			<b id="og-p-title"></b>
@@ -39,7 +66,9 @@ import ToolShell from '../../components/ToolShell.astro';
 	<section class="panel">
 		<div class="panel-head">
 			<span>HTML</span>
-			<button class="btn" id="og-copy">Copy</button>
+			<button class="btn" id="og-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="og-out"></pre>
 	</section>
@@ -73,7 +102,10 @@ import ToolShell from '../../components/ToolShell.astro';
 				['name', 'twitter:image', val('og-image')],
 				['name', 'twitter:site', val('og-twitter')],
 			];
-			byId('og-out').textContent = tags.filter(([, , v]) => v).map(([attr, key, v]) => `<meta ${attr}="${key}" content="${esc(v)}" />`).join('\n');
+			byId('og-out').textContent = tags
+				.filter(([, , v]) => v)
+				.map(([attr, key, v]) => `<meta ${attr}="${key}" content="${esc(v)}" />`)
+				.join('\n');
 			let host = val('og-url');
 			try {
 				host = new URL(host).hostname;

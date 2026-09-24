@@ -14,58 +14,54 @@ import Header from '../../components/Header.astro';
 				</div>
 
 				<div class="subtabs" id="clientSubtabs" role="tablist">
-					<button class="subtab" id="subtab-desktop-light" aria-selected="true"
-						>Preview Desktop <span class="subtab-theme">☀ Light</span></button
-					>
-					<button class="subtab" id="subtab-desktop-dark" aria-selected="false"
-						>Preview Desktop <span class="subtab-theme">☾ Dark</span></button
-					>
-					<button class="subtab" id="subtab-mobile-light" aria-selected="false"
-						>Preview Mobile <span class="subtab-theme">☀ Light</span></button
-					>
-					<button class="subtab" id="subtab-mobile-dark" aria-selected="false"
-						>Preview Mobile <span class="subtab-theme">☾ Dark</span></button
-					>
-					<button class="subtab" id="subtab-conditions" aria-selected="false">Conditions</button>
+					<button class="subtab" id="subtab-desktop-light" aria-selected="true">
+						Preview Desktop <span class="subtab-theme">☀ Light</span>
+					</button>
+					<button class="subtab" id="subtab-desktop-dark" aria-selected="false">
+						Preview Desktop <span class="subtab-theme">☾ Dark</span>
+					</button>
+					<button class="subtab" id="subtab-mobile-light" aria-selected="false">
+						Preview Mobile <span class="subtab-theme">☀ Light</span>
+					</button>
+					<button class="subtab" id="subtab-mobile-dark" aria-selected="false">
+						Preview Mobile <span class="subtab-theme">☾ Dark</span>
+					</button>
+					<button class="subtab" id="subtab-conditions" aria-selected="false">
+						Conditions
+					</button>
 				</div>
 
 				<div class="content">
 					<div id="viewPreview">
 						<div class="frame-stage">
-							<iframe
-								id="preview"
-								class="desktop"
-								title="Client preview"
-								sandbox="allow-same-origin"></iframe>
+							<iframe id="preview" class="desktop" title="Client preview" sandbox="allow-same-origin"></iframe>
 						</div>
 					</div>
 					<div id="viewConditions" style="display:none;"></div>
 					<div id="viewHtml" style="display:none;padding:12px;">
 						<textarea id="source" spellcheck="false"></textarea>
 						<div style="margin-top:8px;display:flex;gap:8px;">
-							<button
-								id="applyBtn"
-								style="background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600;"
-								>Apply</button
-							>
+							<button id="applyBtn" style="background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600;">
+								Apply
+							</button>
 							<button id="sampleBtn">Load sample</button>
 						</div>
 					</div>
 				</div>
 
 				<footer>
-					Support data hand-curated from publicly documented client behaviour (see <a
-						href="https://www.caniemail.com"
-						target="_blank"
-						rel="noopener">caniemail.com</a
-					>) — a first pass, not a QA sign-off.
+					Support data hand-curated from publicly documented client behaviour (see{' '}
+					<a href="https://www.caniemail.com" target="_blank" rel="noopener">
+						caniemail.com
+					</a>
+					) — a first pass, not a QA sign-off.
 				</footer>
 			</div>
 		</main>
 	</div>
 
 	<script>
-		var SAMPLE_HTML = `<!doctype html>
+		const SAMPLE_HTML = `<!doctype html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
 <meta charset="utf-8">
@@ -184,7 +180,7 @@ import Header from '../../components/Header.astro';
 		document.addEventListener('astro:page-load', function () {
 			if (!document.getElementById('preview')) return;
 
-			var CLIENTS = [
+			const CLIENTS = [
 				{ id: 'outlook-desktop', name: 'Outlook Desktop', engine: 'Word rendering engine', group: 'outlook' },
 				{ id: 'outlook-com', name: 'Outlook.com', engine: 'Modern webmail', group: 'outlook' },
 				{ id: 'gmail', name: 'Gmail', engine: 'Webmail (Chromium-based)' },
@@ -192,7 +188,7 @@ import Header from '../../components/Header.astro';
 				{ id: 'thunderbird', name: 'Thunderbird', engine: 'Gecko (desktop)' },
 			];
 
-			var FEATURES = [
+			const FEATURES = [
 				{
 					id: 'border-radius',
 					label: 'border-radius',
@@ -345,7 +341,7 @@ import Header from '../../components/Header.astro';
 				},
 			];
 
-			var els = {
+			const els = {
 				tabs: document.getElementById('tabs'),
 				clientSubtabs: document.getElementById('clientSubtabs'),
 				subtabDesktopLight: document.getElementById('subtab-desktop-light'),
@@ -362,20 +358,20 @@ import Header from '../../components/Header.astro';
 				preview: document.getElementById('preview'),
 			};
 
-			var HTML_TAB_ID = '__html__';
-			var activeClientId = CLIENTS[0].id;
-			var activeSubtab = 'desktop-light';
-			var rawHtml = SAMPLE_HTML;
+			const HTML_TAB_ID = '__html__';
+			let activeClientId = CLIENTS[0].id;
+			let activeSubtab = 'desktop-light';
+			let rawHtml = SAMPLE_HTML;
 
 			function extractDarkMediaBlocks(css: string) {
-				var result: { start: number; end: number; body: string }[] = [];
-				var re = /@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{/gi;
-				var match;
+				const result: { start: number; end: number; body: string }[] = [];
+				const re = /@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{/gi;
+				let match;
 				while ((match = re.exec(css))) {
-					var start = match.index;
-					var bodyStart = re.lastIndex;
-					var depth = 1;
-					var i = bodyStart;
+					const start = match.index;
+					const bodyStart = re.lastIndex;
+					let depth = 1;
+					let i = bodyStart;
 					for (; i < css.length && depth > 0; i++) {
 						if (css[i] === '{') depth++;
 						else if (css[i] === '}') depth--;
@@ -387,11 +383,11 @@ import Header from '../../components/Header.astro';
 			}
 
 			function applyColorScheme(html: string, theme: string) {
-				return html.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, function (full, body) {
-					var blocks = extractDarkMediaBlocks(body);
+				return html.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, function (full: string, body: string) {
+					const blocks = extractDarkMediaBlocks(body);
 					if (!blocks.length) return full;
-					var out = '';
-					var last = 0;
+					let out = '';
+					let last = 0;
 					blocks.forEach(function (b) {
 						out += body.slice(last, b.start);
 						out += theme === 'dark' ? b.body : '';
@@ -402,24 +398,21 @@ import Header from '../../components/Header.astro';
 				});
 			}
 
-			function stripMediaBlocks(html) {
-				return html.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, function (full, body) {
-					var cleaned = body.replace(/@media[^{]*\{([\s\S]*?\})\s*\}/gi, '');
+			function stripMediaBlocks(html: string) {
+				return html.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, function (full: string, body: string) {
+					const cleaned = body.replace(/@media[^{]*\{([\s\S]*?\})\s*\}/gi, '');
 					return full.replace(body, cleaned);
 				});
 			}
-			function stripExternalFonts(html) {
-				return html.replace(
-					/<link[^>]+href=["'][^"']*fonts\.googleapis\.com[^"']*["'][^>]*>/gi,
-					'<!-- web font link removed by this client -->'
-				);
+			function stripExternalFonts(html: string) {
+				return html.replace(/<link[^>]+href=["'][^"']*fonts\.googleapis\.com[^"']*["'][^>]*>/gi, '<!-- web font link removed by this client -->');
 			}
 
-			function transformForClient(html, clientId) {
-				var out = html;
+			function transformForClient(html: string, clientId: string) {
+				let out = html;
 				FEATURES.forEach(function (f) {
 					if (!f.strip) return;
-					var only = f.strip.only;
+					const only = f.strip.only;
 					if (only && only.indexOf(clientId) === -1) return;
 					if (f.strip.link) out = stripExternalFonts(out);
 					else if (f.strip.mediaBlock) out = stripMediaBlocks(out);
@@ -433,7 +426,7 @@ import Header from '../../components/Header.astro';
 				Array.prototype.forEach.call(els.tabs!.children, function (el: HTMLElement) {
 					el.setAttribute('aria-selected', String(el.dataset.tabId === id));
 				});
-				var isHtml = id === HTML_TAB_ID;
+				const isHtml = id === HTML_TAB_ID;
 				(els.clientSubtabs as HTMLElement).style.display = isHtml ? 'none' : '';
 				if (isHtml) {
 					(els.viewHtml as HTMLElement).style.display = '';
@@ -464,7 +457,7 @@ import Header from '../../components/Header.astro';
 			function buildTabs() {
 				els.tabs!.innerHTML = '';
 
-				var htmlBtn = document.createElement('button');
+				const htmlBtn = document.createElement('button');
 				htmlBtn.className = 'tab';
 				htmlBtn.setAttribute('role', 'tab');
 				htmlBtn.dataset.tabId = HTML_TAB_ID;
@@ -475,8 +468,8 @@ import Header from '../../components/Header.astro';
 				els.tabs!.appendChild(htmlBtn);
 
 				CLIENTS.forEach(function (client, i) {
-					var btn = document.createElement('button');
-					var nextIsSameGroup = CLIENTS[i + 1] && client.group && CLIENTS[i + 1].group === client.group;
+					const btn = document.createElement('button');
+					const nextIsSameGroup = CLIENTS[i + 1] && client.group && CLIENTS[i + 1].group === client.group;
 					btn.className = 'tab' + (client.group && !nextIsSameGroup ? ' group-end' : '');
 					btn.setAttribute('role', 'tab');
 					btn.dataset.tabId = client.id;
@@ -490,15 +483,14 @@ import Header from '../../components/Header.astro';
 				});
 			}
 
-			var ICONS: Record<string, string> = { yes: '✓', partial: '~', no: '✕' };
+			const ICONS: Record<string, string> = { yes: '✓', partial: '~', no: '✕' };
 
 			function renderConditions() {
-				var rows = FEATURES.filter(function (f) {
+				const rows = FEATURES.filter(function (f) {
 					return !f.hidden;
 				});
 
-				var html =
-					'<table class="support"><caption>CSS feature support across mail clients</caption><thead><tr><th>CSS feature</th>';
+				let html = '<table class="support"><caption>CSS feature support across mail clients</caption><thead><tr><th>CSS feature</th>';
 				CLIENTS.forEach(function (c) {
 					html += '<th class="center">' + c.name + '</th>';
 				});
@@ -507,20 +499,9 @@ import Header from '../../components/Header.astro';
 				rows.forEach(function (f) {
 					html += '<tr><td>' + f.label + '</td>';
 					CLIENTS.forEach(function (c) {
-						var entry = (f.support as any)[c.id] || { status: 'yes', note: '' };
-						var title = entry.note
-							? entry.note.replace(/"/g, '&quot;')
-							: entry.status === 'yes'
-								? 'Fully supported'
-								: '';
-						html +=
-							'<td class="center" title="' +
-							title +
-							'"><span class="badge icon ' +
-							entry.status +
-							'">' +
-							ICONS[entry.status] +
-							'</span></td>';
+						const entry = (f.support as Record<string, { status: string; note: string }>)[c.id] || { status: 'yes', note: '' };
+						const title = entry.note ? entry.note.replace(/"/g, '&quot;') : entry.status === 'yes' ? 'Fully supported' : '';
+						html += '<td class="center" title="' + title + '"><span class="badge icon ' + entry.status + '">' + ICONS[entry.status] + '</span></td>';
 					});
 					html += '</tr>';
 				});
@@ -545,8 +526,8 @@ import Header from '../../components/Header.astro';
 					renderConditions();
 					return;
 				}
-				var theme = activeSubtab.indexOf('dark') !== -1 ? 'dark' : 'light';
-				var transformed = transformForClient(rawHtml, activeClientId);
+				const theme = activeSubtab.indexOf('dark') !== -1 ? 'dark' : 'light';
+				let transformed = transformForClient(rawHtml, activeClientId);
 				transformed = applyColorScheme(transformed, theme);
 				(els.preview as HTMLIFrameElement).style.colorScheme = theme;
 				(els.preview as HTMLIFrameElement).srcdoc = transformed;

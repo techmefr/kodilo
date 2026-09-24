@@ -5,19 +5,29 @@ const sample = `select u.id, u.name, count(o.id) as orders, sum(o.total) as reve
 update products set price = price * 1.1, updated_at = now() where category_id in (select id from categories where name like '%book%');`;
 ---
 
-<ToolShell slug="sql-prettify" title="SQL Prettify" description="Format SQL with one clause per line, indented joins and conditions, keyword case of your choice. Or minify it.">
+<ToolShell
+	slug="sql-prettify"
+	title="SQL Prettify"
+	description="Format SQL with one clause per line, indented joins and conditions, keyword case of your choice. Or minify it."
+>
 	<div class="toolbar" id="sq-tool">
 		<div class="seg" id="sq-mode">
-			<button data-value="format" aria-pressed="true">Format</button>
+			<button data-value="format" aria-pressed="true">
+				Format
+			</button>
 			<button data-value="minify">Minify</button>
 		</div>
 		<div class="seg" id="sq-case">
-			<button data-value="upper" aria-pressed="true">UPPER</button>
+			<button data-value="upper" aria-pressed="true">
+				UPPER
+			</button>
 			<button data-value="lower">lower</button>
 			<button data-value="keep">Keep</button>
 		</div>
 		<div class="seg" id="sq-indent">
-			<button data-value="2" aria-pressed="true">2 spaces</button>
+			<button data-value="2" aria-pressed="true">
+				2 spaces
+			</button>
 			<button data-value="4">4 spaces</button>
 		</div>
 	</div>
@@ -29,7 +39,9 @@ update products set price = price * 1.1, updated_at = now() where category_id in
 		<section class="panel">
 			<div class="panel-head">
 				<span>Result</span>
-				<button class="btn" id="sq-copy">Copy</button>
+				<button class="btn" id="sq-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="sq-out"></pre>
 		</section>
@@ -40,9 +52,30 @@ update products set price = price * 1.1, updated_at = now() where category_id in
 	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
 
 	const KEYWORDS = new Set(
-		'select from where and or not in is null like ilike between exists as on join inner left right full outer cross natural using group by order having limit offset union all distinct insert into values update set delete create table alter add drop column index primary key foreign references default unique check constraint view with recursive case when then else end asc desc returning if replace truncate cascade over partition window rows range fetch first next only true false interval cast collate'.split(' ')
+		'select from where and or not in is null like ilike between exists as on join inner left right full outer cross natural using group by order having limit offset union all distinct insert into values update set delete create table alter add drop column index primary key foreign references default unique check constraint view with recursive case when then else end asc desc returning if replace truncate cascade over partition window rows range fetch first next only true false interval cast collate'.split(
+			' ',
+		),
 	);
-	const CLAUSES = ['with', 'select', 'from', 'where', 'group by', 'having', 'order by', 'limit', 'offset', 'union all', 'union', 'insert into', 'values', 'update', 'set', 'delete from', 'returning', 'fetch'];
+	const CLAUSES = [
+		'with',
+		'select',
+		'from',
+		'where',
+		'group by',
+		'having',
+		'order by',
+		'limit',
+		'offset',
+		'union all',
+		'union',
+		'insert into',
+		'values',
+		'update',
+		'set',
+		'delete from',
+		'returning',
+		'fetch',
+	];
 	const JOINS = /^(left outer join|right outer join|full outer join|left join|right join|full join|inner join|cross join|natural join|join)$/i;
 
 	function lex(sql: string): string[] {
@@ -64,7 +97,14 @@ update products set price = price * 1.1, updated_at = now() where category_id in
 				i++;
 			} else tok.push(raw[i]);
 		}
-		const kw = (t: string) => (KEYWORDS.has(t.toLowerCase().split(' ')[0]) || JOINS.test(t) || t.includes(' ') ? (kcase === 'upper' ? t.toUpperCase() : kcase === 'lower' ? t.toLowerCase() : t) : t);
+		const kw = (t: string) =>
+			KEYWORDS.has(t.toLowerCase().split(' ')[0]) || JOINS.test(t) || t.includes(' ')
+				? kcase === 'upper'
+					? t.toUpperCase()
+					: kcase === 'lower'
+						? t.toLowerCase()
+						: t
+				: t;
 		const lines: string[] = [];
 		let line = '';
 		let base = 0;
@@ -133,7 +173,11 @@ update products set price = price * 1.1, updated_at = now() where category_id in
 				add(kw(t));
 				continue;
 			}
-			if ((low === 'and' || low === 'or') && (clause === 'where' || clause === 'having' || /join/.test(lines[lines.length - 1] ?? '')) && stack.every((s) => s >= 0)) {
+			if (
+				(low === 'and' || low === 'or') &&
+				(clause === 'where' || clause === 'having' || /join/.test(lines[lines.length - 1] ?? '')) &&
+				stack.every((s) => s >= 0)
+			) {
 				push();
 				line = `${kw(t)}`;
 				continue;
@@ -156,19 +200,23 @@ update products set price = price * 1.1, updated_at = now() where category_id in
 		const fixed: string[] = [];
 		for (let k = 0; k < lines.length; k++) {
 			const l = lines[k];
-			const m = l.match(/^(\s*)(SELECT|FROM|WHERE|GROUP BY|HAVING|ORDER BY|LIMIT|OFFSET|UPDATE|SET|VALUES|RETURNING|INSERT INTO|DELETE FROM|WITH)(?:\s(DISTINCT|ALL))?$/i);
+			const m = l.match(
+				/^(\s*)(SELECT|FROM|WHERE|GROUP BY|HAVING|ORDER BY|LIMIT|OFFSET|UPDATE|SET|VALUES|RETURNING|INSERT INTO|DELETE FROM|WITH)(?:\s(DISTINCT|ALL))?$/i,
+			);
 			if (m && k + 1 < lines.length && lines[k + 1].trim() && !/^\s*\)/.test(lines[k + 1])) {
 				fixed.push(l);
 				continue;
 			}
 			fixed.push(l);
 		}
-		return fixed.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+		return fixed
+			.join('\n')
+			.replace(/\n{3,}/g, '\n\n')
+			.trim();
 	}
 
 	function reindent(text: string, unit: string): string {
 		const out: string[] = [];
-		let depth = 0;
 		const CL = /^(WITH|SELECT|FROM|WHERE|GROUP BY|HAVING|ORDER BY|LIMIT|OFFSET|UNION ALL|UNION|INSERT INTO|VALUES|UPDATE|SET|DELETE FROM|RETURNING|FETCH)\b/i;
 		const JN = /^((LEFT|RIGHT|FULL|INNER|CROSS|NATURAL)\s+(OUTER\s+)?)?JOIN\b/i;
 		const levels: number[] = [0];
@@ -176,21 +224,18 @@ update products set price = price * 1.1, updated_at = now() where category_id in
 			const l = raw.trim();
 			if (!l) {
 				out.push('');
-				depth = 0;
 				levels.length = 1;
 				levels[0] = 0;
 				continue;
 			}
 			if (l.startsWith(')')) {
 				levels.pop();
-				depth = levels[levels.length - 1];
 			}
 			const top = levels[levels.length - 1];
 			const isClause = CL.test(l) || JN.test(l);
 			const indent = isClause ? top : top + 1;
 			out.push(unit.repeat(indent) + l);
 			if (l.endsWith('(')) levels.push(indent + 1);
-			depth = indent;
 		}
 		return out.join('\n');
 	}

@@ -2,19 +2,38 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="favicon-generator" title="Favicon Generator" description="Make a full favicon set from an image or a letter: favicon.ico, PNG sizes, Apple touch icon, web manifest and the HTML to paste. Download it as a zip.">
+<ToolShell
+	slug="favicon-generator"
+	title="Favicon Generator"
+	description="Make a full favicon set from an image or a letter: favicon.ico, PNG sizes, Apple touch icon, web manifest and the HTML to paste. Download it as a zip."
+>
 	<div class="toolbar" id="fv-tool">
 		<div class="seg" id="fv-source" aria-label="Source">
-			<button data-value="text" aria-pressed="true">Letter or emoji</button>
-			<button data-value="image" aria-pressed="false">Image</button>
+			<button data-value="text" aria-pressed="true">
+				Letter or emoji
+			</button>
+			<button data-value="image" aria-pressed="false">
+				Image
+			</button>
 		</div>
 	</div>
 	<div class="fields" id="fv-text-fields">
-		<div class="field"><label for="fv-text">Text</label><input id="fv-text" value="K" maxlength="3" /></div>
-		<div class="field"><label for="fv-bg">Background</label><input id="fv-bg" type="color" value="#4f46e5" /></div>
-		<div class="field"><label for="fv-fg">Text color</label><input id="fv-fg" type="color" value="#ffffff" /></div>
 		<div class="field">
-			<label for="fv-radius">Corner radius <b id="fv-radius-v">22</b>%</label>
+			<label for="fv-text">Text</label>
+			<input id="fv-text" value="K" maxlength="3" />
+		</div>
+		<div class="field">
+			<label for="fv-bg">Background</label>
+			<input id="fv-bg" type="color" value="#4f46e5" />
+		</div>
+		<div class="field">
+			<label for="fv-fg">Text color</label>
+			<input id="fv-fg" type="color" value="#ffffff" />
+		</div>
+		<div class="field">
+			<label for="fv-radius">
+				Corner radius <b id="fv-radius-v">22</b>%
+			</label>
 			<input id="fv-radius" type="range" min="0" max="50" value="22" />
 		</div>
 	</div>
@@ -23,19 +42,33 @@ import ToolShell from '../../components/ToolShell.astro';
 		<span id="fv-drop-label">Drop a square image here, ideally 512×512 PNG or SVG.</span>
 	</label>
 	<div class="fields">
-		<div class="field"><label for="fv-name">App name</label><input id="fv-name" value="kodilo" /></div>
-		<div class="field"><label for="fv-theme">Theme color</label><input id="fv-theme" type="color" value="#4f46e5" /></div>
+		<div class="field">
+			<label for="fv-name">App name</label>
+			<input id="fv-name" value="kodilo" />
+		</div>
+		<div class="field">
+			<label for="fv-theme">Theme color</label>
+			<input id="fv-theme" type="color" value="#4f46e5" />
+		</div>
 	</div>
 	<div class="fv-sizes" id="fv-sizes"></div>
 	<div class="fv-tab">
-		<span class="fv-tab-icon"><img id="fv-tab-img" alt="" width="16" height="16" /></span>
+		<span class="fv-tab-icon">
+			<img id="fv-tab-img" alt="" width="16" height="16" />
+		</span>
 		<span id="fv-tab-name">kodilo</span>
 	</div>
-	<div class="toolbar"><button class="btn primary" id="fv-zip">Download favicon.zip</button></div>
+	<div class="toolbar">
+		<button class="btn primary" id="fv-zip">
+			Download favicon.zip
+		</button>
+	</div>
 	<section class="panel">
 		<div class="panel-head">
 			<span>Paste in your &lt;head&gt;</span>
-			<button class="btn" id="fv-copy">Copy</button>
+			<button class="btn" id="fv-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="fv-html"></pre>
 	</section>
@@ -47,7 +80,14 @@ import ToolShell from '../../components/ToolShell.astro';
 	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
 
 	const SIZES = [16, 32, 48, 180, 192, 512];
-	const NAMES: Record<number, string> = { 16: 'favicon-16x16.png', 32: 'favicon-32x32.png', 48: 'favicon-48x48.png', 180: 'apple-touch-icon.png', 192: 'android-chrome-192x192.png', 512: 'android-chrome-512x512.png' };
+	const NAMES: Record<number, string> = {
+		16: 'favicon-16x16.png',
+		32: 'favicon-32x32.png',
+		48: 'favicon-48x48.png',
+		180: 'apple-touch-icon.png',
+		192: 'android-chrome-192x192.png',
+		512: 'android-chrome-512x512.png',
+	};
 	const HTML = `<link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
@@ -126,7 +166,7 @@ import ToolShell from '../../components/ToolShell.astro';
 					cap.textContent = `${s}×${s}`;
 					fig.append(c, cap);
 					return fig;
-				})
+				}),
 			);
 			(byId('fv-tab-img') as HTMLImageElement).src = draw(32).toDataURL();
 			byId('fv-tab-name').textContent = name.value || 'Untitled';
@@ -147,14 +187,15 @@ import ToolShell from '../../components/ToolShell.astro';
 					display: 'standalone',
 				},
 				null,
-				2
+				2,
 			);
 
 		segmented(byId('fv-source'), (v) => ((source = v), render()));
 		fileZone(byId('fv-drop'), byId<HTMLInputElement>('fv-file'), async (files) => {
 			if (!files[0]) return;
 			image = await loadImageFile(files[0]);
-			byId('fv-drop-label').textContent = `${files[0].name} · ${image.naturalWidth}×${image.naturalHeight}${image.naturalWidth !== image.naturalHeight ? ' · not square, it will be stretched' : ''}`;
+			byId('fv-drop-label').textContent =
+				`${files[0].name} · ${image.naturalWidth}×${image.naturalHeight}${image.naturalWidth !== image.naturalHeight ? ' · not square, it will be stretched' : ''}`;
 			render();
 		});
 		[text, bg, fg, radius, name, theme].forEach((el) => el.addEventListener('input', render));

@@ -6,7 +6,7 @@ export function humanBytes(n: number): string {
 
 export function downloadBytes(bytes: Uint8Array, name: string) {
 	const a = document.createElement('a');
-	a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+	a.href = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
 	a.download = name;
 	a.click();
 	setTimeout(() => URL.revokeObjectURL(a.href), 5000);

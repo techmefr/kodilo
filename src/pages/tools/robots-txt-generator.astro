@@ -2,30 +2,63 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell slug="robots-txt-generator" title="robots.txt Generator" description="Write a robots.txt with rules per crawler, a sitemap link and one-click blocking of AI training bots. Test a URL against the rules.">
+<ToolShell
+	slug="robots-txt-generator"
+	title="robots.txt Generator"
+	description="Write a robots.txt with rules per crawler, a sitemap link and one-click blocking of AI training bots. Test a URL against the rules."
+>
 	<div class="toolbar" id="rb-tool">
 		<div class="chips" id="rb-presets">
-			<button data-preset="allow" aria-pressed="true">Allow everything</button>
-			<button data-preset="private" aria-pressed="false">Hide admin and search</button>
-			<button data-preset="block" aria-pressed="false">Block all crawlers</button>
+			<button data-preset="allow" aria-pressed="true">
+				Allow everything
+			</button>
+			<button data-preset="private" aria-pressed="false">
+				Hide admin and search
+			</button>
+			<button data-preset="block" aria-pressed="false">
+				Block all crawlers
+			</button>
 		</div>
-		<label class="check"><input type="checkbox" id="rb-ai" /> Block AI training crawlers</label>
+		<label class="check">
+			<input type="checkbox" id="rb-ai" /> Block AI training crawlers
+		</label>
 	</div>
 	<div id="rb-groups" class="rb-groups"></div>
-	<div class="toolbar"><button class="btn" id="rb-add">Add crawler rule</button></div>
+	<div class="toolbar">
+		<button class="btn" id="rb-add">
+			Add crawler rule
+		</button>
+	</div>
 	<div class="fields">
-		<div class="field wide"><label for="rb-sitemap">Sitemap URLs, one per line</label><textarea id="rb-sitemap" rows="2" spellcheck="false">https://example.com/sitemap.xml</textarea></div>
+		<div class="field wide">
+			<label for="rb-sitemap">Sitemap URLs, one per line</label>
+			<textarea id="rb-sitemap" rows="2" spellcheck="false">https://example.com/sitemap.xml</textarea>
+		</div>
 	</div>
 	<section class="panel">
 		<div class="panel-head">
 			<span>robots.txt</span>
-			<span class="rb-actions"><button class="btn" id="rb-dl">Download</button><button class="btn" id="rb-copy">Copy</button></span>
+			<span class="rb-actions">
+				<button class="btn" id="rb-dl">
+					Download
+				</button>
+				<button class="btn" id="rb-copy">
+					Copy
+				</button>
+			</span>
 		</div>
 		<pre class="out" id="rb-out"></pre>
 	</section>
 	<div class="fields">
-		<div class="field"><label for="rb-test-path">Test a path</label><input id="rb-test-path" value="/admin/users" spellcheck="false" /></div>
-		<div class="field"><label for="rb-test-agent">As crawler</label><input id="rb-test-agent" value="Googlebot" spellcheck="false" /><span class="field-note" id="rb-test-note"></span></div>
+		<div class="field">
+			<label for="rb-test-path">Test a path</label>
+			<input id="rb-test-path" value="/admin/users" spellcheck="false" />
+		</div>
+		<div class="field">
+			<label for="rb-test-agent">As crawler</label>
+			<input id="rb-test-agent" value="Googlebot" spellcheck="false" />
+			<span class="field-note" id="rb-test-note"></span>
+		</div>
 	</div>
 </ToolShell>
 
@@ -34,7 +67,20 @@ import ToolShell from '../../components/ToolShell.astro';
 	import { byId, copyButton, onPage } from '../../scripts/ui';
 
 	type Group = { agent: string; allow: string; disallow: string; delay: string };
-	const AI = ['GPTBot', 'ChatGPT-User', 'OAI-SearchBot', 'ClaudeBot', 'anthropic-ai', 'Google-Extended', 'CCBot', 'PerplexityBot', 'Bytespider', 'Applebot-Extended', 'meta-externalagent', 'Amazonbot'];
+	const AI = [
+		'GPTBot',
+		'ChatGPT-User',
+		'OAI-SearchBot',
+		'ClaudeBot',
+		'anthropic-ai',
+		'Google-Extended',
+		'CCBot',
+		'PerplexityBot',
+		'Bytespider',
+		'Applebot-Extended',
+		'meta-externalagent',
+		'Amazonbot',
+	];
 	const PRESETS: Record<string, Group[]> = {
 		allow: [{ agent: '*', allow: '', disallow: '', delay: '' }],
 		private: [{ agent: '*', allow: '/admin/public/', disallow: '/admin/\n/search\n/*?sort=\n/cart', delay: '' }],
@@ -42,7 +88,13 @@ import ToolShell from '../../components/ToolShell.astro';
 	};
 
 	function matches(rule: string, path: string) {
-		const re = new RegExp('^' + rule.replace(/[.+?^{}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\\\$$|\$$/, '$'));
+		const re = new RegExp(
+			'^' +
+				rule
+					.replace(/[.+?^{}()|[\]\\]/g, '\\$&')
+					.replace(/\*/g, '.*')
+					.replace(/\\\$$|\$$/, '$'),
+		);
 		return re.test(path);
 	}
 
@@ -54,15 +106,26 @@ import ToolShell from '../../components/ToolShell.astro';
 		const text = () => {
 			const blocks = groups.map((g) => {
 				const lines = [`User-agent: ${g.agent || '*'}`];
-				g.allow.split('\n').map((s) => s.trim()).filter(Boolean).forEach((p) => lines.push(`Allow: ${p}`));
-				const dis = g.disallow.split('\n').map((s) => s.trim()).filter(Boolean);
+				g.allow
+					.split('\n')
+					.map((s) => s.trim())
+					.filter(Boolean)
+					.forEach((p) => lines.push(`Allow: ${p}`));
+				const dis = g.disallow
+					.split('\n')
+					.map((s) => s.trim())
+					.filter(Boolean);
 				dis.forEach((p) => lines.push(`Disallow: ${p}`));
 				if (!dis.length && !g.allow.trim()) lines.push('Disallow:');
 				if (g.delay) lines.push(`Crawl-delay: ${g.delay}`);
 				return lines.join('\n');
 			});
 			if (ai.checked) blocks.push(AI.map((a) => `User-agent: ${a}`).join('\n') + '\nDisallow: /');
-			const maps = sitemap.value.split('\n').map((s) => s.trim()).filter(Boolean).map((s) => `Sitemap: ${s}`);
+			const maps = sitemap.value
+				.split('\n')
+				.map((s) => s.trim())
+				.filter(Boolean)
+				.map((s) => `Sitemap: ${s}`);
 			return [...blocks, ...(maps.length ? [maps.join('\n')] : [])].join('\n\n') + '\n';
 		};
 
@@ -75,8 +138,14 @@ import ToolShell from '../../components/ToolShell.astro';
 			const pick = own.length ? own : all.filter((g) => g.agent === '*' || !g.agent);
 			let best = { len: -1, allow: true };
 			for (const g of pick) {
-				for (const [list, allow] of [[g.allow, true], [g.disallow, false]] as const)
-					for (const r of list.split('\n').map((s) => s.trim()).filter(Boolean))
+				for (const [list, allow] of [
+					[g.allow, true],
+					[g.disallow, false],
+				] as const)
+					for (const r of list
+						.split('\n')
+						.map((s) => s.trim())
+						.filter(Boolean))
 						if (matches(r, path) && (r.length > best.len || (r.length === best.len && allow))) best = { len: r.length, allow };
 			}
 			const note = byId('rb-test-note');
@@ -105,7 +174,7 @@ import ToolShell from '../../components/ToolShell.astro';
 						paint();
 					});
 					return box;
-				})
+				}),
 			);
 			render();
 		};

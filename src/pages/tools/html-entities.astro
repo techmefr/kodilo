@@ -28,22 +28,28 @@ const common: [string, string, string][] = [
 >
 	<div class="toolbar" id="ent-tool">
 		<div class="seg" id="ent-mode" aria-label="Direction">
-			<button data-value="encode" aria-pressed="true">Encode</button>
-			<button data-value="decode" aria-pressed="false">Decode</button>
+			<button data-value="encode" aria-pressed="true">
+				Encode
+			</button>
+			<button data-value="decode" aria-pressed="false">
+				Decode
+			</button>
 		</div>
-		<label class="check" id="ent-all-wrap"><input type="checkbox" id="ent-all" /> Also encode non-ASCII</label>
+		<label class="check" id="ent-all-wrap">
+			<input type="checkbox" id="ent-all" /> Also encode non-ASCII
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
 			<div class="panel-head">Input</div>
-			<textarea id="ent-in" spellcheck="false" aria-label="Input"
-				>{`<a href="/café?x=1&y=2">Tom & Jerry’s “best” — 5 < 6</a>`}</textarea
-			>
+			<textarea id="ent-in" spellcheck="false" aria-label="Input">{`<a href="/café?x=1&y=2">Tom & Jerry’s “best” — 5 < 6</a>`}</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span>Output</span>
-				<button class="btn" id="ent-copy">Copy</button>
+				<button class="btn" id="ent-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="ent-out"></pre>
 		</section>
@@ -51,14 +57,12 @@ const common: [string, string, string][] = [
 	<section class="panel">
 		<div class="panel-head">Common entities · click to copy</div>
 		<div class="ent-grid">
-			{
-				common.map(([char, entity, name]) => (
-					<button class="ent-cell" data-entity={entity} title={name}>
-						<span class="ent-char">{char === ' ' ? '⍽' : char}</span>
-						<code>{entity}</code>
-					</button>
-				))
-			}
+			{common.map(([char, entity, name]) => (
+				<button class="ent-cell" data-entity={entity} title={name}>
+					<span class="ent-char">{char === ' ' ? '⍽' : char}</span>
+					<code>{entity}</code>
+				</button>
+			))}
 		</div>
 	</section>
 </ToolShell>

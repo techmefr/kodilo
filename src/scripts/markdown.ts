@@ -3,7 +3,12 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 const safeUrl = (url: string) => (/^\s*(javascript|vbscript|data):/i.test(url) && !/^\s*data:image\//i.test(url) ? '#' : url);
 
 export function slug(text: string): string {
-	return text.toLowerCase().replace(/<[^>]+>/g, '').replace(/[^\p{L}\p{N}\s-]/gu, '').trim().replace(/\s+/g, '-');
+	return text
+		.toLowerCase()
+		.replace(/<[^>]+>/g, '')
+		.replace(/[^\p{L}\p{N}\s-]/gu, '')
+		.trim()
+		.replace(/\s+/g, '-');
 }
 
 export function inline(text: string): string {
@@ -13,8 +18,14 @@ export function inline(text: string): string {
 		return `\u0000${codes.length - 1}\u0000`;
 	});
 	s = esc(s);
-	s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)/g, (_, alt, src, title) => `<img src="${safeUrl(src)}" alt="${alt}"${title ? ` title="${title}"` : ''} />`);
-	s = s.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)/g, (_, label, href, title) => `<a href="${safeUrl(href)}"${title ? ` title="${title}"` : ''}>${label}</a>`);
+	s = s.replace(
+		/!\[([^\]]*)\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)/g,
+		(_, alt, src, title) => `<img src="${safeUrl(src)}" alt="${alt}"${title ? ` title="${title}"` : ''} />`,
+	);
+	s = s.replace(
+		/\[([^\]]+)\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)/g,
+		(_, label, href, title) => `<a href="${safeUrl(href)}"${title ? ` title="${title}"` : ''}>${label}</a>`,
+	);
 	s = s.replace(/&lt;(https?:\/\/[^\s&]+)&gt;/g, '<a href="$1">$1</a>');
 	s = s.replace(/\*\*(.+?)\*\*|__(.+?)__/g, (_, a, b) => `<strong>${a ?? b}</strong>`);
 	s = s.replace(/(^|[^\w*])\*(?!\s)(.+?)\*(?!\w)|(^|\W)_(?!\s)(.+?)_(?!\w)/g, (_, p1, a, p2, b) => `${p1 ?? p2}<em>${a ?? b}</em>`);
@@ -49,7 +60,7 @@ export function markdown(src: string): string {
 			while (j < lines.length && lines[j].trim() && !/^\s*([-*+]|\d+[.)])\s/.test(lines[j]) && !isBlockStart(lines[j].trim())) body += ` ${lines[j++].trim()}`;
 			const task = body.match(/^\[([ xX])\]\s+(.*)$/);
 			items.push(task ? `<li class="task"><input type="checkbox" disabled${task[1] !== ' ' ? ' checked' : ''} /> ${inline(task[2])}` : `<li>${inline(body)}`);
-			while (j < lines.length && !lines[j].trim() && /^\s*([-*+]|\d+[.)])\s/.test(lines[j + 1] ?? '') && (lines[j + 1].match(/^\s*/)![0].length >= indent)) j++;
+			while (j < lines.length && !lines[j].trim() && /^\s*([-*+]|\d+[.)])\s/.test(lines[j + 1] ?? '') && lines[j + 1].match(/^\s*/)![0].length >= indent) j++;
 		}
 		const tag = ordered ? 'ol' : 'ul';
 		return [`<${tag}${ordered && first !== 1 ? ` start="${first}"` : ''}>${items.map((it) => `${it}</li>`).join('')}</${tag}>`, j];
@@ -96,14 +107,21 @@ export function markdown(src: string): string {
 			continue;
 		}
 		if (t.startsWith('|') && /^\s*\|?\s*:?-{3,}/.test(lines[i + 1] ?? '')) {
-			const cells = (l: string) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+			const cells = (l: string) =>
+				l
+					.trim()
+					.replace(/^\||\|$/g, '')
+					.split('|')
+					.map((c) => c.trim());
 			const head = cells(line);
 			const align = cells(lines[i + 1]).map((c) => (c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : ''));
 			i += 2;
 			const rows: string[][] = [];
 			while (i < lines.length && lines[i].trim().startsWith('|')) rows.push(cells(lines[i++]));
 			const td = (tag: string, c: string, k: number) => `<${tag}${align[k] ? ` style="text-align:${align[k]}"` : ''}>${inline(c)}</${tag}>`;
-			out.push(`<table><thead><tr>${head.map((c, k) => td('th', c, k)).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${head.map((_, k) => td('td', r[k] ?? '', k)).join('')}</tr>`).join('')}</tbody></table>`);
+			out.push(
+				`<table><thead><tr>${head.map((c, k) => td('th', c, k)).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${head.map((_, k) => td('td', r[k] ?? '', k)).join('')}</tr>`).join('')}</tbody></table>`,
+			);
 			continue;
 		}
 		const para: string[] = [];

@@ -11,17 +11,25 @@ const sample = JSON.stringify(
 		owner: null,
 	},
 	null,
-	2
+	2,
 );
 ---
 
-<ToolShell slug="json-to-yaml" title="JSON to YAML" description="Convert JSON to clean YAML: safe quoting, block strings for multi-line text, your choice of indent. Also takes JSON Lines as a multi-document stream.">
+<ToolShell
+	slug="json-to-yaml"
+	title="JSON to YAML"
+	description="Convert JSON to clean YAML: safe quoting, block strings for multi-line text, your choice of indent. Also takes JSON Lines as a multi-document stream."
+>
 	<div class="toolbar" id="jy-tool">
 		<div class="seg" id="jy-indent">
-			<button data-value="2" aria-pressed="true">2 spaces</button>
+			<button data-value="2" aria-pressed="true">
+				2 spaces
+			</button>
 			<button data-value="4">4 spaces</button>
 		</div>
-		<label class="check"><input type="checkbox" id="jy-doc" /> Start with ---</label>
+		<label class="check">
+			<input type="checkbox" id="jy-doc" /> Start with ---
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
@@ -31,7 +39,9 @@ const sample = JSON.stringify(
 		<section class="panel">
 			<div class="panel-head">
 				<span>YAML</span>
-				<button class="btn" id="jy-copy">Copy</button>
+				<button class="btn" id="jy-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="jy-out"></pre>
 		</section>

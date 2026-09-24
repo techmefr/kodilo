@@ -10,31 +10,27 @@ const groups: Record<string, string[]> = {
 };
 ---
 
-<ToolShell
-	slug="gitignore-generator"
-	title=".gitignore Generator"
-	description="Pick your stack and get a clean, deduplicated .gitignore."
->
+<ToolShell slug="gitignore-generator" title=".gitignore Generator" description="Pick your stack and get a clean, deduplicated .gitignore.">
 	<div class="gi-groups" id="gi-tool">
-		{
-			Object.entries(groups).map(([group, items]) => (
-				<div class="gi-group">
-					<span>{group}</span>
-					<div class="chips">
-						{items.map((item) => (
-							<button data-value={item} aria-pressed={['Node', 'Env files', 'VS Code', 'macOS'].includes(item) ? 'true' : 'false'}>
-								{item}
-							</button>
-						))}
-					</div>
+		{Object.entries(groups).map(([group, items]) => (
+			<div class="gi-group">
+				<span>{group}</span>
+				<div class="chips">
+					{items.map((item) => (
+						<button data-value={item} aria-pressed={['Node', 'Env files', 'VS Code', 'macOS'].includes(item) ? 'true' : 'false'}>
+							{item}
+						</button>
+					))}
 				</div>
-			))
-		}
+			</div>
+		))}
 	</div>
 	<section class="panel">
 		<div class="panel-head">
 			<span>.gitignore</span>
-			<button class="btn" id="gi-copy">Copy</button>
+			<button class="btn" id="gi-copy">
+				Copy
+			</button>
 		</div>
 		<pre class="out" id="gi-out"></pre>
 	</section>
@@ -90,7 +86,7 @@ const groups: Record<string, string[]> = {
 			b.addEventListener('click', () => {
 				b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
 				render();
-			})
+			}),
 		);
 		copyButton(byId('gi-copy'), () => byId('gi-out').textContent ?? '');
 		render();

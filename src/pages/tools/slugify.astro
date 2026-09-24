@@ -2,33 +2,39 @@
 import ToolShell from '../../components/ToolShell.astro';
 ---
 
-<ToolShell
-	slug="slugify"
-	title="Slugify"
-	description="Turn any title into a clean URL slug. Accents are transliterated, one slug per line."
->
+<ToolShell slug="slugify" title="Slugify" description="Turn any title into a clean URL slug. Accents are transliterated, one slug per line.">
 	<div class="toolbar" id="slug-tool">
 		<div class="seg" id="slug-sep" aria-label="Separator">
-			<button data-value="-" aria-pressed="true">kebab-case</button>
-			<button data-value="_" aria-pressed="false">snake_case</button>
-			<button data-value="." aria-pressed="false">dot.case</button>
+			<button data-value="-" aria-pressed="true">
+				kebab-case
+			</button>
+			<button data-value="_" aria-pressed="false">
+				snake_case
+			</button>
+			<button data-value="." aria-pressed="false">
+				dot.case
+			</button>
 		</div>
-		<label class="check"><input type="checkbox" id="slug-lower" checked /> Lowercase</label>
-		<label class="check">Max length <input class="num" type="number" id="slug-max" min="0" value="0" /></label>
+		<label class="check">
+			<input type="checkbox" id="slug-lower" checked /> Lowercase
+		</label>
+		<label class="check">
+			Max length <input class="num" type="number" id="slug-max" min="0" value="0" />
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
 			<div class="panel-head">Titles</div>
-			<textarea id="slug-in" spellcheck="false" aria-label="Titles"
-				>Crème brûlée à l'été — 10 recettes faciles !
+			<textarea id="slug-in" spellcheck="false" aria-label="Titles">Crème brûlée à l'été — 10 recettes faciles !
 Straße & Größe: Ærøskøbing Ångström
-Ship It Before Friday, Part 2</textarea
-			>
+Ship It Before Friday, Part 2</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">
 				<span>Slugs</span>
-				<button class="btn" id="slug-copy">Copy</button>
+				<button class="btn" id="slug-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="slug-out"></pre>
 		</section>
@@ -39,7 +45,20 @@ Ship It Before Friday, Part 2</textarea
 	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
 
 	const SPECIAL: Record<string, string> = {
-		ß: 'ss', æ: 'ae', Æ: 'AE', ø: 'o', Ø: 'O', œ: 'oe', Œ: 'OE', ł: 'l', Ł: 'L', đ: 'd', Đ: 'D', þ: 'th', Þ: 'TH', '&': ' and ',
+		ß: 'ss',
+		æ: 'ae',
+		Æ: 'AE',
+		ø: 'o',
+		Ø: 'O',
+		œ: 'oe',
+		Œ: 'OE',
+		ł: 'l',
+		Ł: 'L',
+		đ: 'd',
+		Đ: 'D',
+		þ: 'th',
+		Þ: 'TH',
+		'&': ' and ',
 	};
 
 	function slugify(text: string, sep: string, lower: boolean, max: number): string {

@@ -3,10 +3,18 @@ import ToolShell from '../../components/ToolShell.astro';
 import { SAMPLE } from '../../scripts/markdown';
 ---
 
-<ToolShell slug="markdown-to-html" title="Markdown to HTML" description="Convert GitHub-flavored Markdown to clean HTML: tables, task lists, fenced code, heading anchors. Optionally wrap it in a full page.">
+<ToolShell
+	slug="markdown-to-html"
+	title="Markdown to HTML"
+	description="Convert GitHub-flavored Markdown to clean HTML: tables, task lists, fenced code, heading anchors. Optionally wrap it in a full page."
+>
 	<div class="toolbar" id="mh-tool">
-		<label class="check"><input type="checkbox" id="mh-page" /> Full HTML document</label>
-		<label class="check"><input type="checkbox" id="mh-ids" checked /> Heading ids</label>
+		<label class="check">
+			<input type="checkbox" id="mh-page" /> Full HTML document
+		</label>
+		<label class="check">
+			<input type="checkbox" id="mh-ids" checked /> Heading ids
+		</label>
 	</div>
 	<div class="grid-2">
 		<section class="panel">
@@ -16,7 +24,9 @@ import { SAMPLE } from '../../scripts/markdown';
 		<section class="panel">
 			<div class="panel-head">
 				<span>HTML</span>
-				<button class="btn" id="mh-copy">Copy</button>
+				<button class="btn" id="mh-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out mh-out" id="mh-out"></pre>
 		</section>

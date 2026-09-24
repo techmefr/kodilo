@@ -4,18 +4,28 @@ import ToolShell from '../../components/ToolShell.astro';
 const sample = `@import url("theme.css");:root{--accent:#6d4fe0;--radius:12px}.card,.panel{display:flex;gap:12px;padding:16px 20px;border-radius:var(--radius);background:linear-gradient(135deg,#fff 0%,#f0eef6 100%)}/* hover state */.card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.12)}@media (max-width:600px){.card{flex-direction:column;padding:12px}}`;
 ---
 
-<ToolShell slug="css-formatter" title="CSS Formatter" description="Beautify or minify CSS. Handles media queries, nested rules, comments and strings, with a size comparison.">
+<ToolShell
+	slug="css-formatter"
+	title="CSS Formatter"
+	description="Beautify or minify CSS. Handles media queries, nested rules, comments and strings, with a size comparison."
+>
 	<div class="toolbar" id="cf-tool">
 		<div class="seg" id="cf-mode">
-			<button data-value="beautify" aria-pressed="true">Beautify</button>
+			<button data-value="beautify" aria-pressed="true">
+				Beautify
+			</button>
 			<button data-value="minify">Minify</button>
 		</div>
 		<div class="seg" id="cf-indent">
-			<button data-value="2" aria-pressed="true">2 spaces</button>
+			<button data-value="2" aria-pressed="true">
+				2 spaces
+			</button>
 			<button data-value="4">4 spaces</button>
 			<button data-value="tab">Tab</button>
 		</div>
-		<label class="check"><input type="checkbox" id="cf-comments" /> Strip comments</label>
+		<label class="check">
+			<input type="checkbox" id="cf-comments" /> Strip comments
+		</label>
 		<span class="cf-size" id="cf-size"></span>
 	</div>
 	<div class="grid-2">
@@ -26,7 +36,9 @@ const sample = `@import url("theme.css");:root{--accent:#6d4fe0;--radius:12px}.c
 		<section class="panel">
 			<div class="panel-head">
 				<span>Output</span>
-				<button class="btn" id="cf-copy">Copy</button>
+				<button class="btn" id="cf-copy">
+					Copy
+				</button>
 			</div>
 			<pre class="out" id="cf-out"></pre>
 		</section>
@@ -115,7 +127,10 @@ const sample = `@import url("theme.css");:root{--accent:#6d4fe0;--radius:12px}.c
 			}
 		}
 		if (tidy(line)) out.push(tidy(line));
-		return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+		return out
+			.join('\n')
+			.replace(/\n{3,}/g, '\n\n')
+			.trim();
 	}
 
 	function minify(css: string, strip: boolean): string {
@@ -123,7 +138,13 @@ const sample = `@import url("theme.css");:root{--accent:#6d4fe0;--radius:12px}.c
 			.map((tok) => {
 				if (tok.t === 'com') return strip || !tok.v.startsWith('/*!') ? '' : tok.v;
 				if (tok.t !== 'txt') return tok.v;
-				return tok.v.replace(/\s+/g, ' ').replace(/\s*([>+~,:(])\s*/g, '$1').replace(/\s*\)/g, ')').replace(/\b0\.(\d)/g, '.$1').trim().replace(/and\(/g, 'and (');
+				return tok.v
+					.replace(/\s+/g, ' ')
+					.replace(/\s*([>+~,:(])\s*/g, '$1')
+					.replace(/\s*\)/g, ')')
+					.replace(/\b0\.(\d)/g, '.$1')
+					.trim()
+					.replace(/and\(/g, 'and (');
 			})
 			.join('')
 			.replace(/;}/g, '}')
@@ -141,7 +162,8 @@ const sample = `@import url("theme.css");:root{--accent:#6d4fe0;--radius:12px}.c
 			byId('cf-out').textContent = result;
 			const a = new Blob([input.value]).size;
 			const b = new Blob([result]).size;
-			byId('cf-size').textContent = `${a.toLocaleString('en')} → ${b.toLocaleString('en')} bytes${a ? ` (${b <= a ? '−' : '+'}${Math.abs(Math.round((1 - b / a) * 100))}%)` : ''}`;
+			byId('cf-size').textContent =
+				`${a.toLocaleString('en')} → ${b.toLocaleString('en')} bytes${a ? ` (${b <= a ? '−' : '+'}${Math.abs(Math.round((1 - b / a) * 100))}%)` : ''}`;
 		};
 
 		segmented(byId('cf-mode'), (v) => ((mode = v), render()));
