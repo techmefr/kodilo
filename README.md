@@ -94,6 +94,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - **Markdown to HTML** (`/tools/markdown-to-html/`) — GFM to HTML, tables, tasks, anchors
 - **Markdown Previewer** (`/tools/markdown-previewer/`) — live preview, outline, saved draft
 - **CSS Formatter & Minifier** (`/tools/css-formatter/`) — beautify or minify CSS
+- **SVG to JSX, TSX & Vue** (`/tools/svg-to-component/`) — React or Vue component with size and color props
 - **HTML Formatter** (`/tools/html-formatter/`) — beautify or minify HTML
 - **SQL Prettify** (`/tools/sql-prettify/`) — one clause per line, keyword case
 - **Math Evaluator** (`/tools/math-evaluator/`) — calculator notepad with variables

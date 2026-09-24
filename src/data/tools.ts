@@ -83,6 +83,12 @@ export const categories: Category[] = [
 				description: 'Format and minify CSS stylesheets.',
 			},
 			{
+				slug: 'svg-to-component', icon: 'file-code-2',
+				built: true,
+				name: 'SVG to JSX, TSX & Vue',
+				description: 'Turn an SVG into a React or Vue component with size and color props.',
+			},
+			{
 				slug: 'box-shadow-generator', icon: 'square-stack',
 				built: true,
 				name: 'Box Shadow Generator',
