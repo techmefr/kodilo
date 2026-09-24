@@ -1,0 +1,136 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const links = [
+	['4G', '20 Mbps'],
+	['ADSL', '8 Mbps'],
+	['Fibre', '1 Gbps'],
+	['Datacenter', '10 Gbps'],
+	['USB 3', '5 Gbps'],
+];
+---
+
+<ToolShell
+	slug="transfer-time-calculator"
+	title="Transfer Time Calculator"
+	description="How long a backup, image or dataset takes to move, and the bandwidth a deadline needs."
+>
+	<div class="fields" id="tt-tool">
+		<div class="field" id="tt-size-field">
+			<label for="tt-size">Size</label>
+			<input id="tt-size" spellcheck="false" value="50 GB" />
+		</div>
+		<div class="field" id="tt-bw-field">
+			<label for="tt-bw">Bandwidth</label>
+			<input id="tt-bw" spellcheck="false" value="1 Gbps" />
+			<span class="field-note">bps, Kbps, Mbps, Gbps or MB/s</span>
+		</div>
+	</div>
+	<div class="chips" id="tt-links">
+		{links.map(([label, bw]) => <button data-bw={bw}>{label} · {bw}</button>)}
+	</div>
+	<div class="toolbar">
+		<label class="check tt-eff"
+			>Efficiency <input type="range" id="tt-eff" min="50" max="100" value="90" /> <b id="tt-eff-value">90%</b></label
+		>
+	</div>
+	<div class="stats" id="tt-stats"></div>
+	<div class="fields">
+		<div class="field wide" id="tt-deadline-field">
+			<label for="tt-deadline">Must finish within</label>
+			<input id="tt-deadline" spellcheck="false" placeholder="2h, 30 min, 1d" />
+			<span class="field-note" id="tt-deadline-note"></span>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { formatDuration, formatNumber, parseBytes } from '../../scripts/units';
+	import { byId, onPage } from '../../scripts/ui';
+
+	function parseBandwidth(text: string): number | null {
+		const m = text.trim().replace(',', '.').match(/^(\d+(?:\.\d+)?)\s*([kmgt]?)(bps|b\/s|bit\/s|B\/s|Bps|o\/s)?$/i);
+		if (!m) return null;
+		const scale = { '': 1, k: 1e3, m: 1e6, g: 1e9, t: 1e12 }[m[2].toLowerCase() as '' | 'k' | 'm' | 'g' | 't'];
+		const bytesUnit = m[3] && /^(B\/s|Bps|o\/s)$/.test(m[3]);
+		return Number(m[1]) * scale * (bytesUnit ? 8 : 1);
+	}
+
+	function parseDuration(text: string): number | null {
+		let total = 0;
+		let found = false;
+		for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*(d|h|m(?:in)?|s)?/gi)) {
+			found = true;
+			const unit = (m[2] ?? 'min').toLowerCase();
+			total += Number(m[1]) * (unit === 'd' ? 86400 : unit === 'h' ? 3600 : unit === 's' ? 1 : 60);
+		}
+		return found && total > 0 ? total : null;
+	}
+
+	const humanBandwidth = (bps: number) => {
+		const [value, unit] = bps >= 1e9 ? [bps / 1e9, 'Gbps'] : bps >= 1e6 ? [bps / 1e6, 'Mbps'] : [bps / 1e3, 'Kbps'];
+		return `${formatNumber(value, 2)} ${unit}`;
+	};
+
+	onPage('tt-tool', () => {
+		const size = byId<HTMLInputElement>('tt-size');
+		const bw = byId<HTMLInputElement>('tt-bw');
+		const eff = byId<HTMLInputElement>('tt-eff');
+		const deadline = byId<HTMLInputElement>('tt-deadline');
+
+		const render = () => {
+			byId('tt-eff-value').textContent = `${eff.value}%`;
+			const bytes = parseBytes(size.value);
+			const bps = parseBandwidth(bw.value);
+			byId('tt-size-field').classList.toggle('invalid', bytes === null);
+			byId('tt-bw-field').classList.toggle('invalid', bps === null);
+			const efficiency = Number(eff.value) / 100;
+			if (bytes !== null && bps !== null) {
+				const effective = bps * efficiency;
+				const seconds = (bytes * 8) / effective;
+				const stats: [string, string][] = [
+					['Transfer time', formatDuration(seconds)],
+					['Effective rate', `${formatNumber(effective / 8e6, 2)} MB/s`],
+					['Per hour', `${formatNumber((effective * 3600) / 8e9, 2)} GB`],
+					['Per day', `${formatNumber((effective * 86400) / 8e12, 2)} TB`],
+				];
+				byId('tt-stats').replaceChildren(
+					...stats.map(([label, value]) => {
+						const el = document.createElement('div');
+						el.className = 'stat';
+						el.innerHTML = '<b></b><span></span>';
+						el.querySelector('b')!.textContent = value;
+						el.querySelector('span')!.textContent = label;
+						return el;
+					})
+				);
+			}
+			const limit = parseDuration(deadline.value);
+			byId('tt-deadline-field').classList.toggle('invalid', deadline.value.trim() !== '' && limit === null);
+			byId('tt-deadline-note').textContent =
+				limit && bytes !== null
+					? `Needs at least ${humanBandwidth((bytes * 8) / limit / efficiency)} of raw bandwidth to finish in ${formatDuration(limit)}.`
+					: '';
+		};
+
+		[size, bw, eff, deadline].forEach((el) => el.addEventListener('input', render));
+		document.querySelectorAll<HTMLButtonElement>('#tt-links button').forEach((b) =>
+			b.addEventListener('click', () => {
+				bw.value = b.dataset.bw!;
+				render();
+			})
+		);
+		render();
+	});
+</script>
+
+<style>
+	.tt-eff input {
+		width: 200px;
+		accent-color: var(--accent-strong);
+	}
+	.tt-eff b {
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+	}
+</style>

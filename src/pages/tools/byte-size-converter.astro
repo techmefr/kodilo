@@ -1,0 +1,90 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="byte-size-converter"
+	title="Byte Size Converter"
+	description="Type a size like 1.5 GiB, 500MB or 1073741824. Decimal (kB, MB) and binary (KiB, MiB) side by side."
+>
+	<div class="fields" id="bytes-tool">
+		<div class="field wide" id="bytes-field">
+			<label for="bytes-in">Size</label>
+			<input id="bytes-in" spellcheck="false" value="1.5 GiB" />
+			<span class="field-note" id="bytes-note"></span>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Decimal · SI · powers of 1000</div>
+			<ul class="bytes-list" id="bytes-si"></ul>
+		</section>
+		<section class="panel">
+			<div class="panel-head">Binary · IEC · powers of 1024</div>
+			<ul class="bytes-list" id="bytes-iec"></ul>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { BYTE_UNITS, formatNumber, parseBytes } from '../../scripts/units';
+	import { byId, onPage } from '../../scripts/ui';
+
+	onPage('bytes-tool', () => {
+		const input = byId<HTMLInputElement>('bytes-in');
+
+		const fill = (id: string, units: [string, number][], bytes: number) => {
+			byId(id).replaceChildren(
+				...units.map(([unit, size]) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<code></code><span></span>';
+					li.querySelector('code')!.textContent = formatNumber(bytes / size, 6);
+					li.querySelector('span')!.textContent = unit;
+					return li;
+				})
+			);
+		};
+
+		const render = () => {
+			const bytes = parseBytes(input.value);
+			byId('bytes-field').classList.toggle('invalid', bytes === null);
+			if (bytes === null) {
+				byId('bytes-note').textContent = 'Use a number and an optional unit: 512, 20 MB, 1.5 GiB.';
+				return;
+			}
+			byId('bytes-note').textContent = `${Math.round(bytes).toLocaleString('en')} bytes · ${Math.round(bytes * 8).toLocaleString('en')} bits`;
+			fill('bytes-si', [BYTE_UNITS[0], ...BYTE_UNITS.slice(1, 6)], bytes);
+			fill('bytes-iec', [BYTE_UNITS[0], ...BYTE_UNITS.slice(6)], bytes);
+		};
+
+		input.addEventListener('input', render);
+		render();
+	});
+</script>
+
+<style>
+	.bytes-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.bytes-list :global(li) {
+		display: flex;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+	}
+	.bytes-list :global(li:last-child) {
+		border-bottom: 0;
+	}
+	.bytes-list :global(code) {
+		font-family: var(--mono);
+		font-size: 14px;
+		overflow-wrap: anywhere;
+	}
+	.bytes-list :global(span) {
+		font-weight: 700;
+		color: var(--accent-strong);
+	}
+</style>

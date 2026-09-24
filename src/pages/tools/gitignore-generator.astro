@@ -1,0 +1,118 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const groups: Record<string, string[]> = {
+	Languages: ['Node', 'Python', 'PHP', 'Go', 'Rust', 'Java', 'DotNet', 'Ruby'],
+	Frameworks: ['Laravel', 'Nuxt', 'Next.js', 'Astro', 'Symfony', 'Django'],
+	Tools: ['Terraform', 'Docker', 'Env files', 'Logs'],
+	Editors: ['VS Code', 'JetBrains', 'Vim'],
+	Systems: ['macOS', 'Windows', 'Linux'],
+};
+---
+
+<ToolShell
+	slug="gitignore-generator"
+	title=".gitignore Generator"
+	description="Pick your stack and get a clean, deduplicated .gitignore."
+>
+	<div class="gi-groups" id="gi-tool">
+		{
+			Object.entries(groups).map(([group, items]) => (
+				<div class="gi-group">
+					<span>{group}</span>
+					<div class="chips">
+						{items.map((item) => (
+							<button data-value={item} aria-pressed={['Node', 'Env files', 'VS Code', 'macOS'].includes(item) ? 'true' : 'false'}>
+								{item}
+							</button>
+						))}
+					</div>
+				</div>
+			))
+		}
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>.gitignore</span>
+			<button class="btn" id="gi-copy">Copy</button>
+		</div>
+		<pre class="out" id="gi-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const RULES: Record<string, string[]> = {
+		Node: ['node_modules/', 'npm-debug.log*', 'yarn-error.log*', 'pnpm-debug.log*', '.pnpm-store/', 'dist/', 'coverage/', '.npm/'],
+		Python: ['__pycache__/', '*.py[cod]', '.venv/', 'venv/', '*.egg-info/', '.pytest_cache/', '.mypy_cache/', '.ruff_cache/', 'dist/', 'build/'],
+		PHP: ['vendor/', '.phpunit.result.cache', '.php-cs-fixer.cache', 'composer.phar'],
+		Go: ['*.exe', '*.test', '*.out', 'bin/', 'go.work.sum'],
+		Rust: ['target/', '**/*.rs.bk'],
+		Java: ['*.class', '*.jar', 'target/', 'build/', '.gradle/', 'out/'],
+		DotNet: ['bin/', 'obj/', '*.user', '*.suo', 'TestResults/'],
+		Ruby: ['.bundle/', 'vendor/bundle/', 'log/', 'tmp/', '.byebug_history'],
+		Laravel: ['/vendor/', '/node_modules/', '/public/build/', '/public/hot', '/public/storage', '/storage/*.key', '.phpunit.result.cache', 'Homestead.yaml'],
+		Nuxt: ['.nuxt/', '.output/', '.data/', '.nitro/', '.cache/', 'dist/'],
+		'Next.js': ['.next/', 'out/', 'next-env.d.ts', '.vercel/'],
+		Astro: ['dist/', '.astro/'],
+		Symfony: ['/var/', '/vendor/', '/public/bundles/', '.phpunit.result.cache'],
+		Django: ['*.sqlite3', 'staticfiles/', 'media/', '__pycache__/'],
+		Terraform: ['.terraform/', '*.tfstate', '*.tfstate.*', 'crash.log', '*.tfvars', '.terraform.lock.hcl.bak'],
+		Docker: ['docker-compose.override.yml', '.docker/'],
+		'Env files': ['.env', '.env.*', '!.env.example'],
+		Logs: ['logs/', '*.log'],
+		'VS Code': ['.vscode/*', '!.vscode/settings.json', '!.vscode/extensions.json'],
+		JetBrains: ['.idea/', '*.iml'],
+		Vim: ['*.swp', '*.swo', '*~', 'Session.vim'],
+		macOS: ['.DS_Store', '._*', '.AppleDouble', '.Spotlight-V100', '.Trashes'],
+		Windows: ['Thumbs.db', 'ehthumbs.db', 'Desktop.ini', '$RECYCLE.BIN/'],
+		Linux: ['*~', '.directory', '.Trash-*', '.nfs*'],
+	};
+
+	onPage('gi-tool', () => {
+		const buttons = [...document.querySelectorAll<HTMLButtonElement>('#gi-tool button')];
+
+		const render = () => {
+			const seen = new Set<string>();
+			const blocks = buttons
+				.filter((b) => b.getAttribute('aria-pressed') === 'true')
+				.map((b) => {
+					const lines = RULES[b.dataset.value!].filter((line) => !seen.has(line));
+					lines.forEach((line) => seen.add(line));
+					return lines.length ? `# ${b.dataset.value}\n${lines.join('\n')}` : '';
+				})
+				.filter(Boolean);
+			byId('gi-out').textContent = blocks.length ? `${blocks.join('\n\n')}\n` : 'Pick at least one item above.';
+		};
+
+		buttons.forEach((b) =>
+			b.addEventListener('click', () => {
+				b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+				render();
+			})
+		);
+		copyButton(byId('gi-copy'), () => byId('gi-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.gi-groups {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	.gi-group {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.gi-group > span {
+		font-size: 12px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--ink-soft);
+	}
+</style>

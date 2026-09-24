@@ -1,0 +1,233 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="semver-calculator"
+	title="SemVer Calculator"
+	description="Check which versions a range like ^1.2.3, ~2.0 or >=1.4 <2 accepts, compare versions and compute the next bump."
+>
+	<div class="fields" id="sv-tool">
+		<div class="field" id="sv-range-field">
+			<label for="sv-range">Range</label>
+			<input id="sv-range" spellcheck="false" value="^1.4.2" />
+			<span class="field-note" id="sv-range-note"></span>
+		</div>
+		<div class="field" id="sv-version-field">
+			<label for="sv-version">Version</label>
+			<input id="sv-version" spellcheck="false" value="1.9.0" />
+			<span class="field-note" id="sv-version-note"></span>
+		</div>
+	</div>
+	<div class="stats" id="sv-bumps"></div>
+	<section class="panel">
+		<div class="panel-head">Versions to test · one per line</div>
+		<div class="grid-2 sv-grid">
+			<textarea id="sv-list" spellcheck="false" aria-label="Versions to test">1.4.1
+1.4.2
+1.5.0
+1.99.3
+2.0.0
+2.0.0-beta.1
+1.6.0-rc.1</textarea>
+			<ul class="sv-results" id="sv-results"></ul>
+		</div>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Version = { major: number; minor: number; patch: number; pre: string[] };
+	type Comparator = { op: string; v: Version };
+
+	function parse(text: string): Version | null {
+		const m = text.trim().replace(/^[v=]/, '').match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/);
+		return m ? { major: +m[1], minor: +m[2], patch: +m[3], pre: m[4] ? m[4].split('.') : [] } : null;
+	}
+
+	function compare(a: Version, b: Version): number {
+		for (const k of ['major', 'minor', 'patch'] as const) if (a[k] !== b[k]) return a[k] - b[k];
+		if (!a.pre.length || !b.pre.length) return b.pre.length - a.pre.length;
+		for (let i = 0; i < Math.max(a.pre.length, b.pre.length); i++) {
+			const x = a.pre[i];
+			const y = b.pre[i];
+			if (x === undefined) return -1;
+			if (y === undefined) return 1;
+			if (x === y) continue;
+			const nx = /^\d+$/.test(x);
+			const ny = /^\d+$/.test(y);
+			if (nx && ny) return +x - +y;
+			if (nx !== ny) return nx ? -1 : 1;
+			return x < y ? -1 : 1;
+		}
+		return 0;
+	}
+
+	const v = (major: number, minor: number, patch: number, pre: string[] = []): Version => ({ major, minor, patch, pre });
+	const str = (x: Version) => `${x.major}.${x.minor}.${x.patch}${x.pre.length ? `-${x.pre.join('.')}` : ''}`;
+
+	function partial(text: string) {
+		const m = text.trim().replace(/^v/, '').match(/^(\d+|[x*])(?:\.(\d+|[x*]))?(?:\.(\d+|[x*]))?(?:-([0-9A-Za-z.-]+))?$/i);
+		if (!m) return null;
+		const n = (s?: string) => (s === undefined || /[x*]/i.test(s) ? undefined : +s);
+		return { major: n(m[1]), minor: n(m[2]), patch: n(m[3]), pre: m[4] ? m[4].split('.') : [] };
+	}
+
+	function expand(token: string): Comparator[] | null {
+		const m = token.match(/^(\^|~|>=|<=|>|<|=)?(.+)$/);
+		if (!m) return null;
+		const op = m[1] ?? '';
+		const p = partial(m[2]);
+		if (!p) return null;
+		if (p.major === undefined) return [];
+		const M = p.major;
+		const mi = p.minor ?? 0;
+		const pa = p.patch ?? 0;
+		const low = v(M, mi, pa, p.pre);
+		if (op === '^') {
+			const high = M > 0 ? v(M + 1, 0, 0) : p.minor === undefined ? v(1, 0, 0) : mi > 0 ? v(0, mi + 1, 0) : p.patch === undefined ? v(0, 1, 0) : v(0, 0, pa + 1);
+			return [{ op: '>=', v: low }, { op: '<', v: { ...high, pre: ['0'] } }];
+		}
+		if (op === '~') {
+			const high = p.minor === undefined ? v(M + 1, 0, 0) : v(M, mi + 1, 0);
+			return [{ op: '>=', v: low }, { op: '<', v: { ...high, pre: ['0'] } }];
+		}
+		if (op === '' || op === '=') {
+			if (p.minor === undefined) return [{ op: '>=', v: low }, { op: '<', v: v(M + 1, 0, 0, ['0']) }];
+			if (p.patch === undefined) return [{ op: '>=', v: low }, { op: '<', v: v(M, mi + 1, 0, ['0']) }];
+			return [{ op: '=', v: low }];
+		}
+		return [{ op, v: low }];
+	}
+
+	function parseRange(text: string): Comparator[][] | null {
+		const sets = text.split('||').map((set) => {
+			const hyphen = set.trim().match(/^(\S+)\s+-\s+(\S+)$/);
+			const tokens = hyphen ? [`>=${hyphen[1]}`, `<=${hyphen[2]}`] : set.trim().replace(/(>=|<=|>|<|=|\^|~)\s+/g, '$1').split(/\s+/).filter(Boolean);
+			const all: Comparator[] = [];
+			for (const t of tokens.length ? tokens : ['*']) {
+				const c = expand(t);
+				if (!c) return null;
+				all.push(...c);
+			}
+			return all;
+		});
+		return sets.some((s) => s === null) ? null : (sets as Comparator[][]);
+	}
+
+	function satisfies(version: Version, range: Comparator[][]): boolean {
+		return range.some((set) => {
+			const ok = set.every(({ op, v: b }) => {
+				const c = compare(version, b);
+				return op === '>=' ? c >= 0 : op === '<=' ? c <= 0 : op === '>' ? c > 0 : op === '<' ? c < 0 : c === 0;
+			});
+			if (!ok || !version.pre.length) return ok;
+			return set.some(({ v: b }) => b.pre.length && b.pre[0] !== '0' && b.major === version.major && b.minor === version.minor && b.patch === version.patch);
+		});
+	}
+
+	const describe = (range: Comparator[][]) =>
+		range.map((set) => (set.length ? set.map(({ op, v: b }) => `${op}${str(b)}`).join(' ') : 'any version')).join(' or ');
+
+	onPage('sv-tool', () => {
+		const rangeIn = byId<HTMLInputElement>('sv-range');
+		const versionIn = byId<HTMLInputElement>('sv-version');
+		const list = byId<HTMLTextAreaElement>('sv-list');
+
+		const render = () => {
+			const range = parseRange(rangeIn.value);
+			byId('sv-range-field').classList.toggle('invalid', !range);
+			byId('sv-range-note').textContent = range ? `Means ${describe(range)}` : 'Try ^1.2.3, ~1.2, 1.x, >=1.0.0 <2.0.0 or 1.2 - 1.4.';
+			const version = parse(versionIn.value);
+			byId('sv-version-field').classList.toggle('invalid', !version);
+			byId('sv-version-note').textContent = !version ? 'Use MAJOR.MINOR.PATCH, e.g. 1.9.0 or 2.0.0-rc.1.' : range ? (satisfies(version, range) ? '✓ Satisfies the range' : '✗ Outside the range') : '';
+
+			const bumps = byId('sv-bumps');
+			bumps.replaceChildren();
+			if (version) {
+				const base = v(version.major, version.minor, version.patch);
+				const next: [string, Version][] = [
+					['Major', v(version.major + 1, 0, 0)],
+					['Minor', v(version.major, version.minor + 1, 0)],
+					['Patch', version.pre.length ? base : v(version.major, version.minor, version.patch + 1)],
+					['Pre-release', version.pre.length ? { ...version, pre: version.pre.map((p, i, a) => (i === a.length - 1 && /^\d+$/.test(p) ? String(+p + 1) : p)) } : v(version.major, version.minor, version.patch + 1, ['rc', '0'])],
+				];
+				next.forEach(([label, value]) => {
+					const btn = document.createElement('button');
+					btn.className = 'stat sv-bump';
+					btn.innerHTML = '<b></b><span></span>';
+					btn.querySelector('b')!.textContent = str(value);
+					btn.querySelector('span')!.textContent = `Next ${label.toLowerCase()} · copy`;
+					copyButton(btn, () => str(value));
+					bumps.append(btn);
+				});
+			}
+
+			const items = list.value.split('\n').map((l) => l.trim()).filter(Boolean);
+			const parsed = items.map((text) => ({ text, ver: parse(text) }));
+			const sorted = [...parsed].sort((a, b) => (a.ver && b.ver ? compare(a.ver, b.ver) : a.ver ? -1 : 1));
+			byId('sv-results').replaceChildren(
+				...sorted.map(({ text, ver }) => {
+					const li = document.createElement('li');
+					const state = !ver ? 'bad' : range && satisfies(ver, range) ? 'ok' : 'no';
+					li.className = `sv-${state}`;
+					li.innerHTML = '<code></code><span></span>';
+					li.querySelector('code')!.textContent = text;
+					li.querySelector('span')!.textContent = state === 'bad' ? 'Invalid' : state === 'ok' ? 'Matches' : 'No match';
+					return li;
+				})
+			);
+		};
+
+		[rangeIn, versionIn, list].forEach((el) => el.addEventListener('input', render));
+		render();
+	});
+</script>
+
+<style>
+	.sv-grid {
+		padding: 12px;
+		gap: 12px;
+	}
+	.sv-grid textarea {
+		min-height: 200px;
+	}
+	.sv-results {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.sv-results :global(li) {
+		display: flex;
+		justify-content: space-between;
+		padding: 6px 10px;
+		border-radius: 8px;
+		background: var(--surface-2);
+		font-size: 13px;
+	}
+	.sv-results :global(code) {
+		font-family: var(--mono);
+	}
+	.sv-results :global(.sv-ok span) {
+		color: var(--ok);
+		font-weight: 700;
+	}
+	.sv-results :global(.sv-no span) {
+		color: var(--ink-soft);
+	}
+	.sv-results :global(.sv-bad span) {
+		color: var(--warn);
+		font-weight: 700;
+	}
+	.sv-bumps :global(.sv-bump),
+	:global(.sv-bump) {
+		cursor: pointer;
+		text-align: left;
+		font: inherit;
+		color: var(--ink);
+	}
+</style>

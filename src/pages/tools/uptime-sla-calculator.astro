@@ -1,0 +1,164 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const nines = ['99', '99.5', '99.9', '99.95', '99.99', '99.999'];
+---
+
+<ToolShell
+	slug="uptime-sla-calculator"
+	title="Uptime / SLA Calculator"
+	description="What an availability target really allows, how much downtime you have left, and what chaining services does to your SLA."
+>
+	<div class="fields" id="sla-tool">
+		<div class="field" id="sla-field">
+			<label for="sla-in">Availability %</label>
+			<input id="sla-in" inputmode="decimal" value="99.9" />
+		</div>
+		<div class="field" id="sla-down-field">
+			<label for="sla-down">Or allowed downtime per month</label>
+			<input id="sla-down" spellcheck="false" placeholder="45 min, 2h, 90s" />
+			<span class="field-note" id="sla-down-note"></span>
+		</div>
+	</div>
+	<div class="chips" id="sla-nines">
+		{nines.map((n) => <button data-value={n}>{n}%</button>)}
+	</div>
+	<ul class="sla-list" id="sla-list"></ul>
+	<section class="panel">
+		<div class="panel-head">Composite SLA</div>
+		<div class="sla-composite">
+			<input id="sla-chain" spellcheck="false" value="99.99, 99.95, 99.9" aria-label="SLAs of dependencies" />
+			<p id="sla-chain-out"></p>
+		</div>
+	</section>
+</ToolShell>
+
+<script>
+	import { formatDuration } from '../../scripts/units';
+	import { byId, onPage } from '../../scripts/ui';
+
+	const PERIODS: [string, number][] = [
+		['Per day', 86400],
+		['Per week', 604800],
+		['Per month', 2629746],
+		['Per quarter', 7889238],
+		['Per year', 31556952],
+	];
+
+	function parseDuration(text: string): number | null {
+		const re = /(\d+(?:\.\d+)?)\s*(d|h|m(?:in)?|s)?/gi;
+		let total = 0;
+		let found = false;
+		for (const m of text.matchAll(re)) {
+			found = true;
+			const unit = (m[2] ?? 'min').toLowerCase();
+			total += Number(m[1]) * (unit === 'd' ? 86400 : unit === 'h' ? 3600 : unit === 's' ? 1 : 60);
+		}
+		return found ? total : null;
+	}
+
+	onPage('sla-tool', () => {
+		const input = byId<HTMLInputElement>('sla-in');
+		const down = byId<HTMLInputElement>('sla-down');
+		const chain = byId<HTMLInputElement>('sla-chain');
+
+		const render = () => {
+			const pct = Number(input.value.replace(',', '.'));
+			const valid = input.value.trim() !== '' && pct >= 0 && pct <= 100;
+			byId('sla-field').classList.toggle('invalid', !valid);
+			document.querySelectorAll<HTMLButtonElement>('#sla-nines button').forEach((b) =>
+				b.setAttribute('aria-pressed', String(b.dataset.value === input.value.trim()))
+			);
+			if (!valid) return;
+			byId('sla-list').replaceChildren(
+				...PERIODS.map(([label, seconds]) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<span></span><b></b>';
+					li.querySelector('span')!.textContent = label;
+					li.querySelector('b')!.textContent = formatDuration(seconds * (1 - pct / 100));
+					return li;
+				})
+			);
+		};
+
+		const fromDowntime = () => {
+			const seconds = parseDuration(down.value);
+			byId('sla-down-field').classList.toggle('invalid', down.value.trim() !== '' && seconds === null);
+			byId('sla-down-note').textContent = seconds === null ? '' : `= ${formatDuration(seconds)} per month`;
+			if (seconds === null) return;
+			input.value = String(Number((100 * (1 - seconds / PERIODS[2][1])).toFixed(5)));
+			render();
+		};
+
+		const composite = () => {
+			const values = chain.value.split(/[,;\s]+/).map(Number).filter((n) => n > 0 && n <= 100);
+			const product = values.reduce((acc, v) => acc * (v / 100), 1) * 100;
+			byId('sla-chain-out').textContent = values.length
+				? `Services in series: ${Number(product.toFixed(4))}% — ${formatDuration(PERIODS[2][1] * (1 - product / 100))} of downtime a month. A chain is never more available than its weakest link.`
+				: 'List the availability of each dependency, separated by commas.';
+		};
+
+		input.addEventListener('input', () => {
+			down.value = '';
+			byId('sla-down-note').textContent = '';
+			render();
+		});
+		down.addEventListener('input', fromDowntime);
+		chain.addEventListener('input', composite);
+		document.querySelectorAll<HTMLButtonElement>('#sla-nines button').forEach((b) =>
+			b.addEventListener('click', () => {
+				input.value = b.dataset.value!;
+				down.value = '';
+				render();
+			})
+		);
+		render();
+		composite();
+	});
+</script>
+
+<style>
+	.sla-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		gap: 10px;
+	}
+	.sla-list :global(li) {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		padding: 12px 14px;
+	}
+	.sla-list :global(span) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.sla-list :global(b) {
+		font-size: 20px;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+	}
+	.sla-composite {
+		padding: 12px 14px;
+	}
+	.sla-composite input {
+		width: 100%;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 8px 10px;
+		background: var(--surface-2);
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 14px;
+	}
+	.sla-composite p {
+		margin: 10px 0 0;
+		font-size: 14px;
+	}
+</style>

@@ -1,0 +1,136 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="security-headers-builder"
+	title="Security Headers Builder"
+	description="Assemble HSTS, CSP, framing, referrer and permissions headers, then export them for Nginx, Apache, Caddy, Netlify or raw HTTP."
+>
+	<div class="toolbar" id="sh-tool">
+		<div class="seg" id="sh-format">
+			<button data-value="raw" aria-pressed="true">HTTP</button>
+			<button data-value="nginx">Nginx</button>
+			<button data-value="apache">Apache</button>
+			<button data-value="caddy">Caddy</button>
+			<button data-value="netlify">Netlify _headers</button>
+		</div>
+	</div>
+	<div class="sh-list" id="sh-list"></div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="sh-count"></span>
+			<button class="btn" id="sh-copy">Copy</button>
+		</div>
+		<pre class="out" id="sh-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Header = { name: string; on: boolean; options: [string, string][]; hint: string };
+	const HEADERS: Header[] = [
+		{ name: 'Strict-Transport-Security', on: true, hint: 'Forces HTTPS. Only add preload once every subdomain serves HTTPS.', options: [['1 year + subdomains', 'max-age=31536000; includeSubDomains'], ['1 year + preload', 'max-age=31536000; includeSubDomains; preload'], ['Test: 5 minutes', 'max-age=300']] },
+		{ name: 'Content-Security-Policy', on: true, hint: 'Controls where scripts, styles and frames may load from. Test in report-only first.', options: [['Strict self', "default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"], ['Self + Google Fonts', "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'"], ['Upgrade only', 'upgrade-insecure-requests']] },
+		{ name: 'X-Content-Type-Options', on: true, hint: 'Stops browsers guessing MIME types.', options: [['nosniff', 'nosniff']] },
+		{ name: 'X-Frame-Options', on: true, hint: 'Legacy clickjacking guard; CSP frame-ancestors supersedes it.', options: [['DENY', 'DENY'], ['SAMEORIGIN', 'SAMEORIGIN']] },
+		{ name: 'Referrer-Policy', on: true, hint: 'How much of the URL leaks to other sites.', options: [['strict-origin-when-cross-origin', 'strict-origin-when-cross-origin'], ['no-referrer', 'no-referrer'], ['same-origin', 'same-origin']] },
+		{ name: 'Permissions-Policy', on: true, hint: 'Turns off powerful browser features you do not use.', options: [['Deny sensors', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()'], ['Self only', 'camera=(self), microphone=(self), geolocation=(self)']] },
+		{ name: 'Cross-Origin-Opener-Policy', on: false, hint: 'Isolates your window from cross-origin popups.', options: [['same-origin', 'same-origin'], ['same-origin-allow-popups', 'same-origin-allow-popups']] },
+		{ name: 'Cross-Origin-Resource-Policy', on: false, hint: 'Who may embed your resources.', options: [['same-origin', 'same-origin'], ['same-site', 'same-site'], ['cross-origin', 'cross-origin']] },
+		{ name: 'Cross-Origin-Embedder-Policy', on: false, hint: 'Needed with COOP for SharedArrayBuffer. Breaks embeds without CORP.', options: [['require-corp', 'require-corp'], ['credentialless', 'credentialless']] },
+	];
+
+	onPage('sh-tool', () => {
+		let format = 'raw';
+		const list = byId('sh-list');
+		const state = HEADERS.map((h) => ({ on: h.on, value: h.options[0][1] }));
+
+		HEADERS.forEach((h, i) => {
+			const row = document.createElement('div');
+			row.className = 'sh-row';
+			row.innerHTML = '<label class="check"><input type="checkbox" /><b></b></label><select></select><p></p>';
+			const box = row.querySelector('input')!;
+			const select = row.querySelector('select')!;
+			box.checked = h.on;
+			select.setAttribute('aria-label', `${h.name} value`);
+			row.querySelector('b')!.textContent = h.name;
+			row.querySelector('p')!.textContent = h.hint;
+			h.options.forEach(([label, value]) => select.add(new Option(label, value)));
+			box.addEventListener('change', () => {
+				state[i].on = box.checked;
+				render();
+			});
+			select.addEventListener('change', () => {
+				state[i].value = select.value;
+				render();
+			});
+			list.append(row);
+		});
+
+		const render = () => {
+			const active = HEADERS.map((h, i) => [h.name, state[i].value, state[i].on] as const).filter(([, , on]) => on);
+			byId('sh-count').textContent = `${active.length} headers`;
+			const esc = (v: string) => v.replace(/"/g, '\\"');
+			const lines = {
+				raw: () => active.map(([n, v]) => `${n}: ${v}`).join('\n'),
+				nginx: () => active.map(([n, v]) => `add_header ${n} "${esc(v)}" always;`).join('\n'),
+				apache: () => `<IfModule mod_headers.c>\n${active.map(([n, v]) => `  Header always set ${n} "${esc(v)}"`).join('\n')}\n</IfModule>`,
+				caddy: () => `header {\n${active.map(([n, v]) => `  ${n} "${esc(v)}"`).join('\n')}\n  -Server\n}`,
+				netlify: () => `/*\n${active.map(([n, v]) => `  ${n}: ${v}`).join('\n')}`,
+			}[format as 'raw'];
+			byId('sh-out').textContent = active.length ? lines() : 'Enable at least one header.';
+		};
+
+		segmented(byId('sh-format'), (value) => {
+			format = value;
+			render();
+		});
+		copyButton(byId('sh-copy'), () => byId('sh-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.sh-list {
+		display: grid;
+		gap: 8px;
+	}
+	.sh-list :global(.sh-row) {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+		gap: 4px 12px;
+		align-items: center;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		padding: 10px 14px;
+	}
+	.sh-list :global(.sh-row b) {
+		font-family: var(--mono);
+		font-size: 13px;
+		overflow-wrap: anywhere;
+	}
+	.sh-list :global(select) {
+		min-width: 0;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 6px 8px;
+		background: var(--surface-2);
+		color: var(--ink);
+		font: inherit;
+		font-size: 13px;
+	}
+	.sh-list :global(p) {
+		grid-column: 1 / -1;
+		margin: 0;
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	@media (max-width: 600px) {
+		.sh-list :global(.sh-row) {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>
