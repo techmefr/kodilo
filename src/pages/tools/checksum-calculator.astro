@@ -1,0 +1,180 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="checksum-calculator"
+	title="Checksum Calculator"
+	description="CRC32, CRC32C, Adler-32, FNV-1a and SHA-256 for text or a file, computed locally. Paste an expected value to verify it."
+>
+	<div class="toolbar" id="ck-tool">
+		<div class="seg" id="ck-mode">
+			<button data-value="text" aria-pressed="true">Text</button>
+			<button data-value="file">File</button>
+		</div>
+		<input type="file" id="ck-file" hidden aria-label="File to checksum" />
+	</div>
+	<section class="panel" id="ck-text-panel">
+		<div class="panel-head">Text</div>
+		<textarea id="ck-in" spellcheck="false" aria-label="Text">The quick brown fox jumps over the lazy dog</textarea>
+	</section>
+	<p class="ck-file-info" id="ck-file-info" hidden></p>
+	<div class="fields">
+		<div class="field wide" id="ck-expect-field">
+			<label for="ck-expect">Expected checksum (optional)</label>
+			<input id="ck-expect" spellcheck="false" placeholder="414fa339" />
+			<span class="field-note" id="ck-expect-note"></span>
+		</div>
+	</div>
+	<ul class="ck-list" id="ck-list"></ul>
+</ToolShell>
+
+<script>
+	import { encodeBytes } from '../../scripts/crypto';
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	const table = (poly: number) =>
+		Array.from({ length: 256 }, (_, n) => {
+			let c = n;
+			for (let k = 0; k < 8; k++) c = c & 1 ? poly ^ (c >>> 1) : c >>> 1;
+			return c >>> 0;
+		});
+	const T32 = table(0xedb88320);
+	const T32C = table(0x82f63b78);
+
+	const crc = (t: number[], data: Uint8Array) => {
+		let c = 0xffffffff;
+		for (const b of data) c = t[(c ^ b) & 0xff] ^ (c >>> 8);
+		return (c ^ 0xffffffff) >>> 0;
+	};
+	const adler = (data: Uint8Array) => {
+		let a = 1;
+		let b = 0;
+		for (const x of data) {
+			a = (a + x) % 65521;
+			b = (b + a) % 65521;
+		}
+		return ((b << 16) | a) >>> 0;
+	};
+	const fnv = (data: Uint8Array) => {
+		let h = 0x811c9dc5;
+		for (const x of data) h = Math.imul(h ^ x, 0x01000193);
+		return h >>> 0;
+	};
+	const hex32 = (n: number) => n.toString(16).padStart(8, '0');
+
+	onPage('ck-tool', () => {
+		const input = byId<HTMLTextAreaElement>('ck-in');
+		const file = byId<HTMLInputElement>('ck-file');
+		const expect = byId<HTMLInputElement>('ck-expect');
+		let mode = 'text';
+		let fileBytes: Uint8Array | null = null;
+		let values: [string, string][] = [];
+
+		const compare = () => {
+			const e = expect.value.trim().toLowerCase().replace(/^0x/, '');
+			const hit = values.find(([, v]) => v === e);
+			byId('ck-expect-field').classList.toggle('invalid', !!e && !hit);
+			byId('ck-expect-note').textContent = !e ? '' : hit ? `✓ Matches ${hit[0]}` : '✗ No algorithm matches this value';
+			document.querySelectorAll('#ck-list li').forEach((li, i) => li.classList.toggle('ck-hit', !!hit && values[i][1] === e));
+		};
+
+		const render = async () => {
+			const data = mode === 'text' ? new TextEncoder().encode(input.value) : fileBytes;
+			if (!data) {
+				byId('ck-list').replaceChildren();
+				return;
+			}
+			const sha = encodeBytes(new Uint8Array(await crypto.subtle.digest('SHA-256', data)), 'hex');
+			values = [
+				['CRC32', hex32(crc(T32, data))],
+				['CRC32C', hex32(crc(T32C, data))],
+				['Adler-32', hex32(adler(data))],
+				['FNV-1a 32', hex32(fnv(data))],
+				['SHA-256', sha],
+			];
+			byId('ck-list').replaceChildren(
+				...values.map(([label, value]) => {
+					const li = document.createElement('li');
+					li.innerHTML = '<button><span></span><code></code><em>Copy</em></button>';
+					li.querySelector('span')!.textContent = label;
+					li.querySelector('code')!.textContent = value;
+					li.querySelector('button')!.addEventListener('click', () => {
+						navigator.clipboard.writeText(value);
+						li.querySelector('em')!.textContent = 'Copied';
+						setTimeout(() => (li.querySelector('em')!.textContent = 'Copy'), 1200);
+					});
+					return li;
+				})
+			);
+			compare();
+		};
+
+		segmented(byId('ck-mode'), (v) => {
+			mode = v;
+			file.hidden = v !== 'file';
+			byId('ck-text-panel').hidden = v === 'file';
+			byId('ck-file-info').hidden = v !== 'file' || !fileBytes;
+			render();
+		});
+		file.addEventListener('change', async () => {
+			const f = file.files?.[0];
+			if (!f) return;
+			fileBytes = new Uint8Array(await f.arrayBuffer());
+			const info = byId('ck-file-info');
+			info.textContent = `${f.name} · ${f.size.toLocaleString('en')} bytes`;
+			info.hidden = false;
+			render();
+		});
+		input.addEventListener('input', render);
+		expect.addEventListener('input', compare);
+		render();
+	});
+</script>
+
+<style>
+	.ck-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 8px;
+	}
+	.ck-list :global(button) {
+		width: 100%;
+		display: grid;
+		grid-template-columns: 100px 1fr auto;
+		gap: 12px;
+		align-items: center;
+		text-align: left;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		padding: 10px 14px;
+		color: var(--ink);
+		font: inherit;
+		cursor: pointer;
+	}
+	.ck-list :global(.ck-hit button) {
+		border-color: var(--ok);
+	}
+	.ck-list :global(span) {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+	}
+	.ck-list :global(code) {
+		font-family: var(--mono);
+		font-size: 14px;
+		overflow-wrap: anywhere;
+	}
+	.ck-list :global(em) {
+		font-style: normal;
+		font-size: 12px;
+		color: var(--accent-strong);
+	}
+	.ck-file-info {
+		margin: 0;
+		font-size: 14px;
+	}
+</style>

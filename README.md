@@ -59,6 +59,16 @@ Live at **https://techmefr.github.io/kodilo/**
 - **Security Headers Builder** (`/tools/security-headers-builder/`) — HSTS, CSP and friends for Nginx, Apache, Caddy, Netlify
 - **IPv4 Range Expander** (`/tools/ipv4-range-expander/`) — expand a CIDR or range into addresses and minimal CIDR blocks
 - **IPv6 ULA Generator** (`/tools/ipv6-ula-generator/`) — random RFC 4193 prefix and /64 subnets
+- **Text Statistics** (`/tools/text-statistics/`) — reading time, readability, lexical diversity and top words
+- **XOR Cipher** (`/tools/xor-cipher/`) — repeating-key XOR with text, hex and Base64
+- **Checksum Calculator** (`/tools/checksum-calculator/`) — CRC32, CRC32C, Adler-32, FNV-1a and SHA-256 with verification
+- **MAC Address Generator** (`/tools/mac-address-generator/`) — random MACs with prefix, separator and case options
+- **User Agent Parser** (`/tools/user-agent-parser/`) — browser, engine, OS and device from a User-Agent
+- **MIME Types** (`/tools/mime-types/`) — extension to Content-Type and back
+- **Regex Cheatsheet** (`/tools/regex-cheatsheet/`) — JavaScript regex syntax, click to copy
+- **.env Tool** (`/tools/env-file-tool/`) — validate, diff with .env.example, export to JSON, docker, Compose, Secret
+- **systemd Unit Generator** (`/tools/systemd-unit-generator/`) — service and timer units with hardening
+- **SSH Config Generator** (`/tools/ssh-config-generator/`) — Host blocks with jump hosts and forwarding
 - More tools land as separate categories in the sidebar — see `src/data/tools.ts`.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
@@ -88,15 +98,12 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 
 **Text**
 - Diff Checker
-- Text Statistics
 
 **Encoding & Security**
 - Bcrypt
 - RSA Key Pair Generator
 - Text Encryption
 - BIP39 Generator
-- XOR Cipher
-- Checksum Calculator
 
 **Generators**
 - QR Code Generator
@@ -106,9 +113,7 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 **Converters**
 
 **Network**
-- MAC Address Generator
 - MAC Address Lookup
-- User Agent Parser
 - Phone Parser & Formatter
 
 **Validators**
@@ -129,8 +134,6 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 - SQL Prettify
 - Math Evaluator
 - Docker Run to Compose Converter
-- MIME Types
-- Regex Cheatsheet
 - REST API Tester
 - Docker Cheatsheet
 - Git Cheatsheet
@@ -138,11 +141,8 @@ Tools planned but not built yet, grouped by category (see `src/data/tools.ts`):
 
 **DevOps & Sysadmin**
 - Kubernetes Manifest Generator
-- .env Tool
 - YAML Validator & Formatter
 - Nginx Config Generator
-- systemd Unit Generator
-- SSH Config Generator
 - htpasswd Generator
 - X.509 Certificate Decoder
 - JSON Log Viewer

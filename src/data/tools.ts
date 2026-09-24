@@ -188,6 +188,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'text-statistics',
+				built: true,
 				name: 'Text Statistics',
 				description: 'Reading time, sentence count and other text metrics.',
 			},
@@ -274,11 +275,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'xor-cipher',
+				built: true,
 				name: 'XOR Cipher',
 				description: 'Encrypt or decrypt text/bytes with a repeating XOR key.',
 			},
 			{
 				slug: 'checksum-calculator',
+				built: true,
 				name: 'Checksum Calculator',
 				description: 'Compute a CRC32 or other checksum for text or a file.',
 			},
@@ -386,6 +389,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'mac-address-generator',
+				built: true,
 				name: 'MAC Address Generator',
 				description: 'Generate random MAC addresses.',
 			},
@@ -396,6 +400,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'user-agent-parser',
+				built: true,
 				name: 'User Agent Parser',
 				description: 'Parse a User-Agent string into browser, engine and OS.',
 			},
@@ -519,6 +524,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'mime-types',
+				built: true,
 				name: 'MIME Types',
 				description: 'Look up the MIME type for a file extension.',
 			},
@@ -530,6 +536,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'regex-cheatsheet',
+				built: true,
 				name: 'Regex Cheatsheet',
 				description: 'Quick reference for common regular expression syntax.',
 			},
@@ -591,6 +598,7 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'env-file-tool',
+				built: true,
 				name: '.env Tool',
 				description: 'Validate, diff and convert .env files to JSON, docker -e flags or a Kubernetes Secret.',
 			},
@@ -606,11 +614,13 @@ export const categories: Category[] = [
 			},
 			{
 				slug: 'systemd-unit-generator',
+				built: true,
 				name: 'systemd Unit Generator',
 				description: 'Service and timer units with restart policy, user, environment and hardening options.',
 			},
 			{
 				slug: 'ssh-config-generator',
+				built: true,
 				name: 'SSH Config Generator',
 				description: 'Host blocks for ~/.ssh/config with jump hosts, identity files and port forwarding.',
 			},
