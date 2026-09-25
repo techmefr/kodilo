@@ -1,0 +1,188 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="caddyfile-generator"
+	title="Caddyfile Generator"
+	description="A Caddyfile with automatic HTTPS, a reverse proxy or static file server, www redirect, basic auth, security headers, compression and logs."
+>
+	<div class="toolbar" id="cd-tool">
+		<div class="seg" id="cd-mode" aria-label="Site type">
+			<button data-value="proxy" aria-pressed="true">
+				Reverse proxy
+			</button>
+			<button data-value="static" aria-pressed="false">
+				Static files
+			</button>
+			<button data-value="both" aria-pressed="false">
+				SPA + API
+			</button>
+		</div>
+	</div>
+	<div class="fields">
+		<div class="field">
+			<label for="cd-domain">Domain · space separated</label>
+			<input id="cd-domain" spellcheck="false" value="example.com" />
+		</div>
+		<div class="field">
+			<label for="cd-email">ACME email</label>
+			<input id="cd-email" spellcheck="false" value="ops@example.com" />
+		</div>
+		<div class="field" id="cd-up-field">
+			<label for="cd-up">Upstreams · space separated</label>
+			<input id="cd-up" spellcheck="false" value="localhost:3000 localhost:3001" />
+		</div>
+		<div class="field" id="cd-lb-field">
+			<label for="cd-lb">Load balancing</label>
+			<select id="cd-lb">
+				<option value="round_robin">round_robin</option>
+				<option value="least_conn">least_conn</option>
+				<option value="random">random</option>
+				<option value="ip_hash">ip_hash</option>
+				<option value="first">first</option>
+			</select>
+		</div>
+		<div class="field" id="cd-root-field" hidden>
+			<label for="cd-root">Root</label>
+			<input id="cd-root" spellcheck="false" value="/srv/www" />
+		</div>
+		<div class="field" id="cd-api-field" hidden>
+			<label for="cd-api">API path</label>
+			<input id="cd-api" spellcheck="false" value="/api/*" />
+		</div>
+		<div class="field">
+			<label for="cd-auth-user">Basic auth user</label>
+			<input id="cd-auth-user" spellcheck="false" placeholder="leave empty to disable" />
+		</div>
+		<div class="field">
+			<label for="cd-auth-hash">Password hash · caddy hash-password</label>
+			<input id="cd-auth-hash" spellcheck="false" placeholder="$2a$14$..." />
+		</div>
+	</div>
+	<div class="toolbar">
+		<label class="check">
+			<input type="checkbox" id="cd-www" checked /> Redirect www to apex
+		</label>
+		<label class="check">
+			<input type="checkbox" id="cd-headers" checked /> Security headers
+		</label>
+		<label class="check">
+			<input type="checkbox" id="cd-encode" checked /> zstd + gzip
+		</label>
+		<label class="check">
+			<input type="checkbox" id="cd-health" /> Health checks
+		</label>
+		<label class="check">
+			<input type="checkbox" id="cd-log" checked /> Access log
+		</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Caddyfile</span>
+			<span class="cd-actions">
+				<button class="btn" id="cd-copy">
+					Copy
+				</button>
+				<button class="btn" id="cd-dl">
+					Download
+				</button>
+			</span>
+		</div>
+		<pre class="out" id="cd-out" tabindex="0" aria-label="Caddyfile"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { saveBlob } from '../../scripts/files';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('cd-tool', () => {
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const on = (id: string) => byId<HTMLInputElement>(id).checked;
+		let mode = 'proxy';
+
+		const render = () => {
+			const domains = val('cd-domain')
+				.split(/[\s,]+/)
+				.filter(Boolean);
+			const hosts = domains.length ? domains : ['localhost'];
+			const ups = val('cd-up')
+				.split(/[\s,]+/)
+				.filter(Boolean);
+			const L: string[] = [];
+			if (val('cd-email')) L.push('{', `\temail ${val('cd-email')}`, '}', '');
+			if (on('cd-www')) {
+				const apex = hosts.filter((h) => !h.startsWith('www.') && h.includes('.') && !h.startsWith('*'));
+				apex.forEach((h) => L.push(`www.${h} {`, `\tredir https://${h}{uri} permanent`, '}', ''));
+			}
+			L.push(`${hosts.join(', ')} {`);
+			if (on('cd-encode')) L.push('\tencode zstd gzip');
+			if (on('cd-headers'))
+				L.push(
+					'\theader {',
+					'\t\tStrict-Transport-Security "max-age=31536000; includeSubDomains; preload"',
+					'\t\tX-Content-Type-Options "nosniff"',
+					'\t\tX-Frame-Options "DENY"',
+					'\t\tReferrer-Policy "strict-origin-when-cross-origin"',
+					'\t\tPermissions-Policy "camera=(), microphone=(), geolocation=()"',
+					'\t\t-Server',
+					'\t}',
+				);
+			if (val('cd-auth-user')) L.push('\tbasic_auth {', `\t\t${val('cd-auth-user')} ${val('cd-auth-hash') || '<hash from caddy hash-password>'}`, '\t}');
+			const proxy = (indent: string) => {
+				const target = ups.length ? ups.join(' ') : 'localhost:3000';
+				const extra: string[] = [];
+				if (ups.length > 1) extra.push(`lb_policy ${byId<HTMLSelectElement>('cd-lb').value}`);
+				if (on('cd-health')) extra.push('health_uri /health', 'health_interval 10s');
+				if (!extra.length) return [`${indent}reverse_proxy ${target}`];
+				return [`${indent}reverse_proxy ${target} {`, ...extra.map((e) => `${indent}\t${e}`), `${indent}}`];
+			};
+			const files = (indent: string) => [`${indent}root * ${val('cd-root') || '/srv/www'}`, `${indent}file_server`];
+			if (mode === 'proxy') L.push(...proxy('\t'));
+			else if (mode === 'static') L.push(...files('\t'));
+			else {
+				L.push(
+					`\thandle ${val('cd-api') || '/api/*'} {`,
+					...proxy('\t\t'),
+					'\t}',
+					'\thandle {',
+					...files('\t\t').slice(0, 1),
+					'\t\ttry_files {path} /index.html',
+					'\t\tfile_server',
+					'\t}',
+				);
+			}
+			if (on('cd-log')) L.push('\tlog {', `\t\toutput file /var/log/caddy/${hosts[0].replace(/[^\w.-]/g, '_')}.log`, '\t\tformat json', '\t}');
+			L.push('}');
+			byId('cd-out').textContent = L.join('\n') + '\n';
+		};
+
+		segmented(byId('cd-mode'), (m) => {
+			mode = m;
+			byId('cd-up-field').hidden = m === 'static';
+			byId('cd-lb-field').hidden = m === 'static';
+			byId('cd-root-field').hidden = m === 'proxy';
+			byId('cd-api-field').hidden = m !== 'both';
+			render();
+		});
+		document.querySelectorAll('main input, main select').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('cd-copy'), () => byId('cd-out').textContent ?? '');
+		byId('cd-dl').addEventListener('click', () => saveBlob(new Blob([byId('cd-out').textContent ?? ''], { type: 'text/plain' }), 'Caddyfile'));
+		render();
+	});
+</script>
+
+<style>
+	.cd-actions {
+		display: flex;
+		gap: 6px;
+	}
+	#cd-out {
+		overflow: auto;
+		tab-size: 4;
+	}
+	.field[hidden] {
+		display: none;
+	}
+</style>

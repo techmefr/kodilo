@@ -4,10 +4,12 @@ import { join } from 'node:path';
 const KB = 1024;
 const rules = [
 	{ match: /^_astro\/pdf\.worker/, max: 1400 * KB },
-	{ match: /^_astro\/.*\.m?js$/, max: 600 * KB },
+	{ match: /^_astro\/elk-/, max: 1500 * KB },
+	{ match: /^_astro\/typescript\./, max: 950 * KB },
+	{ match: /^_astro\/.*\.m?js$/, max: 700 * KB },
 	{ match: /^_astro\/.*\.css$/, max: 60 * KB },
 	{ match: /^oui\/.*\.json$/, max: 200 * KB },
-	{ match: /\.html$/, max: 300 * KB },
+	{ match: /\.html$/, max: 450 * KB },
 	{ match: /\.(png|ico|svg)$/, max: 250 * KB },
 ];
 

@@ -1,0 +1,131 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `id;name;email;age;active;manager
+1;Ada Lovelace;ada@example.com;36;true;
+2;Linus Torvalds;linus@example.com;54;false;1
+3;"Hopper; Grace";grace@example.com;85;true;1
+4;Alan Turing;alan@example.com;41;true;null`;
+---
+
+<ToolShell
+	slug="csv-to-json"
+	title="CSV to JSON"
+	description="Turn CSV into JSON with automatic delimiter detection, header rows and typed numbers, booleans and nulls."
+>
+	<div class="toolbar" id="c2j-tool">
+		<div class="seg" id="c2j-shape" aria-label="Output shape">
+			<button data-value="objects" aria-pressed="true">
+				Array of objects
+			</button>
+			<button data-value="arrays" aria-pressed="false">
+				Array of arrays
+			</button>
+		</div>
+		<div class="seg" id="c2j-indent" aria-label="Indent">
+			<button data-value="2" aria-pressed="true">
+				2 spaces
+			</button>
+			<button data-value="4" aria-pressed="false">
+				4 spaces
+			</button>
+			<button data-value="0" aria-pressed="false">
+				Compact
+			</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" id="c2j-header" checked /> First row is header
+		</label>
+		<label class="check">
+			<input type="checkbox" id="c2j-typed" checked /> Typed values
+		</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">CSV</div>
+			<textarea id="c2j-in" spellcheck="false" aria-label="CSV input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>JSON</span>
+				<button class="btn" id="c2j-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="c2j-out" tabindex="0"></pre>
+		</section>
+	</div>
+	<p class="error" id="c2j-error" hidden></p>
+	<div class="stats">
+		<div class="stat">
+			<b id="c2j-rows">0</b>
+			<span>Rows</span>
+		</div>
+		<div class="stat">
+			<b id="c2j-cols">0</b>
+			<span>Columns</span>
+		</div>
+		<div class="stat">
+			<b id="c2j-delim">,</b>
+			<span>Detected delimiter</span>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import Papa from 'papaparse';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const NAMES: Record<string, string> = { ',': 'Comma', ';': 'Semicolon', '\t': 'Tab', '|': 'Pipe' };
+
+	const typed = (v: string): unknown => {
+		const t = v.trim();
+		if (t === '' || t === 'null') return null;
+		if (t === 'true') return true;
+		if (t === 'false') return false;
+		if (/^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/.test(t)) return Number(t);
+		return v;
+	};
+
+	onPage('c2j-tool', () => {
+		const input = byId<HTMLTextAreaElement>('c2j-in');
+		const output = byId('c2j-out');
+		const error = byId('c2j-error');
+		const header = byId<HTMLInputElement>('c2j-header');
+		const typedBox = byId<HTMLInputElement>('c2j-typed');
+		let shape = 'objects';
+		let indent = 2;
+
+		const render = () => {
+			const result = Papa.parse<string[]>(input.value.trim(), { skipEmptyLines: true });
+			const rows = result.data;
+			const delim = result.meta.delimiter;
+			byId('c2j-delim').textContent = NAMES[delim] ?? JSON.stringify(delim);
+			const problem = result.errors.find((e) => e.code !== 'UndetectableDelimiter');
+			if (problem) {
+				error.textContent = `Row ${(problem.row ?? 0) + 1}: ${problem.message}`;
+				error.hidden = false;
+			} else error.hidden = true;
+			const conv = (v: string) => (typedBox.checked ? typed(v) : v);
+			const heads = header.checked ? (rows[0] ?? []) : [];
+			const body = header.checked ? rows.slice(1) : rows;
+			const cols = Math.max(heads.length, ...body.map((r) => r.length), 0);
+			let data: unknown;
+			if (shape === 'arrays') data = header.checked ? [heads, ...body.map((r) => r.map(conv))] : body.map((r) => r.map(conv));
+			else {
+				const keys = Array.from({ length: cols }, (_, i) => heads[i] || `column${i + 1}`);
+				data = body.map((r) => Object.fromEntries(keys.map((k, i) => [k, conv(r[i] ?? '')])));
+			}
+			output.textContent = JSON.stringify(data, null, indent || undefined);
+			byId('c2j-rows').textContent = String(body.length);
+			byId('c2j-cols').textContent = String(cols);
+		};
+
+		segmented(byId('c2j-shape'), (v) => ((shape = v), render()));
+		segmented(byId('c2j-indent'), (v) => ((indent = Number(v)), render()));
+		[header, typedBox].forEach((el) => el.addEventListener('change', render));
+		input.addEventListener('input', render);
+		copyButton(byId('c2j-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

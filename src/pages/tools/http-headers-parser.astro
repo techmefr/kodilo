@@ -1,0 +1,427 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `HTTP/1.1 200 OK
+Date: Thu, 24 Sep 2026 09:12:44 GMT
+Content-Type: text/html; charset=utf-8
+Content-Length: 18432
+Content-Encoding: br
+Cache-Control: public, max-age=3600, stale-while-revalidate=60
+ETag: "5f3a-9b2c"
+Vary: Accept-Encoding
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+Content-Security-Policy: default-src 'self'; img-src 'self' data: https://cdn.example.com; script-src 'self' 'nonce-r4nd0m'; frame-ancestors 'none'
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Set-Cookie: session=4f9a1c; Path=/; Max-Age=86400; Secure; HttpOnly; SameSite=Lax
+Set-Cookie: tracking=abc123; Domain=.example.com; Expires=Fri, 24 Sep 2027 09:12:44 GMT; SameSite=None
+Set-Cookie: theme=dark; Path=/
+X-Frame-Options: DENY
+X-Frame-Options: SAMEORIGIN
+Server: nginx`;
+
+const cookieSample = 'session=4f9a1c; theme=dark; consent=%7B%22ads%22%3Afalse%7D';
+---
+
+<ToolShell
+	slug="http-headers-parser"
+	title="HTTP Headers & Cookie Parser"
+	description="Paste raw request or response headers to see each one explained, with Cache-Control, CSP and Set-Cookie decoded and common mistakes flagged."
+>
+	<section class="panel" id="hh-tool">
+		<div class="panel-head">Raw headers</div>
+		<textarea id="hh-in" spellcheck="false" aria-label="Raw headers">{sample}</textarea>
+	</section>
+	<div class="stats">
+		<div class="stat">
+			<b id="hh-status">—</b>
+			<span>Start line</span>
+		</div>
+		<div class="stat">
+			<b id="hh-count">0</b>
+			<span>Headers</span>
+		</div>
+		<div class="stat">
+			<b id="hh-warn-count">0</b>
+			<span>Warnings</span>
+		</div>
+	</div>
+	<ul class="hh-warnings" id="hh-warnings" aria-label="Warnings"></ul>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Headers</span>
+			<button class="btn" id="hh-copy">
+				Copy as JSON
+			</button>
+		</div>
+		<div class="hh-list" id="hh-list" tabindex="0" role="region" aria-label="Parsed headers"></div>
+	</section>
+	<section class="panel">
+		<div class="panel-head">Cookie header</div>
+		<div class="field hh-cookie-field">
+			<label for="hh-cookie">Cookie</label>
+			<input id="hh-cookie" spellcheck="false" value={cookieSample} />
+		</div>
+		<div class="hh-list" id="hh-cookies" tabindex="0" role="region" aria-label="Parsed cookies"></div>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const INFO: Record<string, string> = {
+		accept: 'Media types the client can handle, with optional q weights.',
+		'accept-encoding': 'Compression algorithms the client accepts.',
+		'accept-language': 'Preferred natural languages for the response.',
+		'accept-ranges': 'Whether the server supports partial range requests.',
+		'access-control-allow-origin': 'CORS: which origin may read the response.',
+		'access-control-allow-methods': 'CORS: methods allowed in the actual request.',
+		'access-control-allow-headers': 'CORS: request headers allowed in the actual request.',
+		'access-control-allow-credentials': 'CORS: whether cookies and auth may be sent.',
+		age: 'Seconds the response has been in a shared cache.',
+		authorization: 'Credentials for authenticating the client.',
+		'cache-control': 'Caching rules for browsers and shared caches.',
+		connection: 'Whether the connection stays open after this message.',
+		'content-disposition': 'Display inline or download as an attachment.',
+		'content-encoding': 'Compression applied to the body.',
+		'content-language': 'Language of the content for the audience.',
+		'content-length': 'Body size in bytes.',
+		'content-security-policy': 'Allowed sources for scripts, styles, frames and more.',
+		'content-type': 'Media type and charset of the body.',
+		cookie: 'Cookies sent by the client.',
+		date: 'When the message was generated.',
+		etag: 'Version identifier of the resource, used for revalidation.',
+		expires: 'Date after which the response is stale.',
+		host: 'Target host and port of the request.',
+		'if-modified-since': 'Conditional request: only if changed after this date.',
+		'if-none-match': 'Conditional request: only if the ETag differs.',
+		'keep-alive': 'Timeout and max requests for a persistent connection.',
+		'last-modified': 'When the resource last changed.',
+		location: 'Redirect target or URL of a created resource.',
+		origin: 'Origin that initiated the request.',
+		'permissions-policy': 'Browser features allowed for this page and its frames.',
+		pragma: 'Legacy HTTP/1.0 cache hint, superseded by Cache-Control.',
+		referer: 'Address of the page that linked to this request.',
+		'referrer-policy': 'How much referrer information is sent with requests.',
+		'retry-after': 'How long to wait before retrying.',
+		server: 'Software used by the origin server.',
+		'set-cookie': 'Cookie the server asks the browser to store.',
+		'strict-transport-security': 'HSTS: force HTTPS for this host.',
+		'transfer-encoding': 'Encoding used to transfer the body, like chunked.',
+		'user-agent': 'Client software making the request.',
+		vary: 'Request headers that change the response, for cache keys.',
+		via: 'Proxies the message passed through.',
+		'www-authenticate': 'Authentication scheme required to access the resource.',
+		'x-content-type-options': 'nosniff stops MIME type sniffing.',
+		'x-forwarded-for': 'Original client IP behind proxies.',
+		'x-frame-options': 'Whether the page may be framed. Prefer CSP frame-ancestors.',
+		'x-powered-by': 'Framework behind the server. Often removed to reduce exposure.',
+		'x-xss-protection': 'Legacy XSS filter, deprecated in modern browsers.',
+	};
+
+	const CACHE: Record<string, string> = {
+		public: 'any cache may store it',
+		private: 'only the browser may store it',
+		'no-cache': 'store but revalidate before each use',
+		'no-store': 'never store',
+		'max-age': 'fresh for {v} s',
+		's-maxage': 'fresh in shared caches for {v} s',
+		'must-revalidate': 'no stale use once expired',
+		'proxy-revalidate': 'shared caches must revalidate once expired',
+		immutable: 'never changes while fresh',
+		'no-transform': 'proxies must not modify it',
+		'stale-while-revalidate': 'serve stale up to {v} s while refreshing',
+		'stale-if-error': 'serve stale up to {v} s on errors',
+		'max-stale': 'accept stale up to {v} s',
+		'min-fresh': 'must stay fresh for {v} s more',
+		'only-if-cached': 'use cache only',
+	};
+
+	const SINGLE = new Set([
+		'content-type',
+		'content-length',
+		'host',
+		'authorization',
+		'x-frame-options',
+		'strict-transport-security',
+		'location',
+		'etag',
+		'date',
+		'server',
+	]);
+
+	type Row = { name: string; value: string; info: string; details: string[]; duplicate: boolean };
+
+	const duration = (s: number) => (s >= 86400 ? `${Math.round((s / 86400) * 10) / 10} days` : s >= 3600 ? `${Math.round((s / 3600) * 10) / 10} h` : `${s} s`);
+
+	const parseCookie = (value: string, warnings: string[]) => {
+		const [pair, ...attrs] = value.split(';').map((s) => s.trim());
+		const eq = pair.indexOf('=');
+		const name = eq < 0 ? pair : pair.slice(0, eq);
+		const details = [`Name: ${name}`, `Value: ${eq < 0 ? '' : pair.slice(eq + 1)}`];
+		const flags: Record<string, string> = {};
+		for (const a of attrs) {
+			if (!a) continue;
+			const i = a.indexOf('=');
+			const k = (i < 0 ? a : a.slice(0, i)).toLowerCase();
+			const v = i < 0 ? '' : a.slice(i + 1);
+			flags[k] = v;
+			if (k === 'expires') {
+				const d = new Date(v);
+				details.push(
+					`Expires: ${
+						isNaN(d.getTime())
+							? `invalid date "${v}"`
+							: d
+									.toISOString()
+									.replace('T', ' ')
+									.replace(/\.\d+Z$/, ' UTC')
+					}`,
+				);
+			} else if (k === 'max-age') details.push(`Max-Age: ${v} (${Number(v) <= 0 ? 'delete now' : duration(Number(v))})`);
+			else if (k === 'domain') details.push(`Domain: ${v} (also sent to subdomains)`);
+			else if (k === 'path') details.push(`Path: ${v}`);
+			else if (k === 'secure') details.push('Secure: HTTPS only');
+			else if (k === 'httponly') details.push('HttpOnly: hidden from JavaScript');
+			else if (k === 'samesite') details.push(`SameSite: ${v}`);
+			else if (k === 'partitioned') details.push('Partitioned: stored per top-level site');
+			else details.push(`${a}`);
+		}
+		if (!('expires' in flags) && !('max-age' in flags)) details.push('Session cookie: removed when the browser closes');
+		const same = flags.samesite?.toLowerCase();
+		if (same === 'none' && !('secure' in flags)) warnings.push(`Cookie "${name}": SameSite=None without Secure is rejected by browsers.`);
+		if (!('samesite' in flags)) warnings.push(`Cookie "${name}": no SameSite, browsers default to Lax.`);
+		if (!('secure' in flags) && same !== 'none') warnings.push(`Cookie "${name}": no Secure flag, it can be sent over plain HTTP.`);
+		if (name.startsWith('__Host-') && (!('secure' in flags) || 'domain' in flags || flags.path !== '/'))
+			warnings.push(`Cookie "${name}": __Host- prefix needs Secure, Path=/ and no Domain.`);
+		if (name.startsWith('__Secure-') && !('secure' in flags)) warnings.push(`Cookie "${name}": __Secure- prefix needs Secure.`);
+		return details;
+	};
+
+	const detailsFor = (name: string, value: string, warnings: string[]) => {
+		if (name === 'cache-control')
+			return value.split(',').map((d) => {
+				const [k, v] = d.trim().split('=');
+				const text = CACHE[k.toLowerCase()];
+				return text ? `${d.trim()}: ${text.replace('{v}', v ?? '')}` : d.trim();
+			});
+		if (name === 'content-security-policy' || name === 'content-security-policy-report-only') {
+			const parts = value
+				.split(';')
+				.map((d) => d.trim())
+				.filter(Boolean);
+			if (parts.some((p) => /'unsafe-inline'/.test(p) && p.startsWith('script-src'))) warnings.push("CSP: script-src allows 'unsafe-inline'.");
+			return parts;
+		}
+		if (name === 'set-cookie') return parseCookie(value, warnings);
+		if (name === 'strict-transport-security') {
+			const m = value.match(/max-age=(\d+)/i);
+			if (m && Number(m[1]) < 15768000) warnings.push('HSTS: max-age under 6 months.');
+			return value.split(';').map((d) => {
+				const t = d.trim();
+				const age = t.match(/^max-age=(\d+)$/i);
+				return age ? `${t}: ${duration(Number(age[1]))}` : t;
+			});
+		}
+		if (name === 'content-type') return value.split(';').map((d) => d.trim());
+		if (name === 'accept' || name === 'accept-language' || name === 'accept-encoding' || name === 'vary') return value.split(',').map((d) => d.trim());
+		if (name === 'x-xss-protection') warnings.push('X-XSS-Protection is deprecated. Use a Content-Security-Policy.');
+		if (name === 'access-control-allow-origin' && value.trim() === '*')
+			warnings.push('CORS: Access-Control-Allow-Origin is *, any site can read the response.');
+		return [];
+	};
+
+	const parse = (raw: string) => {
+		const lines = raw.replace(/\r/g, '').split('\n');
+		const unfolded: string[] = [];
+		for (const l of lines) {
+			if (/^[ \t]/.test(l) && unfolded.length) unfolded[unfolded.length - 1] += ` ${l.trim()}`;
+			else if (l.trim()) unfolded.push(l);
+		}
+		let start = '';
+		if (unfolded[0] && /^(HTTP\/[\d.]+\s+\d{3}|[A-Z]+\s+\S+\s+HTTP\/[\d.]+)/.test(unfolded[0])) start = unfolded.shift()!;
+		const warnings: string[] = [];
+		const rows: Row[] = [];
+		const seen = new Map<string, number>();
+		for (const l of unfolded) {
+			const i = l.indexOf(':');
+			if (i <= 0) {
+				warnings.push(`Not a header line: "${l.slice(0, 60)}"`);
+				continue;
+			}
+			const name = l.slice(0, i).trim();
+			const key = name.toLowerCase();
+			const value = l.slice(i + 1).trim();
+			seen.set(key, (seen.get(key) ?? 0) + 1);
+			rows.push({
+				name,
+				value,
+				info: INFO[key] ?? (key.startsWith('x-') ? 'Custom or non-standard header.' : ''),
+				details: detailsFor(key, value, warnings),
+				duplicate: false,
+			});
+		}
+		for (const r of rows) {
+			const key = r.name.toLowerCase();
+			if ((seen.get(key) ?? 0) > 1 && key !== 'set-cookie') r.duplicate = true;
+		}
+		for (const [k, n] of seen)
+			if (n > 1 && k !== 'set-cookie') warnings.push(`Duplicate header ${k} appears ${n} times${SINGLE.has(k) ? ', it should appear once' : ''}.`);
+		return { start, rows, warnings };
+	};
+
+	onPage('hh-tool', () => {
+		const input = byId<HTMLTextAreaElement>('hh-in');
+		const cookie = byId<HTMLInputElement>('hh-cookie');
+		let last: ReturnType<typeof parse> | null = null;
+
+		const card = (title: string, value: string, info: string, details: string[], flag = '') => {
+			const el = document.createElement('div');
+			el.className = 'hh-row';
+			const head = document.createElement('div');
+			head.className = 'hh-name';
+			head.textContent = title;
+			if (flag) {
+				const b = document.createElement('span');
+				b.className = 'hh-flag';
+				b.textContent = flag;
+				head.append(' ', b);
+			}
+			const val = document.createElement('div');
+			val.className = 'hh-value';
+			val.textContent = value;
+			el.append(head, val);
+			if (info) {
+				const p = document.createElement('div');
+				p.className = 'hh-info';
+				p.textContent = info;
+				el.append(p);
+			}
+			if (details.length) {
+				const ul = document.createElement('ul');
+				ul.className = 'hh-details';
+				ul.append(
+					...details.map((d) => {
+						const li = document.createElement('li');
+						li.textContent = d;
+						return li;
+					}),
+				);
+				el.append(ul);
+			}
+			return el;
+		};
+
+		const render = () => {
+			last = parse(input.value);
+			byId('hh-status').textContent = last.start ? last.start.replace(/^HTTP\/[\d.]+\s+/, '') : 'None';
+			byId('hh-count').textContent = String(last.rows.length);
+			byId('hh-warn-count').textContent = String(last.warnings.length);
+			byId('hh-warnings').replaceChildren(
+				...last.warnings.map((w) => {
+					const li = document.createElement('li');
+					li.textContent = w;
+					return li;
+				}),
+			);
+			const list = byId('hh-list');
+			list.replaceChildren(...last.rows.map((r) => card(r.name, r.value, r.info, r.details, r.duplicate ? 'Duplicate' : '')));
+			if (!last.rows.length) list.textContent = 'No headers found.';
+		};
+
+		const renderCookies = () => {
+			const pairs = cookie.value
+				.replace(/^cookie:\s*/i, '')
+				.split(';')
+				.map((s) => s.trim())
+				.filter(Boolean);
+			const box = byId('hh-cookies');
+			box.replaceChildren(
+				...pairs.map((p) => {
+					const i = p.indexOf('=');
+					const name = i < 0 ? p : p.slice(0, i);
+					const raw = i < 0 ? '' : p.slice(i + 1);
+					let decoded = raw;
+					try {
+						decoded = decodeURIComponent(raw);
+					} catch {}
+					return card(name, raw, decoded !== raw ? `Decoded: ${decoded}` : '', []);
+				}),
+			);
+			if (!pairs.length) box.textContent = 'No cookies.';
+		};
+
+		input.addEventListener('input', render);
+		cookie.addEventListener('input', renderCookies);
+		copyButton(byId('hh-copy'), () => JSON.stringify(last ? last.rows.map((r) => ({ name: r.name, value: r.value })) : [], null, 2));
+		render();
+		renderCookies();
+	});
+</script>
+
+<style>
+	.hh-list {
+		display: flex;
+		flex-direction: column;
+		max-height: 560px;
+		overflow: auto;
+		color: var(--ink-soft);
+		font-size: 13px;
+	}
+	.hh-list :global(.hh-row) {
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		min-width: 0;
+	}
+	.hh-list :global(.hh-name) {
+		font-weight: 700;
+		color: var(--ink);
+		font-size: 14px;
+	}
+	.hh-list :global(.hh-flag) {
+		font-size: 11px;
+		font-weight: 700;
+		color: var(--warn);
+		border: 1px solid var(--warn);
+		border-radius: 999px;
+		padding: 1px 8px;
+	}
+	.hh-list :global(.hh-value) {
+		font-family: var(--mono);
+		color: var(--ink);
+		word-break: break-all;
+	}
+	.hh-list :global(.hh-details) {
+		margin: 2px 0 0;
+		padding-left: 18px;
+		font-family: var(--mono);
+		font-size: 12.5px;
+		word-break: break-word;
+	}
+	.hh-warnings {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.hh-warnings :global(li) {
+		color: var(--warn);
+		background: var(--warn-bg);
+		border-radius: 10px;
+		padding: 8px 12px;
+		font-size: 13px;
+	}
+	.hh-cookie-field {
+		border: 0;
+		border-bottom: 1px solid var(--border);
+		border-radius: 0;
+	}
+	.hh-cookie-field input {
+		font-size: 15px;
+	}
+</style>

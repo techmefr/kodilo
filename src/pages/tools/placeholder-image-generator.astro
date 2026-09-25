@@ -1,0 +1,187 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="placeholder-image-generator"
+	title="Placeholder Image Generator"
+	description="Make placeholder images of any size with your colors and label, as PNG, JPG, WebP or SVG, plus a data URI and an inline SVG snippet."
+>
+	<div class="fields" id="ph-tool">
+		<div class="field">
+			<label for="ph-w">Width</label>
+			<input id="ph-w" type="number" min="1" max="4000" value="1200" />
+		</div>
+		<div class="field">
+			<label for="ph-h">Height</label>
+			<input id="ph-h" type="number" min="1" max="4000" value="630" />
+		</div>
+		<div class="field">
+			<label for="ph-bg">Background</label>
+			<input id="ph-bg" type="color" value="#cbd5e1" />
+		</div>
+		<div class="field">
+			<label for="ph-fg">Text color</label>
+			<input id="ph-fg" type="color" value="#334155" />
+		</div>
+		<div class="field wide">
+			<label for="ph-text">Text</label>
+			<input id="ph-text" placeholder="1200×630" />
+			<span class="field-note">Leave empty to show the size.</span>
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="ph-format" role="group" aria-label="Format">
+			<button data-value="png" aria-pressed="true">
+				PNG
+			</button>
+			<button data-value="jpeg" aria-pressed="false">
+				JPG
+			</button>
+			<button data-value="webp" aria-pressed="false">
+				WebP
+			</button>
+			<button data-value="svg" aria-pressed="false">
+				SVG
+			</button>
+		</div>
+		<button class="btn primary" id="ph-dl">
+			Download
+		</button>
+		<span class="ph-meta" id="ph-meta"></span>
+	</div>
+	<div class="ph-stage">
+		<div class="user-colors ph-preview">
+			<canvas id="ph-canvas" role="img" aria-label="Placeholder preview"></canvas>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Data URI</span>
+			<button class="btn" id="ph-copy-uri">
+				Copy
+			</button>
+		</div>
+		<pre class="out ph-out" id="ph-uri" tabindex="0" aria-label="Data URI"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>SVG snippet</span>
+			<button class="btn" id="ph-copy-svg">
+				Copy
+			</button>
+		</div>
+		<pre class="out ph-out" id="ph-svg" tabindex="0" aria-label="SVG snippet"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { saveBlob, toBlob } from '../../scripts/files';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const FONT = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+	const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+	onPage('ph-tool', () => {
+		const wIn = byId<HTMLInputElement>('ph-w');
+		const hIn = byId<HTMLInputElement>('ph-h');
+		const bg = byId<HTMLInputElement>('ph-bg');
+		const fg = byId<HTMLInputElement>('ph-fg');
+		const text = byId<HTMLInputElement>('ph-text');
+		const canvas = byId<HTMLCanvasElement>('ph-canvas');
+		let format = 'png';
+
+		const dims = () => {
+			const clamp = (v: string) => Math.min(4000, Math.max(1, Math.round(Number(v) || 1)));
+			return [clamp(wIn.value), clamp(hIn.value)];
+		};
+		const label = (w: number, h: number) => text.value.trim() || `${w}×${h}`;
+		const fontSize = (w: number, h: number, t: string) => Math.max(8, Math.floor(Math.min(h * 0.25, (w * 0.8) / Math.max(1, t.length * 0.58))));
+
+		const svg = (w: number, h: number) => {
+			const t = label(w, h);
+			return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="100%" height="100%" fill="${bg.value}"/><text x="50%" y="50%" fill="${fg.value}" font-family="${FONT}" font-size="${fontSize(w, h, t)}" font-weight="600" text-anchor="middle" dominant-baseline="central">${esc(t)}</text></svg>`;
+		};
+
+		const draw = () => {
+			const [w, h] = dims();
+			const t = label(w, h);
+			canvas.width = w;
+			canvas.height = h;
+			const g = canvas.getContext('2d')!;
+			g.fillStyle = bg.value;
+			g.fillRect(0, 0, w, h);
+			g.fillStyle = fg.value;
+			g.font = `600 ${fontSize(w, h, t)}px ${FONT}`;
+			g.textAlign = 'center';
+			g.textBaseline = 'middle';
+			g.fillText(t, w / 2, h / 2);
+			canvas.setAttribute('aria-label', `Placeholder preview, ${w} by ${h}, showing ${t}`);
+			return [w, h] as const;
+		};
+
+		const dataUri = (w: number, h: number) =>
+			format === 'svg' ? `data:image/svg+xml,${encodeURIComponent(svg(w, h))}` : canvas.toDataURL(`image/${format}`, 0.92);
+
+		const render = () => {
+			const [w, h] = draw();
+			const uri = dataUri(w, h);
+			byId('ph-uri').textContent = uri;
+			byId('ph-svg').textContent = svg(w, h);
+			const ext = format === 'jpeg' ? 'jpg' : format;
+			byId('ph-meta').textContent = `${w}×${h} ${ext.toUpperCase()} · data URI ${(uri.length / 1024).toFixed(1)} KB`;
+		};
+
+		segmented(byId('ph-format'), (v) => ((format = v), render()));
+		[wIn, hIn, bg, fg, text].forEach((el) => el.addEventListener('input', render));
+		byId('ph-dl').addEventListener('click', async () => {
+			const [w, h] = draw();
+			const ext = format === 'jpeg' ? 'jpg' : format;
+			const blob = format === 'svg' ? new Blob([svg(w, h)], { type: 'image/svg+xml' }) : await toBlob(canvas, `image/${format}`, 0.92);
+			saveBlob(blob, `placeholder-${w}x${h}.${ext}`);
+		});
+		copyButton(byId('ph-copy-uri'), () => byId('ph-uri').textContent ?? '');
+		copyButton(byId('ph-copy-svg'), () => byId('ph-svg').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.field input[type='color'] {
+		width: 100%;
+		height: 32px;
+		border: 0;
+		padding: 0;
+		background: none;
+		cursor: pointer;
+	}
+	.ph-meta {
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.ph-stage {
+		display: grid;
+		place-items: center;
+		padding: 16px;
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.ph-preview {
+		display: flex;
+		max-width: 100%;
+	}
+	.ph-preview canvas {
+		max-width: 100%;
+		max-height: 420px;
+		width: auto;
+		height: auto;
+		object-fit: contain;
+		box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+	}
+	.ph-out {
+		min-height: 0;
+		max-height: 160px;
+		overflow: auto;
+	}
+</style>

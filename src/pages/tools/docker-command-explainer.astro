@@ -1,0 +1,871 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const examples = [
+	{
+		name: 'nginx with ports and volume',
+		cmd: `docker run -d --name web \\
+  --restart unless-stopped \\
+  -p 8080:80 -p 127.0.0.1:8443:443 \\
+  -v ./site:/usr/share/nginx/html:ro \\
+  -v nginx-cache:/var/cache/nginx \\
+  --network frontend \\
+  nginx:1.27-alpine`,
+	},
+	{
+		name: 'postgres with env and named volume',
+		cmd: `docker run -d --name db \\
+  -e POSTGRES_USER=app \\
+  -e POSTGRES_PASSWORD=secret \\
+  -v pgdata:/var/lib/postgresql/data \\
+  -p 5432:5432 --memory 1g --cpus 1.5 \\
+  --health-cmd "pg_isready -U app" --health-interval 10s \\
+  postgres:17`,
+	},
+	{
+		name: 'build with args',
+		cmd: `docker build -t registry.example.com/shop/api:2.4.0 \\
+  -f docker/Dockerfile \\
+  --build-arg NODE_VERSION=22 --build-arg APP_ENV=production \\
+  --target runtime --platform linux/amd64 --no-cache .`,
+	},
+	{ name: 'exec into a container', cmd: 'docker exec -it -u root -w /app -e DEBUG=1 web sh' },
+	{
+		name: 'risky run',
+		cmd: `docker run -it --rm --privileged \\
+  -v /var/run/docker.sock:/var/run/docker.sock \\
+  --network host ubuntu bash`,
+	},
+];
+const sample = examples[0].cmd;
+---
+
+<ToolShell
+	slug="docker-command-explainer"
+	title="Docker Command Explainer"
+	description="Paste a docker command to see every flag explained in plain English, risky options flagged, and a host-to-container diagram of ports, mounts, network and env."
+>
+	<div class="dx" id="dx-tool" data-examples={JSON.stringify(examples)}>
+		<div class="chips" id="dx-examples" role="group" aria-label="Examples"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Command</span>
+				<button class="btn" id="dx-copy">
+					Copy
+				</button>
+			</div>
+			<textarea id="dx-in" spellcheck="false" aria-label="docker command">{sample}</textarea>
+		</section>
+		<p class="error" id="dx-error" hidden></p>
+		<ul class="dx-tokens" id="dx-tokens" aria-label="Command tokens"></ul>
+		<div class="dx-warns" id="dx-warns" role="status"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Diagram</span>
+			</div>
+			<div class="dx-scroll" tabindex="0" role="region" aria-label="Diagram, scrollable">
+				<svg id="dx-svg" role="group" aria-label="Host and container diagram"></svg>
+			</div>
+			<p class="dx-note" id="dx-note" hidden></p>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Explanation</span>
+			</div>
+			<ol class="dx-list" id="dx-list"></ol>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { shellSplit } from '../../scripts/shell';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Def = { v: boolean; d: string };
+	type Item = { k: string; token: string; text: string; warn?: string; tag: string };
+	type Row = { k: string; kind: string; left: string; right: string; label: string };
+	type Pill = { k: string; text: string };
+
+	const table = (rows: [string, number, string][]) => {
+		const out: Record<string, Def> = {};
+		rows.forEach(([names, v, d]) => names.split(' ').forEach((n) => (out[n] = { v: !!v, d })));
+		return out;
+	};
+
+	const RUN = table([
+		['-d --detach', 0, 'Detached: run in the background and print the container ID.'],
+		['-i --interactive', 0, 'Keep STDIN open so you can type into the process.'],
+		['-t --tty', 0, 'Allocate a pseudo-terminal so the output behaves like a real terminal.'],
+		['--rm', 0, 'Delete the container automatically as soon as it exits.'],
+		['--name', 1, 'Name the container "$" so you can use it instead of the ID.'],
+		['-p --publish', 1, 'Publish a port.'],
+		['-P --publish-all', 0, 'Publish every EXPOSEd port to a random high port on all host interfaces.'],
+		['--expose', 1, 'Mark port $ as exposed without publishing it on the host.'],
+		['-v --volume', 1, 'Mount a volume.'],
+		['--mount', 1, 'Mount a volume.'],
+		['--tmpfs', 1, 'Mount an in-memory tmpfs at $; its content vanishes when the container stops.'],
+		['-e --env', 1, 'Set an environment variable.'],
+		['--env-file', 1, 'Load environment variables from the file $, one KEY=value per line.'],
+		['--network --net', 1, 'Attach the container to the network "$".'],
+		['--network-alias', 1, 'Extra DNS name "$" for this container on its network.'],
+		['--ip', 1, 'Use the fixed IP address $ on the user-defined network.'],
+		['--add-host', 1, 'Add the entry $ to the container /etc/hosts.'],
+		['--dns', 1, 'Use $ as the DNS server.'],
+		['-h --hostname', 1, 'Set the container hostname to $.'],
+		['--restart', 1, 'Restart policy.'],
+		['-u --user', 1, 'Run the process as $ (name or uid:gid) instead of the image default user.'],
+		['-w --workdir', 1, 'Start the process in the directory $ inside the container.'],
+		['--entrypoint', 1, 'Replace the image ENTRYPOINT with $.'],
+		['--cpus', 1, 'Limit the container to $ CPU cores worth of time.'],
+		['-m --memory', 1, 'Hard memory limit of $; going over it gets the process OOM-killed (exit code 137).'],
+		['--memory-swap', 1, 'Limit memory plus swap to $.'],
+		['--memory-reservation', 1, 'Soft memory limit of $, enforced when the host runs low.'],
+		['--cpuset-cpus', 1, 'Pin the container to the CPUs $.'],
+		['--pids-limit', 1, 'Allow at most $ processes inside the container.'],
+		['--shm-size', 1, 'Size /dev/shm to $ (browsers and databases often need more than 64m).'],
+		['--ulimit', 1, 'Set the ulimit $.'],
+		['--gpus', 1, 'Give the container access to GPUs ($); requires the NVIDIA container toolkit.'],
+		['--device', 1, 'Expose the host device $ inside the container.'],
+		['--health-cmd', 1, 'Healthcheck command "$"; Docker marks the container healthy or unhealthy from its exit code.'],
+		['--health-interval', 1, 'Run the healthcheck every $.'],
+		['--health-timeout', 1, 'Count a healthcheck taking longer than $ as failed.'],
+		['--health-retries', 1, 'Mark the container unhealthy after $ consecutive failures.'],
+		['--health-start-period', 1, 'Grace period of $ before failures count.'],
+		['--no-healthcheck', 0, 'Disable any HEALTHCHECK defined in the image.'],
+		['--cap-add', 1, 'Grant the Linux capability $ on top of the default set.'],
+		['--cap-drop', 1, 'Remove the Linux capability $; dropping ALL is a good hardening default.'],
+		['--privileged', 0, 'Give the container almost full access to the host: every device and every capability.'],
+		['--read-only', 0, 'Mount the root filesystem read-only; writable paths need a volume or tmpfs.'],
+		['--security-opt', 1, 'Security option $ (seccomp, AppArmor, no-new-privileges).'],
+		['--init', 0, 'Run a tiny init as PID 1 that forwards signals and reaps zombie processes.'],
+		['--platform', 1, 'Use the image variant built for $, for example linux/amd64 on an ARM machine.'],
+		['--pull', 1, 'Image pull policy $ (always, missing or never).'],
+		['-l --label', 1, 'Attach the metadata label $.'],
+		['--log-driver', 1, 'Send logs to the $ logging driver.'],
+		['--log-opt', 1, 'Logging driver option $.'],
+		['--stop-signal', 1, 'Send $ on docker stop instead of SIGTERM.'],
+		['--stop-timeout', 1, 'Wait $ seconds after the stop signal before sending SIGKILL.'],
+		['--pid', 1, 'PID namespace mode $.'],
+		['--ipc', 1, 'IPC namespace mode $.'],
+		['--link', 1, 'Legacy link to the container $; a user-defined network does this better.'],
+		['-a --attach', 1, 'Attach to the $ stream.'],
+		['--group-add', 1, 'Add the process to the extra group $.'],
+		['--sysctl', 1, 'Set the kernel parameter $ for this container.'],
+		['--cidfile', 1, 'Write the container ID to the file $.'],
+	]);
+
+	const BUILD = table([
+		['-t --tag', 1, 'Name and tag the resulting image $.'],
+		['-f --file', 1, 'Use the Dockerfile at $ instead of ./Dockerfile.'],
+		['--build-arg', 1, 'Set the build argument $, read by ARG instructions.'],
+		['--platform', 1, 'Build for the platform $.'],
+		['--target', 1, 'Stop at the stage named $ in a multi-stage Dockerfile.'],
+		['--no-cache', 0, 'Ignore the layer cache and rebuild every instruction.'],
+		['--pull', 0, 'Always try to pull a newer version of the base images.'],
+		['--progress', 1, 'Progress output style $ (auto, plain or tty).'],
+		['--secret', 1, 'Expose the build secret $ to RUN --mount=type=secret without baking it into a layer.'],
+		['--ssh', 1, 'Forward the SSH agent or keys $ for RUN --mount=type=ssh.'],
+		['--cache-from', 1, 'Reuse cache layers from $.'],
+		['--cache-to', 1, 'Export the build cache to $.'],
+		['--push', 0, 'Push the image to its registry right after the build.'],
+		['--load', 0, 'Load the result into the local image store.'],
+		['-o --output', 1, 'Write the build result to $.'],
+		['-q --quiet', 0, 'Only print the image ID.'],
+		['--label', 1, 'Add the metadata label $ to the image.'],
+		['--network', 1, 'Network mode $ for RUN instructions.'],
+	]);
+
+	const pick = (src: Record<string, Def>, names: string) => Object.fromEntries(names.split(' ').map((n) => [n, src[n]]));
+	const EXEC = {
+		...pick(RUN, '-i --interactive -t --tty -e --env --env-file -u --user -w --workdir --privileged'),
+		...table([['-d --detach', 0, 'Run the command in the background.']]),
+	};
+	const COMPOSE_GLOBAL = table([
+		['-f --file', 1, 'Use the compose file $.'],
+		['-p --project-name', 1, 'Project name $, prefixed to containers, networks and volumes.'],
+		['--profile', 1, 'Enable the services of profile $.'],
+		['--env-file', 1, 'Read variables for interpolation from $.'],
+	]);
+	const COMPOSE_SUB = table([
+		['-d --detach', 0, 'Start the services in the background.'],
+		['--build', 0, 'Build images before starting the containers.'],
+		['--force-recreate', 0, 'Recreate containers even if their configuration did not change.'],
+		['--no-deps', 0, 'Do not start linked services.'],
+		['--remove-orphans', 0, 'Remove containers of services no longer in the compose file.'],
+		['--scale', 1, 'Run $ (service=count) replicas.'],
+		['--wait', 0, 'Wait until services are running or healthy.'],
+		['--abort-on-container-exit', 0, 'Stop everything when any container exits.'],
+		['-v --volumes', 0, 'Also delete named volumes: this erases their data.'],
+		['--rmi', 1, 'Remove images ($).'],
+		['-f --follow', 0, 'Keep streaming new log lines.'],
+		['--tail -n', 1, 'Show only the last $ lines.'],
+	]);
+	const REGISTRY = table([
+		['--platform', 1, 'Only the $ variant.'],
+		['-a --all-tags', 0, 'Every tag of the repository.'],
+		['-q --quiet', 0, 'Suppress verbose output.'],
+	]);
+	const NETWORK = table([
+		['-d --driver', 1, 'Network driver $ (bridge, overlay, macvlan).'],
+		['--subnet', 1, 'Subnet $ in CIDR notation.'],
+		['--gateway', 1, 'Gateway $ for the subnet.'],
+		['--ip-range', 1, 'Allocate container IPs from $.'],
+		['--internal', 0, 'No outbound internet access for this network.'],
+		['--attachable', 0, 'Let standalone containers join this overlay network.'],
+		['--ipv6', 0, 'Enable IPv6.'],
+	]);
+	const VOLUME = table([
+		['-d --driver', 1, 'Volume driver $.'],
+		['-o --opt', 1, 'Driver option $.'],
+		['--label', 1, 'Metadata label $.'],
+	]);
+	const LOGS = table([
+		['-f --follow', 0, 'Keep streaming new log lines.'],
+		['-n --tail', 1, 'Show only the last $ lines.'],
+		['--since', 1, 'Only logs newer than $.'],
+		['--until', 1, 'Only logs older than $.'],
+		['-t --timestamps', 0, 'Prefix each line with its timestamp.'],
+		['--details', 0, 'Show extra attributes.'],
+	]);
+	const PS = table([
+		['-a --all', 0, 'Include stopped containers, not only running ones.'],
+		['-q --quiet', 0, 'Print only container IDs.'],
+		['-f --filter', 1, 'Filter by $.'],
+		['--format', 1, 'Format the output with the Go template $.'],
+		['-s --size', 0, 'Show the disk size of each container.'],
+		['-n --last', 1, 'Show the $ most recently created containers.'],
+		['-l --latest', 0, 'Show the latest created container.'],
+		['--no-trunc', 0, 'Do not truncate IDs and commands.'],
+	]);
+
+	const CMDS: Record<string, [string, Record<string, Def>]> = {
+		run: ['Create a new container from an image and start it.', RUN],
+		create: ['Create a container from an image without starting it.', RUN],
+		build: ['Build an image from a Dockerfile and a build context.', BUILD],
+		exec: ['Run an extra command inside a container that is already running.', EXEC],
+		compose: ['Docker Compose: manage the multi-container app described in compose.yaml.', COMPOSE_GLOBAL],
+		push: ['Upload an image to its registry.', REGISTRY],
+		pull: ['Download an image from its registry.', REGISTRY],
+		'network create': ['Create a user-defined network; containers on it reach each other by name.', NETWORK],
+		'volume create': ['Create a named volume managed by Docker.', VOLUME],
+		logs: ['Print the stdout and stderr of a container.', LOGS],
+		ps: ['List containers.', PS],
+		start: ['Start one or more stopped containers.', {}],
+		stop: ['Stop running containers: SIGTERM, then SIGKILL after 10 seconds.', {}],
+		restart: ['Stop then start containers.', {}],
+		kill: ['Send SIGKILL to running containers.', {}],
+		rm: ['Remove stopped containers.', table([['-f --force', 0, 'Kill it first if it is running.']])],
+	};
+	const COMPOSE_CMDS: Record<string, string> = {
+		up: 'Create and start every service (plus their networks and volumes).',
+		down: 'Stop and remove the containers and networks of the project.',
+		logs: 'Show logs of the services.',
+		ps: 'List the containers of the project.',
+		build: 'Build the images of services with a build section.',
+		pull: 'Pull the images of every service.',
+		restart: 'Restart the services.',
+		stop: 'Stop the services without removing them.',
+		exec: 'Run a command inside a running service container.',
+	};
+	const RESTART: Record<string, string> = {
+		no: 'Never restart automatically (the default).',
+		always: 'Always restart, including after the Docker daemon restarts, even if you stopped it manually before the reboot.',
+		'unless-stopped': 'Restart always, except when you stopped it yourself.',
+		'on-failure': 'Restart only when the process exits with a non-zero code.',
+	};
+
+	const isPath = (s: string) => /^([./~$]|[A-Za-z]:[\\/])/.test(s);
+
+	const describeImage = (image: string) => {
+		const at = image.includes('@');
+		const last = image.split('/').pop() ?? image;
+		const tag = at ? image.split('@')[1] : last.includes(':') ? last.split(':')[1] : 'latest';
+		const first = image.split('/')[0];
+		const registry = image.includes('/') && /[.:]|^localhost$/.test(first) ? first : 'Docker Hub';
+		const warn =
+			!at && (tag === 'latest' || !last.includes(':'))
+				? 'No pinned tag: "latest" moves over time, so builds are not reproducible. Pin a version such as :1.27.'
+				: undefined;
+		return {
+			tag,
+			registry,
+			warn,
+			text: `Image ${image.replace(/[:@][^/]*$/, '')}, ${at ? 'pinned by digest' : `tag ${tag}${last.includes(':') ? '' : ' (implicit)'}`}, pulled from ${registry} if it is not local yet.`,
+		};
+	};
+
+	const explain = (src: string) => {
+		const args = shellSplit(src);
+		const items: Item[] = [];
+		const rows: Row[] = [];
+		const env: Pill[] = [];
+		const pills: Pill[] = [];
+		let left = 'Host';
+		let right = 'Container';
+		let rightSub = '';
+		let n = 0;
+		const key = () => `t${n++}`;
+		if (args[0] === 'docker-compose') args.splice(0, 1, 'docker', 'compose');
+		if (args[0] === 'docker') items.push({ k: key(), token: args.shift()!, text: 'The Docker CLI, which talks to the Docker daemon.', tag: 'cmd' });
+		if ((args[0] === 'container' || args[0] === 'image' || args[0] === 'buildx') && args[1]) args.shift();
+		let cmd = args[0] ?? '';
+		if ((cmd === 'network' || cmd === 'volume') && args[1] === 'create') cmd = `${cmd} create`;
+		const spec = CMDS[cmd];
+		if (!spec) throw new Error(cmd ? `"${cmd}" is not a command this explainer knows yet.` : 'Paste a docker command.');
+		args.splice(0, cmd.split(' ').length);
+		items.push({ k: key(), token: cmd, text: spec[0], tag: 'cmd' });
+		let flags = spec[1];
+		let positional = 0;
+		let rest = false;
+		let image = '';
+		for (let i = 0; i < args.length; i++) {
+			const a = args[i];
+			const k = key();
+			if (!rest && a.startsWith('-') && a.length > 1) {
+				let flag = a;
+				let value: string | undefined;
+				if (a.startsWith('--') && a.includes('=')) [flag, value] = [a.slice(0, a.indexOf('=')), a.slice(a.indexOf('=') + 1)];
+				const def = flags[flag];
+				if (!def && /^-[a-zA-Z]{2,}$/.test(flag)) {
+					const parts = flag
+						.slice(1)
+						.split('')
+						.map((c) => flags[`-${c}`]);
+					if (parts.every(Boolean) && parts.slice(0, -1).every((p) => !p.v)) {
+						const lastDef = parts[parts.length - 1];
+						if (lastDef.v) value = args[++i];
+						items.push({
+							k,
+							token: value ? `${a} ${value}` : a,
+							text: `Combined short flags: ${parts.map((p) => p.d.replace('$', value ?? '')).join(' ')}`,
+							tag: 'flag',
+						});
+						continue;
+					}
+				}
+				if (!def) {
+					items.push({ k, token: a, text: 'An option this explainer does not cover; check docker help for it.', tag: 'unknown' });
+					continue;
+				}
+				if (def.v && value === undefined) value = args[++i];
+				if (def.v && value === undefined) throw new Error(`${flag} needs a value.`);
+				const item: Item = { k, token: value !== undefined ? `${flag} ${value}` : flag, text: def.d.replace('$', value ?? ''), tag: 'flag' };
+				const runLike = cmd === 'run' || cmd === 'create' || cmd === 'exec';
+				if (runLike && (flag === '-p' || flag === '--publish')) {
+					const [spec2, proto = 'tcp'] = value!.split('/');
+					const parts = spec2.split(':');
+					const cont = parts.pop()!;
+					const host = parts.pop() ?? '';
+					const ip = parts.join(':');
+					const bindIp = ip || '0.0.0.0';
+					item.text = host
+						? `Publish container port ${cont}/${proto} on host port ${host}, bound to ${ip ? ip : 'every interface (0.0.0.0)'}. Traffic to ${bindIp}:${host} is forwarded into the container.`
+						: `Publish container port ${cont}/${proto} on a random free host port on every interface.`;
+					if (bindIp === '0.0.0.0' || bindIp === '::')
+						item.warn = `Port ${host || cont} is reachable from other machines, and Docker rules bypass ufw. Use 127.0.0.1:${host || cont}:${cont} to keep it local.`;
+					rows.push({ k, kind: 'port', left: `${bindIp}:${host || 'random'}`, right: `${cont}/${proto}`, label: `port ${host || '?'} → ${cont}` });
+				} else if (runLike && (flag === '-v' || flag === '--volume' || flag === '--mount' || flag === '--tmpfs')) {
+					let source = '';
+					let target: string;
+					let ro = false;
+					let type: string;
+					if (flag === '--mount') {
+						const kv = Object.fromEntries(value!.split(',').map((p) => (p.includes('=') ? p.split(/=(.*)/s).slice(0, 2) : [p, 'true'])));
+						type = kv.type ?? 'volume';
+						source = kv.source ?? kv.src ?? '';
+						target = kv.target ?? kv.dst ?? kv.destination ?? '';
+						ro = 'readonly' in kv || 'ro' in kv;
+					} else if (flag === '--tmpfs') {
+						type = 'tmpfs';
+						target = value!.split(':')[0];
+					} else {
+						const parts = value!.split(':');
+						if (/^[A-Za-z]$/.test(parts[0]) && parts.length > 2) parts.splice(0, 2, `${parts[0]}:${parts[1]}`);
+						if (parts.length === 1) [target] = parts;
+						else [source, target] = parts;
+						ro = (parts[2] ?? '').split(',').includes('ro');
+						type = !source ? 'volume' : isPath(source) ? 'bind' : 'volume';
+					}
+					const mode = ro ? 'read-only' : 'read-write';
+					if (type === 'bind')
+						item.text = `Bind mount: the host path ${source} appears at ${target} inside the container (${mode}). Edits on either side are visible to both.`;
+					else if (type === 'tmpfs') item.text = `tmpfs mount at ${target}: stored in RAM, never written to disk, gone when the container stops.`;
+					else if (source)
+						item.text = `Named volume "${source}" mounted at ${target} (${mode}). Docker stores it and keeps the data after the container is removed.`;
+					else item.text = `Anonymous volume at ${target}: Docker creates a volume with a random name; it is deleted with --rm.`;
+					if (source === '/var/run/docker.sock')
+						item.warn = 'Mounting the Docker socket gives the container full control of Docker, which means root on the host.';
+					else if (type === 'bind' && /^\/(etc|root|proc|sys)?\/?$/.test(source)) item.warn = `Bind-mounting ${source} exposes sensitive host files.`;
+					rows.push({
+						k,
+						kind: type === 'bind' ? 'bind' : type === 'tmpfs' ? 'tmpfs' : 'volume',
+						left: type === 'tmpfs' ? 'RAM' : source || 'anonymous',
+						right: target,
+						label: `${type === 'bind' ? 'bind mount' : type === 'tmpfs' ? 'tmpfs' : 'named volume'}${ro ? ' (ro)' : ''}`,
+					});
+				} else if (runLike && (flag === '-e' || flag === '--env')) {
+					const [name, ...val] = value!.split('=');
+					item.text = val.length ? `Set the environment variable ${name} to "${val.join('=')}".` : `Pass ${name} through from your shell environment.`;
+					if (/PASS|SECRET|TOKEN|KEY/i.test(name) && val.length)
+						item.warn = `${name} is visible in shell history and docker inspect. Prefer --env-file or Docker secrets.`;
+					env.push({ k, text: val.length ? `${name}=${val.join('=')}` : `${name} (from host)` });
+				} else if (runLike && (flag === '--network' || flag === '--net')) {
+					if (value === 'host') {
+						item.text = 'Share the host network stack: no isolation and no port mapping, the container binds host ports directly.';
+						item.warn = 'Host networking removes network isolation between the container and the host.';
+					} else if (value === 'none') item.text = 'No network at all except loopback.';
+					pills.push({ k, text: `network: ${value}` });
+				} else if (runLike && flag === '--restart') {
+					item.text = `Restart policy "${value}": ${RESTART[value!.split(':')[0]] ?? 'custom policy.'}`;
+					pills.push({ k, text: `restart: ${value}` });
+				} else if (runLike && flag === '--name') rightSub = value!;
+				else if (
+					runLike &&
+					(flag === '-u' ||
+						flag === '--user' ||
+						flag === '-w' ||
+						flag === '--workdir' ||
+						flag === '--cpus' ||
+						flag === '-m' ||
+						flag === '--memory' ||
+						flag === '--gpus')
+				)
+					pills.push({ k, text: `${flag.replace(/^-+/, '')}: ${value}` });
+				else if (runLike && flag === '--privileged') {
+					item.warn = 'Privileged mode disables most isolation; a compromised process can take over the host. Add only the capability you need with --cap-add.';
+					pills.push({ k, text: 'privileged' });
+				} else if (runLike && flag === '--cap-add' && /^(ALL|SYS_ADMIN|NET_ADMIN|SYS_PTRACE)$/i.test(value!))
+					item.warn = `${value} is a powerful capability close to root on the host.`;
+				else if (runLike && flag === '--pid' && value === 'host')
+					item.warn = 'Sharing the host PID namespace lets the container see and signal host processes.';
+				else if (runLike && (flag === '-P' || flag === '--publish-all')) item.warn = 'Every exposed port becomes reachable on all host interfaces.';
+				else if (cmd === 'build' && flag === '--build-arg') {
+					const [name, ...val] = value!.split('=');
+					rows.push({ k, kind: 'plain', left: `${name}=${val.join('=')}`, right: `ARG ${name}`, label: 'build arg' });
+					if (/PASS|SECRET|TOKEN/i.test(name)) item.warn = 'Build args are stored in the image history. Use --secret for credentials.';
+				} else if (cmd === 'build' && (flag === '-t' || flag === '--tag')) {
+					right = 'Image';
+					rightSub = value!;
+					const info = describeImage(value!);
+					if (info.warn) item.warn = info.warn;
+				} else if (cmd === 'build' && (flag === '-f' || flag === '--file'))
+					rows.push({ k, kind: 'bind', left: value!, right: 'build steps', label: 'Dockerfile' });
+				else if (cmd === 'build' && (flag === '--target' || flag === '--platform' || flag === '--no-cache'))
+					pills.push({ k, text: flag === '--no-cache' ? 'no cache' : `${flag.slice(2)}: ${value}` });
+				else if (cmd === 'compose' && flag === '-v') item.warn = 'Named volumes are deleted, including database data.';
+				items.push(item);
+				continue;
+			}
+			positional++;
+			if (cmd === 'run' || cmd === 'create') {
+				if (positional === 1) {
+					image = a;
+					const info = describeImage(a);
+					items.push({ k, token: a, text: info.text, warn: info.warn, tag: 'image' });
+					rest = true;
+				} else
+					items.push({
+						k,
+						token: a,
+						text: positional === 2 ? 'Command run inside the container, replacing the image CMD.' : 'Argument passed to that command.',
+						tag: 'arg',
+					});
+			} else if (cmd === 'exec') {
+				if (positional === 1) {
+					rightSub = a;
+					items.push({ k, token: a, text: `Target container "${a}"; it must be running.`, tag: 'image' });
+				} else {
+					if (positional === 2) rows.push({ k, kind: 'plain', left: args.slice(i).join(' '), right: 'new process', label: 'exec' });
+					items.push({
+						k,
+						token: a,
+						text: positional === 2 ? 'Command to start as a new process next to PID 1; it ends when you exit it.' : 'Argument passed to that command.',
+						tag: 'arg',
+					});
+				}
+				if (positional >= 2) rest = true;
+			} else if (cmd === 'build') {
+				left = `Build context ${a}`;
+				items.push({
+					k,
+					token: a,
+					text: `Build context "${a}": this folder is sent to the builder; COPY paths are relative to it and .dockerignore filters it.`,
+					tag: 'arg',
+				});
+			} else if (cmd === 'compose' && positional === 1) {
+				flags = { ...COMPOSE_SUB };
+				items.push({ k, token: a, text: COMPOSE_CMDS[a] ?? 'Compose subcommand.', tag: 'cmd' });
+			} else if (cmd === 'push' || cmd === 'pull') {
+				const info = describeImage(a);
+				items.push({
+					k,
+					token: a,
+					text: `${info.text.replace(/, pulled from .*$/, '')}, ${cmd === 'push' ? 'sent to' : 'fetched from'} ${info.registry}.`,
+					warn: info.warn,
+					tag: 'image',
+				});
+			} else
+				items.push({
+					k,
+					token: a,
+					text: cmd.includes('create') ? `Name of the new ${cmd.split(' ')[0]}.` : cmd === 'compose' ? `Service "${a}".` : `Container "${a}" (name or ID).`,
+					tag: 'arg',
+				});
+		}
+		if ((cmd === 'run' || cmd === 'create') && !image) throw new Error('No image found after the options.');
+		if (cmd === 'run' || cmd === 'create') right = `Container ${rightSub || '(random name)'}`;
+		if (cmd === 'exec') {
+			left = 'Your terminal';
+			right = `Container ${rightSub}`;
+			rightSub = '';
+		}
+		const diagram = ['run', 'create', 'exec', 'build'].includes(cmd);
+		return { items, rows, env, pills, left, right, rightSub: cmd === 'run' || cmd === 'create' ? image : rightSub, diagram, cmd };
+	};
+
+	const NS = 'http://www.w3.org/2000/svg';
+	const s = (tag: string, attrs: Record<string, string | number>, parent?: Element, text?: string) => {
+		const e = document.createElementNS(NS, tag);
+		Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, String(v)));
+		if (text !== undefined) e.textContent = text;
+		parent?.appendChild(e);
+		return e;
+	};
+	const cut = (t: string, n = 24) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+
+	onPage('dx-tool', () => {
+		const root = byId('dx-tool');
+		const input = byId<HTMLTextAreaElement>('dx-in');
+		const svg = byId('dx-svg') as unknown as SVGSVGElement;
+		const examples = JSON.parse(root.dataset.examples ?? '[]') as { name: string; cmd: string }[];
+
+		const draw = (m: ReturnType<typeof explain>) => {
+			svg.replaceChildren();
+			const note = byId('dx-note');
+			note.hidden = m.diagram;
+			note.textContent = m.diagram ? '' : 'The diagram covers run, create, exec and build commands.';
+			if (!m.diagram) {
+				svg.setAttribute('width', '0');
+				svg.setAttribute('height', '0');
+				return;
+			}
+			const W = 680;
+			const defs = s('defs', {}, svg);
+			const marker = s(
+				'marker',
+				{ id: 'dx-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' },
+				defs,
+			);
+			s('path', { d: 'M0 0L10 5L0 10z', class: 'dx-head' }, marker);
+			const rows = m.rows.length ? m.rows : [];
+			const top = 96;
+			const rowsH = Math.max(1, rows.length) * 52;
+			const envH = m.env.length ? 30 + m.env.length * 20 : 0;
+			const pillH = m.pills.length ? 16 + Math.ceil(m.pills.length / 2) * 30 : 0;
+			const H = top + rowsH + envH + pillH + 24;
+			svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+			svg.setAttribute('width', String(W));
+			svg.setAttribute('height', String(H));
+			s('rect', { x: 8, y: 8, width: 232, height: H - 16, rx: 16, class: 'dx-box' }, svg);
+			s('rect', { x: 440, y: 8, width: 232, height: H - 16, rx: 16, class: 'dx-box container' }, svg);
+			s('text', { x: 24, y: 38, class: 'dx-title' }, svg, cut(m.left, 26));
+			s('text', { x: 456, y: 38, class: 'dx-title' }, svg, cut(m.right, 26));
+			if (m.rightSub) s('text', { x: 456, y: 62, class: 'dx-sub' }, svg, cut(m.rightSub, 30));
+			if (!rows.length)
+				s('text', { x: W / 2, y: top + 26, class: 'dx-sub dx-mid' }, svg, m.cmd === 'build' ? 'No build args' : 'No ports or mounts: fully isolated');
+			rows.forEach((r, i) => {
+				const y = top + i * 52;
+				const g = s('g', { class: `dx-row k-${r.kind}`, 'data-k': r.k, tabindex: 0, role: 'img', 'aria-label': `${r.label}: ${r.left} to ${r.right}` }, svg);
+				if (r.kind === 'volume') {
+					s('path', { d: `M28 ${y + 6}v24a82 6 0 0 0 164 0v-24`, class: 'dx-node' }, g);
+					s('ellipse', { cx: 110, cy: y + 6, rx: 82, ry: 6, class: 'dx-node' }, g);
+					s('text', { x: 110, y: y + 27, class: 'dx-label dx-mid' }, g, cut(r.left, 22));
+				} else {
+					s('rect', { x: 24, y, width: 196, height: 36, rx: 8, class: 'dx-node' }, g);
+					s('text', { x: 122, y: y + 23, class: 'dx-label dx-mid' }, g, cut(r.left, 24));
+				}
+				s('rect', { x: 460, y, width: 196, height: 36, rx: 8, class: 'dx-node' }, g);
+				s('text', { x: 558, y: y + 23, class: 'dx-label dx-mid' }, g, cut(r.right, 24));
+				const both = r.kind === 'bind' || r.kind === 'volume';
+				s(
+					'line',
+					{ x1: 222, y1: y + 18, x2: 458, y2: y + 18, class: 'dx-link', 'marker-end': 'url(#dx-arrow)', ...(both ? { 'marker-start': 'url(#dx-arrow)' } : {}) },
+					g,
+				);
+				s('text', { x: 340, y: y + 11, class: 'dx-edge dx-mid' }, g, cut(r.label, 30));
+			});
+			let y = top + rowsH + 10;
+			if (m.env.length) {
+				s('text', { x: 460, y: y + 8, class: 'dx-sub' }, svg, 'Environment');
+				m.env.forEach((e, i) => {
+					const g = s('g', { class: 'dx-row k-env', 'data-k': e.k, tabindex: 0, role: 'img', 'aria-label': `Environment variable ${e.text}` }, svg);
+					s('text', { x: 460, y: y + 30 + i * 20, class: 'dx-mono' }, g, cut(e.text, 28));
+				});
+				y += envH;
+			}
+			m.pills.forEach((p, i) => {
+				const px = 456 + (i % 2) * 104;
+				const py = y + 8 + Math.floor(i / 2) * 30;
+				const g = s('g', { class: 'dx-row k-pill', 'data-k': p.k, tabindex: 0, role: 'img', 'aria-label': p.text }, svg);
+				s('rect', { x: px, y: py, width: 98, height: 24, rx: 12, class: 'dx-node' }, g);
+				s('text', { x: px + 49, y: py + 16, class: 'dx-edge dx-mid' }, g, cut(p.text, 15));
+			});
+		};
+
+		const render = () => {
+			const error = byId('dx-error');
+			try {
+				const m = explain(input.value);
+				error.hidden = true;
+				byId('dx-tokens').replaceChildren(
+					...m.items.map((it) => {
+						const li = document.createElement('li');
+						li.className = `dx-chip tag-${it.tag}${it.warn ? ' risky' : ''}`;
+						li.dataset.k = it.k;
+						li.tabIndex = 0;
+						li.textContent = it.token;
+						return li;
+					}),
+				);
+				byId('dx-list').replaceChildren(
+					...m.items.map((it) => {
+						const li = document.createElement('li');
+						li.dataset.k = it.k;
+						const code = document.createElement('code');
+						code.textContent = it.token;
+						const p = document.createElement('span');
+						p.textContent = it.text;
+						li.append(code, p);
+						if (it.warn) {
+							const w = document.createElement('strong');
+							w.className = 'dx-warn';
+							w.textContent = `Risk: ${it.warn}`;
+							li.append(w);
+						}
+						return li;
+					}),
+				);
+				const warns = m.items.filter((it) => it.warn).length;
+				const wbox = byId('dx-warns');
+				wbox.textContent = warns ? `${warns} risky option${warns > 1 ? 's' : ''} found, highlighted below.` : 'No risky options found.';
+				wbox.className = `dx-warns ${warns ? 'bad' : 'good'}`;
+				draw(m);
+				svg.setAttribute(
+					'aria-label',
+					`Diagram: ${m.left} and ${m.right}, ${m.rows.length} mapping${m.rows.length === 1 ? '' : 's'}, ${m.env.length} environment variables.`,
+				);
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+			}
+			document
+				.querySelectorAll<HTMLButtonElement>('#dx-examples button')
+				.forEach((b) => b.setAttribute('aria-pressed', String(examples[Number(b.dataset.i)].cmd === input.value)));
+		};
+
+		const highlight = (k: string | undefined) => {
+			root.querySelectorAll('[data-k]').forEach((el) => el.classList.toggle('hl', !!k && (el as HTMLElement).dataset.k === k));
+		};
+		const target = (e: Event) => ((e.target as Element).closest?.('[data-k]') as HTMLElement | null)?.dataset.k;
+		root.addEventListener('pointerover', (e) => highlight(target(e)));
+		root.addEventListener('pointerleave', () => highlight(undefined));
+		root.addEventListener('focusin', (e) => highlight(target(e)));
+		root.addEventListener('focusout', () => highlight(undefined));
+
+		byId('dx-examples').replaceChildren(
+			...examples.map((ex, i) => {
+				const b = document.createElement('button');
+				b.textContent = ex.name;
+				b.dataset.i = String(i);
+				b.addEventListener('click', () => {
+					input.value = ex.cmd;
+					render();
+				});
+				return b;
+			}),
+		);
+		input.addEventListener('input', render);
+		copyButton(byId('dx-copy'), () => input.value);
+		render();
+	});
+</script>
+
+<style is:global>
+	.dx {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	#dx-in {
+		min-height: 150px;
+	}
+	.dx-tokens {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.dx-chip {
+		font-family: var(--mono);
+		font-size: 13px;
+		padding: 4px 10px;
+		border-radius: 8px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--ink);
+		word-break: break-all;
+		cursor: default;
+	}
+	.dx-chip.tag-cmd {
+		border-color: var(--accent-strong);
+	}
+	.dx-chip.tag-image {
+		border-color: var(--tint-3);
+	}
+	.dx-chip.tag-unknown {
+		border-style: dashed;
+	}
+	.dx-chip.risky {
+		border-color: var(--bad);
+		border-width: 2px;
+	}
+	.dx-chip.hl,
+	.dx-list li.hl {
+		background: var(--accent);
+		outline: 2px solid var(--accent-strong);
+	}
+	.dx-chip:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 2px;
+	}
+	.dx-warns {
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.dx-warns.bad {
+		color: var(--bad);
+	}
+	.dx-warns.good {
+		color: var(--ok);
+	}
+	.dx-scroll {
+		overflow-x: auto;
+		padding: 12px;
+	}
+	.dx-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	#dx-svg {
+		display: block;
+		font-family: var(--sans);
+	}
+	.dx-note {
+		margin: 0;
+		padding: 0 14px 14px;
+		color: var(--ink-soft);
+		font-size: 14px;
+	}
+	.dx-box {
+		fill: var(--surface-2);
+		stroke: var(--border);
+	}
+	.dx-box.container {
+		stroke: var(--accent-strong);
+		stroke-width: 1.5;
+	}
+	.dx-title {
+		fill: var(--ink);
+		font-size: 15px;
+		font-weight: 800;
+	}
+	.dx-sub {
+		fill: var(--ink-soft);
+		font-size: 13px;
+		font-weight: 600;
+	}
+	.dx-mid {
+		text-anchor: middle;
+	}
+	.dx-node {
+		fill: var(--surface);
+		stroke: var(--accent-strong);
+		stroke-width: 1.5;
+	}
+	.dx-label,
+	.dx-mono {
+		fill: var(--ink);
+		font-family: var(--mono);
+		font-size: 12px;
+	}
+	.dx-edge {
+		fill: var(--ink);
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.dx-link {
+		stroke: var(--accent-strong);
+		stroke-width: 2;
+	}
+	.dx-head {
+		fill: var(--ink-soft);
+	}
+	.k-port .dx-node,
+	.k-port .dx-link {
+		stroke: var(--tint-3);
+	}
+	.k-bind .dx-node,
+	.k-bind .dx-link {
+		stroke: var(--tint-1);
+	}
+	.k-volume .dx-node,
+	.k-volume .dx-link {
+		stroke: var(--tint-2);
+	}
+	.k-tmpfs .dx-node,
+	.k-tmpfs .dx-link {
+		stroke: var(--warn);
+	}
+	.dx-row {
+		cursor: default;
+		outline: none;
+	}
+	.dx-row.hl .dx-node {
+		fill: var(--accent);
+		stroke-width: 3;
+	}
+	.dx-row.hl .dx-link {
+		stroke-width: 4;
+	}
+	.dx-row.hl .dx-mono {
+		font-weight: 800;
+	}
+	.dx-list {
+		margin: 0;
+		padding: 8px;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.dx-list li {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 8px 10px;
+		border-radius: 10px;
+		font-size: 14px;
+	}
+	.dx-list code {
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+		word-break: break-all;
+	}
+	.dx-warn {
+		color: var(--bad);
+		font-size: 13px;
+	}
+</style>

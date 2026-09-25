@@ -1,0 +1,294 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const types = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert'];
+const sampleBody =
+	'Tokens are now refreshed in the background a minute before they expire, so long running sessions no longer drop the user back to the login screen in the middle of their work.';
+const sampleParse = `feat(api)!: drop support for v1 endpoints
+
+The v1 routes were deprecated a year ago.
+
+BREAKING CHANGE: clients must call /v2 instead of /v1.
+Closes #42`;
+---
+
+<ToolShell
+	slug="conventional-commit-builder"
+	title="Conventional Commit Builder"
+	description="Write a Conventional Commits message with live checks and a ready git commit command, or paste one to validate it and see the semver bump."
+>
+	<div class="toolbar" id="cc-tool">
+		<div class="seg" id="cc-mode" role="group" aria-label="Mode">
+			<button data-value="build" aria-pressed="true">
+				Build
+			</button>
+			<button data-value="parse" aria-pressed="false">
+				Parse
+			</button>
+		</div>
+	</div>
+	<div id="cc-build" class="cc-stack">
+		<div class="fields">
+			<div class="field">
+				<label for="cc-type">Type</label>
+				<select id="cc-type">
+					{types.map((t) => (
+						<option value={t}>{t}</option>
+					))}
+				</select>
+			</div>
+			<div class="field">
+				<label for="cc-scope">Scope</label>
+				<input id="cc-scope" spellcheck="false" value="auth" />
+			</div>
+			<div class="field wide">
+				<label for="cc-subject">Subject</label>
+				<input id="cc-subject" value="refresh tokens before they expire" />
+				<span class="field-note" id="cc-count"></span>
+			</div>
+			<div class="field wide">
+				<label for="cc-body">Body · wrapped at 72</label>
+				<textarea id="cc-body" rows="4">{sampleBody}</textarea>
+			</div>
+			<div class="field wide" id="cc-breaking-field" hidden>
+				<label for="cc-breaking-note">Breaking change</label>
+				<input id="cc-breaking-note" value="sessions created before this release must sign in again." />
+			</div>
+			<div class="field">
+				<label for="cc-issues">Closes issues · comma separated</label>
+				<input id="cc-issues" spellcheck="false" value="123" />
+			</div>
+			<div class="field">
+				<label for="cc-footers">Other footers · one per line</label>
+				<textarea id="cc-footers" rows="2" spellcheck="false">Reviewed-by: Jane Doe</textarea>
+			</div>
+		</div>
+		<div class="toolbar">
+			<label class="check">
+				<input type="checkbox" id="cc-breaking" /> Breaking change
+			</label>
+			<div class="seg" id="cc-host" role="group" aria-label="Issue references">
+				<button data-value="github" aria-pressed="true">
+					GitHub #123
+				</button>
+				<button data-value="gitlab" aria-pressed="false">
+					GitLab group/project#123
+				</button>
+			</div>
+			<div class="field cc-glproject" id="cc-glproject-field" hidden>
+				<label for="cc-glproject">GitLab project</label>
+				<input id="cc-glproject" spellcheck="false" value="" placeholder="group/project" />
+			</div>
+		</div>
+		<ul class="cc-warn" id="cc-warn"></ul>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Commit message</span>
+				<button class="btn" id="cc-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="cc-out"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>git commit</span>
+				<button class="btn" id="cc-cmd-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out cc-cmd" id="cc-cmd"></pre>
+		</section>
+	</div>
+	<div id="cc-parse" class="cc-stack" hidden>
+		<section class="panel">
+			<div class="panel-head">
+				<label for="cc-in">Commit message</label>
+			</div>
+			<textarea id="cc-in" spellcheck="false">{sampleParse}</textarea>
+		</section>
+		<div class="stats">
+			<div class="stat">
+				<b id="cc-bump">-</b>
+				<span>semver bump</span>
+			</div>
+			<div class="stat">
+				<b id="cc-ptype">-</b>
+				<span>type</span>
+			</div>
+			<div class="stat">
+				<b id="cc-pscope">-</b>
+				<span>scope</span>
+			</div>
+		</div>
+		<ul class="cc-warn" id="cc-issues-list" aria-live="polite"></ul>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const TYPES = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert'];
+	const NON_IMPERATIVE =
+		/^(added|adds|adding|fixed|fixes|fixing|updated|updates|updating|removed|removes|removing|changed|changes|changing|created|creates|implemented|implements|refactored|improved|improves|made|makes)\b/i;
+
+	const wrap = (text: string, width = 72) =>
+		text
+			.split(/\n{2,}/)
+			.map((para) => {
+				const words = para.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+				const lines: string[] = [];
+				let line = '';
+				words.forEach((w) => {
+					if (line && `${line} ${w}`.length > width) {
+						lines.push(line);
+						line = w;
+					} else line = line ? `${line} ${w}` : w;
+				});
+				if (line) lines.push(line);
+				return lines.join('\n');
+			})
+			.filter(Boolean)
+			.join('\n\n');
+
+	const shellQuote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+
+	const parseCommit = (message: string) => {
+		const problems: string[] = [];
+		const lines = message.replace(/\r/g, '').split('\n');
+		const header = lines[0] ?? '';
+		const m = header.match(/^(\w+)(?:\(([^()\s]+)\))?(!)?: (.+)$/);
+		if (!m) {
+			problems.push('Header must look like type(scope)!: subject, with a colon and a space.');
+			return { type: '', scope: '', bump: 'none', problems };
+		}
+		const [, type, scope = '', bang, subject] = m;
+		if (!TYPES.includes(type.toLowerCase())) problems.push(`Unknown type "${type}". Use one of ${TYPES.join(', ')}.`);
+		if (type !== type.toLowerCase()) problems.push('Type should be lowercase.');
+		if (header.length > 72) problems.push(`Header is ${header.length} characters, keep it under 72.`);
+		if (/\.$/.test(subject)) problems.push('Subject should not end with a period.');
+		if (lines.length > 1 && lines[1].trim() !== '') problems.push('Leave a blank line between the header and the body.');
+		const rest = lines.slice(1).join('\n');
+		const breakingFooter = /^BREAKING[ -]CHANGE: .+/m.test(rest);
+		const breaking = !!bang || breakingFooter;
+		const bump = breaking
+			? 'major'
+			: type.toLowerCase() === 'feat'
+				? 'minor'
+				: type.toLowerCase() === 'fix' || type.toLowerCase() === 'perf'
+					? 'patch'
+					: 'none';
+		return { type: type.toLowerCase(), scope, bump, problems };
+	};
+
+	onPage('cc-tool', () => {
+		let host = 'github';
+		const val = (id: string) => byId<HTMLInputElement>(id).value;
+
+		const render = () => {
+			const type = val('cc-type');
+			const scope = val('cc-scope').trim();
+			const breaking = byId<HTMLInputElement>('cc-breaking').checked;
+			const subject = val('cc-subject').trim();
+			byId('cc-breaking-field').hidden = !breaking;
+			byId('cc-glproject-field').hidden = host !== 'gitlab';
+			const header = `${type}${scope ? `(${scope})` : ''}${breaking ? '!' : ''}: ${subject}`;
+			const warn: string[] = [];
+			const count = byId('cc-count');
+			count.textContent = `${header.length} / 72 characters in the header`;
+			count.parentElement!.classList.toggle('invalid', header.length > 72);
+			if (!subject) warn.push('Write a subject.');
+			if (header.length > 72) warn.push('Header is longer than 72 characters.');
+			if (/\.$/.test(subject)) warn.push('Drop the trailing period.');
+			if (/^[A-Z]/.test(subject)) warn.push('Start the subject with a lowercase letter.');
+			if (NON_IMPERATIVE.test(subject)) warn.push('Use the imperative mood, as in "add" rather than "added" or "adds".');
+			if (scope && /[\s()]/.test(scope)) warn.push('Scope should be a single word without spaces or parentheses.');
+			const body = wrap(val('cc-body'));
+			const project = val('cc-glproject').trim();
+			const issues = val('cc-issues')
+				.split(',')
+				.map((s) => s.trim().replace(/^#/, ''))
+				.filter(Boolean)
+				.map((n) => `Closes ${host === 'gitlab' && project ? `${project}#${n}` : `#${n}`}`);
+			const footers = [
+				...(breaking ? [`BREAKING CHANGE: ${val('cc-breaking-note').trim() || 'describe what breaks.'}`] : []),
+				...issues,
+				...val('cc-footers')
+					.split('\n')
+					.map((l) => l.trim())
+					.filter(Boolean),
+			];
+			const parts = [header, body, footers.join('\n')].filter(Boolean);
+			const message = parts.join('\n\n');
+			byId('cc-out').textContent = message;
+			byId('cc-cmd').textContent = parts.length === 1 ? `git commit -m ${shellQuote(header)}` : `git commit -F - <<'EOF'\n${message}\nEOF`;
+			byId('cc-warn').replaceChildren(
+				...warn.map((t) => {
+					const li = document.createElement('li');
+					li.textContent = t;
+					return li;
+				}),
+			);
+		};
+
+		const renderParse = () => {
+			const r = parseCommit(byId<HTMLTextAreaElement>('cc-in').value);
+			byId('cc-bump').textContent = r.bump;
+			byId('cc-ptype').textContent = r.type || '-';
+			byId('cc-pscope').textContent = r.scope || '-';
+			const list = r.problems.length ? r.problems : ['Valid Conventional Commit.'];
+			byId('cc-issues-list').replaceChildren(
+				...list.map((t) => {
+					const li = document.createElement('li');
+					li.textContent = t;
+					li.className = r.problems.length ? '' : 'ok';
+					return li;
+				}),
+			);
+		};
+
+		segmented(byId('cc-mode'), (v) => {
+			byId('cc-build').hidden = v !== 'build';
+			byId('cc-parse').hidden = v !== 'parse';
+		});
+		segmented(byId('cc-host'), (v) => ((host = v), render()));
+		document.querySelectorAll('#cc-build input, #cc-build textarea, #cc-build select').forEach((el) => el.addEventListener('input', render));
+		byId('cc-in').addEventListener('input', renderParse);
+		copyButton(byId('cc-copy'), () => byId('cc-out').textContent ?? '');
+		copyButton(byId('cc-cmd-copy'), () => byId('cc-cmd').textContent ?? '');
+		render();
+		renderParse();
+	});
+</script>
+
+<style>
+	.cc-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.cc-stack[hidden] {
+		display: none;
+	}
+	.cc-cmd {
+		min-height: auto !important;
+	}
+	.cc-glproject {
+		padding: 6px 12px;
+	}
+	.cc-glproject input {
+		font-size: 14px;
+	}
+	.cc-warn {
+		margin: 0;
+		padding: 0 0 0 18px;
+		font-size: 13px;
+		color: var(--warn);
+	}
+	.cc-warn:empty {
+		display: none;
+	}
+	.cc-warn :global(li.ok) {
+		color: var(--ok);
+	}
+</style>

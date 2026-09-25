@@ -1,0 +1,221 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sampleExcludes = 'node_modules\n*.log';
+---
+
+<ToolShell
+	slug="tar-command-builder"
+	title="tar Command Builder"
+	description="Create, extract or list tar archives with gzip, bzip2, xz or zstd, and get the matching opposite command for free."
+>
+	<div class="toolbar" id="tr-tool">
+		<div class="seg" id="tr-mode" role="group" aria-label="Mode">
+			<button data-value="c" aria-pressed="true">
+				create
+			</button>
+			<button data-value="x">extract</button>
+			<button data-value="t">list</button>
+		</div>
+		<div class="seg" id="tr-comp" role="group" aria-label="Compression">
+			<button data-value="none">none</button>
+			<button data-value="gzip" aria-pressed="true">
+				gzip
+			</button>
+			<button data-value="bzip2">bzip2</button>
+			<button data-value="xz">xz</button>
+			<button data-value="zstd">zstd</button>
+		</div>
+	</div>
+	<div class="fields">
+		<div class="field">
+			<label for="tr-name">Archive</label>
+			<input id="tr-name" spellcheck="false" value="backup.tar.gz" />
+		</div>
+		<div class="field">
+			<label for="tr-dir" id="tr-dir-label">
+				Change to directory (-C)
+			</label>
+			<input id="tr-dir" spellcheck="false" value="/var/www" />
+		</div>
+		<div class="field" id="tr-files-field">
+			<label for="tr-files">Files and folders · space separated</label>
+			<input id="tr-files" spellcheck="false" value="site uploads" />
+		</div>
+		<div class="field" id="tr-strip-field">
+			<label for="tr-strip">strip-components</label>
+			<input id="tr-strip" spellcheck="false" inputmode="numeric" placeholder="1" />
+		</div>
+		<div class="field wide" id="tr-ex-field">
+			<label for="tr-ex">Excludes · one pattern per line</label>
+			<textarea id="tr-ex" class="tr-area" spellcheck="false">{sampleExcludes}</textarea>
+		</div>
+	</div>
+	<div class="toolbar">
+		<label class="check">
+			<input type="checkbox" id="tr-v" /> Verbose (-v)
+		</label>
+		<label class="check">
+			<input type="checkbox" id="tr-p" /> Preserve permissions (-p)
+		</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Command</span>
+			<button class="btn" id="tr-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out tr-out" id="tr-out"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="tr-opp-label"></span>
+			<button class="btn" id="tr-opp-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out tr-out" id="tr-opp"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>What each part does</span>
+		</div>
+		<dl class="tr-explain" id="tr-explain"></dl>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+	import { shellSplit } from '../../scripts/shell';
+
+	onPage('tr-tool', () => {
+		let mode = 'c';
+		let comp = 'gzip';
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const q = (s: string) => (/^~?[A-Za-z0-9_/.,:@%+=-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
+		const ext: Record<string, string> = { none: '.tar', gzip: '.tar.gz', bzip2: '.tar.bz2', xz: '.tar.xz', zstd: '.tar.zst' };
+		const letter: Record<string, string> = { none: '', gzip: 'z', bzip2: 'j', xz: 'J', zstd: '' };
+
+		const build = (m: string): [string, string][] => {
+			const name = val('tr-name') || `archive${ext[comp]}`;
+			const dir = val('tr-dir');
+			const verbose = byId<HTMLInputElement>('tr-v').checked;
+			const perms = byId<HTMLInputElement>('tr-p').checked && m === 'x';
+			const flags = `-${m}${perms ? 'p' : ''}${letter[comp]}${verbose ? 'v' : ''}f`;
+			const verb = m === 'c' ? 'Create' : m === 'x' ? 'Extract' : 'List';
+			const parts: [string, string][] = [
+				['tar', 'The tar archiver.'],
+				[
+					flags,
+					[
+						`-${m} ${verb.toLowerCase()} an archive`,
+						...(perms ? ['-p keep the original permissions'] : []),
+						...(letter[comp] ? [`-${letter[comp]} ${m === 'c' ? 'compress' : 'decompress'} with ${comp}`] : []),
+						...(verbose ? ['-v list files as they are processed'] : []),
+						'-f the archive file name follows',
+					].join('; ') + '.',
+				],
+			];
+			if (comp === 'zstd') parts.push(['--zstd', `${m === 'c' ? 'Compress' : 'Decompress'} with zstd.`]);
+			parts.push([q(name), `The archive ${m === 'c' ? 'to write' : 'to read'}.`]);
+			if (m === 'c') {
+				byId<HTMLTextAreaElement>('tr-ex')
+					.value.split('\n')
+					.map((l) => l.trim())
+					.filter(Boolean)
+					.forEach((e) => parts.push([`--exclude=${q(e)}`, `Leave out anything matching ${e}.`]));
+			}
+			if (dir && m !== 't')
+				parts.push([
+					`-C ${q(dir)}`,
+					m === 'c' ? `Move into ${dir} first, so paths inside the archive are relative to it.` : `Extract into ${dir} (it must exist).`,
+				]);
+			const strip = val('tr-strip');
+			if (m === 'x' && /^\d+$/.test(strip) && strip !== '0')
+				parts.push([`--strip-components=${strip}`, `Drop the first ${strip} leading folder${strip === '1' ? '' : 's'} from every path while extracting.`]);
+			if (m === 'c') {
+				let files: string[];
+				try {
+					files = shellSplit(val('tr-files'));
+				} catch {
+					files = [val('tr-files')];
+				}
+				if (!files.length) files = ['.'];
+				parts.push([files.map(q).join(' '), `What to put in the archive${dir ? `, relative to ${dir}` : ''}.`]);
+			}
+			return parts;
+		};
+
+		const render = () => {
+			byId('tr-files-field').hidden = mode !== 'c';
+			byId('tr-ex-field').hidden = mode !== 'c';
+			byId('tr-strip-field').hidden = mode !== 'x';
+			byId('tr-dir-label').textContent = mode === 'x' ? 'Extract into (-C)' : 'Change to directory (-C)';
+			const parts = build(mode);
+			byId('tr-out').textContent = parts.map(([p]) => p).join(' ');
+			const opp = mode === 'c' ? 'x' : 'c';
+			byId('tr-opp-label').textContent = mode === 'c' ? 'Extract it again' : 'Create it again';
+			byId('tr-opp').textContent = build(opp)
+				.map(([p]) => p)
+				.join(' ');
+			byId('tr-explain').replaceChildren(
+				...parts.flatMap(([k, v]) => {
+					const dt = document.createElement('dt');
+					dt.textContent = k;
+					const dd = document.createElement('dd');
+					dd.textContent = v;
+					return [dt, dd];
+				}),
+			);
+		};
+
+		segmented(byId('tr-mode'), (v) => ((mode = v), render()));
+		segmented(byId('tr-comp'), (v) => {
+			comp = v;
+			const input = byId<HTMLInputElement>('tr-name');
+			const stem = input.value.replace(/\.(tar(\.(gz|bz2|xz|zst))?|tgz)$/, '');
+			input.value = `${stem || 'archive'}${ext[v]}`;
+			render();
+		});
+		document.querySelectorAll('main input, main textarea').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('tr-copy'), () => byId('tr-out').textContent ?? '');
+		copyButton(byId('tr-opp-copy'), () => byId('tr-opp').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.tr-area {
+		min-height: 60px;
+		font-family: var(--mono) !important;
+		font-size: 14px !important;
+	}
+	.tr-out {
+		min-height: auto !important;
+	}
+	.tr-explain {
+		margin: 0;
+		padding: 12px 14px;
+		display: grid;
+		grid-template-columns: minmax(0, max-content) 1fr;
+		gap: 6px 16px;
+		font-size: 14px;
+	}
+	.tr-explain :global(dt) {
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--ink);
+		overflow-wrap: anywhere;
+		max-width: 320px;
+	}
+	.tr-explain :global(dd) {
+		margin: 0;
+	}
+	@media (max-width: 560px) {
+		.tr-explain {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

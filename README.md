@@ -143,6 +143,44 @@ Live at **https://techmefr.github.io/kodilo/**
 - **Unicode Inspector** (`/tools/unicode-inspector/`) — code points, UTF-8 bytes, escapes, invisible characters
 - **Keyboard Event Info** (`/tools/keycode-info/`) — key, code, keyCode, modifiers and a handler snippet
 - **Aspect Ratio Calculator** (`/tools/aspect-ratio-calculator/`) — ratio, resize, common formats and CSS
+- **JavaScript Formatter & Minifier** (`/tools/javascript-formatter/`) — Prettier beautify and Terser minify for JS/TS
+- **CSV to JSON** (`/tools/csv-to-json/`) — CSV to JSON with delimiter detection and typed values
+- **JSONPath Tester** (`/tools/jsonpath-tester/`) — live JSONPath queries with matched paths
+- **Fake Data Generator** (`/tools/fake-data-generator/`) — seeded fake records as JSON, CSV or SQL
+- **Mermaid Live Editor** (`/tools/mermaid-editor/`) — live Mermaid diagram editor with SVG export
+- **Time Zone Converter** (`/tools/timezone-converter/`) — a date-time across any time zones, DST-aware
+- **Line Tools** (`/tools/line-tools/`) — sort, dedupe, filter and number lines
+- **Base32, Base58 & Hex Encoder** (`/tools/base-encoder/`) — Base32, Base58 and hex encoding with character codes
+- **Markdown Table Generator** (`/tools/markdown-table-generator/`) — editable grid or CSV to an aligned Markdown table
+- **Color Shades Generator** (`/tools/color-shades-generator/`) — OKLCH shade scale from 50 to 950 with contrast ratios
+- **HTTP Headers & Cookie Parser** (`/tools/http-headers-parser/`) — explain raw HTTP headers, Set-Cookie and Cookie
+- **License Generator** (`/tools/license-generator/`) — MIT, Apache, GPL, BSD, ISC, MPL and Unlicense files
+- **CSR Generator** (`/tools/csr-generator/`) — PKCS#10 CSR and private key, generated in the browser
+- **Code Screenshot** (`/tools/code-screenshot/`) — beautiful code images as PNG
+- **Placeholder Image Generator** (`/tools/placeholder-image-generator/`) — placeholder images, data URIs and SVG
+- **GitHub Actions Workflow Generator** (`/tools/github-actions-generator/`) — CI workflows with matrix, cache and pinned actions
+- **Dockerfile Generator & Linter** (`/tools/dockerfile-generator/`) — multi-stage Dockerfiles and a best-practice linter
+- **Docker Compose Validator** (`/tools/docker-compose-validator/`) — compose syntax and semantic checks with a service summary
+- **Kubernetes Secret Encoder** (`/tools/kubernetes-secret-encoder/`) — Secret YAML from key/values, TLS or registry credentials, and back
+- **Caddyfile Generator** (`/tools/caddyfile-generator/`) — Caddyfiles with proxy, static files, headers and auth
+- **CIDR Aggregator & Splitter** (`/tools/cidr-aggregator/`) — merge, exclude and split IPv4 CIDR blocks
+- **Firewall Rule Generator** (`/tools/firewall-rule-generator/`) — ufw, iptables and nftables from one rule list, with an SSH lockout warning
+- **Logrotate Config Generator** (`/tools/logrotate-generator/`) — logrotate.d files explained line by line
+- **fstab Entry Generator** (`/tools/fstab-generator/`) — aligned fstab lines with _netdev/nofail and pass checks
+- **RAID Calculator** (`/tools/raid-calculator/`) — RAID capacity and fault tolerance in TB or TiB
+- **rsync Command Builder** (`/tools/rsync-command-builder/`) — rsync flags, SSH options and the trailing slash explained
+- **find Command Builder** (`/tools/find-command-builder/`) — find with prune, -exec and xargs -0, explained
+- **tar Command Builder** (`/tools/tar-command-builder/`) — tar create, extract and list with the reverse command
+- **GitLab CI Generator** (`/tools/gitlab-ci-generator/`) — pipelines for Node, Python, Go, Docker or GitLab Pages
+- **CODEOWNERS Generator** (`/tools/codeowners-generator/`) — code owners with sections and order checks
+- **README Badge Generator** (`/tools/readme-badge-generator/`) — shields.io badges with GitHub and GitLab presets
+- **Issue & PR Template Generator** (`/tools/issue-pr-template-generator/`) — issue forms and PR/MR templates
+- **Conventional Commit Builder** (`/tools/conventional-commit-builder/`) — build and validate commit messages, predict the semver bump
+- **Git Undo Guide** (`/tools/git-undo-guide/`) — the right command to undo almost anything in Git
+- **Docker Command Explainer** (`/tools/docker-command-explainer/`) — explain any docker command, flag by flag
+- **Docker Compose Visualizer** (`/tools/docker-compose-visualizer/`) — compose.yaml as a diagram of services, networks and volumes
+- **Dockerfile Layer Visualizer** (`/tools/dockerfile-layer-visualizer/`) — stages, layers and cache invalidation of a Dockerfile
+- **Docker Container Lifecycle** (`/tools/docker-container-lifecycle/`) — interactive container state diagram and simulator
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
 No sign-up, no account, no tracking. Every tool runs entirely client-side.
