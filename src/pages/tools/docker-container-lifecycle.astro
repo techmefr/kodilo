@@ -1,0 +1,669 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="docker-container-lifecycle"
+	title="Docker Container Lifecycle"
+	description="Explore the states a container goes through, the command behind every transition, the signals sent and what exit codes mean, then drive a demo container yourself."
+>
+	<div class="lc" id="lc-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span>State diagram</span>
+			</div>
+			<div class="lc-scroll" tabindex="0" role="region" aria-label="Lifecycle diagram, scrollable">
+				<svg id="lc-svg" viewBox="0 0 700 440" width="700" height="440" role="group" aria-label="Container lifecycle state diagram"></svg>
+			</div>
+		</section>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">
+					<span id="lc-info-title">Details</span>
+					<button class="btn" id="lc-copy">
+						Copy
+					</button>
+				</div>
+				<div class="lc-info" id="lc-info" aria-live="polite"></div>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span>Simulate</span>
+				</div>
+				<div class="lc-sim">
+					<p class="lc-now">
+						Container <code>web</code> is <strong id="lc-state"></strong>
+					</p>
+					<label class="check">
+						<input type="checkbox" id="lc-rm" /> Run with --rm
+					</label>
+					<div class="lc-buttons" id="lc-buttons" role="group" aria-label="Commands"></div>
+					<div class="lc-log-head">
+						<span>Commands run</span>
+						<button class="btn" id="lc-reset">
+							Reset
+						</button>
+					</div>
+					<pre class="lc-log" id="lc-log" tabindex="0" role="log" aria-label="Command log"></pre>
+				</div>
+			</section>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Exit codes</span>
+			</div>
+			<table class="lc-codes">
+				<thead>
+					<tr>
+						<th scope="col">Code</th>
+						<th scope="col">Meaning</th>
+					</tr>
+				</thead>
+				<tbody id="lc-codes"></tbody>
+			</table>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type State = 'image' | 'created' | 'running' | 'paused' | 'exited' | 'removed';
+	type Edge = { id: string; from: State; to: State; cmd: string; label: string; what: string; exit?: string; path: string; lx: number; ly: number };
+
+	const STATES: Record<State, { x: number; y: number; label: string; what: string; cmd: string }> = {
+		image: {
+			x: 80,
+			y: 220,
+			label: 'image',
+			what: 'A read-only template on disk. No container exists yet; docker images lists it.',
+			cmd: 'docker images nginx',
+		},
+		created: {
+			x: 290,
+			y: 70,
+			label: 'created',
+			what: 'The container filesystem and config exist but no process runs. Ports are reserved only once it starts.',
+			cmd: 'docker ps -a --filter status=created',
+		},
+		running: {
+			x: 400,
+			y: 220,
+			label: 'running',
+			what: 'PID 1 of the container is alive. It keeps running until that process exits or you stop it.',
+			cmd: 'docker ps',
+		},
+		paused: {
+			x: 620,
+			y: 70,
+			label: 'paused',
+			what: 'All processes are frozen with the cgroup freezer: memory is kept, no CPU is used, no signal is delivered.',
+			cmd: 'docker ps --filter status=paused',
+		},
+		exited: {
+			x: 620,
+			y: 370,
+			label: 'exited',
+			what: 'PID 1 has ended. The writable layer, logs and exit code are kept until you remove the container.',
+			cmd: 'docker ps -a --filter status=exited',
+		},
+		removed: {
+			x: 290,
+			y: 370,
+			label: 'removed',
+			what: 'The container and its writable layer are gone. Named volumes survive; anonymous ones go only with rm -v or --rm.',
+			cmd: 'docker ps -a',
+		},
+	};
+
+	const EDGES: Edge[] = [
+		{
+			id: 'create',
+			from: 'image',
+			to: 'created',
+			cmd: 'docker create --name web nginx',
+			label: 'create',
+			what: 'Creates the container from the image without starting it.',
+			path: 'M120 196L246 92',
+			lx: 150,
+			ly: 132,
+		},
+		{
+			id: 'run',
+			from: 'image',
+			to: 'running',
+			cmd: 'docker run -d --name web nginx',
+			label: 'run',
+			what: 'create plus start in one step. Pulls the image first if it is missing.',
+			path: 'M132 220L346 220',
+			lx: 240,
+			ly: 212,
+		},
+		{
+			id: 'start',
+			from: 'created',
+			to: 'running',
+			cmd: 'docker start web',
+			label: 'start',
+			what: 'Starts PID 1 using the stored configuration.',
+			path: 'M312 100L380 190',
+			lx: 330,
+			ly: 152,
+		},
+		{
+			id: 'pause',
+			from: 'running',
+			to: 'paused',
+			cmd: 'docker pause web',
+			label: 'pause',
+			what: 'Freezes every process of the container. No signal is sent, so the app cannot react.',
+			path: 'M444 196C510 150 540 110 568 84',
+			lx: 540,
+			ly: 150,
+		},
+		{
+			id: 'unpause',
+			from: 'paused',
+			to: 'running',
+			cmd: 'docker unpause web',
+			label: 'unpause',
+			what: 'Thaws the processes; they continue exactly where they were.',
+			path: 'M600 100C570 150 520 190 454 210',
+			lx: 500,
+			ly: 128,
+		},
+		{
+			id: 'stop',
+			from: 'running',
+			to: 'exited',
+			cmd: 'docker stop web',
+			label: 'stop',
+			what: 'Sends SIGTERM (or the image STOPSIGNAL) to PID 1, waits 10 seconds (change with -t), then sends SIGKILL.',
+			exit: '0 or 143 when the app handles SIGTERM, 137 when the timeout forced SIGKILL.',
+			path: 'M440 246C500 300 540 330 570 356',
+			lx: 470,
+			ly: 312,
+		},
+		{
+			id: 'kill',
+			from: 'running',
+			to: 'exited',
+			cmd: 'docker kill web',
+			label: 'kill',
+			what: 'Sends SIGKILL right away: no cleanup, open writes can be lost. Use -s to send another signal.',
+			exit: '137 (128 + 9, SIGKILL).',
+			path: 'M420 250C440 320 520 370 566 376',
+			lx: 430,
+			ly: 350,
+		},
+		{
+			id: 'exit',
+			from: 'running',
+			to: 'exited',
+			cmd: 'docker wait web',
+			label: 'process exits',
+			what: 'PID 1 finished on its own (crash or end of work). docker wait prints the exit code.',
+			exit: '0 for success, the app code otherwise.',
+			path: 'M452 232C560 250 630 290 640 342',
+			lx: 600,
+			ly: 272,
+		},
+		{
+			id: 'restart',
+			from: 'running',
+			to: 'running',
+			cmd: 'docker restart web',
+			label: 'restart',
+			what: 'stop then start: SIGTERM, up to 10 seconds, SIGKILL, then a new PID 1 in the same container.',
+			path: 'M380 190C340 130 460 130 420 190',
+			lx: 400,
+			ly: 122,
+		},
+		{
+			id: 'start-again',
+			from: 'exited',
+			to: 'running',
+			cmd: 'docker start web',
+			label: 'start',
+			what: 'Starts the same container again; files written in its writable layer are still there.',
+			path: 'M596 346C560 300 500 270 450 240',
+			lx: 540,
+			ly: 300,
+		},
+		{
+			id: 'rm',
+			from: 'exited',
+			to: 'removed',
+			cmd: 'docker rm web',
+			label: 'rm',
+			what: 'Deletes a stopped container and its writable layer.',
+			path: 'M566 370L346 370',
+			lx: 456,
+			ly: 362,
+		},
+		{
+			id: 'rm-created',
+			from: 'created',
+			to: 'removed',
+			cmd: 'docker rm web',
+			label: 'rm',
+			what: 'Deletes a container that never started.',
+			path: 'M280 100L280 340',
+			lx: 262,
+			ly: 292,
+		},
+		{
+			id: 'rm-f',
+			from: 'running',
+			to: 'removed',
+			cmd: 'docker rm -f web',
+			label: 'rm -f',
+			what: 'Kills the container with SIGKILL and deletes it in one step.',
+			exit: '137, though nobody reads it since the container is gone.',
+			path: 'M372 246L316 344',
+			lx: 332,
+			ly: 284,
+		},
+		{
+			id: 'rm-f-paused',
+			from: 'paused',
+			to: 'removed',
+			cmd: 'docker rm -f web',
+			label: 'rm -f',
+			what: 'Force-removes a paused container.',
+			path: 'M660 100C700 250 520 420 330 392',
+			lx: 660,
+			ly: 200,
+		},
+		{
+			id: 'auto-rm',
+			from: 'exited',
+			to: 'removed',
+			cmd: 'docker run --rm --name web nginx',
+			label: 'auto with --rm',
+			what: 'With docker run --rm, Docker removes the container and its anonymous volumes as soon as PID 1 exits.',
+			path: 'M580 396C520 430 380 430 330 396',
+			lx: 456,
+			ly: 428,
+		},
+	];
+
+	const CODES: [string, string][] = [
+		['0', 'Success: the process exited normally.'],
+		['1', 'Generic application error.'],
+		['125', 'docker run itself failed (bad flag, daemon error).'],
+		['126', 'The command exists but cannot be executed (permission, not a binary).'],
+		['127', 'Command not found inside the container.'],
+		['130', 'Interrupted by SIGINT (Ctrl+C), 128 + 2.'],
+		['137', 'Killed by SIGKILL (128 + 9): docker kill, stop timeout or the OOM killer.'],
+		['143', 'Terminated by SIGTERM (128 + 15), usually a clean docker stop.'],
+	];
+
+	const SIM: { id: string; label: string; from: State[]; to: (rm: boolean) => State; cmd: (rm: boolean) => string; edge: string }[] = [
+		{
+			id: 'create',
+			label: 'create',
+			from: ['image', 'removed'],
+			to: () => 'created',
+			cmd: (rm) => `docker create${rm ? ' --rm' : ''} --name web nginx`,
+			edge: 'create',
+		},
+		{
+			id: 'run',
+			label: 'run',
+			from: ['image', 'removed'],
+			to: () => 'running',
+			cmd: (rm) => `docker run -d${rm ? ' --rm' : ''} --name web nginx`,
+			edge: 'run',
+		},
+		{ id: 'start', label: 'start', from: ['created', 'exited'], to: () => 'running', cmd: () => 'docker start web', edge: 'start' },
+		{ id: 'pause', label: 'pause', from: ['running'], to: () => 'paused', cmd: () => 'docker pause web', edge: 'pause' },
+		{ id: 'unpause', label: 'unpause', from: ['paused'], to: () => 'running', cmd: () => 'docker unpause web', edge: 'unpause' },
+		{ id: 'stop', label: 'stop', from: ['running'], to: (rm) => (rm ? 'removed' : 'exited'), cmd: () => 'docker stop web', edge: 'stop' },
+		{ id: 'kill', label: 'kill', from: ['running'], to: (rm) => (rm ? 'removed' : 'exited'), cmd: () => 'docker kill web', edge: 'kill' },
+		{ id: 'exit', label: 'process exits', from: ['running'], to: (rm) => (rm ? 'removed' : 'exited'), cmd: () => '# PID 1 exited with code 0', edge: 'exit' },
+		{ id: 'restart', label: 'restart', from: ['running', 'exited', 'created'], to: () => 'running', cmd: () => 'docker restart web', edge: 'restart' },
+		{ id: 'rm', label: 'rm', from: ['created', 'exited'], to: () => 'removed', cmd: () => 'docker rm web', edge: 'rm' },
+		{ id: 'rm-f', label: 'rm -f', from: ['created', 'running', 'paused', 'exited'], to: () => 'removed', cmd: () => 'docker rm -f web', edge: 'rm-f' },
+	];
+
+	const NS = 'http://www.w3.org/2000/svg';
+	const s = (tag: string, attrs: Record<string, string | number>, parent?: Element, text?: string) => {
+		const e = document.createElementNS(NS, tag);
+		Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, String(v)));
+		if (text !== undefined) e.textContent = text;
+		parent?.appendChild(e);
+		return e;
+	};
+
+	onPage('lc-tool', () => {
+		const svg = byId('lc-svg') as unknown as SVGSVGElement;
+		const rmBox = byId<HTMLInputElement>('lc-rm');
+		let current: State = 'image';
+		let autoRm = false;
+		let selected = '';
+		let copyText = '';
+		const log: string[] = [];
+
+		const defs = s('defs', {}, svg);
+		const marker = s('marker', { id: 'lc-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, defs);
+		s('path', { d: 'M0 0L10 5L0 10z', class: 'lc-head' }, marker);
+
+		const activate = (g: Element, fn: () => void) => {
+			g.addEventListener('click', fn);
+			g.addEventListener('keydown', (e) => {
+				const ev = e as KeyboardEvent;
+				if (ev.key === 'Enter' || ev.key === ' ') {
+					ev.preventDefault();
+					fn();
+				}
+			});
+		};
+
+		EDGES.forEach((e) => {
+			const g = s(
+				'g',
+				{
+					class: `lc-edge${e.id === 'auto-rm' ? ' auto' : ''}`,
+					'data-k': `e:${e.id}`,
+					tabindex: 0,
+					role: 'button',
+					'aria-label': `${e.label}: ${e.from} to ${e.to}`,
+				},
+				svg,
+			);
+			s('path', { d: e.path, class: 'lc-hit' }, g);
+			s('path', { d: e.path, class: 'lc-line', 'marker-end': 'url(#lc-arrow)' }, g);
+			const w = e.label.length * 7 + 14;
+			s('rect', { x: e.lx - w / 2, y: e.ly - 11, width: w, height: 20, rx: 10, class: 'lc-tag' }, g);
+			s('text', { x: e.lx, y: e.ly + 4, class: 'lc-tag-text' }, g, e.label);
+			activate(g, () => show(`e:${e.id}`));
+		});
+		(Object.keys(STATES) as State[]).forEach((k) => {
+			const st = STATES[k];
+			const g = s('g', { class: `lc-state st-${k}`, 'data-k': `s:${k}`, 'data-state': k, tabindex: 0, role: 'button', 'aria-label': `State ${st.label}` }, svg);
+			if (k === 'image') {
+				s('rect', { x: st.x - 52, y: st.y - 26, width: 104, height: 52, rx: 6, class: 'lc-node' }, g);
+				s('rect', { x: st.x - 46, y: st.y - 32, width: 104, height: 52, rx: 6, class: 'lc-node back' }, g);
+				g.insertBefore(g.lastChild!, g.firstChild);
+			} else s('rect', { x: st.x - 56, y: st.y - 26, width: 112, height: 52, rx: 26, class: 'lc-node' }, g);
+			s('text', { x: st.x, y: st.y + 5, class: 'lc-label' }, g, st.label);
+			activate(g, () => show(`s:${k}`));
+		});
+
+		const show = (k: string) => {
+			selected = k;
+			const info = byId('lc-info');
+			info.replaceChildren();
+			const add = (tag: string, text: string, cls?: string) => {
+				const el = document.createElement(tag);
+				el.textContent = text;
+				if (cls) el.className = cls;
+				info.append(el);
+			};
+			if (k.startsWith('s:')) {
+				const st = STATES[k.slice(2) as State];
+				byId('lc-info-title').textContent = `State: ${st.label}`;
+				add('p', st.what);
+				add('pre', st.cmd, 'lc-cmd');
+				const out = EDGES.filter((e) => e.from === k.slice(2)).map((e) => e.label);
+				add('p', out.length ? `From here: ${[...new Set(out)].join(', ')}.` : 'Terminal state: create or run a new container.', 'lc-soft');
+				copyText = st.cmd;
+			} else {
+				const e = EDGES.find((x) => `e:${x.id}` === k)!;
+				byId('lc-info-title').textContent = `${e.from} → ${e.to}`;
+				add('pre', e.cmd, 'lc-cmd');
+				add('p', e.what);
+				if (e.exit) add('p', `Exit code: ${e.exit}`, 'lc-soft');
+				copyText = e.cmd;
+			}
+			paint();
+		};
+
+		const paint = () => {
+			svg.querySelectorAll<SVGElement>('[data-k]').forEach((el) => {
+				el.classList.toggle('sel', el.dataset.k === selected);
+				el.classList.toggle('now', el.dataset.k === `s:${current}`);
+			});
+			byId('lc-state').textContent = current === 'image' ? 'not created yet' : current;
+			byId('lc-buttons')
+				.querySelectorAll<HTMLButtonElement>('button')
+				.forEach((b) => {
+					const a = SIM.find((x) => x.id === b.dataset.id)!;
+					b.disabled = !a.from.includes(current);
+				});
+			byId('lc-log').textContent = log.length ? log.join('\n') : 'No command yet.';
+			rmBox.disabled = current !== 'image' && current !== 'removed';
+		};
+
+		byId('lc-buttons').replaceChildren(
+			...SIM.map((a) => {
+				const b = document.createElement('button');
+				b.className = 'btn';
+				b.textContent = a.label;
+				b.dataset.id = a.id;
+				b.addEventListener('click', () => {
+					const rm = rmBox.checked;
+					if (a.id === 'create' || a.id === 'run') autoRm = rm;
+					log.push(`$ ${a.cmd(rm)}`);
+					let next = a.to(autoRm);
+					let edge = a.edge;
+					if (a.edge === 'start' && current === 'exited') edge = 'start-again';
+					if (a.edge === 'rm' && current === 'created') edge = 'rm-created';
+					if (a.edge === 'rm-f' && current === 'paused') edge = 'rm-f-paused';
+					if (a.id === 'restart') next = 'running';
+					if (next === 'removed' && ['stop', 'kill', 'exit'].includes(a.id)) {
+						log.push('# --rm: container removed automatically');
+						edge = 'auto-rm';
+					}
+					if (a.id === 'stop') log.push('# SIGTERM sent, process exited with 0');
+					if (a.id === 'kill') log.push('# SIGKILL sent, exit code 137');
+					current = next;
+					show(`e:${edge}`);
+				});
+				return b;
+			}),
+		);
+
+		byId('lc-codes').replaceChildren(
+			...CODES.map(([c, m]) => {
+				const tr = document.createElement('tr');
+				const td1 = document.createElement('td');
+				td1.textContent = c;
+				const td2 = document.createElement('td');
+				td2.textContent = m;
+				tr.append(td1, td2);
+				return tr;
+			}),
+		);
+
+		byId('lc-reset').addEventListener('click', () => {
+			log.length = 0;
+			current = 'image';
+			autoRm = false;
+			show('s:image');
+		});
+		copyButton(byId('lc-copy'), () => copyText);
+		show('e:run');
+	});
+</script>
+
+<style is:global>
+	.lc {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.lc-scroll {
+		overflow-x: auto;
+		padding: 12px;
+	}
+	.lc-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	#lc-svg {
+		display: block;
+		font-family: var(--sans);
+	}
+	.lc-node {
+		fill: var(--surface);
+		stroke: var(--accent-strong);
+		stroke-width: 2;
+	}
+	.lc-node.back {
+		fill: var(--surface-2);
+	}
+	.st-running .lc-node {
+		stroke: var(--ok);
+	}
+	.st-paused .lc-node {
+		stroke: var(--warn);
+	}
+	.st-exited .lc-node {
+		stroke: var(--bad);
+	}
+	.st-removed .lc-node {
+		stroke: var(--ink-soft);
+		stroke-dasharray: 5 4;
+	}
+	.lc-state.now .lc-node:not(.back) {
+		fill: var(--accent);
+		stroke-width: 4;
+	}
+	.lc-label {
+		fill: var(--ink);
+		font-size: 15px;
+		font-weight: 800;
+		text-anchor: middle;
+	}
+	.lc-hit {
+		fill: none;
+		stroke: transparent;
+		stroke-width: 16;
+	}
+	.lc-line {
+		pointer-events: none;
+		fill: none;
+		stroke: var(--ink-soft);
+		stroke-width: 1.5;
+	}
+	.lc-edge.auto .lc-line {
+		stroke-dasharray: 5 4;
+	}
+	.lc-head {
+		fill: var(--ink-soft);
+	}
+	.lc-tag {
+		fill: var(--surface);
+		stroke: var(--border);
+	}
+	.lc-tag-text {
+		fill: var(--ink);
+		font-family: var(--mono);
+		font-size: 12px;
+		font-weight: 600;
+		text-anchor: middle;
+	}
+	.lc-edge,
+	.lc-state {
+		cursor: pointer;
+		outline: none;
+	}
+	.lc-edge:hover .lc-line,
+	.lc-edge:focus-visible .lc-line,
+	.lc-edge.sel .lc-line {
+		stroke: var(--accent-strong);
+		stroke-width: 3.5;
+	}
+	.lc-edge.sel .lc-tag,
+	.lc-edge:focus-visible .lc-tag {
+		stroke: var(--accent-strong);
+		stroke-width: 2;
+	}
+	.lc-state:hover .lc-node,
+	.lc-state:focus-visible .lc-node,
+	.lc-state.sel .lc-node {
+		stroke-width: 4;
+	}
+	.lc-state:focus-visible .lc-node:not(.back) {
+		stroke: var(--ink);
+	}
+	.lc-info {
+		padding: 12px 14px;
+		font-size: 14px;
+	}
+	.lc-info p {
+		margin: 0 0 8px;
+	}
+	.lc-cmd {
+		margin: 0 0 10px;
+		padding: 8px 10px;
+		border-radius: 8px;
+		background: var(--surface-2);
+		font-family: var(--mono);
+		font-size: 13px;
+		white-space: pre-wrap;
+		word-break: break-all;
+	}
+	.lc-soft {
+		color: var(--ink-soft);
+	}
+	.lc-sim {
+		padding: 12px 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.lc-now {
+		margin: 0;
+		font-size: 15px;
+	}
+	.lc-buttons {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.lc-buttons .btn:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+	.lc-log-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.lc-log {
+		margin: 0;
+		min-height: 90px;
+		max-height: 200px;
+		overflow: auto;
+		padding: 10px;
+		border-radius: 8px;
+		background: var(--surface-2);
+		font-family: var(--mono);
+		font-size: 12px;
+		white-space: pre-wrap;
+		word-break: break-all;
+	}
+	.lc-codes {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 14px;
+	}
+	.lc-codes th,
+	.lc-codes td {
+		text-align: left;
+		padding: 8px 14px;
+		border-bottom: 1px solid var(--border);
+	}
+	.lc-codes td:first-child {
+		font-family: var(--mono);
+		font-weight: 700;
+	}
+</style>

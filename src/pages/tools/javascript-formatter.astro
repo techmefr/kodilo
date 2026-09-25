@@ -1,0 +1,169 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `import {readFile} from "node:fs/promises"
+const cache=new Map()
+export async function loadConfig(path,{fallback={},strict=false}={}){if(cache.has(path))return cache.get(path)
+try{const raw=await readFile(path,"utf8");const config={...fallback,...JSON.parse(raw)};cache.set(path,config);return config}catch(error){if(strict)throw new Error(\`Cannot read \${path}: \${error.message}\`);return fallback}}
+export const pick=(obj,keys)=>Object.fromEntries(keys.filter(k=>k in obj).map(k=>[k,obj[k]]))
+`;
+---
+
+<ToolShell
+	slug="javascript-formatter"
+	title="JavaScript Formatter & Minifier"
+	description="Beautify JavaScript or TypeScript with Prettier, or minify it with Terser and see how many bytes you save."
+>
+	<div class="toolbar" id="jsf-tool">
+		<div class="seg" id="jsf-mode" aria-label="Mode">
+			<button data-value="beautify" aria-pressed="true">
+				Beautify
+			</button>
+			<button data-value="minify" aria-pressed="false">
+				Minify
+			</button>
+		</div>
+		<div class="seg" id="jsf-lang" aria-label="Language">
+			<button data-value="js" aria-pressed="true">
+				JavaScript
+			</button>
+			<button data-value="ts" aria-pressed="false">
+				TypeScript
+			</button>
+		</div>
+		<div class="seg" id="jsf-indent" aria-label="Indent">
+			<button data-value="2" aria-pressed="true">
+				2 spaces
+			</button>
+			<button data-value="4" aria-pressed="false">
+				4 spaces
+			</button>
+			<button data-value="tab" aria-pressed="false">
+				Tab
+			</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" id="jsf-semi" checked /> Semicolons
+		</label>
+		<label class="check">
+			<input type="checkbox" id="jsf-single" /> Single quotes
+		</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="jsf-in" spellcheck="false" aria-label="JavaScript input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="jsf-status">Output</span>
+				<button class="btn" id="jsf-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="jsf-out" tabindex="0"></pre>
+		</section>
+	</div>
+	<p class="error" id="jsf-error" hidden></p>
+	<div class="stats" id="jsf-stats" hidden>
+		<div class="stat">
+			<b id="jsf-orig"></b>
+			<span>Original</span>
+		</div>
+		<div class="stat">
+			<b id="jsf-min"></b>
+			<span>Minified</span>
+		</div>
+		<div class="stat">
+			<b id="jsf-saved"></b>
+			<span>Saved</span>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const bytes = (s: string) => new TextEncoder().encode(s).length;
+	const human = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(2)} KB`);
+
+	onPage('jsf-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jsf-in');
+		const output = byId('jsf-out');
+		const error = byId('jsf-error');
+		const semi = byId<HTMLInputElement>('jsf-semi');
+		const single = byId<HTMLInputElement>('jsf-single');
+		let mode = 'beautify';
+		let lang = 'js';
+		let indent = '2';
+		let run = 0;
+
+		const fail = (e: unknown) => {
+			const err = e as { message?: string; loc?: { start?: { line: number; column: number } }; line?: number; col?: number };
+			const loc = err.loc?.start
+				? `Line ${err.loc.start.line}, column ${err.loc.start.column}: `
+				: err.line
+					? `Line ${err.line}, column ${(err.col ?? 0) + 1}: `
+					: '';
+			error.textContent = loc + String(err.message ?? e).split('\n')[0];
+			error.hidden = false;
+			output.textContent = '';
+			byId('jsf-stats').hidden = true;
+		};
+
+		const render = async () => {
+			const id = ++run;
+			const code = input.value;
+			try {
+				if (mode === 'beautify') {
+					const [prettier, babel, estree, ts] = await Promise.all([
+						import('prettier/standalone'),
+						import('prettier/plugins/babel'),
+						import('prettier/plugins/estree'),
+						lang === 'ts' ? import('prettier/plugins/typescript') : Promise.resolve(null),
+					]);
+					const result = await prettier.format(code, {
+						parser: lang === 'ts' ? 'typescript' : 'babel',
+						plugins: ts ? [estree, ts] : [babel, estree],
+						useTabs: indent === 'tab',
+						tabWidth: indent === '4' ? 4 : 2,
+						semi: semi.checked,
+						singleQuote: single.checked,
+						printWidth: 100,
+					});
+					if (id !== run) return;
+					output.textContent = result;
+					byId('jsf-status').textContent = 'Beautified';
+					byId('jsf-stats').hidden = true;
+				} else {
+					const { minify } = await import('terser');
+					const result = await minify(code, { module: true, compress: true, mangle: true }).catch((e) => {
+						if (lang === 'ts') e.message = `${e.message} (Terser minifies plain JavaScript: remove type annotations first)`;
+						throw e;
+					});
+					if (id !== run) return;
+					const out = result.code ?? '';
+					output.textContent = out;
+					const a = bytes(code);
+					const b = bytes(out);
+					byId('jsf-orig').textContent = human(a);
+					byId('jsf-min').textContent = human(b);
+					byId('jsf-saved').textContent = a ? `${(((a - b) / a) * 100).toFixed(1)}%` : '0%';
+					byId('jsf-status').textContent = 'Minified';
+					byId('jsf-stats').hidden = false;
+				}
+				error.hidden = true;
+			} catch (e) {
+				if (id === run) fail(e);
+			}
+		};
+
+		segmented(byId('jsf-mode'), (v) => ((mode = v), render()));
+		segmented(byId('jsf-lang'), (v) => ((lang = v), render()));
+		segmented(byId('jsf-indent'), (v) => ((indent = v), render()));
+		[semi, single].forEach((el) => el.addEventListener('change', render));
+		input.addEventListener('input', render);
+		copyButton(byId('jsf-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

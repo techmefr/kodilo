@@ -1,0 +1,229 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const presets = [
+	['gh-stars', 'GitHub stars', true],
+	['gh-license', 'GitHub license', true],
+	['gh-release', 'GitHub release', true],
+	['gh-ci', 'GitHub CI', true],
+	['gh-issues', 'GitHub issues', false],
+	['gl-pipeline', 'GitLab pipeline', false],
+	['gl-coverage', 'GitLab coverage', false],
+	['gl-release', 'GitLab release', false],
+] as const;
+---
+
+<ToolShell
+	slug="readme-badge-generator"
+	title="README Badge Generator"
+	description="Build shields.io badges for your README, with GitHub and GitLab presets, a live preview and Markdown, HTML or reStructuredText output."
+>
+	<div class="fields" id="bd-tool">
+		<div class="field">
+			<label for="bd-label">Label</label>
+			<input id="bd-label" value="made with" />
+		</div>
+		<div class="field">
+			<label for="bd-message">Message</label>
+			<input id="bd-message" value="love" />
+		</div>
+		<div class="field">
+			<label for="bd-color">Color</label>
+			<input id="bd-color" spellcheck="false" value="ff69b4" />
+		</div>
+		<div class="field">
+			<label for="bd-logo">Logo · simple-icons slug</label>
+			<input id="bd-logo" spellcheck="false" value="astro" />
+		</div>
+		<div class="field">
+			<label for="bd-repo">GitHub owner/repo</label>
+			<input id="bd-repo" spellcheck="false" value="withastro/astro" />
+		</div>
+		<div class="field">
+			<label for="bd-workflow">GitHub workflow file</label>
+			<input id="bd-workflow" spellcheck="false" value="ci.yml" />
+		</div>
+		<div class="field">
+			<label for="bd-glproject">GitLab project path</label>
+			<input id="bd-glproject" spellcheck="false" value="gitlab-org/gitlab" />
+		</div>
+		<div class="field">
+			<label for="bd-branch">Branch</label>
+			<input id="bd-branch" spellcheck="false" value="main" />
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="bd-style" role="group" aria-label="Style">
+			<button data-value="flat" aria-pressed="true">
+				flat
+			</button>
+			<button data-value="flat-square" aria-pressed="false">
+				flat-square
+			</button>
+			<button data-value="for-the-badge" aria-pressed="false">
+				for-the-badge
+			</button>
+			<button data-value="plastic" aria-pressed="false">
+				plastic
+			</button>
+			<button data-value="social" aria-pressed="false">
+				social
+			</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" id="bd-static" checked /> Static badge
+		</label>
+	</div>
+	<div class="chips" id="bd-presets" role="group" aria-label="Presets">
+		{presets.map(([value, label, on]) => (
+			<button data-value={value} aria-pressed={on ? 'true' : 'false'}>
+				{label}
+			</button>
+		))}
+	</div>
+	<section class="panel">
+		<div class="panel-head">Preview</div>
+		<div class="bd-preview" id="bd-preview"></div>
+	</section>
+	<div class="toolbar">
+		<div class="seg" id="bd-format" role="group" aria-label="Output format">
+			<button data-value="md" aria-pressed="true">
+				Markdown
+			</button>
+			<button data-value="html" aria-pressed="false">
+				HTML
+			</button>
+			<button data-value="rst" aria-pressed="false">
+				reStructuredText
+			</button>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="bd-kind">Markdown</span>
+			<button class="btn" id="bd-copy">
+				Copy all
+			</button>
+		</div>
+		<pre class="out" id="bd-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Badge = { alt: string; src: string; href: string };
+
+	const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+	const part = (s: string) => encodeURIComponent(s.replace(/-/g, '--').replace(/_/g, '__'));
+
+	onPage('bd-tool', () => {
+		let style = 'flat';
+		let format = 'md';
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const presetButtons = [...document.querySelectorAll<HTMLButtonElement>('#bd-presets button')];
+
+		const badges = (): Badge[] => {
+			const repo = val('bd-repo');
+			const gl = val('bd-glproject');
+			const glEnc = encodeURIComponent(gl);
+			const branch = val('bd-branch') || 'main';
+			const q = (extra: Record<string, string> = {}) => {
+				const params = new URLSearchParams({ style, ...extra });
+				if (val('bd-logo') && !('logo' in extra)) params.set('logo', val('bd-logo'));
+				[...params.keys()].forEach((k) => params.get(k) || params.delete(k));
+				return `?${params.toString()}`;
+			};
+			const list: Badge[] = [];
+			if (byId<HTMLInputElement>('bd-static').checked) {
+				const color = val('bd-color').replace(/^#/, '') || 'blue';
+				const label = val('bd-label');
+				const path = label
+					? `${part(label)}-${part(val('bd-message'))}-${encodeURIComponent(color)}`
+					: `${part(val('bd-message'))}-${encodeURIComponent(color)}`;
+				list.push({ alt: `${label} ${val('bd-message')}`.trim(), src: `https://img.shields.io/badge/${path}${q()}`, href: '' });
+			}
+			const gh = `https://github.com/${repo}`;
+			const glUrl = `https://gitlab.com/${gl}`;
+			const map: Record<string, Badge> = {
+				'gh-stars': { alt: 'GitHub stars', src: `https://img.shields.io/github/stars/${repo}${q({ logo: 'github' })}`, href: `${gh}/stargazers` },
+				'gh-license': { alt: 'License', src: `https://img.shields.io/github/license/${repo}${q({ logo: '' })}`, href: `${gh}/blob/${branch}/LICENSE` },
+				'gh-release': { alt: 'Latest release', src: `https://img.shields.io/github/v/release/${repo}${q({ logo: 'github' })}`, href: `${gh}/releases/latest` },
+				'gh-ci': {
+					alt: 'CI status',
+					src: `https://img.shields.io/github/actions/workflow/status/${repo}/${encodeURIComponent(val('bd-workflow') || 'ci.yml')}${q({ branch, logo: 'githubactions' })}`,
+					href: `${gh}/actions/workflows/${val('bd-workflow') || 'ci.yml'}`,
+				},
+				'gh-issues': { alt: 'Open issues', src: `https://img.shields.io/github/issues/${repo}${q({ logo: 'github' })}`, href: `${gh}/issues` },
+				'gl-pipeline': {
+					alt: 'Pipeline status',
+					src: `https://img.shields.io/gitlab/pipeline-status/${glEnc}${q({ branch, logo: 'gitlab' })}`,
+					href: `${glUrl}/-/pipelines`,
+				},
+				'gl-coverage': {
+					alt: 'Coverage',
+					src: `https://img.shields.io/gitlab/pipeline-coverage/${glEnc}${q({ branch, logo: 'gitlab' })}`,
+					href: `${glUrl}/-/pipelines`,
+				},
+				'gl-release': { alt: 'GitLab release', src: `https://img.shields.io/gitlab/v/release/${glEnc}${q({ logo: 'gitlab' })}`, href: `${glUrl}/-/releases` },
+			};
+			presetButtons.filter((b) => b.getAttribute('aria-pressed') === 'true').forEach((b) => list.push(map[b.dataset.value!]));
+			return list;
+		};
+
+		const render = () => {
+			const list = badges();
+			const preview = byId('bd-preview');
+			preview.replaceChildren(
+				...list.map((b) => {
+					const img = document.createElement('img');
+					img.src = b.src;
+					img.alt = b.alt || 'badge';
+					img.height = style === 'for-the-badge' ? 28 : 20;
+					return img;
+				}),
+			);
+			if (!list.length) preview.textContent = 'Pick at least one badge.';
+			const lines = list.map((b) => {
+				if (format === 'html') {
+					const img = `<img src="${esc(b.src)}" alt="${esc(b.alt)}" />`;
+					return b.href ? `<a href="${esc(b.href)}">${img}</a>` : img;
+				}
+				if (format === 'rst') return [`.. image:: ${b.src}`, `   :alt: ${b.alt}`, ...(b.href ? [`   :target: ${b.href}`] : [])].join('\n');
+				const img = `![${b.alt.replace(/[[\]]/g, '')}](${b.src})`;
+				return b.href ? `[${img}](${b.href})` : img;
+			});
+			byId('bd-kind').textContent = { md: 'Markdown', html: 'HTML', rst: 'reStructuredText' }[format] ?? '';
+			byId('bd-out').textContent = lines.join(format === 'rst' ? '\n\n' : '\n');
+		};
+
+		segmented(byId('bd-style'), (v) => ((style = v), render()));
+		segmented(byId('bd-format'), (v) => ((format = v), render()));
+		presetButtons.forEach((b) =>
+			b.addEventListener('click', () => {
+				b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+				render();
+			}),
+		);
+		document.querySelectorAll('#bd-tool input, #bd-static').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('bd-copy'), () => byId('bd-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.bd-preview {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		padding: 14px;
+		min-height: 52px;
+		color: var(--ink-soft);
+		font-size: 13px;
+	}
+	.bd-preview :global(img) {
+		max-width: 100%;
+		width: auto;
+	}
+</style>

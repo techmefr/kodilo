@@ -1,0 +1,283 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="gitlab-ci-generator"
+	title="GitLab CI Generator"
+	description="A modern .gitlab-ci.yml with stages, cache keyed on the lockfile, artifacts, rules, needs and a manual deploy job."
+>
+	<div class="toolbar" id="gl-tool">
+		<div class="seg" id="gl-stack" role="group" aria-label="Stack">
+			<button data-value="node" aria-pressed="true">
+				Node
+			</button>
+			<button data-value="python" aria-pressed="false">
+				Python
+			</button>
+			<button data-value="go" aria-pressed="false">
+				Go
+			</button>
+			<button data-value="docker" aria-pressed="false">
+				Docker
+			</button>
+			<button data-value="pages" aria-pressed="false">
+				Pages
+			</button>
+		</div>
+	</div>
+	<div class="fields">
+		<div class="field">
+			<label for="gl-image">Default image</label>
+			<input id="gl-image" spellcheck="false" value="node:22-alpine" />
+		</div>
+		<div class="field">
+			<label for="gl-env">Deploy environment</label>
+			<input id="gl-env" spellcheck="false" value="production" />
+		</div>
+		<div class="field">
+			<label for="gl-url">Environment URL</label>
+			<input id="gl-url" spellcheck="false" value="https://example.com" />
+		</div>
+		<div class="field">
+			<label for="gl-expire">Artifacts expire in</label>
+			<input id="gl-expire" spellcheck="false" value="1 week" />
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="chips" id="gl-stages" role="group" aria-label="Stages">
+			<button data-value="lint" aria-pressed="true">
+				lint
+			</button>
+			<button data-value="test" aria-pressed="true">
+				test
+			</button>
+			<button data-value="build" aria-pressed="true">
+				build
+			</button>
+			<button data-value="deploy" aria-pressed="true">
+				deploy
+			</button>
+		</div>
+	</div>
+	<div class="toolbar">
+		<label class="check">
+			<input type="checkbox" id="gl-mr" checked /> Merge requests
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gl-branch" checked /> Default branch
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gl-tags" checked /> Tags
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gl-cache" checked /> Cache
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gl-int" checked /> Interruptible
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gl-manual" checked /> Manual deploy
+		</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>.gitlab-ci.yml</span>
+			<span class="gl-actions">
+				<button class="btn" id="gl-copy">
+					Copy
+				</button>
+				<button class="btn" id="gl-dl">
+					Download
+				</button>
+			</span>
+		</div>
+		<pre class="out" id="gl-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Stack = {
+		image: string;
+		cacheKey: string;
+		cachePaths: string[];
+		before: string[];
+		lint: string[];
+		test: string[];
+		build: string[];
+		artifacts: string[];
+	};
+
+	const STACKS: Record<string, Stack> = {
+		node: {
+			image: 'node:22-alpine',
+			cacheKey: 'package-lock.json',
+			cachePaths: ['.npm/'],
+			before: ['npm ci --cache .npm --prefer-offline'],
+			lint: ['npm run lint'],
+			test: ['npm test'],
+			build: ['npm run build'],
+			artifacts: ['dist/'],
+		},
+		python: {
+			image: 'python:3.13-slim',
+			cacheKey: 'requirements.txt',
+			cachePaths: ['.cache/pip'],
+			before: ['pip install -r requirements.txt'],
+			lint: ['ruff check .'],
+			test: ['pytest --junitxml=report.xml'],
+			build: ['python -m build'],
+			artifacts: ['dist/'],
+		},
+		go: {
+			image: 'golang:1.25',
+			cacheKey: 'go.sum',
+			cachePaths: ['.go/pkg/mod/'],
+			before: ['go mod download'],
+			lint: ['go vet ./...'],
+			test: ['go test -race ./...'],
+			build: ['go build -o bin/app ./...'],
+			artifacts: ['bin/'],
+		},
+		docker: {
+			image: 'docker:27',
+			cacheKey: '',
+			cachePaths: [],
+			before: [],
+			lint: ['docker run --rm -i hadolint/hadolint < Dockerfile'],
+			test: ['docker build --target test .'],
+			build: [
+				'echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"',
+				'docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" .',
+				'docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"',
+			],
+			artifacts: [],
+		},
+		pages: {
+			image: 'node:22-alpine',
+			cacheKey: 'package-lock.json',
+			cachePaths: ['.npm/'],
+			before: ['npm ci --cache .npm --prefer-offline'],
+			lint: ['npm run lint'],
+			test: ['npm test'],
+			build: ['npm run build'],
+			artifacts: ['dist/'],
+		},
+	};
+
+	onPage('gl-tool', () => {
+		let stack = 'node';
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const on = (id: string) => byId<HTMLInputElement>(id).checked;
+		const stageButtons = [...document.querySelectorAll<HTMLButtonElement>('#gl-stages button')];
+		const q = (s: string) => (/^[-?:,[\]{}#&*!|>'"%@`]|: | #|:$|^\s|\s$/.test(s) ? `'${s.replace(/'/g, "''")}'` : s);
+		const list = (key: string, items: string[], pad = '  ') => (items.length ? [`${pad}${key}:`, ...items.map((i) => `${pad}  - ${q(i)}`)] : []);
+
+		const render = () => {
+			const s = STACKS[stack];
+			const stages = stageButtons.filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.dataset.value!);
+			const image = val('gl-image') || s.image;
+			const out: string[] = [];
+			out.push('stages:', ...stages.map((st) => `  - ${st}`), '');
+			const rules: string[] = [];
+			if (on('gl-mr')) rules.push(`    - if: $CI_PIPELINE_SOURCE == "merge_request_event"`);
+			if (on('gl-branch')) rules.push(`    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH`);
+			if (on('gl-tags')) rules.push(`    - if: $CI_COMMIT_TAG`);
+			if (rules.length) out.push('workflow:', '  rules:', ...rules, '');
+			if (stack === 'go') out.push('variables:', '  GOPATH: $CI_PROJECT_DIR/.go', '');
+			if (stack === 'python') out.push('variables:', '  PIP_CACHE_DIR: $CI_PROJECT_DIR/.cache/pip', '');
+			if (stack === 'docker') out.push('variables:', '  DOCKER_TLS_CERTDIR: "/certs"', '');
+			out.push('default:', `  image: ${q(image)}`);
+			if (stack === 'docker') out.push('  services:', '    - docker:27-dind');
+			if (on('gl-int')) out.push('  interruptible: true');
+			if (on('gl-cache') && s.cacheKey)
+				out.push('  cache:', '    key:', '      files:', `        - ${s.cacheKey}`, '    paths:', ...s.cachePaths.map((p) => `      - ${p}`));
+			out.push(...list('before_script', s.before));
+			out.push('');
+			const has = (st: string) => stages.includes(st);
+			const prev: string[] = [];
+			const job = (name: string, stage: string, script: string[], extra: string[] = []) => {
+				out.push(`${name}:`, `  stage: ${stage}`);
+				if (prev.length) out.push(`  needs: [${prev.join(', ')}]`);
+				out.push(...list('script', script), ...extra, '');
+			};
+			if (has('lint')) job('lint', 'lint', s.lint);
+			if (has('test')) job('test', 'test', s.test, stack === 'python' ? ['  artifacts:', '    when: always', '    reports:', '      junit: report.xml'] : []);
+			prev.push(...['lint', 'test'].filter(has));
+			if (has('build')) {
+				const art = s.artifacts.length
+					? ['  artifacts:', '    paths:', ...s.artifacts.map((a) => `      - ${a}`), `    expire_in: ${q(val('gl-expire') || '1 week')}`]
+					: [];
+				job('build', 'build', s.build, art);
+				prev.length = 0;
+				prev.push('build');
+			}
+			if (has('deploy')) {
+				const manual = on('gl-manual');
+				const rule = ['  rules:', `    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH`, ...(manual ? ['      when: manual'] : [])];
+				const env = ['  environment:', `    name: ${q(val('gl-env') || 'production')}`, ...(val('gl-url') ? [`    url: ${q(val('gl-url'))}`] : [])];
+				if (stack === 'pages') {
+					out.push('pages:', '  stage: deploy');
+					if (prev.length) out.push(`  needs: [${prev.join(', ')}]`);
+					out.push(
+						'  script:',
+						'    - echo "Publishing dist to GitLab Pages"',
+						'  pages:',
+						'    publish: dist',
+						'  artifacts:',
+						'    paths:',
+						'      - dist/',
+						...rule,
+						'',
+					);
+				} else if (stack === 'docker') {
+					job(
+						'deploy',
+						'deploy',
+						[
+							'echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"',
+							'docker pull "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"',
+							'docker tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" "$CI_REGISTRY_IMAGE:latest"',
+							'docker push "$CI_REGISTRY_IMAGE:latest"',
+						],
+						[...env, ...rule, '  interruptible: false'],
+					);
+				} else {
+					job('deploy', 'deploy', ['./scripts/deploy.sh'], [...env, ...rule, '  interruptible: false']);
+				}
+			}
+			byId('gl-out').textContent = `${out.join('\n').replace(/\n+$/, '')}\n`;
+		};
+
+		segmented(byId('gl-stack'), (v) => {
+			stack = v;
+			byId<HTMLInputElement>('gl-image').value = STACKS[v].image;
+			render();
+		});
+		stageButtons.forEach((b) =>
+			b.addEventListener('click', () => {
+				b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+				render();
+			}),
+		);
+		document.querySelectorAll('main input').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('gl-copy'), () => byId('gl-out').textContent ?? '');
+		byId('gl-dl').addEventListener('click', () => {
+			const link = document.createElement('a');
+			link.href = URL.createObjectURL(new Blob([byId('gl-out').textContent ?? ''], { type: 'text/yaml' }));
+			link.download = '.gitlab-ci.yml';
+			link.click();
+			URL.revokeObjectURL(link.href);
+		});
+		render();
+	});
+</script>
+
+<style>
+	.gl-actions {
+		display: inline-flex;
+		gap: 6px;
+	}
+</style>

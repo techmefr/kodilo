@@ -1,0 +1,254 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="base-encoder"
+	title="Base32, Base58 & Hex Encoder"
+	description="Encode UTF-8 text to Base32 (RFC 4648), Base58 (Bitcoin alphabet) or hexadecimal, or decode it back. Character codes are listed alongside."
+>
+	<div class="toolbar" id="be-tool">
+		<div class="seg" id="be-format" role="group" aria-label="Encoding">
+			<button data-value="base32" aria-pressed="true">
+				Base32
+			</button>
+			<button data-value="base58" aria-pressed="false">
+				Base58
+			</button>
+			<button data-value="hex" aria-pressed="false">
+				Hex
+			</button>
+		</div>
+		<div class="seg" id="be-dir" role="group" aria-label="Direction">
+			<button data-value="encode" aria-pressed="true">
+				Encode
+			</button>
+			<button data-value="decode" aria-pressed="false">
+				Decode
+			</button>
+		</div>
+		<button class="btn" id="be-swap">
+			Swap
+		</button>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head" id="be-in-label">
+				Text
+			</div>
+			<textarea id="be-in" spellcheck="false" aria-label="Input">Hello, kodilo! ✓</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="be-out-label">Base32</span>
+				<button class="btn" id="be-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="be-out" tabindex="0"></pre>
+		</section>
+	</div>
+	<div class="error" id="be-error" hidden></div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Character codes</span>
+			<button class="btn" id="be-codes-copy">
+				Copy
+			</button>
+		</div>
+		<div class="be-codes" id="be-codes" tabindex="0" role="region" aria-label="Character codes"></div>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+	const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+	const LABELS: Record<string, string> = { base32: 'Base32', base58: 'Base58', hex: 'Hex' };
+
+	function base32Encode(bytes: Uint8Array): string {
+		let out = '';
+		let buffer = 0;
+		let bits = 0;
+		for (const b of bytes) {
+			buffer = (buffer << 8) | b;
+			bits += 8;
+			while (bits >= 5) {
+				out += B32[(buffer >>> (bits - 5)) & 31];
+				bits -= 5;
+			}
+		}
+		if (bits > 0) out += B32[(buffer << (5 - bits)) & 31];
+		while (out.length % 8) out += '=';
+		return out;
+	}
+
+	function base32Decode(text: string): Uint8Array {
+		const clean = text.replace(/\s+/g, '').toUpperCase().replace(/=+$/, '');
+		const out: number[] = [];
+		let buffer = 0;
+		let bits = 0;
+		for (const ch of clean) {
+			const v = B32.indexOf(ch);
+			if (v < 0) throw new Error(`Invalid Base32 character: "${ch}"`);
+			buffer = ((buffer << 5) | v) & 0xffff;
+			bits += 5;
+			if (bits >= 8) {
+				out.push((buffer >>> (bits - 8)) & 255);
+				bits -= 8;
+			}
+		}
+		return new Uint8Array(out);
+	}
+
+	function base58Encode(bytes: Uint8Array): string {
+		let n = 0n;
+		for (const b of bytes) n = n * 256n + BigInt(b);
+		let out = '';
+		while (n > 0n) {
+			out = B58[Number(n % 58n)] + out;
+			n /= 58n;
+		}
+		for (const b of bytes) {
+			if (b !== 0) break;
+			out = '1' + out;
+		}
+		return out;
+	}
+
+	function base58Decode(text: string): Uint8Array {
+		const clean = text.trim();
+		let n = 0n;
+		for (const ch of clean) {
+			const v = B58.indexOf(ch);
+			if (v < 0) throw new Error(`Invalid Base58 character: "${ch}"`);
+			n = n * 58n + BigInt(v);
+		}
+		const out: number[] = [];
+		while (n > 0n) {
+			out.unshift(Number(n % 256n));
+			n /= 256n;
+		}
+		for (const ch of clean) {
+			if (ch !== '1') break;
+			out.unshift(0);
+		}
+		return new Uint8Array(out);
+	}
+
+	function hexEncode(bytes: Uint8Array): string {
+		return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+	}
+
+	function hexDecode(text: string): Uint8Array {
+		const clean = text.replace(/0x/gi, '').replace(/[\s:,-]+/g, '');
+		if (/[^0-9a-f]/i.test(clean)) throw new Error(`Invalid hex character: "${clean.match(/[^0-9a-f]/i)![0]}"`);
+		if (clean.length % 2) throw new Error('Hex input must have an even number of digits.');
+		return new Uint8Array(clean.match(/../g)?.map((h) => parseInt(h, 16)) ?? []);
+	}
+
+	const encoders: Record<string, (b: Uint8Array) => string> = { base32: base32Encode, base58: base58Encode, hex: hexEncode };
+	const decoders: Record<string, (t: string) => Uint8Array> = { base32: base32Decode, base58: base58Decode, hex: hexDecode };
+
+	onPage('be-tool', () => {
+		const input = byId<HTMLTextAreaElement>('be-in');
+		const output = byId('be-out');
+		const error = byId('be-error');
+		const codes = byId('be-codes');
+		let format = 'base32';
+		let direction = 'encode';
+		let codeText = '';
+
+		const setPressed = (group: string, value: string) =>
+			byId(group)
+				.querySelectorAll('button')
+				.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === value)));
+
+		const paintCodes = (text: string) => {
+			const rows = [...text].map((ch) => {
+				const cp = ch.codePointAt(0)!;
+				const utf8 = hexEncode(new TextEncoder().encode(ch)).replace(/(..)(?!$)/g, '$1 ');
+				return { ch, cp, utf8 };
+			});
+			codeText = rows.map((r) => `${r.ch}\t${r.cp}\tU+${r.cp.toString(16).toUpperCase().padStart(4, '0')}\t${r.utf8}`).join('\n');
+			const table = document.createElement('table');
+			const head = table.createTHead().insertRow();
+			['Char', 'Decimal', 'Code point', 'UTF-8 bytes'].forEach((h) => (head.appendChild(document.createElement('th')).textContent = h));
+			const body = table.createTBody();
+			rows.slice(0, 500).forEach((r) => {
+				const tr = body.insertRow();
+				[r.ch === ' ' ? '␠' : r.ch, String(r.cp), `U+${r.cp.toString(16).toUpperCase().padStart(4, '0')}`, r.utf8].forEach(
+					(v) => (tr.insertCell().textContent = v),
+				);
+			});
+			codes.replaceChildren(table);
+		};
+
+		const render = () => {
+			byId('be-in-label').textContent = direction === 'encode' ? 'Text' : LABELS[format];
+			byId('be-out-label').textContent = direction === 'encode' ? LABELS[format] : 'Text';
+			try {
+				if (direction === 'encode') {
+					output.textContent = encoders[format](new TextEncoder().encode(input.value));
+					paintCodes(input.value);
+				} else {
+					const text = new TextDecoder('utf-8', { fatal: true }).decode(decoders[format](input.value));
+					output.textContent = text;
+					paintCodes(text);
+				}
+				error.hidden = true;
+			} catch (e) {
+				output.textContent = '';
+				error.textContent = e instanceof TypeError ? 'Decoded bytes are not valid UTF-8 text.' : (e as Error).message;
+				error.hidden = false;
+				codes.replaceChildren();
+			}
+		};
+
+		segmented(byId('be-format'), (value) => {
+			format = value;
+			render();
+		});
+		segmented(byId('be-dir'), (value) => {
+			direction = value;
+			render();
+		});
+		byId('be-swap').addEventListener('click', () => {
+			if (!error.hidden) return;
+			input.value = output.textContent ?? '';
+			direction = direction === 'encode' ? 'decode' : 'encode';
+			setPressed('be-dir', direction);
+			render();
+		});
+		input.addEventListener('input', render);
+		copyButton(byId('be-copy'), () => output.textContent ?? '');
+		copyButton(byId('be-codes-copy'), () => codeText);
+		render();
+	});
+</script>
+
+<style>
+	.be-codes {
+		overflow: auto;
+		max-height: 320px;
+	}
+	.be-codes :global(table) {
+		border-collapse: collapse;
+		font-size: 13px;
+		min-width: 100%;
+	}
+	.be-codes :global(th),
+	.be-codes :global(td) {
+		padding: 6px 12px;
+		border-bottom: 1px solid var(--border);
+		text-align: left;
+		white-space: nowrap;
+		font-family: var(--mono);
+	}
+	.be-codes :global(th) {
+		font-size: 12px;
+		color: var(--ink-soft);
+		background: var(--surface-2);
+	}
+</style>

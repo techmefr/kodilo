@@ -1,0 +1,312 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `version: "3.8"
+services:
+  web:
+    image: nginx:1.27
+    container_name: web
+    ports:
+      - "8080:80"
+      - "99999:443"
+    depends_on: [api, cache]
+    networks: [front]
+    restart: sometimes
+  api:
+    build: ./api
+    environment:
+      DATABASE_URL: \${DATABASE_URL}
+      LOG_LEVEL: \${LOG_LEVEL:-info}
+    volumes:
+      - data:/var/lib/api
+      - logs:/var/log/api
+    networks: [front, back]
+  worker:
+    container_name: web
+    command: npm run worker
+networks:
+  front:
+volumes:
+  data:
+`;
+---
+
+<ToolShell
+	slug="docker-compose-validator"
+	title="Docker Compose Validator"
+	description="Paste a compose file to catch YAML errors with line and column, plus the mistakes Docker only reports at runtime: bad ports, unknown services, networks and volumes."
+>
+	<div class="grid-2" id="dc-tool">
+		<section class="panel">
+			<div class="panel-head">
+				compose.yaml <span class="dc-status" id="dc-status"></span>
+			</div>
+			<textarea id="dc-in" spellcheck="false" aria-label="Compose YAML">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="dc-count">Findings</span>
+				<button class="btn" id="dc-copy">
+					Copy
+				</button>
+			</div>
+			<ul class="dc-findings" id="dc-findings" tabindex="0" aria-label="Findings"></ul>
+		</section>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Services</span>
+		</div>
+		<div class="dc-scroll" tabindex="0" role="region" aria-label="Service summary">
+			<table class="dc-table">
+				<thead>
+					<tr>
+						<th scope="col">Service</th>
+						<th scope="col">Image / build</th>
+						<th scope="col">Ports</th>
+						<th scope="col">Depends on</th>
+					</tr>
+				</thead>
+				<tbody id="dc-rows"></tbody>
+			</table>
+		</div>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Interpolated variables</span>
+		</div>
+		<p class="dc-vars" id="dc-vars"></p>
+	</section>
+</ToolShell>
+
+<script>
+	import { isMap, isSeq, LineCounter, parseDocument, type Node } from 'yaml';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Finding = { line: number; col: number; severity: 'error' | 'warning' | 'info'; message: string };
+	const TOP = ['version', 'name', 'services', 'networks', 'volumes', 'configs', 'secrets', 'include'];
+	const RESTART = ['no', 'always', 'on-failure', 'unless-stopped'];
+
+	onPage('dc-tool', () => {
+		const input = byId<HTMLTextAreaElement>('dc-in');
+		let report = '';
+
+		const render = () => {
+			const lc = new LineCounter();
+			const doc = parseDocument(input.value, { lineCounter: lc, prettyErrors: true });
+			const f: Finding[] = [];
+			const at = (node: unknown) => {
+				const r = (node as Node | null)?.range;
+				return r ? lc.linePos(r[0]) : { line: 1, col: 1 };
+			};
+			const add = (node: unknown, severity: Finding['severity'], message: string) => f.push({ ...at(node), severity, message });
+			doc.errors.forEach((e) => f.push({ line: e.linePos?.[0].line ?? 1, col: e.linePos?.[0].col ?? 1, severity: 'error', message: e.message.split('\n')[0] }));
+			const rows: string[][] = [];
+			const vars = new Set<string>();
+			for (const m of input.value.matchAll(/(?<!\$)\$\{([A-Za-z_]\w*)[^}]*\}|(?<!\$)\$([A-Za-z_]\w*)/g)) vars.add(m[1] ?? m[2]);
+
+			if (!doc.errors.length) {
+				const root = doc.contents;
+				if (!isMap(root)) add(root, 'error', 'The file must be a mapping with a services key.');
+				else {
+					const keyOf = (p: { key: unknown }) => String((p.key as { value?: unknown })?.value ?? p.key);
+					const topMap = new Map(root.items.map((p) => [keyOf(p), p]));
+					root.items.forEach((p) => {
+						const k = keyOf(p);
+						if (k === 'version') add(p.key, 'warning', 'The version key is obsolete and ignored by Compose v2.');
+						else if (!TOP.includes(k) && !k.startsWith('x-')) add(p.key, 'error', `Unknown top-level key "${k}".`);
+					});
+					const namesOf = (k: string) => {
+						const v = topMap.get(k)?.value;
+						return new Set(isMap(v) ? v.items.map(keyOf) : []);
+					};
+					const nets = namesOf('networks');
+					const vols = namesOf('volumes');
+					const services = topMap.get('services')?.value;
+					if (!isMap(services)) add(topMap.get('services')?.key ?? root, 'error', 'Missing or empty services mapping.');
+					else {
+						const serviceNames = new Set(services.items.map(keyOf));
+						const containers = new Map<string, string>();
+						services.items.forEach((sp) => {
+							const name = keyOf(sp);
+							const svc = sp.value;
+							if (!isMap(svc)) {
+								add(sp.key, 'error', `Service "${name}" must be a mapping.`);
+								return;
+							}
+							const get = (k: string) => svc.items.find((p) => keyOf(p) === k);
+							const js = (svc.toJSON() ?? {}) as Record<string, unknown>;
+							if (!js.image && !js.build) add(sp.key, 'error', `Service "${name}" has neither image nor build.`);
+							const ports: string[] = [];
+							const portsNode = get('ports')?.value;
+							if (isSeq(portsNode))
+								portsNode.items.forEach((item) => {
+									const raw = (item as { toJSON?: () => unknown }).toJSON?.() ?? item;
+									if (raw && typeof raw === 'object') {
+										const o = raw as Record<string, unknown>;
+										ports.push(`${o.published ?? ''}:${o.target ?? ''}`);
+										if (!o.target) add(item, 'error', `Port in "${name}" has no target.`);
+										return;
+									}
+									const s = String(raw);
+									ports.push(s);
+									const m = s.match(/^(?:(\[?[\d.:a-fA-F]+\]?):)?(?:(\d+(?:-\d+)?):)?(\d+(?:-\d+)?)(\/(tcp|udp|sctp))?$/);
+									const nums = s
+										.replace(/\/\w+$/, '')
+										.split(':')
+										.slice(-2)
+										.join('-')
+										.split('-')
+										.filter((x) => /^\d+$/.test(x))
+										.map(Number);
+									if (!m) add(item, 'error', `Invalid port "${s}" in "${name}".`);
+									else if (nums.some((n) => n < 1 || n > 65535)) add(item, 'error', `Port out of range in "${s}" (${name}).`);
+								});
+							else if (portsNode) add(portsNode, 'error', `ports of "${name}" must be a list.`);
+							const deps = js.depends_on ? (Array.isArray(js.depends_on) ? (js.depends_on as string[]) : Object.keys(js.depends_on as object)) : [];
+							const depNode = get('depends_on')?.value;
+							deps.forEach((d) => {
+								if (!serviceNames.has(d)) add(depNode, 'error', `"${name}" depends on unknown service "${d}".`);
+								if (d === name) add(depNode, 'error', `"${name}" depends on itself.`);
+							});
+							const svcNets = js.networks ? (Array.isArray(js.networks) ? (js.networks as string[]) : Object.keys(js.networks as object)) : [];
+							svcNets.forEach((n) => {
+								if (n !== 'default' && !nets.has(n)) add(get('networks')?.value, 'error', `Network "${n}" used by "${name}" is not defined.`);
+							});
+							const volNode = get('volumes')?.value;
+							if (Array.isArray(js.volumes))
+								(js.volumes as unknown[]).forEach((v, i) => {
+									const source = typeof v === 'string' ? v.split(':')[0] : String((v as Record<string, unknown>)?.source ?? '');
+									const type = typeof v === 'string' ? (v.includes(':') ? 'volume' : 'anon') : String((v as Record<string, unknown>)?.type ?? 'volume');
+									if (type === 'volume' && source && !/^[./~$]/.test(source) && !vols.has(source))
+										add(isSeq(volNode) ? volNode.items[i] : volNode, 'error', `Volume "${source}" used by "${name}" is not defined.`);
+								});
+							const restart = get('restart');
+							if (restart && !RESTART.includes(String(js.restart)) && !/^on-failure:\d+$/.test(String(js.restart)))
+								add(restart.value, 'error', `restart "${js.restart}" must be one of ${RESTART.join(', ')}.`);
+							const cn = get('container_name');
+							if (cn) {
+								const c = String(js.container_name);
+								if (containers.has(c)) add(cn.value, 'error', `container_name "${c}" is also used by "${containers.get(c)}".`);
+								else containers.set(c, name);
+							}
+							const image = js.image ? String(js.image) : '';
+							if (image && !/[:@]/.test(image.split('/').pop() ?? '')) add(get('image')?.value, 'warning', `Image "${image}" has no tag.`);
+							rows.push([
+								name,
+								image || (js.build ? `build: ${typeof js.build === 'string' ? js.build : String((js.build as Record<string, unknown>).context ?? '.')}` : '—'),
+								ports.join(', ') || '—',
+								deps.join(', ') || '—',
+							]);
+						});
+					}
+				}
+			}
+			f.sort((a, b) => a.line - b.line || a.col - b.col);
+			const errors = f.filter((x) => x.severity === 'error').length;
+			const status = byId('dc-status');
+			status.textContent = errors ? `✕ ${errors} error${errors > 1 ? 's' : ''}` : '✓ Valid';
+			status.dataset.ok = String(!errors);
+			byId('dc-count').textContent = f.length ? `${f.length} findings` : 'No findings';
+			report = f.map((x) => `${x.line}:${x.col} ${x.severity} ${x.message}`).join('\n');
+			byId('dc-findings').replaceChildren(
+				...f.map((x) => {
+					const li = document.createElement('li');
+					li.dataset.severity = x.severity;
+					const b = document.createElement('b');
+					b.textContent = `${x.severity} · ${x.line}:${x.col}`;
+					li.append(b, document.createTextNode(` ${x.message}`));
+					return li;
+				}),
+			);
+			byId('dc-rows').replaceChildren(
+				...rows.map((r) => {
+					const tr = document.createElement('tr');
+					r.forEach((c, i) => {
+						const cell = document.createElement(i ? 'td' : 'th');
+						if (!i) cell.setAttribute('scope', 'row');
+						cell.textContent = c;
+						tr.append(cell);
+					});
+					return tr;
+				}),
+			);
+			byId('dc-vars').textContent = vars.size ? [...vars].map((v) => `$${v}`).join('  ') : 'None';
+		};
+
+		input.addEventListener('input', render);
+		copyButton(byId('dc-copy'), () => report);
+		render();
+	});
+</script>
+
+<style>
+	#dc-in {
+		min-height: 380px;
+	}
+	.dc-status {
+		font-size: 12px;
+		font-weight: 700;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+	.dc-status[data-ok='true'] {
+		color: var(--ok);
+	}
+	.dc-status[data-ok='false'] {
+		color: var(--bad);
+	}
+	.dc-findings {
+		list-style: none;
+		margin: 0;
+		padding: 8px 14px;
+		max-height: 380px;
+		overflow: auto;
+		font-size: 13px;
+	}
+	.dc-findings li {
+		padding: 8px 0;
+		border-bottom: 1px solid var(--border);
+	}
+	.dc-findings b {
+		text-transform: uppercase;
+		font-size: 11px;
+		letter-spacing: 0.05em;
+	}
+	.dc-findings li[data-severity='error'] b {
+		color: var(--bad);
+	}
+	.dc-findings li[data-severity='warning'] b {
+		color: var(--warn);
+	}
+	.dc-findings li[data-severity='info'] b {
+		color: var(--ink-soft);
+	}
+	.dc-scroll {
+		overflow-x: auto;
+	}
+	.dc-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 13px;
+		font-family: var(--mono);
+	}
+	.dc-table th,
+	.dc-table td {
+		text-align: left;
+		padding: 8px 14px;
+		border-bottom: 1px solid var(--border);
+		white-space: nowrap;
+	}
+	.dc-table thead th {
+		color: var(--ink-soft);
+		font-family: var(--sans);
+		font-size: 12px;
+	}
+	.dc-vars {
+		margin: 0;
+		padding: 12px 14px;
+		font-family: var(--mono);
+		font-size: 13px;
+	}
+</style>

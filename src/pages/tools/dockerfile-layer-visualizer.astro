@@ -1,0 +1,568 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `# syntax=docker/dockerfile:1
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+FROM node:22-alpine AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+EXPOSE 3000
+USER node
+CMD ["node", "dist/server.js"]
+`;
+---
+
+<ToolShell
+	slug="dockerfile-layer-visualizer"
+	title="Dockerfile Layer Visualizer"
+	description="Paste a Dockerfile to see its stages and layers, which instructions write to the filesystem, how stages copy from each other, and which layers a file change rebuilds."
+>
+	<div class="dl" id="dl-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span>Dockerfile</span>
+				<button class="btn" id="dl-copy">
+					Copy
+				</button>
+			</div>
+			<textarea id="dl-in" spellcheck="false" aria-label="Dockerfile">{sample}</textarea>
+		</section>
+		<p class="error" id="dl-error" hidden></p>
+		<div class="fields">
+			<div class="field wide">
+				<label for="dl-change">Change a file</label>
+				<select id="dl-change"></select>
+			</div>
+		</div>
+		<p class="dl-summary" id="dl-summary" role="status"></p>
+		<div class="dl-legend" aria-hidden="true">
+			<span>
+				<i class="lg-fs"></i>filesystem layer
+			</span>
+			<span>
+				<i class="lg-meta"></i>metadata only
+			</span>
+			<span>
+				<i class="lg-rebuilt"></i>rebuilt
+			</span>
+			<span>
+				<i class="lg-cached"></i>cached
+			</span>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Stages and layers</span>
+			</div>
+			<div class="dl-scroll" tabindex="0" role="region" aria-label="Layer diagram, scrollable">
+				<svg id="dl-svg" role="group" aria-label="Layer diagram"></svg>
+			</div>
+		</section>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">
+					<span>Instructions</span>
+				</div>
+				<ol class="dl-list" id="dl-list"></ol>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span>Tips</span>
+				</div>
+				<ul class="dl-tips" id="dl-tips"></ul>
+			</section>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Ins = { i: number; op: string; args: string; stage: number; from?: string; fs: boolean };
+	type Stage = { i: number; name: string; base: string; ins: Ins[] };
+
+	const FS = new Set(['RUN', 'COPY', 'ADD']);
+	const OPS: Record<string, string> = {
+		FROM: 'Starts a new stage from a base image; every layer of that image comes along.',
+		RUN: 'Runs a shell command at build time and saves the filesystem changes as a new layer.',
+		COPY: 'Copies files into the image as a new layer. Its cache key is the checksum of the copied files.',
+		ADD: 'Like COPY, but can also fetch URLs and unpack local tar archives. Prefer COPY for plain files.',
+		ENV: 'Sets an environment variable for later instructions and for the running container. Metadata only.',
+		ARG: 'Declares a build argument, set with --build-arg. Changing its value invalidates the cache from the first use.',
+		WORKDIR: 'Sets the working directory for later instructions and for the container. Metadata only.',
+		EXPOSE: 'Documents which port the app listens on. It does not publish anything.',
+		CMD: 'Default command of the container, easy to override with docker run image <cmd>.',
+		ENTRYPOINT: 'Fixed executable of the container; CMD becomes its default arguments.',
+		USER: 'User that runs the next instructions and the container. Metadata only.',
+		LABEL: 'Adds metadata key-value pairs to the image.',
+		HEALTHCHECK: 'Command Docker runs to decide whether the container is healthy.',
+		VOLUME: 'Declares a mount point that gets an anonymous volume at run time.',
+		SHELL: 'Changes the shell used by RUN in shell form.',
+		STOPSIGNAL: 'Signal sent to PID 1 by docker stop.',
+		ONBUILD: 'Instruction deferred to images built FROM this one.',
+	};
+
+	const parseDockerfile = (text: string) => {
+		const lines: { n: number; text: string }[] = [];
+		let buf = '';
+		text.split(/\r?\n/).forEach((raw, n) => {
+			const line = raw.trim();
+			if (!buf && (!line || line.startsWith('#'))) return;
+			if (buf && line.startsWith('#')) return;
+			if (line.endsWith('\\')) {
+				buf += `${line.slice(0, -1).trim()} `;
+				return;
+			}
+			lines.push({ n, text: (buf + line).trim() });
+			buf = '';
+		});
+		if (buf) lines.push({ n: -1, text: buf.trim() });
+		const stages: Stage[] = [];
+		const all: Ins[] = [];
+		lines.forEach(({ text: t }) => {
+			const m = /^(\w+)\s*(.*)$/s.exec(t);
+			if (!m) return;
+			const op = m[1].toUpperCase();
+			const args = m[2];
+			if (op === 'FROM') {
+				const parts = args.split(/\s+/).filter((p) => !p.startsWith('--'));
+				const asIdx = parts.findIndex((p) => p.toUpperCase() === 'AS');
+				stages.push({ i: stages.length, name: asIdx > 0 ? parts[asIdx + 1] : String(stages.length), base: parts[0] ?? '', ins: [] });
+			} else if (!stages.length) {
+				if (op !== 'ARG') throw new Error(`${op} before the first FROM.`);
+				return;
+			}
+			const stage = stages[stages.length - 1];
+			const from = /--from=(\S+)/.exec(args)?.[1];
+			const ins: Ins = { i: all.length, op, args, stage: stage.i, from, fs: FS.has(op) };
+			stage.ins.push(ins);
+			all.push(ins);
+		});
+		if (!stages.length) throw new Error('No FROM instruction found.');
+		const find = (ref: string) => stages.find((st) => st.name === ref || String(st.i) === ref);
+		return { stages, all, find };
+	};
+
+	const sources = (ins: Ins) =>
+		ins.args
+			.split(/\s+/)
+			.filter((p) => p && !p.startsWith('--'))
+			.slice(0, -1)
+			.join(' ') || ins.args;
+
+	const NS = 'http://www.w3.org/2000/svg';
+	const s = (tag: string, attrs: Record<string, string | number>, parent?: Element, text?: string) => {
+		const e = document.createElementNS(NS, tag);
+		Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, String(v)));
+		if (text !== undefined) e.textContent = text;
+		parent?.appendChild(e);
+		return e;
+	};
+	const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+
+	onPage('dl-tool', () => {
+		const root = byId('dl-tool');
+		const input = byId<HTMLTextAreaElement>('dl-in');
+		const select = byId<HTMLSelectElement>('dl-change');
+		const svg = byId('dl-svg') as unknown as SVGSVGElement;
+		let optionsKey = '';
+
+		const render = () => {
+			const error = byId('dl-error');
+			let df: ReturnType<typeof parseDockerfile>;
+			try {
+				df = parseDockerfile(input.value);
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+				return;
+			}
+			const { stages, all, find } = df;
+			const inputs = all.filter((x) => (x.op === 'COPY' || x.op === 'ADD') && !x.from);
+			const opts = [
+				...inputs.map((x) => ({ v: String(x.i), label: `Edit ${cut(sources(x), 40)} (${x.op} in stage ${stages[x.stage].name})` })),
+				...stages.map((st) => ({ v: String(st.ins[0].i), label: `New version of base image ${st.base} (stage ${st.name})` })),
+				{ v: 'none', label: 'Nothing changed' },
+			];
+			const key = opts.map((o) => o.label).join('|');
+			if (key !== optionsKey) {
+				const prev = select.selectedOptions[0]?.textContent;
+				optionsKey = key;
+				select.replaceChildren(
+					...opts.map((o) => {
+						const el = document.createElement('option');
+						el.value = o.v;
+						el.textContent = o.label;
+						return el;
+					}),
+				);
+				const keep = opts.find((o) => o.label === prev) ?? opts.find((o) => /package/.test(o.label)) ?? opts[0];
+				select.value = keep.v;
+			}
+			const changed = select.value === 'none' ? -1 : Number(select.value);
+
+			const final = stages[stages.length - 1];
+			const needed = new Set<number>();
+			const mark = (st: Stage) => {
+				if (needed.has(st.i)) return;
+				needed.add(st.i);
+				const parent = find(st.base);
+				if (parent && parent.i !== st.i) mark(parent);
+				st.ins.forEach((x) => {
+					const src = x.from ? find(x.from) : undefined;
+					if (src) mark(src);
+				});
+			};
+			mark(final);
+
+			const start: number[] = stages.map(() => Infinity);
+			stages.forEach((st) => {
+				st.ins.forEach((x, idx) => {
+					if (x.i === changed) start[st.i] = Math.min(start[st.i], idx);
+					const src = x.from ? find(x.from) : x.op === 'FROM' ? find(st.base) : undefined;
+					if (src && src.i < st.i && start[src.i] !== Infinity && needed.has(src.i)) start[st.i] = Math.min(start[st.i], idx);
+				});
+			});
+			const state = (x: Ins) => {
+				if (!needed.has(x.stage)) return 'skipped';
+				const idx = stages[x.stage].ins.indexOf(x);
+				return idx >= start[x.stage] ? 'rebuilt' : 'cached';
+			};
+
+			const W = 620;
+			const RH = 34;
+			let y = 12;
+			const rowY: Record<number, number> = {};
+			const stageY: Record<number, [number, number]> = {};
+			stages.forEach((st) => {
+				const top = y;
+				y += 44;
+				st.ins.slice(1).forEach((x) => {
+					rowY[x.i] = y;
+					y += RH + 6;
+				});
+				y += 10;
+				stageY[st.i] = [top, y];
+				y += 24;
+			});
+			svg.replaceChildren();
+			svg.setAttribute('viewBox', `0 0 ${W} ${y}`);
+			svg.setAttribute('width', String(W));
+			svg.setAttribute('height', String(y));
+			const defs = s('defs', {}, svg);
+			const marker = s('marker', { id: 'dl-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, defs);
+			s('path', { d: 'M0 0L10 5L0 10z', class: 'dl-head' }, marker);
+
+			stages.forEach((st, si) => {
+				const [top, bottom] = stageY[st.i];
+				const isFinal = st === final;
+				const head = st.ins[0];
+				const g = s(
+					'g',
+					{ class: `dl-stage${isFinal ? ' final' : ''}${needed.has(st.i) ? '' : ' unused'}`, 'data-k': `i${head.i}`, tabindex: 0, role: 'img' },
+					svg,
+				);
+				g.setAttribute(
+					'aria-label',
+					`Stage ${st.name} from ${st.base}${isFinal ? ', final image' : ''}${needed.has(st.i) ? '' : ', not needed by the final image'}, ${state(head)}`,
+				);
+				s('rect', { x: 8, y: top, width: 500, height: bottom - top, rx: 14, class: 'dl-stage-bg' }, g);
+				s('text', { x: 24, y: top + 27, class: 'dl-title' }, g, cut(`Stage ${si + 1}: ${st.name}`, 30));
+				s('text', { x: 494, y: top + 27, class: 'dl-sub dl-end' }, g, cut(`FROM ${st.base}${isFinal ? ' · final image' : ''}`, 36));
+				if (state(head) === 'rebuilt') s('circle', { cx: 16, cy: top + 22, r: 4, class: 'dl-dot' }, g);
+				st.ins.slice(1).forEach((x) => {
+					const ry = rowY[x.i];
+					const st2 = state(x);
+					const r = s(
+						'g',
+						{ class: `dl-row ${x.fs ? 'fs' : 'meta'} ${st2}`, 'data-k': `i${x.i}`, 'data-state': st2, 'data-op': x.op, tabindex: 0, role: 'img' },
+						svg,
+					);
+					r.setAttribute('aria-label', `${x.op} ${x.args}: ${x.fs ? 'filesystem layer' : 'metadata only'}, ${st2}`);
+					s('rect', { x: 24, y: ry, width: 468, height: RH, rx: 8, class: 'dl-block' }, r);
+					s('rect', { x: 24, y: ry, width: 6, height: RH, rx: 3, class: 'dl-bar' }, r);
+					s('text', { x: 40, y: ry + 22, class: 'dl-op' }, r, x.op);
+					s('text', { x: 40 + x.op.length * 8.6 + 8, y: ry + 22, class: 'dl-args' }, r, cut(x.args, 42 - x.op.length));
+					s('text', { x: 484, y: ry + 22, class: 'dl-state dl-end' }, r, st2);
+				});
+			});
+			let lane = 0;
+			all.forEach((x) => {
+				const src = x.from ? find(x.from) : undefined;
+				if (!src) return;
+				const [, srcBottom] = stageY[src.i];
+				const y1 = srcBottom - 20;
+				const y2 = rowY[x.i] + RH / 2;
+				const bx = 540 + (lane++ % 4) * 18;
+				const g = s('g', { class: 'dl-from', 'data-k': `i${x.i}` }, svg);
+				s('path', { d: `M508 ${y1}C${bx} ${y1} ${bx} ${y2} 496 ${y2}`, class: 'dl-edge', 'marker-end': 'url(#dl-arrow)' }, g);
+			});
+			const layers = final.ins.filter((x) => x.fs).length;
+			const rebuilt = all.filter((x) => x.fs && state(x) === 'rebuilt').length;
+			svg.setAttribute(
+				'aria-label',
+				`${stages.length} stages; final stage ${final.name} adds ${layers} filesystem layers on top of ${final.base}; ${rebuilt} layers rebuilt after the change`,
+			);
+			byId('dl-summary').textContent =
+				changed === -1
+					? 'Nothing changed: every layer comes from the cache.'
+					: `${rebuilt} filesystem layer${rebuilt === 1 ? '' : 's'} rebuilt, ${all.filter((x) => x.fs && state(x) === 'cached').length} cached. The cache breaks at the changed instruction and everything below it in that stage runs again.`;
+
+			byId('dl-list').replaceChildren(
+				...all.map((x) => {
+					const li = document.createElement('li');
+					li.dataset.k = `i${x.i}`;
+					li.tabIndex = 0;
+					const code = document.createElement('code');
+					code.textContent = `${x.op} ${x.args}`;
+					const p = document.createElement('span');
+					const src = x.from ? ` It reads from stage ${x.from}, so only the copied files end up here, not the build tools.` : '';
+					p.textContent = `${OPS[x.op] ?? 'Instruction.'}${src} Now ${state(x)}.`;
+					li.append(code, p);
+					return li;
+				}),
+			);
+
+			const tips: string[] = [];
+			stages.forEach((st) => {
+				const copyAll = st.ins.findIndex((x) => x.op === 'COPY' && !x.from && /^\.\s/.test(sources(x) + ' '));
+				const install = st.ins.findIndex(
+					(x) => x.op === 'RUN' && /(npm (ci|install)|yarn( install)?$|pnpm install|pip install|composer install|bundle install|go mod download)/.test(x.args),
+				);
+				if (copyAll !== -1 && install > copyAll)
+					tips.push(`Stage ${st.name}: copy the lockfile and install dependencies before COPY . . so editing source code does not reinstall everything.`);
+				st.ins.forEach((x, idx) => {
+					if (x.op === 'RUN' && /apt-get update/.test(x.args) && !/apt-get (-\S+ )*install/.test(x.args))
+						tips.push(`Stage ${st.name}: run apt-get update and apt-get install in the same RUN, or a cached update layer serves stale package lists.`);
+					if (x.op === 'RUN' && /apt-get install/.test(x.args) && !/rm -rf \/var\/lib\/apt\/lists/.test(x.args))
+						tips.push(`Stage ${st.name}: end the apt-get RUN with rm -rf /var/lib/apt/lists/* to keep the layer small.`);
+					if (x.op === 'ADD' && !/https?:\/\/|\.tar/.test(x.args)) tips.push(`Stage ${st.name}: use COPY instead of ADD for plain files.`);
+					if (x.op === 'RUN' && st.ins[idx + 1]?.op === 'RUN' && st.ins[idx + 2]?.op === 'RUN')
+						tips.push(`Stage ${st.name}: several RUN in a row create several layers; chain related commands with &&.`);
+				});
+				if (!/[:@]/.test(st.base.split('/').pop() ?? '') && !find(st.base) && st.base !== 'scratch')
+					tips.push(`Stage ${st.name}: pin the base image tag instead of the implicit latest.`);
+			});
+			if (!final.ins.some((x) => x.op === 'USER')) tips.push('The final image runs as root. Add a USER instruction.');
+			if (stages.length === 1 && all.some((x) => x.op === 'RUN' && /build|compile|make/.test(x.args)))
+				tips.push('Use a multi-stage build so compilers and dev dependencies stay out of the final image.');
+			tips.push('Add a .dockerignore (node_modules, .git, dist, .env) so the build context stays small and secrets never reach COPY . .');
+			byId('dl-tips').replaceChildren(
+				...[...new Set(tips)].map((t) => {
+					const li = document.createElement('li');
+					li.textContent = t;
+					return li;
+				}),
+			);
+		};
+
+		const highlight = (k: string | undefined) => {
+			root.querySelectorAll<HTMLElement | SVGElement>('[data-k]').forEach((el) => el.classList.toggle('hl', !!k && el.dataset.k === k));
+		};
+		const target = (e: Event) => ((e.target as Element).closest?.('[data-k]') as HTMLElement | null)?.dataset.k;
+		root.addEventListener('pointerover', (e) => highlight(target(e)));
+		root.addEventListener('pointerleave', () => highlight(undefined));
+		root.addEventListener('focusin', (e) => highlight(target(e)));
+		root.addEventListener('focusout', () => highlight(undefined));
+
+		input.addEventListener('input', render);
+		select.addEventListener('change', render);
+		copyButton(byId('dl-copy'), () => input.value);
+		render();
+	});
+</script>
+
+<style is:global>
+	.dl {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	#dl-in {
+		min-height: 260px;
+	}
+	.dl-summary {
+		margin: 0;
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.dl-legend {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 14px;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.dl-legend span {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.dl-legend i {
+		display: inline-block;
+		width: 14px;
+		height: 14px;
+		border-radius: 4px;
+		border: 2px solid var(--accent-strong);
+	}
+	.dl-legend .lg-meta {
+		border-style: dashed;
+		border-color: var(--ink-soft);
+	}
+	.dl-legend .lg-rebuilt {
+		border-color: var(--bad);
+		background: var(--bad);
+	}
+	.dl-legend .lg-cached {
+		border-color: var(--ok);
+		background: var(--ok);
+	}
+	.dl-scroll {
+		overflow-x: auto;
+		padding: 12px;
+	}
+	.dl-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	#dl-svg {
+		display: block;
+		font-family: var(--sans);
+	}
+	.dl-stage-bg {
+		fill: var(--surface-2);
+		stroke: var(--border);
+	}
+	.dl-stage.final .dl-stage-bg {
+		stroke: var(--accent-strong);
+		stroke-width: 3;
+	}
+	.dl-stage.unused .dl-stage-bg {
+		stroke-dasharray: 6 4;
+	}
+	.dl-stage.hl .dl-stage-bg {
+		fill: var(--accent);
+	}
+	.dl-title {
+		fill: var(--ink);
+		font-size: 15px;
+		font-weight: 800;
+	}
+	.dl-sub {
+		fill: var(--ink-soft);
+		font-family: var(--mono);
+		font-size: 12px;
+	}
+	.dl-end {
+		text-anchor: end;
+	}
+	.dl-dot {
+		fill: var(--bad);
+	}
+	.dl-block {
+		fill: var(--surface);
+		stroke: var(--accent-strong);
+		stroke-width: 1.5;
+	}
+	.dl-row.meta .dl-block {
+		stroke: var(--ink-soft);
+		stroke-dasharray: 4 3;
+	}
+	.dl-bar {
+		fill: var(--ok);
+	}
+	.dl-row.rebuilt .dl-bar {
+		fill: var(--bad);
+	}
+	.dl-row.skipped .dl-bar {
+		fill: var(--border);
+	}
+	.dl-row.hl .dl-block {
+		fill: var(--accent);
+		stroke-width: 3;
+	}
+	.dl-op {
+		fill: var(--ink);
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 800;
+	}
+	.dl-args {
+		fill: var(--ink);
+		font-family: var(--mono);
+		font-size: 12px;
+	}
+	.dl-state {
+		fill: var(--ink-soft);
+		font-size: 12px;
+		font-weight: 700;
+	}
+	.dl-row.rebuilt .dl-state {
+		fill: var(--bad);
+	}
+	.dl-row.cached .dl-state {
+		fill: var(--ok);
+	}
+	.dl-edge {
+		fill: none;
+		stroke: var(--tint-3);
+		stroke-width: 2;
+	}
+	.dl-from.hl .dl-edge {
+		stroke-width: 4;
+	}
+	.dl-head {
+		fill: var(--tint-3);
+	}
+	.dl-row,
+	.dl-stage {
+		outline: none;
+	}
+	.dl-list,
+	.dl-tips {
+		margin: 0;
+		padding: 8px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 14px;
+	}
+	.dl-list {
+		list-style: none;
+	}
+	.dl-tips {
+		padding-left: 28px;
+	}
+	.dl-list li {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 8px 10px;
+		border-radius: 10px;
+	}
+	.dl-list li.hl {
+		background: var(--accent);
+		outline: 2px solid var(--accent-strong);
+	}
+	.dl-list li:focus-visible {
+		outline: 2px solid var(--accent-strong);
+	}
+	.dl-list code {
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+		word-break: break-all;
+	}
+</style>

@@ -1,0 +1,186 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `banana
+  apple
+Cherry
+banana
+
+item10
+item2
+apple
+date
+item1
+`;
+---
+
+<ToolShell
+	slug="line-tools"
+	title="Line Tools"
+	description="Sort, deduplicate, trim, filter, reverse, shuffle or number lines. Operations run in the order shown and the output updates as you type."
+>
+	<div class="toolbar" id="lt-tool">
+		<div class="seg" id="lt-sort" role="group" aria-label="Sort">
+			<button data-value="" aria-pressed="true">
+				No sort
+			</button>
+			<button data-value="az" aria-pressed="false">
+				A→Z
+			</button>
+			<button data-value="za" aria-pressed="false">
+				Z→A
+			</button>
+			<button data-value="natural" aria-pressed="false">
+				Natural
+			</button>
+			<button data-value="length" aria-pressed="false">
+				By length
+			</button>
+		</div>
+	</div>
+	<div class="toolbar">
+		<label class="check">
+			<input type="checkbox" id="lt-trim" checked /> Trim
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lt-empty" checked /> Remove empty lines
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lt-dedupe" /> Remove duplicates
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lt-case" checked /> Case-sensitive
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lt-reverse" /> Reverse
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lt-shuffle" /> Shuffle
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lt-number" /> Number lines
+		</label>
+	</div>
+	<div class="toolbar">
+		<input class="num lt-filter" id="lt-filter" placeholder="Keep lines containing…" aria-label="Keep lines containing" spellcheck="false" />
+		<label class="check">
+			<input type="checkbox" id="lt-regex" /> Regex
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lt-invert" /> Invert filter
+		</label>
+	</div>
+	<div class="error" id="lt-error" hidden></div>
+	<div class="stats">
+		<div class="stat">
+			<b id="lt-in-count">0</b>
+			<span>Input lines</span>
+		</div>
+		<div class="stat">
+			<b id="lt-out-count">0</b>
+			<span>Output lines</span>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="lt-in" spellcheck="false" aria-label="Input lines">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Output</span>
+				<button class="btn" id="lt-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="lt-out" tabindex="0"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('lt-tool', () => {
+		const input = byId<HTMLTextAreaElement>('lt-in');
+		const output = byId('lt-out');
+		const error = byId('lt-error');
+		const checked = (id: string) => byId<HTMLInputElement>(id).checked;
+		const collator = new Intl.Collator('en', { sensitivity: 'base' });
+		const natural = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+		let sort = '';
+
+		const render = () => {
+			const source = input.value.replace(/\r\n?/g, '\n');
+			const rawLines = source === '' ? [] : source.replace(/\n$/, '').split('\n');
+			let lines = [...rawLines];
+			error.hidden = true;
+			if (checked('lt-trim')) lines = lines.map((l) => l.trim());
+			if (checked('lt-empty')) lines = lines.filter((l) => l.trim() !== '');
+			const filter = byId<HTMLInputElement>('lt-filter').value;
+			if (filter) {
+				let test: (l: string) => boolean;
+				if (checked('lt-regex')) {
+					try {
+						const re = new RegExp(filter, checked('lt-case') ? '' : 'i');
+						test = (l) => re.test(l);
+					} catch (e) {
+						error.textContent = (e as Error).message;
+						error.hidden = false;
+						test = () => true;
+					}
+				} else {
+					const needle = checked('lt-case') ? filter : filter.toLowerCase();
+					test = (l) => (checked('lt-case') ? l : l.toLowerCase()).includes(needle);
+				}
+				const invert = checked('lt-invert');
+				lines = lines.filter((l) => test(l) !== invert);
+			}
+			if (checked('lt-dedupe')) {
+				const seen = new Set<string>();
+				const sensitive = checked('lt-case');
+				lines = lines.filter((l) => {
+					const key = sensitive ? l : l.toLowerCase();
+					if (seen.has(key)) return false;
+					seen.add(key);
+					return true;
+				});
+			}
+			if (sort === 'az') lines.sort((a, b) => collator.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0));
+			if (sort === 'za') lines.sort((a, b) => collator.compare(b, a) || (a < b ? 1 : a > b ? -1 : 0));
+			if (sort === 'natural') lines.sort((a, b) => natural.compare(a, b));
+			if (sort === 'length') lines.sort((a, b) => a.length - b.length || collator.compare(a, b));
+			if (checked('lt-reverse')) lines.reverse();
+			if (checked('lt-shuffle')) {
+				for (let i = lines.length - 1; i > 0; i--) {
+					const j = Math.floor(Math.random() * (i + 1));
+					[lines[i], lines[j]] = [lines[j], lines[i]];
+				}
+			}
+			if (checked('lt-number')) {
+				const width = String(lines.length).length;
+				lines = lines.map((l, i) => `${String(i + 1).padStart(width, ' ')}. ${l}`);
+			}
+			output.textContent = lines.join('\n');
+			byId('lt-in-count').textContent = String(rawLines.length);
+			byId('lt-out-count').textContent = String(lines.length);
+		};
+
+		segmented(byId('lt-sort'), (value) => {
+			sort = value;
+			render();
+		});
+		input.addEventListener('input', render);
+		byId('lt-filter').addEventListener('input', render);
+		document.querySelectorAll<HTMLInputElement>('#lt-tool ~ .toolbar input[type="checkbox"]').forEach((c) => c.addEventListener('change', render));
+		copyButton(byId('lt-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.lt-filter {
+		width: 240px;
+		max-width: 100%;
+	}
+</style>

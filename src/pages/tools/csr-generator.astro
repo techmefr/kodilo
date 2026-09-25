@@ -1,0 +1,218 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="csr-generator"
+	title="CSR Generator"
+	description="Create a certificate signing request and its private key for RSA or ECDSA, with subject fields and DNS alternative names, ready to send to a certificate authority."
+>
+	<div class="fields" id="csr-tool">
+		<div class="field">
+			<label for="csr-cn">Common name (CN)</label>
+			<input id="csr-cn" value="example.com" spellcheck="false" />
+		</div>
+		<div class="field">
+			<label for="csr-o">Organization (O)</label>
+			<input id="csr-o" value="Example Inc" />
+		</div>
+		<div class="field">
+			<label for="csr-ou">Organizational unit (OU)</label>
+			<input id="csr-ou" value="IT" />
+		</div>
+		<div class="field">
+			<label for="csr-l">Locality (L)</label>
+			<input id="csr-l" value="San Francisco" />
+		</div>
+		<div class="field">
+			<label for="csr-st">State or province (ST)</label>
+			<input id="csr-st" value="California" />
+		</div>
+		<div class="field" id="csr-c-field">
+			<label for="csr-c">Country (C)</label>
+			<input id="csr-c" value="US" maxlength="2" spellcheck="false" />
+			<span class="field-note" id="csr-c-note">
+				Two-letter ISO code
+			</span>
+		</div>
+		<div class="field">
+			<label for="csr-email">Email</label>
+			<input id="csr-email" type="email" value="admin@example.com" spellcheck="false" />
+		</div>
+		<div class="field wide">
+			<label for="csr-san">DNS names (one per line)</label>
+			<textarea id="csr-san" rows="3" spellcheck="false">example.com&#10;www.example.com</textarea>
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="csr-key" role="group" aria-label="Key type">
+			<button data-value="rsa2048" aria-pressed="true">
+				RSA 2048
+			</button>
+			<button data-value="rsa4096" aria-pressed="false">
+				RSA 4096
+			</button>
+			<button data-value="p256" aria-pressed="false">
+				ECDSA P-256
+			</button>
+			<button data-value="p384" aria-pressed="false">
+				ECDSA P-384
+			</button>
+		</div>
+		<button class="btn primary" id="csr-go">
+			Generate
+		</button>
+	</div>
+	<p class="csr-status" id="csr-status" role="status"></p>
+	<p class="error" id="csr-error" hidden></p>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">
+				<span>Certificate request</span>
+				<span class="csr-actions">
+					<button class="btn" id="csr-copy">
+						Copy
+					</button>
+					<button class="btn" id="csr-dl">
+						Download
+					</button>
+				</span>
+			</div>
+			<pre class="out csr-out" id="csr-out" tabindex="0" aria-label="Certificate request PEM"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Private key</span>
+				<span class="csr-actions">
+					<button class="btn" id="csr-copy-key">
+						Copy
+					</button>
+					<button class="btn" id="csr-dl-key">
+						Download
+					</button>
+				</span>
+			</div>
+			<pre class="out csr-out" id="csr-priv" tabindex="0" aria-label="Private key PEM"></pre>
+		</section>
+	</div>
+	<p class="csr-note">The key pair is generated with WebCrypto in your browser and never leaves it. Keep the private key secret.</p>
+</ToolShell>
+
+<script>
+	import 'reflect-metadata/lite';
+	import type { Extension } from '@peculiar/x509';
+	import { saveBlob } from '../../scripts/files';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const pem = (label: string, buf: ArrayBuffer) =>
+		`-----BEGIN ${label}-----\n${btoa(String.fromCharCode(...new Uint8Array(buf)))
+			.match(/.{1,64}/g)!
+			.join('\n')}\n-----END ${label}-----\n`;
+
+	const ALGS: Record<string, { gen: RsaHashedKeyGenParams | EcKeyGenParams; sign: Algorithm | EcdsaParams; label: string }> = {
+		rsa2048: {
+			gen: { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+			sign: { name: 'RSASSA-PKCS1-v1_5' },
+			label: 'RSA 2048',
+		},
+		rsa4096: {
+			gen: { name: 'RSASSA-PKCS1-v1_5', modulusLength: 4096, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+			sign: { name: 'RSASSA-PKCS1-v1_5' },
+			label: 'RSA 4096',
+		},
+		p256: { gen: { name: 'ECDSA', namedCurve: 'P-256' }, sign: { name: 'ECDSA', hash: 'SHA-256' } as EcdsaParams, label: 'ECDSA P-256' },
+		p384: { gen: { name: 'ECDSA', namedCurve: 'P-384' }, sign: { name: 'ECDSA', hash: 'SHA-384' } as EcdsaParams, label: 'ECDSA P-384' },
+	};
+
+	onPage('csr-tool', () => {
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		let key = 'rsa2048';
+		let run = 0;
+
+		const generate = async () => {
+			const current = ++run;
+			const error = byId('csr-error');
+			const country = val('csr-c').toUpperCase();
+			const bad = country !== '' && !/^[A-Z]{2}$/.test(country);
+			byId('csr-c-field').classList.toggle('invalid', bad);
+			byId('csr-c-note').textContent = bad ? 'Must be two letters, like US or FR' : 'Two-letter ISO code';
+			if (bad) return;
+			const name = (
+				[
+					['CN', val('csr-cn')],
+					['O', val('csr-o')],
+					['OU', val('csr-ou')],
+					['L', val('csr-l')],
+					['ST', val('csr-st')],
+					['C', country],
+					['E', val('csr-email')],
+				] as const
+			)
+				.filter(([, v]) => v)
+				.map(([k, v]) => ({ [k]: [v] }));
+			const dns = byId<HTMLTextAreaElement>('csr-san')
+				.value.split(/[\s,]+/)
+				.map((s) => s.trim())
+				.filter(Boolean);
+			if (!name.length) {
+				error.hidden = false;
+				error.textContent = 'Fill in at least one subject field.';
+				return;
+			}
+			const alg = ALGS[key];
+			byId('csr-status').textContent = `Generating ${alg.label} key…`;
+			const started = performance.now();
+			try {
+				const keys = (await crypto.subtle.generateKey(alg.gen, true, ['sign', 'verify'])) as CryptoKeyPair;
+				const { Pkcs10CertificateRequestGenerator, SubjectAlternativeNameExtension } = (await import(
+					'@peculiar/x509/build/x509.cjs.js' as string
+				)) as typeof import('@peculiar/x509');
+				const extensions: Extension[] = dns.length ? [new SubjectAlternativeNameExtension(dns.map((value) => ({ type: 'dns' as const, value })))] : [];
+				const csr = await Pkcs10CertificateRequestGenerator.create({ name, keys, signingAlgorithm: alg.sign, extensions });
+				const priv = await crypto.subtle.exportKey('pkcs8', keys.privateKey);
+				if (current !== run) return;
+				error.hidden = true;
+				byId('csr-out').textContent = `${csr.toString('pem')}\n`;
+				byId('csr-priv').textContent = pem('PRIVATE KEY', priv);
+				byId('csr-status').textContent = `${alg.label} key and CSR generated in ${Math.round(performance.now() - started)} ms.`;
+			} catch (e) {
+				if (current !== run) return;
+				error.hidden = false;
+				error.textContent = `Could not generate the request: ${(e as Error).message}`;
+				byId('csr-status').textContent = '';
+			}
+		};
+
+		const fileBase = () => (val('csr-cn') || 'request').replace(/[^a-z0-9.-]+/gi, '_');
+		segmented(byId('csr-key'), (v) => ((key = v), generate()));
+		byId('csr-go').addEventListener('click', generate);
+		copyButton(byId('csr-copy'), () => byId('csr-out').textContent ?? '');
+		copyButton(byId('csr-copy-key'), () => byId('csr-priv').textContent ?? '');
+		byId('csr-dl').addEventListener('click', () =>
+			saveBlob(new Blob([byId('csr-out').textContent ?? ''], { type: 'application/pkcs10' }), `${fileBase()}.csr`),
+		);
+		byId('csr-dl-key').addEventListener('click', () =>
+			saveBlob(new Blob([byId('csr-priv').textContent ?? ''], { type: 'application/x-pem-file' }), `${fileBase()}.key`),
+		);
+		generate();
+	});
+</script>
+
+<style>
+	.csr-status,
+	.csr-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+		min-height: 1em;
+	}
+	.csr-actions {
+		display: flex;
+		gap: 8px;
+	}
+	.csr-out {
+		min-height: 260px;
+		max-height: 420px;
+		overflow: auto;
+	}
+</style>

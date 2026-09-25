@@ -1,0 +1,175 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const fields = [
+	['id', 'UUID'],
+	['name', 'Full name'],
+	['email', 'Email'],
+	['phone', 'Phone'],
+	['company', 'Company'],
+	['job', 'Job title'],
+	['street', 'Street address'],
+	['city', 'City'],
+	['zip', 'Zip code'],
+	['country', 'Country'],
+	['birthdate', 'Date'],
+	['age', 'Number'],
+	['active', 'Boolean'],
+	['website', 'URL'],
+	['ip', 'IPv4'],
+	['username', 'Username'],
+	['color', 'Color'],
+	['price', 'Price'],
+	['bio', 'Lorem sentence'],
+];
+const defaults = ['id', 'name', 'email', 'city', 'active'];
+---
+
+<ToolShell
+	slug="fake-data-generator"
+	title="Fake Data Generator"
+	description="Generate realistic fake records as JSON, CSV or SQL INSERT statements, with a seed for reproducible output."
+>
+	<div class="chips" id="fd-tool" role="group" aria-label="Fields">
+		{fields.map(([key, label]) => (
+			<button data-field={key} aria-pressed={defaults.includes(key) ? 'true' : 'false'}>
+				{label}
+			</button>
+		))}
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="fd-format" aria-label="Format">
+			<button data-value="json" aria-pressed="true">
+				JSON
+			</button>
+			<button data-value="csv" aria-pressed="false">
+				CSV
+			</button>
+			<button data-value="sql" aria-pressed="false">
+				SQL INSERT
+			</button>
+		</div>
+		<label class="check">
+			Rows <input class="num" type="number" id="fd-rows" min="1" max="1000" value="10" />
+		</label>
+		<label class="check">
+			Seed <input class="num" type="number" id="fd-seed" value="42" />
+		</label>
+		<label class="check" id="fd-table-wrap" hidden>
+			Table <input class="num fd-table" id="fd-table" value="users" spellcheck="false" />
+		</label>
+		<button class="btn" id="fd-regen">
+			Regenerate
+		</button>
+		<button class="btn primary" id="fd-download">
+			Download
+		</button>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="fd-status">Output</span>
+			<button class="btn" id="fd-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out fd-out" id="fd-out" tabindex="0"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { faker } from '@faker-js/faker/locale/en';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Value = string | number | boolean;
+	const GEN: Record<string, () => Value> = {
+		id: () => faker.string.uuid(),
+		name: () => faker.person.fullName(),
+		email: () => faker.internet.email().toLowerCase(),
+		phone: () => faker.phone.number(),
+		company: () => faker.company.name(),
+		job: () => faker.person.jobTitle(),
+		street: () => faker.location.streetAddress(),
+		city: () => faker.location.city(),
+		zip: () => faker.location.zipCode(),
+		country: () => faker.location.country(),
+		birthdate: () => faker.date.birthdate().toISOString().slice(0, 10),
+		age: () => faker.number.int({ min: 18, max: 90 }),
+		active: () => faker.datatype.boolean(),
+		website: () => faker.internet.url(),
+		ip: () => faker.internet.ipv4(),
+		username: () => faker.internet.username(),
+		color: () => faker.color.rgb(),
+		price: () => Number(faker.commerce.price()),
+		bio: () => faker.lorem.sentence(),
+	};
+
+	onPage('fd-tool', () => {
+		const chips = Array.from(byId('fd-tool').querySelectorAll<HTMLButtonElement>('button'));
+		const rowsIn = byId<HTMLInputElement>('fd-rows');
+		const seedIn = byId<HTMLInputElement>('fd-seed');
+		const tableIn = byId<HTMLInputElement>('fd-table');
+		const output = byId('fd-out');
+		let format = 'json';
+
+		const csvCell = (v: Value) => {
+			const s = String(v);
+			return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+		};
+		const sqlValue = (v: Value) => (typeof v === 'number' ? String(v) : typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : `'${v.replace(/'/g, "''")}'`);
+		const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
+
+		const render = () => {
+			const keys = chips.filter((c) => c.getAttribute('aria-pressed') === 'true').map((c) => c.dataset.field ?? '');
+			const count = Math.min(1000, Math.max(1, Math.floor(Number(rowsIn.value) || 1)));
+			faker.seed(Number(seedIn.value) || 0);
+			faker.setDefaultRefDate('2026-01-01T00:00:00Z');
+			const rows = Array.from({ length: count }, () => Object.fromEntries(keys.map((k) => [k, GEN[k]()])) as Record<string, Value>);
+			byId('fd-table-wrap').hidden = format !== 'sql';
+			if (!keys.length) output.textContent = 'Pick at least one field.';
+			else if (format === 'json') output.textContent = JSON.stringify(rows, null, 2);
+			else if (format === 'csv') output.textContent = [keys.join(','), ...rows.map((r) => keys.map((k) => csvCell(r[k])).join(','))].join('\n');
+			else {
+				const table = ident(tableIn.value.trim() || 'records');
+				output.textContent = rows
+					.map((r) => `INSERT INTO ${table} (${keys.map(ident).join(', ')}) VALUES (${keys.map((k) => sqlValue(r[k])).join(', ')});`)
+					.join('\n');
+			}
+			byId('fd-status').textContent = `${count} ${count === 1 ? 'row' : 'rows'} · ${keys.length} fields`;
+		};
+
+		chips.forEach((c) =>
+			c.addEventListener('click', () => {
+				c.setAttribute('aria-pressed', String(c.getAttribute('aria-pressed') !== 'true'));
+				render();
+			}),
+		);
+		segmented(byId('fd-format'), (v) => ((format = v), render()));
+		[rowsIn, seedIn, tableIn].forEach((el) => el.addEventListener('input', render));
+		byId('fd-regen').addEventListener('click', () => {
+			seedIn.value = String(Math.floor(Math.random() * 1_000_000));
+			render();
+		});
+		byId('fd-download').addEventListener('click', () => {
+			const ext = format === 'sql' ? 'sql' : format;
+			const blob = new Blob([output.textContent ?? ''], { type: format === 'json' ? 'application/json' : 'text/plain' });
+			const link = document.createElement('a');
+			link.href = URL.createObjectURL(blob);
+			link.download = `fake-data.${ext}`;
+			link.click();
+			URL.revokeObjectURL(link.href);
+		});
+		copyButton(byId('fd-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.fd-table {
+		width: 120px;
+		font-family: var(--mono);
+	}
+	.fd-out {
+		max-height: 520px;
+		overflow: auto;
+	}
+</style>

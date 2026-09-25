@@ -1,0 +1,268 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const levels = ['0', '1', '5', '6', '10', '50', '60'];
+---
+
+<ToolShell
+	slug="raid-calculator"
+	title="RAID Calculator"
+	description="Usable capacity, parity overhead, fault tolerance and relative speed for RAID 0, 1, 5, 6, 10, 50 and 60, with every level compared side by side."
+>
+	<div class="fields" id="rd-tool">
+		<div class="field">
+			<label for="rd-count">Number of disks</label>
+			<input id="rd-count" type="number" min="1" max="256" value="4" />
+		</div>
+		<div class="field">
+			<label for="rd-size">Disk size</label>
+			<div class="rd-size">
+				<input id="rd-size" type="number" min="0" step="any" value="4" />
+				<select id="rd-unit" aria-label="Disk size unit">
+					<option value="1e9">GB</option>
+					<option value="1e12" selected>
+						TB
+					</option>
+				</select>
+			</div>
+		</div>
+		<div class="field" id="rd-groups-field">
+			<label for="rd-groups">Parity groups · RAID 50/60</label>
+			<input id="rd-groups" type="number" min="2" value="2" />
+		</div>
+		<div class="field wide">
+			<label for="rd-mixed">Mixed sizes · optional, comma separated, overrides the two fields above</label>
+			<input id="rd-mixed" spellcheck="false" placeholder="4, 4, 8, 8" />
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="rd-level" role="group" aria-label="RAID level">
+			{levels.map((l) => (
+				<button data-value={l} aria-pressed={l === '5' ? 'true' : 'false'}>
+					RAID {l}
+				</button>
+			))}
+		</div>
+		<div class="seg" id="rd-base" role="group" aria-label="Display units">
+			<button data-value="10" aria-pressed="true">
+				TB (decimal)
+			</button>
+			<button data-value="2">TiB (binary)</button>
+		</div>
+	</div>
+	<p class="error" id="rd-error" hidden></p>
+	<div class="stats" id="rd-stats" aria-live="polite">
+		<div class="stat">
+			<b id="rd-usable"></b>
+			<span>Usable capacity</span>
+		</div>
+		<div class="stat">
+			<b id="rd-overhead"></b>
+			<span>Lost to redundancy</span>
+		</div>
+		<div class="stat">
+			<b id="rd-eff"></b>
+			<span>Efficiency</span>
+		</div>
+		<div class="stat">
+			<b id="rd-tol"></b>
+			<span>Disks that can fail</span>
+		</div>
+		<div class="stat">
+			<b id="rd-read"></b>
+			<span>Read speed vs one disk</span>
+		</div>
+		<div class="stat">
+			<b id="rd-write"></b>
+			<span>Write speed vs one disk</span>
+		</div>
+	</div>
+	<p class="rd-note" id="rd-note"></p>
+	<section class="panel">
+		<div class="panel-head">
+			<span>All levels for these disks</span>
+		</div>
+		<div class="rd-scroll" tabindex="0" role="region" aria-label="RAID level comparison">
+			<table class="rd-table">
+				<thead>
+					<tr>
+						<th scope="col">Level</th>
+						<th scope="col">Usable</th>
+						<th scope="col">Efficiency</th>
+						<th scope="col">Can fail</th>
+						<th scope="col">Read</th>
+						<th scope="col">Write</th>
+						<th scope="col">Min disks</th>
+					</tr>
+				</thead>
+				<tbody id="rd-body"></tbody>
+			</table>
+		</div>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	type Result = { usable: number; tol: string; read: number; write: number; min: number; error?: string };
+
+	onPage('rd-tool', () => {
+		let level = '5';
+		let base = '10';
+
+		const disks = () => {
+			const unit = Number(byId<HTMLSelectElement>('rd-unit').value);
+			const mixed = byId<HTMLInputElement>('rd-mixed')
+				.value.split(/[,\s]+/)
+				.map(Number)
+				.filter((n) => n > 0);
+			if (mixed.length) return mixed.map((n) => n * unit);
+			const n = Math.max(0, Math.min(256, Math.floor(Number(byId<HTMLInputElement>('rd-count').value) || 0)));
+			const s = Math.max(0, Number(byId<HTMLInputElement>('rd-size').value) || 0) * unit;
+			return Array.from({ length: n }, () => s);
+		};
+
+		const calc = (lvl: string, d: number[], g: number): Result => {
+			const n = d.length;
+			const s = n ? Math.min(...d) : 0;
+			const mins: Record<string, number> = { '0': 2, '1': 2, '5': 3, '6': 4, '10': 4, '50': 6, '60': 8 };
+			const min = lvl === '50' ? Math.max(6, g * 3) : lvl === '60' ? Math.max(8, g * 4) : mins[lvl];
+			const fail = (error: string): Result => ({ usable: 0, tol: '—', read: 0, write: 0, min, error });
+			if (n < min) return fail(`RAID ${lvl} needs at least ${min} disks.`);
+			switch (lvl) {
+				case '0':
+					return { usable: d.reduce((a, b) => a + b, 0), tol: '0', read: n, write: n, min };
+				case '1':
+					return { usable: s, tol: String(n - 1), read: n, write: 1, min };
+				case '5':
+					return { usable: (n - 1) * s, tol: '1', read: n - 1, write: n / 4, min };
+				case '6':
+					return { usable: (n - 2) * s, tol: '2', read: n - 2, write: n / 6, min };
+				case '10':
+					if (n % 2) return fail('RAID 10 needs an even number of disks.');
+					return { usable: (n / 2) * s, tol: n > 2 ? `1 to ${n / 2}` : '1', read: n, write: n / 2, min };
+				default: {
+					const parity = lvl === '50' ? 1 : 2;
+					if (n % g) return fail(`RAID ${lvl} needs the disks split evenly into ${g} groups.`);
+					return { usable: (n - parity * g) * s, tol: `${parity} to ${parity * g}`, read: n - parity * g, write: n / (lvl === '50' ? 4 : 6), min };
+				}
+			}
+		};
+
+		const fmt = (bytes: number) => {
+			const units = base === '10' ? ['GB', 'TB', 'PB'] : ['GiB', 'TiB', 'PiB'];
+			const k = base === '10' ? 1000 : 1024;
+			let v = bytes / k ** 3;
+			let i = 0;
+			while (v >= k && i < units.length - 1) {
+				v /= k;
+				i++;
+			}
+			return `${Number(v.toFixed(2))} ${units[i]}`;
+		};
+		const x = (v: number) => (v ? `${Number(v.toFixed(2))}×` : '—');
+
+		const render = () => {
+			const d = disks();
+			const g = Math.max(2, Math.floor(Number(byId<HTMLInputElement>('rd-groups').value) || 2));
+			const raw = d.reduce((a, b) => a + b, 0);
+			const r = calc(level, d, g);
+			byId('rd-groups-field').hidden = level !== '50' && level !== '60';
+			byId('rd-error').hidden = !r.error;
+			byId('rd-error').textContent = r.error ?? '';
+			byId('rd-usable').textContent = r.error ? '—' : fmt(r.usable);
+			byId('rd-overhead').textContent = r.error ? '—' : fmt(raw - r.usable);
+			byId('rd-eff').textContent = r.error || !raw ? '—' : `${Math.round((r.usable / raw) * 100)}%`;
+			byId('rd-tol').textContent = r.tol;
+			byId('rd-read').textContent = x(r.read);
+			byId('rd-write').textContent = x(r.write);
+			const smallest = d.length ? Math.min(...d) : 0;
+			const mixed = d.some((v) => v !== smallest);
+			byId('rd-note').textContent =
+				`${d.length} disks, ${fmt(raw)} raw.${mixed ? ` Mixed sizes: except in RAID 0, every disk only contributes ${fmt(smallest)}, the size of the smallest one.` : ''} Speeds are relative multipliers for random I/O, counting the parity write penalty (4 for RAID 5/50, 6 for RAID 6/60).`;
+			byId('rd-body').replaceChildren(
+				...['0', '1', '5', '6', '10', '50', '60'].map((l) => {
+					const c = calc(l, d, g);
+					const tr = document.createElement('tr');
+					if (l === level) tr.className = 'rd-current';
+					const cells = [
+						`RAID ${l}`,
+						c.error ? 'Not possible' : fmt(c.usable),
+						c.error || !raw ? '—' : `${Math.round((c.usable / raw) * 100)}%`,
+						c.tol,
+						x(c.read),
+						x(c.write),
+						String(c.min),
+					];
+					cells.forEach((t, i) => {
+						const cell = document.createElement(i ? 'td' : 'th');
+						if (!i) cell.setAttribute('scope', 'row');
+						cell.textContent = t;
+						tr.append(cell);
+					});
+					return tr;
+				}),
+			);
+		};
+
+		segmented(byId('rd-level'), (v) => ((level = v), render()));
+		segmented(byId('rd-base'), (v) => ((base = v), render()));
+		document.querySelectorAll('#rd-tool input, #rd-tool select').forEach((el) => el.addEventListener('input', render));
+		render();
+	});
+</script>
+
+<style>
+	.rd-size {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+	}
+	.rd-size input {
+		flex: 1;
+		min-width: 0;
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 20px;
+		outline: none;
+	}
+	.rd-size select {
+		font: inherit;
+		padding: 4px 6px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+		color: var(--ink);
+	}
+	.rd-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.rd-scroll {
+		overflow-x: auto;
+	}
+	.rd-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 14px;
+		font-variant-numeric: tabular-nums;
+	}
+	.rd-table th,
+	.rd-table td {
+		text-align: left;
+		padding: 8px 14px;
+		border-bottom: 1px solid var(--border);
+		white-space: nowrap;
+	}
+	.rd-table thead th {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.rd-table :global(.rd-current) {
+		background: var(--surface-2);
+		font-weight: 700;
+	}
+</style>

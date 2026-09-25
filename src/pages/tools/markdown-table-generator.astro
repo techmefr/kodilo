@@ -1,0 +1,231 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const importSample = `Tool,Category,Stars
+Prettier,Formatter,49000
+ESLint,Linter,25000`;
+---
+
+<ToolShell
+	slug="markdown-table-generator"
+	title="Markdown Table Generator"
+	description="Edit cells in a grid, set each column's alignment or paste CSV and TSV. The Markdown table is padded, aligned and ready to paste."
+>
+	<div class="toolbar" id="mt-tool">
+		<button class="btn" id="mt-add-row">
+			Add row
+		</button>
+		<button class="btn" id="mt-add-col">
+			Add column
+		</button>
+		<label class="check">
+			<input type="checkbox" id="mt-pad" checked /> Pad columns
+		</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">Table</div>
+		<div class="mt-grid" id="mt-grid" tabindex="0" role="region" aria-label="Table editor"></div>
+	</section>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">
+				<span>Import CSV or TSV</span>
+				<button class="btn" id="mt-import">
+					Import
+				</button>
+			</div>
+			<textarea id="mt-csv" spellcheck="false" aria-label="CSV or TSV to import">{importSample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Markdown</span>
+				<button class="btn" id="mt-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="mt-out" tabindex="0"></pre>
+		</section>
+	</div>
+	<div class="error" id="mt-error" hidden></div>
+</ToolShell>
+
+<script>
+	import Papa from 'papaparse';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Align = 'left' | 'center' | 'right';
+
+	function width(text: string): number {
+		return [...text].length;
+	}
+
+	function pad(text: string, size: number, align: Align): string {
+		const gap = size - width(text);
+		if (gap <= 0) return text;
+		if (align === 'right') return ' '.repeat(gap) + text;
+		if (align === 'center') return ' '.repeat(Math.floor(gap / 2)) + text + ' '.repeat(Math.ceil(gap / 2));
+		return text + ' '.repeat(gap);
+	}
+
+	onPage('mt-tool', () => {
+		const grid = byId('mt-grid');
+		const output = byId('mt-out');
+		const error = byId('mt-error');
+		let rows: string[][] = [
+			['Name', 'Language', 'Stars'],
+			['Astro', 'TypeScript', '48000'],
+			['Svelte', 'JavaScript', '80000'],
+			['Rust | Cargo', 'Rust', '100000'],
+		];
+		let aligns: Align[] = ['left', 'left', 'right'];
+
+		const escape = (v: string) => v.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
+
+		const renderOutput = () => {
+			const padded = byId<HTMLInputElement>('mt-pad').checked;
+			const cells = rows.map((r) => r.map((c) => escape(c.trim())));
+			const sizes = aligns.map((_, i) => Math.max(3, ...cells.map((r) => width(r[i] ?? ''))));
+			const line = (r: string[]) => `| ${r.map((c, i) => (padded ? pad(c, sizes[i], aligns[i]) : c)).join(' | ')} |`;
+			const rule = aligns.map((a, i) => {
+				const n = padded ? sizes[i] : 3;
+				if (a === 'center') return `:${'-'.repeat(n - 2)}:`;
+				if (a === 'right') return `${'-'.repeat(n - 1)}:`;
+				return '-'.repeat(n);
+			});
+			output.textContent = [line(cells[0]), `| ${rule.join(' | ')} |`, ...cells.slice(1).map(line)].join('\n');
+		};
+
+		const iconButton = (label: string, text: string, on: () => void) => {
+			const b = document.createElement('button');
+			b.className = 'btn';
+			b.textContent = text;
+			b.setAttribute('aria-label', label);
+			b.addEventListener('click', on);
+			return b;
+		};
+
+		const renderGrid = () => {
+			const table = document.createElement('table');
+			const controls = table.createTHead().insertRow();
+			aligns.forEach((a, c) => {
+				const th = document.createElement('th');
+				th.scope = 'col';
+				const select = document.createElement('select');
+				select.className = 'num';
+				select.setAttribute('aria-label', `Column ${c + 1} alignment`);
+				(['left', 'center', 'right'] as Align[]).forEach((v) => select.append(new Option(v[0].toUpperCase() + v.slice(1), v, false, v === a)));
+				select.addEventListener('change', () => {
+					aligns[c] = select.value as Align;
+					renderOutput();
+				});
+				const rm = iconButton(`Remove column ${c + 1}`, '✕', () => {
+					if (aligns.length < 2) return;
+					aligns.splice(c, 1);
+					rows.forEach((r) => r.splice(c, 1));
+					render();
+				});
+				th.append(select, rm);
+				controls.append(th);
+			});
+			const actions = document.createElement('th');
+			actions.innerHTML = '<span class="sr-only">Row actions</span>';
+			controls.append(actions);
+			const body = table.createTBody();
+			rows.forEach((row, r) => {
+				const tr = body.insertRow();
+				if (r === 0) tr.className = 'mt-header';
+				row.forEach((value, c) => {
+					const input = document.createElement('input');
+					input.value = value;
+					input.spellcheck = false;
+					input.setAttribute('aria-label', r === 0 ? `Header, column ${c + 1}` : `Row ${r}, column ${c + 1}`);
+					input.addEventListener('input', () => {
+						rows[r][c] = input.value;
+						renderOutput();
+					});
+					tr.insertCell().append(input);
+				});
+				const cell = tr.insertCell();
+				if (r > 0)
+					cell.append(
+						iconButton(`Remove row ${r}`, '✕', () => {
+							rows.splice(r, 1);
+							render();
+						}),
+					);
+			});
+			grid.replaceChildren(table);
+		};
+
+		const render = () => {
+			renderGrid();
+			renderOutput();
+		};
+
+		byId('mt-add-row').addEventListener('click', () => {
+			rows.push(aligns.map(() => ''));
+			render();
+		});
+		byId('mt-add-col').addEventListener('click', () => {
+			aligns.push('left');
+			rows.forEach((r, i) => r.push(i === 0 ? `Column ${aligns.length}` : ''));
+			render();
+		});
+		byId('mt-pad').addEventListener('change', renderOutput);
+		byId('mt-import').addEventListener('click', () => {
+			const text = byId<HTMLTextAreaElement>('mt-csv').value.trim();
+			const result = Papa.parse<string[]>(text, { skipEmptyLines: true });
+			if (!result.data.length) {
+				error.textContent = result.errors[0]?.message ?? 'Nothing to import.';
+				error.hidden = false;
+				return;
+			}
+			error.hidden = true;
+			const cols = Math.max(...result.data.map((r) => r.length));
+			rows = result.data.map((r) => Array.from({ length: cols }, (_, i) => r[i] ?? ''));
+			aligns = Array.from({ length: cols }, (_, i) =>
+				rows.slice(1).every((r) => r[i].trim() !== '' && !Number.isNaN(Number(r[i]))) && rows.length > 1 ? 'right' : 'left',
+			);
+			render();
+		});
+		copyButton(byId('mt-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.mt-grid {
+		overflow-x: auto;
+		padding: 8px;
+	}
+	.mt-grid :global(table) {
+		border-collapse: separate;
+		border-spacing: 4px;
+	}
+	.mt-grid :global(th) {
+		white-space: nowrap;
+		text-align: left;
+	}
+	.mt-grid :global(th .num) {
+		width: auto;
+		margin-right: 4px;
+	}
+	.mt-grid :global(td input) {
+		width: 140px;
+		font-family: var(--mono);
+		font-size: 13px;
+		padding: 7px 10px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface-2);
+		color: var(--ink);
+	}
+	.mt-grid :global(.mt-header input) {
+		font-weight: 700;
+		background: var(--surface);
+	}
+	.mt-grid :global(td input:focus-visible) {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 1px;
+	}
+</style>

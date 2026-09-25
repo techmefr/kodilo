@@ -1,0 +1,355 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const lintSample = `FROM node:latest
+ENV API_KEY=sk_live_123456
+RUN apt-get update
+RUN apt-get install -y curl
+RUN curl -fsSL https://example.com/install.sh | sh
+ADD . /app
+WORKDIR /app
+RUN npm install
+EXPOSE
+CMD npm start
+`;
+---
+
+<ToolShell
+	slug="dockerfile-generator"
+	title="Dockerfile Generator & Linter"
+	description="Generate a multi-stage Dockerfile with a non-root user and a health check, plus its .dockerignore, or lint an existing Dockerfile line by line."
+>
+	<div class="toolbar" id="df-tool">
+		<div class="seg" id="df-mode" aria-label="Mode">
+			<button data-value="gen" aria-pressed="true">
+				Generate
+			</button>
+			<button data-value="lint" aria-pressed="false">
+				Lint
+			</button>
+		</div>
+	</div>
+	<div id="df-gen">
+		<div class="toolbar">
+			<div class="seg" id="df-stack" aria-label="Stack">
+				<button data-value="node" aria-pressed="true">
+					Node
+				</button>
+				<button data-value="python" aria-pressed="false">
+					Python
+				</button>
+				<button data-value="go" aria-pressed="false">
+					Go
+				</button>
+				<button data-value="static" aria-pressed="false">
+					Static nginx
+				</button>
+			</div>
+			<label class="check">
+				<input type="checkbox" id="df-health" checked /> HEALTHCHECK
+			</label>
+			<label class="check">
+				<input type="checkbox" id="df-user" checked /> Non-root user
+			</label>
+		</div>
+		<div class="fields df-fields">
+			<div class="field">
+				<label for="df-version">Base version</label>
+				<input id="df-version" spellcheck="false" value="22" />
+			</div>
+			<div class="field">
+				<label for="df-port">Port</label>
+				<input id="df-port" spellcheck="false" value="3000" />
+			</div>
+			<div class="field">
+				<label for="df-entry">Entrypoint</label>
+				<input id="df-entry" spellcheck="false" value="dist/server.js" />
+			</div>
+		</div>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">
+					<span>Dockerfile</span>
+					<button class="btn" id="df-copy">
+						Copy
+					</button>
+				</div>
+				<pre class="out" id="df-out" tabindex="0" aria-label="Dockerfile"></pre>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span>.dockerignore</span>
+					<button class="btn" id="df-ignore-copy">
+						Copy
+					</button>
+				</div>
+				<pre class="out" id="df-ignore" tabindex="0" aria-label="dockerignore"></pre>
+			</section>
+		</div>
+	</div>
+	<div id="df-lint" hidden>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">
+					<span>Dockerfile</span>
+				</div>
+				<textarea id="df-lint-in" spellcheck="false" aria-label="Dockerfile to lint">{lintSample}</textarea>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span id="df-count">Findings</span>
+				</div>
+				<ul class="df-findings" id="df-findings" tabindex="0" aria-label="Findings"></ul>
+			</section>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Finding = { line: number; severity: 'error' | 'warning' | 'info'; message: string };
+
+	function lintDockerfile(text: string): Finding[] {
+		const raw = text.split('\n');
+		const instr: { line: number; op: string; args: string }[] = [];
+		for (let i = 0; i < raw.length; i++) {
+			const start = i;
+			let body = raw[i];
+			while (/\\\s*$/.test(body) && i + 1 < raw.length) body = body.replace(/\\\s*$/, ' ') + raw[++i];
+			const t = body.trim();
+			if (!t || t.startsWith('#')) continue;
+			const m = t.match(/^(\w+)\s*(.*)$/);
+			if (m) instr.push({ line: start + 1, op: m[1].toUpperCase(), args: m[2] });
+		}
+		const f: Finding[] = [];
+		let prev = '';
+		for (const { line, op, args } of instr) {
+			if (op === 'FROM') {
+				const image = args.split(/\s+/)[0];
+				if (image !== 'scratch' && !/\$/.test(image)) {
+					if (/:latest$/.test(image)) f.push({ line, severity: 'warning', message: `Pin a version instead of ${image}.` });
+					else if (!/[:@]/.test(image.split('/').pop() ?? '')) f.push({ line, severity: 'warning', message: `No tag on ${image}, it resolves to latest.` });
+				}
+			}
+			if (op === 'RUN') {
+				if (/apt-get\s+install/.test(args) && !/--no-install-recommends/.test(args))
+					f.push({ line, severity: 'warning', message: 'apt-get install without --no-install-recommends.' });
+				if (/apt-get\s+install/.test(args) && !/rm -rf \/var\/lib\/apt\/lists/.test(args))
+					f.push({ line, severity: 'info', message: 'Clean /var/lib/apt/lists in the same RUN to keep the layer small.' });
+				if (/apt-get\s+update/.test(args) && !/apt-get\s+install/.test(args))
+					f.push({ line, severity: 'warning', message: 'apt-get update alone in a RUN leaves a stale cache for later installs.' });
+				if (/(curl|wget)[^|]*\|\s*(ba|z)?sh\b/.test(args)) f.push({ line, severity: 'error', message: 'Piping a download into a shell runs unverified code.' });
+				if (/^sudo\b|\ssudo\s/.test(args)) f.push({ line, severity: 'warning', message: 'Avoid sudo in a Dockerfile.' });
+				if (prev === 'RUN') f.push({ line, severity: 'info', message: 'Consecutive RUN instructions, chain them with && to save layers.' });
+			}
+			if (op === 'ADD' && !/https?:\/\/|\.tar(\.\w+)?\b|\.tgz\b/.test(args))
+				f.push({ line, severity: 'warning', message: 'Use COPY instead of ADD for local files.' });
+			if ((op === 'ENV' || op === 'ARG') && /(pass(word)?|secret|token|api_?key|private_?key)\w*\s*[= ]\s*\S+/i.test(args))
+				f.push({ line, severity: 'error', message: 'Secret-looking value baked into the image, use build secrets or runtime env.' });
+			if (op === 'EXPOSE' && !/\d/.test(args)) f.push({ line, severity: 'error', message: 'EXPOSE needs a port.' });
+			if (op === 'EXPOSE' && /\d/.test(args) && args.split(/\s+/).some((p) => !/^\d{1,5}(\/(tcp|udp))?$/.test(p) || Number(p.split('/')[0]) > 65535))
+				f.push({ line, severity: 'error', message: `Invalid port in EXPOSE ${args}.` });
+			if ((op === 'CMD' || op === 'ENTRYPOINT') && !args.startsWith('['))
+				f.push({ line, severity: 'info', message: `${op} in shell form does not forward signals, prefer the JSON form.` });
+			if (op === 'WORKDIR' && !/^(\/|\$)/.test(args)) f.push({ line, severity: 'warning', message: 'WORKDIR should be an absolute path.' });
+			if (op === 'MAINTAINER') f.push({ line, severity: 'info', message: 'MAINTAINER is deprecated, use a LABEL.' });
+			prev = op;
+		}
+		const last = instr.length ? instr[instr.length - 1].line : 1;
+		if (instr.length && instr[0].op !== 'FROM' && instr[0].op !== 'ARG')
+			f.push({ line: instr[0].line, severity: 'error', message: 'The first instruction must be FROM.' });
+		const users = instr.filter((i) => i.op === 'USER');
+		if (!users.length) f.push({ line: last, severity: 'warning', message: 'No USER, the container runs as root.' });
+		else if (/^(root|0)(:|$)/.test(users[users.length - 1].args))
+			f.push({ line: users[users.length - 1].line, severity: 'warning', message: 'The final USER is root.' });
+		if (!instr.some((i) => i.op === 'HEALTHCHECK')) f.push({ line: last, severity: 'info', message: 'No HEALTHCHECK defined.' });
+		return f.sort((a, b) => a.line - b.line);
+	}
+
+	onPage('df-tool', () => {
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const defaults: Record<string, [string, string, string]> = {
+			node: ['22', '3000', 'dist/server.js'],
+			python: ['3.12', '8000', 'app.main:app'],
+			go: ['1.23', '8080', './cmd/server'],
+			static: ['1.27', '8080', 'dist'],
+		};
+		let stack = 'node';
+
+		const render = () => {
+			const v = val('df-version') || defaults[stack][0];
+			const port = val('df-port') || defaults[stack][1];
+			const entry = val('df-entry') || defaults[stack][2];
+			const user = byId<HTMLInputElement>('df-user').checked;
+			const health = byId<HTMLInputElement>('df-health').checked;
+			const hc = (cmd: string) => (health ? ['', `HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \\`, `  CMD ${cmd} || exit 1`] : []);
+			let L: string[];
+			let ignore = ['.git', '.gitignore', 'Dockerfile', '.dockerignore', '.env', '.env.*', '*.log', '.DS_Store'];
+			if (stack === 'node') {
+				L = [
+					`FROM node:${v}-alpine AS deps`,
+					'WORKDIR /app',
+					'COPY package.json package-lock.json ./',
+					'RUN npm ci',
+					'',
+					`FROM node:${v}-alpine AS build`,
+					'WORKDIR /app',
+					'COPY --from=deps /app/node_modules ./node_modules',
+					'COPY . .',
+					'RUN npm run build && npm prune --omit=dev',
+					'',
+					`FROM node:${v}-alpine`,
+					'ENV NODE_ENV=production',
+					'WORKDIR /app',
+					`COPY --from=build ${user ? '--chown=node:node ' : ''}/app/node_modules ./node_modules`,
+					`COPY --from=build ${user ? '--chown=node:node ' : ''}/app/dist ./dist`,
+					`COPY ${user ? '--chown=node:node ' : ''}package.json ./`,
+					...(user ? ['USER node'] : []),
+					`EXPOSE ${port}`,
+					...hc(`wget -qO- http://127.0.0.1:${port}/health`),
+					`CMD ["node", "${entry}"]`,
+				];
+				ignore = ['node_modules', 'dist', 'coverage', ...ignore];
+			} else if (stack === 'python') {
+				const [mod] = entry.split(':');
+				L = [
+					`FROM python:${v}-slim AS build`,
+					'WORKDIR /app',
+					'RUN python -m venv /opt/venv',
+					'ENV PATH="/opt/venv/bin:$PATH"',
+					'COPY requirements.txt .',
+					'RUN pip install --no-cache-dir -r requirements.txt',
+					'',
+					`FROM python:${v}-slim`,
+					'ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/opt/venv/bin:$PATH"',
+					...(user ? ['RUN groupadd --system app && useradd --system --gid app --no-create-home app'] : []),
+					'WORKDIR /app',
+					'COPY --from=build /opt/venv /opt/venv',
+					`COPY ${user ? '--chown=app:app ' : ''}. .`,
+					...(user ? ['USER app'] : []),
+					`EXPOSE ${port}`,
+					...hc(`python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${port}/health')"`),
+					`CMD ["uvicorn", "${entry.includes(':') ? entry : `${mod}:app`}", "--host", "0.0.0.0", "--port", "${port}"]`,
+				];
+				ignore = ['__pycache__', '*.pyc', '.venv', 'venv', '.pytest_cache', ...ignore];
+			} else if (stack === 'go') {
+				L = [
+					`FROM golang:${v}-alpine AS build`,
+					'WORKDIR /src',
+					'COPY go.mod go.sum ./',
+					'RUN go mod download',
+					'COPY . .',
+					`RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/app ${entry}`,
+					'',
+					'FROM gcr.io/distroless/static-debian12' + (user ? ':nonroot' : ''),
+					'COPY --from=build /out/app /app',
+					...(user ? ['USER nonroot:nonroot'] : []),
+					`EXPOSE ${port}`,
+					...(health ? ['', 'HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD ["/app", "-healthcheck"]'] : []),
+					'ENTRYPOINT ["/app"]',
+				];
+				ignore = ['bin', 'vendor', '*.test', ...ignore];
+			} else {
+				L = [
+					'FROM node:22-alpine AS build',
+					'WORKDIR /app',
+					'COPY package.json package-lock.json ./',
+					'RUN npm ci',
+					'COPY . .',
+					'RUN npm run build',
+					'',
+					`FROM nginxinc/nginx-unprivileged:${v}-alpine`,
+					`COPY --from=build /app/${entry} /usr/share/nginx/html`,
+					...(user ? ['USER nginx'] : []),
+					'EXPOSE 8080',
+					...hc('wget -qO- http://127.0.0.1:8080/'),
+				];
+				ignore = ['node_modules', entry, ...ignore];
+			}
+			byId('df-out').textContent = L.join('\n') + '\n';
+			byId('df-ignore').textContent = ignore.join('\n') + '\n';
+		};
+
+		const lint = () => {
+			const findings = lintDockerfile(byId<HTMLTextAreaElement>('df-lint-in').value);
+			const list = byId('df-findings');
+			list.replaceChildren(
+				...findings.map((x) => {
+					const li = document.createElement('li');
+					li.dataset.severity = x.severity;
+					const tag = document.createElement('b');
+					tag.textContent = `${x.severity} · line ${x.line}`;
+					li.append(tag, document.createTextNode(` ${x.message}`));
+					return li;
+				}),
+			);
+			byId('df-count').textContent = findings.length ? `${findings.length} findings` : 'No findings';
+		};
+
+		segmented(byId('df-mode'), (m) => {
+			byId('df-gen').hidden = m !== 'gen';
+			byId('df-lint').hidden = m !== 'lint';
+		});
+		segmented(byId('df-stack'), (s) => {
+			stack = s;
+			const [v, p, e] = defaults[s];
+			byId<HTMLInputElement>('df-version').value = v;
+			byId<HTMLInputElement>('df-port').value = p;
+			byId<HTMLInputElement>('df-entry').value = e;
+			render();
+		});
+		document.querySelectorAll('#df-gen input').forEach((el) => el.addEventListener('input', render));
+		byId('df-lint-in').addEventListener('input', lint);
+		copyButton(byId('df-copy'), () => byId('df-out').textContent ?? '');
+		copyButton(byId('df-ignore-copy'), () => byId('df-ignore').textContent ?? '');
+		render();
+		lint();
+	});
+</script>
+
+<style>
+	#df-gen,
+	#df-lint {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	#df-gen[hidden],
+	#df-lint[hidden] {
+		display: none;
+	}
+	#df-lint-in {
+		min-height: 320px;
+	}
+	#df-out,
+	#df-ignore {
+		overflow: auto;
+	}
+	.df-findings {
+		list-style: none;
+		margin: 0;
+		padding: 8px 14px;
+		max-height: 420px;
+		overflow: auto;
+		font-size: 13px;
+	}
+	.df-findings li {
+		padding: 8px 0;
+		border-bottom: 1px solid var(--border);
+	}
+	.df-findings b {
+		text-transform: uppercase;
+		font-size: 11px;
+		letter-spacing: 0.05em;
+	}
+	.df-findings li[data-severity='error'] b {
+		color: var(--bad);
+	}
+	.df-findings li[data-severity='warning'] b {
+		color: var(--warn);
+	}
+	.df-findings li[data-severity='info'] b {
+		color: var(--ink-soft);
+	}
+</style>

@@ -1,0 +1,283 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="color-shades-generator"
+	title="Color Shades Generator"
+	description="Turn one color into a Tailwind-style scale from 50 to 950, built in OKLCH for even steps. Each shade shows its contrast against white and black."
+>
+	<div class="fields" id="cs-tool">
+		<div class="field" id="cs-field">
+			<label for="cs-hex">Base color</label>
+			<div class="cs-pick">
+				<input type="color" id="cs-picker" value="#3b82f6" aria-label="Color picker" />
+				<input id="cs-hex" value="#3b82f6" spellcheck="false" />
+			</div>
+			<span class="field-note" id="cs-note"></span>
+		</div>
+		<div class="field">
+			<label for="cs-name">Color name</label>
+			<input id="cs-name" value="brand" spellcheck="false" />
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="cs-anchor" role="group" aria-label="Base position">
+			<button data-value="500" aria-pressed="true">
+				Base at 500
+			</button>
+			<button data-value="nearest" aria-pressed="false">
+				Nearest step
+			</button>
+		</div>
+	</div>
+	<ul class="cs-scale" id="cs-scale"></ul>
+	<section class="panel">
+		<div class="panel-head">
+			<div class="seg" id="cs-format" role="group" aria-label="Export format">
+				<button data-value="tailwind" aria-pressed="true">
+					Tailwind
+				</button>
+				<button data-value="css" aria-pressed="false">
+					CSS variables
+				</button>
+				<button data-value="list" aria-pressed="false">
+					List
+				</button>
+			</div>
+			<button class="btn" id="cs-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out" id="cs-out" tabindex="0"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Rgb = [number, number, number];
+
+	const STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+	const CURVE = [0.971, 0.932, 0.882, 0.809, 0.707, 0.623, 0.546, 0.488, 0.424, 0.379, 0.282];
+	const CHROMA = [0.12, 0.28, 0.5, 0.75, 0.92, 1, 0.97, 0.88, 0.76, 0.64, 0.46];
+	const TOP = 0.985;
+	const BOTTOM = 0.2;
+
+	const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+	const fromLinear = (c: number) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+
+	function parseHex(value: string): Rgb | null {
+		let v = value.trim().replace(/^#/, '');
+		if (/^[0-9a-f]{3}$/i.test(v)) v = [...v].map((c) => c + c).join('');
+		if (!/^[0-9a-f]{6}$/i.test(v)) return null;
+		return [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255) as Rgb;
+	}
+
+	function toHex(rgb: Rgb): string {
+		return (
+			'#' +
+			rgb
+				.map((c) =>
+					Math.round(Math.min(1, Math.max(0, c)) * 255)
+						.toString(16)
+						.padStart(2, '0'),
+				)
+				.join('')
+		);
+	}
+
+	function rgbToOklch([r, g, b]: Rgb): [number, number, number] {
+		const [lr, lg, lb] = [r, g, b].map(toLinear);
+		const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+		const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+		const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+		const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
+		const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+		const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+		return [L, Math.hypot(A, B), (Math.atan2(B, A) * 180) / Math.PI];
+	}
+
+	function oklchToLinear(L: number, C: number, H: number): Rgb {
+		const a = C * Math.cos((H * Math.PI) / 180);
+		const b = C * Math.sin((H * Math.PI) / 180);
+		const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+		const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+		const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+		return [
+			4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+			-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+			-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+		];
+	}
+
+	function oklchToRgb(L: number, C: number, H: number): Rgb {
+		const inGamut = (c: number) => oklchToLinear(L, c, H).every((v) => v >= -0.0001 && v <= 1.0001);
+		let chroma = C;
+		if (!inGamut(chroma)) {
+			let lo = 0;
+			let hi = C;
+			for (let i = 0; i < 24; i++) {
+				const mid = (lo + hi) / 2;
+				if (inGamut(mid)) lo = mid;
+				else hi = mid;
+			}
+			chroma = lo;
+		}
+		return oklchToLinear(L, chroma, H).map((v) => fromLinear(Math.min(1, Math.max(0, v)))) as Rgb;
+	}
+
+	function luminance(rgb: Rgb): number {
+		const [r, g, b] = rgb.map(toLinear);
+		return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+	}
+
+	function contrast(a: number, b: number): number {
+		return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+	}
+
+	onPage('cs-tool', () => {
+		const hex = byId<HTMLInputElement>('cs-hex');
+		const picker = byId<HTMLInputElement>('cs-picker');
+		const output = byId('cs-out');
+		let anchor = '500';
+		let format = 'tailwind';
+		let shades: { step: number; hex: string }[] = [];
+
+		const renderOutput = () => {
+			const name = byId<HTMLInputElement>('cs-name').value.trim().replace(/\s+/g, '-') || 'brand';
+			if (format === 'tailwind') {
+				const body = shades.map((s) => `      ${s.step}: '${s.hex}',`).join('\n');
+				output.textContent = `colors: {\n  ${/^[a-z_$][\w$]*$/i.test(name) ? name : `'${name}'`}: {\n${body.replace(/^ {4}/gm, '  ')}\n  },\n}`;
+			} else if (format === 'css') {
+				output.textContent = `:root {\n${shades.map((s) => `  --${name}-${s.step}: ${s.hex};`).join('\n')}\n}`;
+			} else {
+				output.textContent = shades.map((s) => `${s.step} ${s.hex}`).join('\n');
+			}
+		};
+
+		const render = () => {
+			const rgb = parseHex(hex.value);
+			const field = byId('cs-field');
+			if (!rgb) {
+				field.classList.add('invalid');
+				byId('cs-note').textContent = 'Use a hex color like #3b82f6';
+				return;
+			}
+			field.classList.remove('invalid');
+			const baseHex = toHex(rgb);
+			picker.value = baseHex;
+			const [L, C, H] = rgbToOklch(rgb);
+			const k = anchor === '500' ? 5 : CURVE.reduce((best, v, i) => (Math.abs(v - L) < Math.abs(CURVE[best] - L) ? i : best), 0);
+			byId('cs-note').textContent = `oklch(${(L * 100).toFixed(1)}% ${C.toFixed(3)} ${(((H % 360) + 360) % 360).toFixed(1)}) · base at ${STEPS[k]}`;
+			shades = STEPS.map((step, i) => {
+				if (i === k) return { step, hex: baseHex };
+				const l = i < k ? TOP - ((TOP - L) * (TOP - CURVE[i])) / (TOP - CURVE[k]) : L - ((L - BOTTOM) * (CURVE[k] - CURVE[i])) / (CURVE[k] - BOTTOM);
+				return { step, hex: toHex(oklchToRgb(Math.min(0.995, Math.max(0.05, l)), (C * CHROMA[i]) / CHROMA[k], H)) };
+			});
+			byId('cs-scale').replaceChildren(
+				...shades.map((s, i) => {
+					const li = document.createElement('li');
+					li.className = 'cs-shade';
+					li.dataset.step = String(s.step);
+					const lum = luminance(parseHex(s.hex)!);
+					const swatch = document.createElement('span');
+					swatch.className = 'cs-swatch';
+					swatch.style.background = s.hex;
+					const label = document.createElement('b');
+					label.textContent = `${s.step}${i === k ? ' · base' : ''}`;
+					const code = document.createElement('button');
+					code.className = 'btn cs-hex';
+					code.textContent = s.hex;
+					code.setAttribute('aria-label', `Copy ${s.step} ${s.hex}`);
+					copyButton(code, () => s.hex);
+					const ratios = document.createElement('span');
+					ratios.className = 'cs-ratios';
+					ratios.textContent = `White ${contrast(lum, 1).toFixed(2)} · Black ${contrast(lum, 0).toFixed(2)}`;
+					li.append(swatch, label, code, ratios);
+					return li;
+				}),
+			);
+			renderOutput();
+		};
+
+		hex.addEventListener('input', render);
+		picker.addEventListener('input', () => {
+			hex.value = picker.value;
+			render();
+		});
+		byId('cs-name').addEventListener('input', renderOutput);
+		segmented(byId('cs-anchor'), (value) => {
+			anchor = value;
+			render();
+		});
+		segmented(byId('cs-format'), (value) => {
+			format = value;
+			renderOutput();
+		});
+		copyButton(byId('cs-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.cs-pick {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.cs-pick input[type='color'] {
+		width: 40px;
+		height: 32px;
+		padding: 0;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: transparent;
+		cursor: pointer;
+	}
+	.cs-pick #cs-hex {
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 20px;
+		outline: none;
+		width: 100%;
+		min-width: 0;
+	}
+	.cs-scale {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+		gap: 10px;
+	}
+	.cs-scale :global(.cs-shade) {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 8px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.cs-scale :global(.cs-swatch) {
+		display: block;
+		height: 64px;
+		border-radius: 10px;
+		border: 1px solid var(--border);
+	}
+	.cs-scale :global(.cs-hex) {
+		font-family: var(--mono);
+		align-self: flex-start;
+	}
+	.cs-scale :global(.cs-ratios) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.panel-head .seg {
+		text-transform: none;
+		letter-spacing: 0;
+	}
+</style>

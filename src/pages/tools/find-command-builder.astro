@@ -1,0 +1,271 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const samplePrune = './node_modules\n./.git';
+---
+
+<ToolShell
+	slug="find-command-builder"
+	title="find Command Builder"
+	description="Compose a find command from name, type, size, age, owner and permission filters, prune folders and pick an action, with each part explained."
+>
+	<div class="fields" id="fd-tool">
+		<div class="field">
+			<label for="fd-path">Start path</label>
+			<input id="fd-path" spellcheck="false" value="." />
+		</div>
+		<div class="field">
+			<label for="fd-name">Name pattern</label>
+			<input id="fd-name" spellcheck="false" value="*.log" />
+		</div>
+		<div class="field">
+			<label for="fd-size">Size · +100M, -1k</label>
+			<input id="fd-size" spellcheck="false" value="+10M" />
+		</div>
+		<div class="field">
+			<label for="fd-mtime">Modified · days, +30 = older</label>
+			<input id="fd-mtime" spellcheck="false" value="+30" />
+		</div>
+		<div class="field">
+			<label for="fd-mmin">Modified · minutes</label>
+			<input id="fd-mmin" spellcheck="false" placeholder="-60" />
+		</div>
+		<div class="field">
+			<label for="fd-user">User</label>
+			<input id="fd-user" spellcheck="false" placeholder="www-data" />
+		</div>
+		<div class="field">
+			<label for="fd-group">Group</label>
+			<input id="fd-group" spellcheck="false" placeholder="adm" />
+		</div>
+		<div class="field">
+			<label for="fd-perm">Permissions · 644, -u+x, /o+w</label>
+			<input id="fd-perm" spellcheck="false" placeholder="/o+w" />
+		</div>
+		<div class="field">
+			<label for="fd-min">mindepth</label>
+			<input id="fd-min" spellcheck="false" inputmode="numeric" placeholder="1" />
+		</div>
+		<div class="field">
+			<label for="fd-max">maxdepth</label>
+			<input id="fd-max" spellcheck="false" inputmode="numeric" placeholder="3" />
+		</div>
+		<div class="field wide">
+			<label for="fd-prune">Skip these paths · one per line</label>
+			<textarea id="fd-prune" class="fd-area" spellcheck="false">{samplePrune}</textarea>
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="fd-type" role="group" aria-label="File type">
+			<button data-value="">any</button>
+			<button data-value="f" aria-pressed="true">
+				files
+			</button>
+			<button data-value="d">directories</button>
+			<button data-value="l">symlinks</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" id="fd-icase" /> Ignore case (-iname)
+		</label>
+		<label class="check">
+			<input type="checkbox" id="fd-empty" /> Empty only
+		</label>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="fd-action" role="group" aria-label="Action">
+			<button data-value="print" aria-pressed="true">
+				print
+			</button>
+			<button data-value="delete">delete</button>
+			<button data-value="exec">-exec … +</button>
+			<button data-value="xargs">xargs -0</button>
+		</div>
+	</div>
+	<div class="field" id="fd-cmd-field">
+		<label for="fd-exec">Command to run on the matches</label>
+		<input id="fd-exec" spellcheck="false" value="gzip -9" />
+	</div>
+	<ul class="fd-warn" id="fd-warn"></ul>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Command</span>
+			<button class="btn" id="fd-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out fd-out" id="fd-out"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>What each part does</span>
+		</div>
+		<dl class="fd-explain" id="fd-explain"></dl>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+	import { shellSplit } from '../../scripts/shell';
+
+	onPage('fd-tool', () => {
+		let type = 'f';
+		let action = 'print';
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const q = (s: string) => (/^[A-Za-z0-9_/.,:@%+=-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
+		const units: Record<string, string> = { c: 'bytes', k: 'KiB', M: 'MiB', G: 'GiB' };
+		const cmp = (v: string, unit: string) =>
+			v.startsWith('+') ? `more than ${v.slice(1)} ${unit}` : v.startsWith('-') ? `less than ${v.slice(1)} ${unit}` : `exactly ${v} ${unit}`;
+
+		const render = () => {
+			const warns: string[] = [];
+			const parts: [string, string][] = [];
+			const path = val('fd-path') || '.';
+			parts.push([`find ${q(path)}`, `Search from ${path}, recursively.`]);
+			const depth = (id: string, flag: string, why: string) => {
+				const v = val(id);
+				if (!v) return;
+				if (!/^\d+$/.test(v)) return warns.push(`${flag} must be a whole number.`);
+				parts.push([`${flag} ${v}`, why.replace('N', v)]);
+			};
+			depth('fd-min', '-mindepth', 'Ignore matches less than N levels below the start path.');
+			depth('fd-max', '-maxdepth', 'Do not descend more than N levels.');
+			const prune = byId<HTMLTextAreaElement>('fd-prune')
+				.value.split('\n')
+				.map((l) => l.trim().replace(/\/+$/, ''))
+				.filter(Boolean);
+			if (prune.length) {
+				const expr = prune.map((p) => `-path ${q(p)}`).join(' -o ');
+				parts.push([
+					`${prune.length > 1 ? `\\( ${expr} \\)` : expr} -prune -o`,
+					`Skip ${prune.join(', ')} entirely without descending into them; everything else continues to the tests below.`,
+				]);
+			}
+			if (type) parts.push([`-type ${type}`, `Only ${type === 'f' ? 'regular files' : type === 'd' ? 'directories' : 'symbolic links'}.`]);
+			const name = val('fd-name');
+			const icase = byId<HTMLInputElement>('fd-icase').checked;
+			if (name)
+				parts.push([
+					`${icase ? '-iname' : '-name'} ${q(name)}`,
+					`Name matches ${name}${icase ? ', ignoring case' : ''}. The pattern is quoted so the shell does not expand it.`,
+				]);
+			const size = val('fd-size');
+			if (size) {
+				if (/^[+-]?\d+[ckMG]?$/.test(size)) {
+					const u = size.match(/[ckMG]$/)?.[0];
+					parts.push([`-size ${size}`, `Size ${cmp(size.replace(/[ckMG]$/, ''), u ? units[u] : '512-byte blocks')}.`]);
+				} else warns.push('Size looks like +100M, -1k or 20c.');
+			}
+			const time = (id: string, flag: string, unit: string) => {
+				const v = val(id);
+				if (!v) return;
+				if (!/^[+-]?\d+$/.test(v)) return warns.push(`${flag} looks like +30 or -2.`);
+				parts.push([`${flag} ${v}`, `Last modified ${cmp(v, unit)} ago.`]);
+			};
+			time('fd-mtime', '-mtime', 'days');
+			time('fd-mmin', '-mmin', 'minutes');
+			if (val('fd-user')) parts.push([`-user ${q(val('fd-user'))}`, `Owned by user ${val('fd-user')}.`]);
+			if (val('fd-group')) parts.push([`-group ${q(val('fd-group'))}`, `Owned by group ${val('fd-group')}.`]);
+			const perm = val('fd-perm');
+			if (perm)
+				parts.push([
+					`-perm ${q(perm)}`,
+					perm.startsWith('/')
+						? `Any of the bits ${perm.slice(1)} is set.`
+						: perm.startsWith('-')
+							? `All of the bits ${perm.slice(1)} are set.`
+							: `Permissions are exactly ${perm}.`,
+				]);
+			if (byId<HTMLInputElement>('fd-empty').checked) parts.push(['-empty', 'Empty files or directories only.']);
+			let words: string[] = [];
+			try {
+				words = shellSplit(val('fd-exec'));
+			} catch {
+				warns.push('The command has an unclosed quote.');
+			}
+			const cmd = words.map(q).join(' ') || 'ls -l';
+			if (action === 'print') parts.push(['-print', 'Print each match.']);
+			if (action === 'delete') {
+				parts.push(['-delete', 'Delete every match. There is no undo.']);
+				warns.push('-delete removes files for good. Run once with print first and check the list.');
+				if (prune.length) warns.push('-delete turns on -depth, which makes -prune ineffective: pruned folders will be searched too.');
+			}
+			if (action === 'exec') parts.push([`-exec ${cmd} {} +`, `Run ${cmd} on the matches, passing as many file names per call as fit.`]);
+			if (action === 'xargs') {
+				parts.push(['-print0', 'Print matches separated by a null byte, so names with spaces or newlines are safe.']);
+				const pipe = `| xargs -0 ${cmd}`;
+				parts.push([pipe, `Read the null-separated list and run ${cmd} on it in batches.`]);
+			}
+			byId('fd-cmd-field').hidden = action !== 'exec' && action !== 'xargs';
+			byId('fd-out').textContent = parts.map(([p]) => p).join(' ');
+			byId('fd-explain').replaceChildren(
+				...parts.flatMap(([k, v]) => {
+					const dt = document.createElement('dt');
+					dt.textContent = k;
+					const dd = document.createElement('dd');
+					dd.textContent = v;
+					return [dt, dd];
+				}),
+			);
+			byId('fd-warn').replaceChildren(
+				...warns.map((t) => {
+					const li = document.createElement('li');
+					li.className = 'error';
+					li.textContent = t;
+					return li;
+				}),
+			);
+		};
+
+		segmented(byId('fd-type'), (v) => ((type = v), render()));
+		segmented(byId('fd-action'), (v) => ((action = v), render()));
+		document.querySelectorAll('main input, main textarea').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('fd-copy'), () => byId('fd-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.fd-area {
+		min-height: 60px;
+		font-family: var(--mono) !important;
+		font-size: 14px !important;
+	}
+	.fd-out {
+		min-height: auto !important;
+	}
+	.fd-warn {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.fd-warn:empty {
+		display: none;
+	}
+	.fd-explain {
+		margin: 0;
+		padding: 12px 14px;
+		display: grid;
+		grid-template-columns: minmax(0, max-content) 1fr;
+		gap: 6px 16px;
+		font-size: 14px;
+	}
+	.fd-explain :global(dt) {
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--ink);
+		overflow-wrap: anywhere;
+		max-width: 320px;
+	}
+	.fd-explain :global(dd) {
+		margin: 0;
+	}
+	@media (max-width: 560px) {
+		.fd-explain {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

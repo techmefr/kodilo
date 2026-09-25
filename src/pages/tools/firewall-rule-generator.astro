@@ -1,0 +1,395 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="firewall-rule-generator"
+	title="Firewall Rule Generator"
+	description="Describe your rules once and get the same firewall as ufw commands, an iptables-save file or a complete nftables ruleset."
+>
+	<div class="toolbar" id="fw-tool">
+		<span class="fw-label" id="fw-in-label">
+			Incoming default
+		</span>
+		<div class="seg" id="fw-in" role="group" aria-labelledby="fw-in-label">
+			<button data-value="deny" aria-pressed="true">
+				deny
+			</button>
+			<button data-value="reject">reject</button>
+			<button data-value="allow">allow</button>
+		</div>
+		<span class="fw-label" id="fw-out-label">
+			Outgoing default
+		</span>
+		<div class="seg" id="fw-outpol" role="group" aria-labelledby="fw-out-label">
+			<button data-value="allow" aria-pressed="true">
+				allow
+			</button>
+			<button data-value="deny">deny</button>
+		</div>
+	</div>
+	<div class="toolbar">
+		<label class="check">
+			<input type="checkbox" id="fw-est" checked /> Allow established/related
+		</label>
+		<label class="check">
+			<input type="checkbox" id="fw-lo" checked /> Allow loopback
+		</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Rules</span>
+			<button class="btn" id="fw-add">
+				Add rule
+			</button>
+		</div>
+		<div class="fw-rows" id="fw-rows"></div>
+	</section>
+	<ul class="fw-warn" id="fw-warn"></ul>
+	<div class="toolbar">
+		<div class="seg" id="fw-tab" role="group" aria-label="Output format">
+			<button data-value="ufw" aria-pressed="true">
+				ufw
+			</button>
+			<button data-value="iptables">iptables</button>
+			<button data-value="nftables">nftables</button>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="fw-file"></span>
+			<button class="btn" id="fw-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out" id="fw-out"></pre>
+	</section>
+	<section class="panel" id="fw-v6-panel">
+		<div class="panel-head">
+			<span>/etc/iptables/rules.v6</span>
+			<button class="btn" id="fw-v6-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out" id="fw-v6"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>What these rules do</span>
+		</div>
+		<ul class="fw-explain" id="fw-explain"></ul>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Rule = { action: string; dir: string; proto: string; port: string; src: string; dst: string; iface: string; comment: string };
+
+	onPage('fw-tool', () => {
+		let inPolicy = 'deny';
+		let outPolicy = 'allow';
+		let tab = 'ufw';
+		const rules: Rule[] = [
+			{ action: 'allow', dir: 'in', proto: 'tcp', port: '22', src: '203.0.113.0/24', dst: '', iface: '', comment: 'SSH from office' },
+			{ action: 'allow', dir: 'in', proto: 'tcp', port: '80,443', src: '', dst: '', iface: '', comment: 'Web' },
+			{ action: 'allow', dir: 'in', proto: 'udp', port: '51820', src: '', dst: '', iface: 'eth0', comment: 'WireGuard' },
+			{ action: 'deny', dir: 'in', proto: 'tcp', port: '3306', src: '', dst: '', iface: '', comment: 'Block MySQL' },
+		];
+
+		const clean = (s: string) => s.replace(/["'\\]/g, '').trim();
+		const ports = (p: string) =>
+			p
+				.split(',')
+				.map((x) => x.trim())
+				.filter((x) => /^\d+([-:]\d+)?$/.test(x))
+				.map((x) => x.split(/[-:]/).map(Number));
+		const isV6 = (c: string) => c.includes(':');
+		const protos = (r: Rule) => (r.proto === 'any' && r.port.trim() ? ['tcp', 'udp'] : [r.proto]);
+
+		const ufw = () => {
+			const out = [`sudo ufw default ${inPolicy} incoming`, `sudo ufw default ${outPolicy === 'allow' ? 'allow' : 'deny'} outgoing`];
+			rules.forEach((r) => {
+				const parts = ['sudo ufw', r.action, r.dir];
+				if (r.iface) parts.push('on', clean(r.iface));
+				if (r.proto === 'icmp') {
+					out.push(`# ufw has no CLI rule for ICMP; edit /etc/ufw/before.rules (${clean(r.comment) || 'icmp'})`);
+					return;
+				}
+				const list = ports(r.port);
+				const multi = list.length > 1 || list.some((p) => p.length > 1);
+				const proto = r.proto === 'any' && multi ? ['tcp', 'udp'] : [r.proto];
+				proto.forEach((pr) => {
+					const p = [...parts];
+					if (pr !== 'any') p.push('proto', pr);
+					p.push('from', clean(r.src) || 'any', 'to', clean(r.dst) || 'any');
+					if (list.length) p.push('port', list.map((x) => x.join(':')).join(','));
+					if (r.comment) p.push('comment', `'${clean(r.comment)}'`);
+					out.push(p.join(' '));
+				});
+			});
+			out.push('sudo ufw enable', 'sudo ufw status verbose');
+			return out.join('\n');
+		};
+
+		const ipt = (v6: boolean) => {
+			const target = (a: string) => (a === 'allow' ? 'ACCEPT' : a === 'deny' ? 'DROP' : 'REJECT');
+			const out = [
+				'*filter',
+				`:INPUT ${inPolicy === 'allow' ? 'ACCEPT' : 'DROP'} [0:0]`,
+				':FORWARD DROP [0:0]',
+				`:OUTPUT ${outPolicy === 'allow' ? 'ACCEPT' : 'DROP'} [0:0]`,
+			];
+			if (byId<HTMLInputElement>('fw-lo').checked) out.push('-A INPUT -i lo -j ACCEPT', '-A OUTPUT -o lo -j ACCEPT');
+			if (byId<HTMLInputElement>('fw-est').checked)
+				out.push(
+					'-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT',
+					'-A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT',
+					'-A INPUT -m conntrack --ctstate INVALID -j DROP',
+				);
+			rules.forEach((r) => {
+				const src = clean(r.src);
+				const dst = clean(r.dst);
+				if ((src && isV6(src) !== v6) || (dst && isV6(dst) !== v6)) return;
+				const chain = r.dir === 'in' ? 'INPUT' : 'OUTPUT';
+				const base = [`-A ${chain}`];
+				if (r.iface) base.push(`${r.dir === 'in' ? '-i' : '-o'} ${clean(r.iface)}`);
+				if (src) base.push(`-s ${src}`);
+				if (dst) base.push(`-d ${dst}`);
+				const tail = [...(r.comment ? [`-m comment --comment "${clean(r.comment)}"`] : []), `-j ${target(r.action)}`];
+				protos(r).forEach((pr) => {
+					if (pr === 'icmp') return out.push([...base, v6 ? '-p ipv6-icmp' : '-p icmp', ...tail].join(' '));
+					if (pr === 'any') return out.push([...base, ...tail].join(' '));
+					const list = ports(r.port);
+					if (!list.length) return out.push([...base, `-p ${pr}`, ...tail].join(' '));
+					if (list.length === 1) return out.push([...base, `-p ${pr}`, `--dport ${list[0].join(':')}`, ...tail].join(' '));
+					out.push([...base, `-p ${pr}`, `-m multiport --dports ${list.map((x) => x.join(':')).join(',')}`, ...tail].join(' '));
+				});
+			});
+			if (v6 && byId<HTMLInputElement>('fw-est').checked) out.push('-A INPUT -p ipv6-icmp -j ACCEPT');
+			if (inPolicy === 'reject') out.push(`-A INPUT -j REJECT --reject-with ${v6 ? 'icmp6-port-unreachable' : 'icmp-port-unreachable'}`);
+			out.push('COMMIT');
+			return out.join('\n');
+		};
+
+		const nft = () => {
+			const verdict = (a: string) => (a === 'allow' ? 'accept' : a === 'deny' ? 'drop' : 'reject');
+			const chains: Record<string, string[]> = { in: [], out: [] };
+			if (byId<HTMLInputElement>('fw-lo').checked) {
+				chains.in.push('iif "lo" accept');
+				chains.out.push('oif "lo" accept');
+			}
+			if (byId<HTMLInputElement>('fw-est').checked) {
+				chains.in.push('ct state established,related accept', 'ct state invalid drop', 'meta l4proto ipv6-icmp accept');
+				chains.out.push('ct state established,related accept');
+			}
+			rules.forEach((r) => {
+				const p: string[] = [];
+				if (r.iface) p.push(`${r.dir === 'in' ? 'iifname' : 'oifname'} "${clean(r.iface)}"`);
+				const src = clean(r.src);
+				const dst = clean(r.dst);
+				if (src) p.push(`${isV6(src) ? 'ip6' : 'ip'} saddr ${src}`);
+				if (dst) p.push(`${isV6(dst) ? 'ip6' : 'ip'} daddr ${dst}`);
+				const list = ports(r.port).map((x) => x.join('-'));
+				const set = list.length > 1 ? `{ ${list.join(', ')} }` : list[0];
+				if (r.proto === 'icmp') p.push('meta l4proto { icmp, ipv6-icmp }');
+				else if (r.proto === 'any') {
+					if (set) p.push(`meta l4proto { tcp, udp } th dport ${set}`);
+				} else p.push(set ? `${r.proto} dport ${set}` : `meta l4proto ${r.proto}`);
+				p.push(verdict(r.action));
+				if (r.comment) p.push(`comment "${clean(r.comment)}"`);
+				chains[r.dir].push(p.join(' '));
+			});
+			if (inPolicy === 'reject') chains.in.push('reject');
+			const pol = (x: string) => (x === 'allow' ? 'accept' : 'drop');
+			const block = (name: string, hook: string, policy: string, body: string[]) => [
+				`\tchain ${name} {`,
+				`\t\ttype filter hook ${hook} priority filter; policy ${policy};`,
+				...body.map((l) => `\t\t${l}`),
+				'\t}',
+			];
+			return [
+				'#!/usr/sbin/nft -f',
+				'flush ruleset',
+				'',
+				'table inet filter {',
+				...block('input', 'input', pol(inPolicy), chains.in),
+				'',
+				...block('forward', 'forward', 'drop', []),
+				'',
+				...block('output', 'output', pol(outPolicy), chains.out),
+				'}',
+			].join('\n');
+		};
+
+		const covers22 = (r: Rule) =>
+			r.dir === 'in' &&
+			r.action === 'allow' &&
+			r.proto !== 'udp' &&
+			r.proto !== 'icmp' &&
+			(!r.port.trim() || ports(r.port).some(([a, b]) => (b === undefined ? a === 22 : a <= 22 && b >= 22)));
+
+		const explain = () =>
+			rules.map((r) => {
+				const verb = r.action === 'allow' ? 'Allow' : r.action === 'deny' ? 'Silently drop' : 'Reject';
+				const what =
+					r.proto === 'icmp'
+						? 'ICMP (ping)'
+						: `${r.proto === 'any' ? 'TCP/UDP' : r.proto.toUpperCase()} ${r.port.trim() ? `port ${r.port.trim()}` : 'on every port'}`;
+				return `${verb} ${r.dir === 'in' ? 'incoming' : 'outgoing'} ${what}${r.src ? ` from ${r.src}` : ''}${r.dst ? ` to ${r.dst}` : ''}${r.iface ? ` on ${r.iface}` : ''}${r.comment ? ` (${r.comment})` : ''}.`;
+			});
+
+		const render = () => {
+			const warns: string[] = [];
+			if (inPolicy !== 'allow' && !rules.some(covers22))
+				warns.push('SSH (port 22) is not allowed and the incoming default blocks everything: you will lock yourself out of a remote server.');
+			if (!byId<HTMLInputElement>('fw-est').checked && inPolicy !== 'allow')
+				warns.push('Without established/related, replies to your own outgoing connections will be dropped.');
+			if (outPolicy === 'deny' && !byId<HTMLInputElement>('fw-est').checked)
+				warns.push('Outgoing is denied and established traffic is not allowed: incoming connections cannot be answered.');
+			rules.forEach((r, i) => {
+				if (r.port.trim() && !ports(r.port).length) warns.push(`Rule ${i + 1}: "${r.port}" is not a port, list or range like 1000-2000.`);
+			});
+			byId('fw-warn').replaceChildren(
+				...warns.map((w) => {
+					const li = document.createElement('li');
+					li.className = 'error';
+					li.textContent = w;
+					return li;
+				}),
+			);
+			byId('fw-file').textContent = tab === 'ufw' ? 'ufw commands' : tab === 'iptables' ? '/etc/iptables/rules.v4' : '/etc/nftables.conf';
+			byId('fw-out').textContent = tab === 'ufw' ? ufw() : tab === 'iptables' ? ipt(false) : nft();
+			byId('fw-v6-panel').hidden = tab !== 'iptables';
+			byId('fw-v6').textContent =
+				`${ipt(true)}\n\n# Load with: sudo ip6tables-restore < /etc/iptables/rules.v6\n# IPv4 rules above load with: sudo iptables-restore < /etc/iptables/rules.v4`;
+			const base = [
+				`Incoming traffic not matched below is ${inPolicy === 'allow' ? 'accepted' : inPolicy === 'deny' ? 'dropped silently' : 'rejected with an error'}; outgoing is ${outPolicy === 'allow' ? 'accepted' : 'dropped'}.`,
+				...(byId<HTMLInputElement>('fw-lo').checked ? ['Loopback (lo) is always allowed so local services can talk to each other.'] : []),
+				...(byId<HTMLInputElement>('fw-est').checked ? ['Replies to connections already in progress are allowed (stateful firewall).'] : []),
+				...explain(),
+			];
+			byId('fw-explain').replaceChildren(
+				...base.map((t) => {
+					const li = document.createElement('li');
+					li.textContent = t;
+					return li;
+				}),
+			);
+		};
+
+		const select = (label: string, options: string[], value: string, on: (v: string) => void) => {
+			const s = document.createElement('select');
+			s.setAttribute('aria-label', label);
+			options.forEach((o) => s.add(new Option(o, o, false, o === value)));
+			s.addEventListener('change', () => (on(s.value), render()));
+			return s;
+		};
+		const input = (label: string, value: string, placeholder: string, cls: string, on: (v: string) => void) => {
+			const el = document.createElement('input');
+			el.setAttribute('aria-label', label);
+			el.spellcheck = false;
+			el.value = value;
+			el.placeholder = placeholder;
+			el.className = cls;
+			el.addEventListener('input', () => (on(el.value), render()));
+			return el;
+		};
+
+		const drawRows = () => {
+			byId('fw-rows').replaceChildren(
+				...rules.map((r, i) => {
+					const row = document.createElement('div');
+					row.className = 'fw-row';
+					const n = `Rule ${i + 1}`;
+					const del = document.createElement('button');
+					del.className = 'btn';
+					del.textContent = 'Remove';
+					del.setAttribute('aria-label', `Remove rule ${i + 1}`);
+					del.addEventListener('click', () => (rules.splice(i, 1), drawRows(), render()));
+					row.append(
+						select(`${n} action`, ['allow', 'deny', 'reject'], r.action, (v) => (r.action = v)),
+						select(`${n} direction`, ['in', 'out'], r.dir, (v) => (r.dir = v)),
+						select(`${n} protocol`, ['tcp', 'udp', 'icmp', 'any'], r.proto, (v) => (r.proto = v)),
+						input(`${n} port or range`, r.port, 'port', 'fw-port', (v) => (r.port = v)),
+						input(`${n} source CIDR`, r.src, 'source', '', (v) => (r.src = v)),
+						input(`${n} destination CIDR`, r.dst, 'destination', '', (v) => (r.dst = v)),
+						input(`${n} interface`, r.iface, 'iface', 'fw-port', (v) => (r.iface = v)),
+						input(`${n} comment`, r.comment, 'comment', '', (v) => (r.comment = v)),
+						del,
+					);
+					return row;
+				}),
+			);
+		};
+
+		byId('fw-add').addEventListener('click', () => {
+			rules.push({ action: 'allow', dir: 'in', proto: 'tcp', port: '8080', src: '', dst: '', iface: '', comment: '' });
+			drawRows();
+			render();
+		});
+		segmented(byId('fw-in'), (v) => ((inPolicy = v), render()));
+		segmented(byId('fw-outpol'), (v) => ((outPolicy = v), render()));
+		segmented(byId('fw-tab'), (v) => ((tab = v), render()));
+		byId('fw-est').addEventListener('input', render);
+		byId('fw-lo').addEventListener('input', render);
+		copyButton(byId('fw-copy'), () => byId('fw-out').textContent ?? '');
+		copyButton(byId('fw-v6-copy'), () => byId('fw-v6').textContent ?? '');
+		drawRows();
+		render();
+	});
+</script>
+
+<style>
+	.fw-label {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--ink-soft);
+	}
+	.fw-rows {
+		display: flex;
+		flex-direction: column;
+	}
+	.fw-rows :global(.fw-row) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+	}
+	.fw-rows :global(select),
+	.fw-rows :global(input) {
+		font: inherit;
+		font-size: 13px;
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+		color: var(--ink);
+		min-width: 0;
+		flex: 1 1 110px;
+	}
+	.fw-rows :global(select),
+	.fw-rows :global(.fw-port) {
+		flex: 0 1 80px;
+	}
+	.fw-warn,
+	.fw-explain {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.fw-warn {
+		list-style: none;
+		padding: 0;
+	}
+	.fw-warn:empty {
+		display: none;
+	}
+	.fw-explain {
+		padding: 12px 14px 12px 32px;
+		font-size: 14px;
+		color: var(--ink);
+	}
+</style>

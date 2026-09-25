@@ -1,0 +1,200 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const examples: Record<string, string> = {
+	flowchart: `flowchart LR
+    A[Push to main] --> B{Tests pass?}
+    B -- Yes --> C[Build image]
+    B -- No --> D[Notify author]
+    C --> E[(Registry)]
+    E --> F[Deploy to staging]
+    F --> G{Smoke OK?}
+    G -- Yes --> H[Promote to production]
+    G -- No --> D`,
+	sequence: `sequenceDiagram
+    participant U as User
+    participant A as App
+    participant S as Auth server
+    U->>A: Open login page
+    A->>S: Redirect with PKCE challenge
+    S-->>U: Show consent screen
+    U->>S: Approve
+    S-->>A: Authorization code
+    A->>S: Exchange code + verifier
+    S-->>A: Access token`,
+	class: `classDiagram
+    class Order {
+        +String id
+        +Date createdAt
+        +total() Number
+    }
+    class LineItem {
+        +String sku
+        +int quantity
+        +Number price
+    }
+    class Customer {
+        +String email
+    }
+    Customer "1" --> "*" Order
+    Order "1" *-- "*" LineItem`,
+	gantt: `gantt
+    title Release plan
+    dateFormat YYYY-MM-DD
+    section Design
+    Specs           :done, s1, 2026-09-01, 5d
+    Mockups         :active, s2, after s1, 4d
+    section Build
+    API             :b1, after s2, 8d
+    Frontend        :b2, after s2, 10d
+    section Launch
+    QA              :after b2, 4d
+    Release         :milestone, after b2, 0d`,
+	er: `erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--|{ LINE_ITEM : contains
+    PRODUCT ||--o{ LINE_ITEM : "ordered in"
+    CUSTOMER {
+        string email
+        string name
+    }
+    ORDER {
+        int id
+        date created_at
+    }`,
+};
+const labels: Record<string, string> = { flowchart: 'Flowchart', sequence: 'Sequence', class: 'Class', gantt: 'Gantt', er: 'Entity relationship' };
+---
+
+<ToolShell
+	slug="mermaid-editor"
+	title="Mermaid Live Editor"
+	description="Write Mermaid diagrams and see them rendered live, then copy or download the SVG. Flowcharts, sequences, classes, Gantt and ER."
+>
+	<div class="chips" id="mm-tool" role="group" aria-label="Examples">
+		{Object.keys(examples).map((k) => (
+			<button data-example={k} data-code={examples[k]} aria-pressed={k === 'flowchart' ? 'true' : 'false'}>
+				{labels[k]}
+			</button>
+		))}
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Diagram source</div>
+			<textarea id="mm-in" spellcheck="false" aria-label="Mermaid source">{examples.flowchart}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="mm-status">Preview</span>
+				<span class="mm-actions">
+					<button class="btn" id="mm-copy">
+						Copy SVG
+					</button>
+					<button class="btn primary" id="mm-download">
+						Download SVG
+					</button>
+				</span>
+			</div>
+			<div class="mm-view" id="mm-view" tabindex="0" role="region" aria-label="Rendered diagram"></div>
+		</section>
+	</div>
+	<p class="error" id="mm-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const isDark = () => {
+		const t = document.documentElement.dataset.theme;
+		return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+	};
+
+	onPage('mm-tool', () => {
+		const input = byId<HTMLTextAreaElement>('mm-in');
+		const view = byId('mm-view');
+		const error = byId('mm-error');
+		const chips = Array.from(byId('mm-tool').querySelectorAll<HTMLButtonElement>('button'));
+		let svg = '';
+		let count = 0;
+		let timer = 0;
+		let theme = '';
+
+		const render = async () => {
+			const id = ++count;
+			const { default: mermaid } = await import('mermaid');
+			const next = isDark() ? 'dark' : 'default';
+			if (next !== theme) {
+				theme = next;
+				mermaid.initialize({
+					startOnLoad: false,
+					securityLevel: 'strict',
+					theme: next,
+					themeVariables: next === 'dark' ? { edgeLabelBackground: '#1e1e24' } : {},
+				});
+			}
+			try {
+				await mermaid.parse(input.value);
+				const result = await mermaid.render(`mm-svg-${id}`, input.value);
+				if (id !== count) return;
+				svg = result.svg;
+				view.innerHTML = svg;
+				error.hidden = true;
+				byId('mm-status').textContent = 'Preview';
+			} catch (e) {
+				document.getElementById(`dmm-svg-${id}`)?.remove();
+				if (id !== count) return;
+				error.textContent = String((e as Error).message ?? e);
+				error.hidden = false;
+				byId('mm-status').textContent = 'Syntax error';
+			}
+		};
+
+		const schedule = () => {
+			clearTimeout(timer);
+			timer = window.setTimeout(render, 300);
+		};
+
+		chips.forEach((c) =>
+			c.addEventListener('click', () => {
+				chips.forEach((b) => b.setAttribute('aria-pressed', String(b === c)));
+				input.value = c.dataset.code ?? '';
+				render();
+			}),
+		);
+		input.addEventListener('input', () => {
+			chips.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.code === input.value)));
+			schedule();
+		});
+		new MutationObserver(() => render()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+		matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => render());
+		copyButton(byId('mm-copy'), () => svg);
+		byId('mm-download').addEventListener('click', () => {
+			const link = document.createElement('a');
+			link.href = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+			link.download = 'diagram.svg';
+			link.click();
+			URL.revokeObjectURL(link.href);
+		});
+		render();
+	});
+</script>
+
+<style>
+	.mm-actions {
+		display: flex;
+		gap: 6px;
+		flex-wrap: wrap;
+	}
+	.mm-view {
+		min-height: 220px;
+		max-height: 640px;
+		overflow: auto;
+		padding: 14px;
+		display: grid;
+		place-items: center;
+	}
+	.mm-view :global(svg) {
+		max-width: 100%;
+		height: auto;
+	}
+</style>

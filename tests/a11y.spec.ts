@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { allTools } from '../src/data/tools';
 
 const pages = ['./', 'tools/not-a-tool/', ...allTools.filter((t) => t.built).map((t) => `tools/${t.slug}/`)];
-const userColors = ['#wc-preview', '.wc-ui', '.contrast-card'];
+const userColors = ['#wc-preview', '.wc-ui', '.contrast-card', '.user-colors'];
 
 test.describe.configure({ timeout: 120_000 });
 

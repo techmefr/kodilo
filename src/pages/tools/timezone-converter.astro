@@ -1,0 +1,241 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="timezone-converter"
+	title="Time Zone Converter"
+	description="Pick a date, a time and a source zone to see the matching local time everywhere else. Offsets follow daylight saving rules automatically."
+>
+	<div class="fields" id="tz-tool">
+		<div class="field">
+			<label for="tz-when">Date and time</label>
+			<input id="tz-when" type="datetime-local" step="60" />
+		</div>
+		<div class="field">
+			<label for="tz-source">Source time zone</label>
+			<select id="tz-source"></select>
+			<span class="field-note" id="tz-note"></span>
+		</div>
+	</div>
+	<div class="toolbar">
+		<button class="btn primary" id="tz-now">
+			Now
+		</button>
+		<input class="num tz-add-input" id="tz-add-input" list="tz-zones" placeholder="Search a time zone" aria-label="Search a time zone to add" />
+		<datalist id="tz-zones"></datalist>
+		<button class="btn" id="tz-add">
+			Add zone
+		</button>
+		<button class="btn" id="tz-copy">
+			Copy
+		</button>
+	</div>
+	<div class="error" id="tz-error" hidden></div>
+	<ul class="tz-list" id="tz-list"></ul>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Parts = { year: number; month: number; day: number; hour: number; minute: number; second: number };
+
+	const DEFAULTS = ['America/New_York', 'Europe/London', 'Asia/Tokyo', 'Australia/Sydney'];
+
+	function partsIn(date: Date, zone: string): Parts {
+		const map = Object.fromEntries(
+			new Intl.DateTimeFormat('en-US', {
+				timeZone: zone,
+				year: 'numeric',
+				month: '2-digit',
+				day: '2-digit',
+				hour: '2-digit',
+				minute: '2-digit',
+				second: '2-digit',
+				hourCycle: 'h23',
+			})
+				.formatToParts(date)
+				.map((p) => [p.type, p.value]),
+		);
+		return { year: +map.year, month: +map.month, day: +map.day, hour: +map.hour, minute: +map.minute, second: +map.second };
+	}
+
+	function offsetMinutes(date: Date, zone: string): number {
+		const p = partsIn(date, zone);
+		const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+		return Math.round((asUtc - Math.floor(date.getTime() / 1000) * 1000) / 60000);
+	}
+
+	function wallToDate(wall: string, zone: string): Date | null {
+		const m = wall.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+		if (!m) return null;
+		const guess = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+		let ts = guess - offsetMinutes(new Date(guess), zone) * 60000;
+		ts = guess - offsetMinutes(new Date(ts), zone) * 60000;
+		return new Date(ts);
+	}
+
+	function formatOffset(minutes: number): string {
+		const sign = minutes < 0 ? '−' : '+';
+		const abs = Math.abs(minutes);
+		return `UTC${sign}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
+	}
+
+	function dayNumber(p: Parts): number {
+		return Date.UTC(p.year, p.month - 1, p.day) / 86400000;
+	}
+
+	function localWall(date: Date, zone: string): string {
+		const p = partsIn(date, zone);
+		const pad = (n: number) => String(n).padStart(2, '0');
+		return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
+	}
+
+	onPage('tz-tool', () => {
+		const when = byId<HTMLInputElement>('tz-when');
+		const source = byId<HTMLSelectElement>('tz-source');
+		const addInput = byId<HTMLInputElement>('tz-add-input');
+		const list = byId('tz-list');
+		const error = byId('tz-error');
+		const zones = Intl.supportedValuesOf('timeZone');
+		const userZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		const all = [...new Set([userZone, 'UTC', ...zones])].sort();
+		const targets = DEFAULTS.filter((z) => z !== userZone);
+		let lines: string[] = [];
+
+		source.replaceChildren(...all.map((z) => new Option(z.replace(/_/g, ' '), z, false, z === userZone)));
+		byId('tz-zones').replaceChildren(...all.map((z) => new Option(z.replace(/_/g, ' '), z)));
+
+		const render = () => {
+			const date = wallToDate(when.value, source.value);
+			if (!date) {
+				error.textContent = 'Pick a valid date and time.';
+				error.hidden = false;
+				list.replaceChildren();
+				return;
+			}
+			error.hidden = true;
+			const baseDay = dayNumber(partsIn(date, source.value));
+			byId('tz-note').textContent = `${formatOffset(offsetMinutes(date, source.value))} · ${date.toISOString().replace('.000', '')}`;
+			lines = [];
+			list.replaceChildren(
+				...targets.map((zone, i) => {
+					const li = document.createElement('li');
+					li.className = 'tz-row';
+					li.dataset.zone = zone;
+					const diff = dayNumber(partsIn(date, zone)) - baseDay;
+					const time = new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
+					const day = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+					const offset = formatOffset(offsetMinutes(date, zone));
+					const name = document.createElement('span');
+					name.className = 'tz-name';
+					name.textContent = zone.replace(/_/g, ' ');
+					const t = document.createElement('b');
+					t.className = 'tz-time';
+					t.textContent = time;
+					const meta = document.createElement('span');
+					meta.className = 'tz-meta';
+					meta.textContent = `${day} · ${offset}`;
+					const badge = document.createElement('span');
+					badge.className = 'tz-diff';
+					badge.textContent = diff === 0 ? 'Same day' : `${diff > 0 ? '+' : '−'}${Math.abs(diff)} day`;
+					const rm = document.createElement('button');
+					rm.className = 'btn';
+					rm.textContent = '✕';
+					rm.setAttribute('aria-label', `Remove ${zone}`);
+					rm.addEventListener('click', () => {
+						targets.splice(i, 1);
+						render();
+					});
+					li.append(name, t, meta, badge, rm);
+					lines.push(`${zone}: ${day} ${time} (${offset})`);
+					return li;
+				}),
+			);
+			if (!targets.length) list.textContent = 'No target zones. Add one above.';
+		};
+
+		const add = () => {
+			const value = addInput.value.trim().replace(/ /g, '_');
+			const match = all.find((z) => z.toLowerCase() === value.toLowerCase());
+			if (!match) {
+				error.textContent = `Unknown time zone: ${addInput.value}`;
+				error.hidden = false;
+				return;
+			}
+			if (!targets.includes(match)) targets.push(match);
+			addInput.value = '';
+			render();
+		};
+
+		const now = () => {
+			when.value = localWall(new Date(), source.value);
+			render();
+		};
+
+		when.addEventListener('input', render);
+		source.addEventListener('change', render);
+		byId('tz-now').addEventListener('click', now);
+		byId('tz-add').addEventListener('click', add);
+		addInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') add();
+		});
+		addInput.addEventListener('change', () => {
+			if (all.includes(addInput.value)) add();
+		});
+		copyButton(byId('tz-copy'), () => lines.join('\n'));
+		now();
+	});
+</script>
+
+<style>
+	.tz-add-input {
+		width: 220px;
+		max-width: 100%;
+	}
+	.tz-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.tz-list :global(.tz-row) {
+		display: grid;
+		grid-template-columns: minmax(0, 1.4fr) auto minmax(0, 2fr) auto auto;
+		align-items: center;
+		gap: 12px;
+		padding: 12px 14px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.tz-list :global(.tz-name) {
+		font-weight: 700;
+		overflow-wrap: anywhere;
+	}
+	.tz-list :global(.tz-time) {
+		font-family: var(--mono);
+		font-size: 22px;
+		font-variant-numeric: tabular-nums;
+	}
+	.tz-list :global(.tz-meta) {
+		color: var(--ink-soft);
+		font-size: 13px;
+	}
+	.tz-list :global(.tz-diff) {
+		font-size: 12px;
+		font-weight: 700;
+		padding: 3px 8px;
+		border-radius: 999px;
+		background: var(--surface-2);
+		color: var(--ink);
+		white-space: nowrap;
+	}
+	@media (max-width: 640px) {
+		.tz-list :global(.tz-row) {
+			grid-template-columns: 1fr auto;
+		}
+	}
+</style>

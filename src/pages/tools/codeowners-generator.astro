@@ -1,0 +1,281 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = [
+	{ section: '', pattern: '*', owners: '@acme/core' },
+	{ section: 'Frontend', pattern: '/web/', owners: '@acme/frontend' },
+	{ section: 'Frontend', pattern: '*.css', owners: '@jane' },
+	{ section: 'Backend', pattern: '/api/', owners: '@acme/backend ops@acme.dev' },
+	{ section: 'Backend', pattern: '/api/payments/', owners: '@acme/payments' },
+	{ section: 'Docs', pattern: '/docs/', owners: '@acme/docs' },
+];
+const sampleJson = JSON.stringify(sample);
+---
+
+<ToolShell
+	slug="codeowners-generator"
+	title="CODEOWNERS Generator"
+	description="Map paths to owners for GitHub or GitLab, with sections and approvals, owner validation and shadowed pattern warnings."
+>
+	<div class="toolbar" id="co-tool" data-sample={sampleJson}>
+		<div class="seg" id="co-platform" role="group" aria-label="Platform">
+			<button data-value="github" aria-pressed="true">
+				GitHub
+			</button>
+			<button data-value="gitlab" aria-pressed="false">
+				GitLab
+			</button>
+		</div>
+		<button class="btn" id="co-add">
+			Add rule
+		</button>
+	</div>
+	<p class="co-hint">The last matching pattern wins, so put broad rules first and specific ones after.</p>
+	<div class="co-rows" id="co-rows"></div>
+	<div id="co-sections" class="co-sections" hidden></div>
+	<div id="co-warn" class="co-warn" role="status"></div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="co-file"></span>
+			<span class="co-actions">
+				<button class="btn" id="co-copy">
+					Copy
+				</button>
+				<button class="btn" id="co-dl">
+					Download
+				</button>
+			</span>
+		</div>
+		<pre class="out" id="co-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Row = { section: string; pattern: string; owners: string };
+	type SectionOpts = { optional: boolean; approvals: number };
+
+	const OWNER = /^(@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\/[A-Za-z0-9._-]+)*|[^\s@]+@[^\s@]+\.[^\s@]+)$/;
+
+	const toRegex = (pattern: string) => {
+		let p = pattern.trim();
+		const anchored = p.startsWith('/') || p.slice(0, -1).includes('/');
+		p = p.replace(/^\//, '');
+		const dir = p.endsWith('/');
+		const body = p
+			.replace(/\/$/, '')
+			.replace(/[.+^$()|[\]\\]/g, '\\$&')
+			.replace(/\*\*\//g, '\u0001')
+			.replace(/\*\*/g, '\u0002')
+			.replace(/\*/g, '[^/]*')
+			.replace(/\?/g, '[^/]')
+			.replace(/\u0001/g, '(?:.*/)?')
+			.replace(/\u0002/g, '.*');
+		return new RegExp(`${anchored ? '^' : '(?:^|/)'}${body}${dir ? '/.*' : '(?:/.*)?'}$`);
+	};
+
+	const covers = (a: string, b: string) => {
+		const later = a.trim();
+		const earlier = b.trim();
+		if (later === earlier || ['*', '**', '/**'].includes(later)) return true;
+		if (/[*?[]/.test(earlier)) return later.endsWith('/') && !/[*?[]/.test(later) && earlier.startsWith(later);
+		const probe = earlier.replace(/^\//, '').replace(/\/$/, '/file.txt');
+		return toRegex(later).test(probe);
+	};
+
+	onPage('co-tool', () => {
+		let platform = 'github';
+		const rows: Row[] = JSON.parse(byId('co-tool').dataset.sample ?? '[]');
+		const sectionOpts: Record<string, SectionOpts> = { Backend: { optional: false, approvals: 2 }, Docs: { optional: true, approvals: 1 } };
+		const rowsEl = byId('co-rows');
+
+		const drawRows = () => {
+			rowsEl.replaceChildren(
+				...rows.map((row, i) => {
+					const wrap = document.createElement('div');
+					wrap.className = 'co-row';
+					const make = (key: keyof Row, label: string, cls: string) => {
+						const input = document.createElement('input');
+						input.value = row[key];
+						input.spellcheck = false;
+						input.className = cls;
+						input.setAttribute('aria-label', `${label} ${i + 1}`);
+						input.addEventListener('input', () => {
+							row[key] = input.value;
+							render();
+						});
+						return input;
+					};
+					const del = document.createElement('button');
+					del.className = 'btn';
+					del.textContent = 'Remove';
+					del.setAttribute('aria-label', `Remove rule ${i + 1}`);
+					del.addEventListener('click', () => {
+						rows.splice(i, 1);
+						drawRows();
+						render();
+					});
+					const section = make('section', 'Section', 'co-section');
+					section.placeholder = 'Section';
+					section.hidden = platform !== 'gitlab';
+					wrap.append(section, make('pattern', 'Pattern', 'co-pattern'), make('owners', 'Owners', 'co-owners'), del);
+					return wrap;
+				}),
+			);
+		};
+
+		const drawSections = () => {
+			const names = [...new Set(rows.map((r) => r.section.trim()).filter(Boolean))];
+			const box = byId('co-sections');
+			box.hidden = platform !== 'gitlab' || !names.length;
+			box.replaceChildren(
+				...names.map((name, i) => {
+					const opts = (sectionOpts[name] ??= { optional: false, approvals: 1 });
+					const line = document.createElement('div');
+					line.className = 'co-sec';
+					const title = document.createElement('b');
+					title.textContent = `[${name}]`;
+					const optLabel = document.createElement('label');
+					optLabel.className = 'check';
+					const opt = document.createElement('input');
+					opt.type = 'checkbox';
+					opt.checked = opts.optional;
+					opt.addEventListener('input', () => ((opts.optional = opt.checked), render()));
+					optLabel.append(opt, ' Optional');
+					const num = document.createElement('input');
+					num.type = 'number';
+					num.min = '1';
+					num.className = 'num';
+					num.id = `co-appr-${i}`;
+					num.value = String(opts.approvals);
+					num.addEventListener('input', () => ((opts.approvals = Math.max(1, Number(num.value) || 1)), render()));
+					const numLabel = document.createElement('label');
+					numLabel.className = 'check';
+					numLabel.htmlFor = num.id;
+					numLabel.textContent = 'Approvals';
+					line.append(title, optLabel, numLabel, num);
+					return line;
+				}),
+			);
+		};
+
+		const render = () => {
+			const gitlab = platform === 'gitlab';
+			byId('co-file').textContent = gitlab ? 'CODEOWNERS · .gitlab/CODEOWNERS or docs/CODEOWNERS' : '.github/CODEOWNERS · or CODEOWNERS or docs/CODEOWNERS';
+			const warnings: string[] = [];
+			const valid = rows.filter((r) => r.pattern.trim());
+			valid.forEach((r, i) => {
+				r.owners
+					.split(/\s+/)
+					.filter(Boolean)
+					.forEach((o) => {
+						if (!OWNER.test(o)) warnings.push(`Rule ${i + 1}: "${o}" is not a valid owner. Use @user, @org/team or an email.`);
+					});
+				if (!r.owners.trim()) warnings.push(`Rule ${i + 1}: "${r.pattern.trim()}" has no owners, so it removes ownership for those paths.`);
+				if (!gitlab && r.pattern.includes('!')) warnings.push(`Rule ${i + 1}: GitHub does not support negation with !.`);
+				const later = valid.slice(i + 1).findIndex((o) => (!gitlab || o.section.trim() === r.section.trim()) && covers(o.pattern, r.pattern));
+				if (later >= 0)
+					warnings.push(
+						`Rule ${i + 1}: "${r.pattern.trim()}" never applies, rule ${i + 2 + later} ("${valid[i + 1 + later].pattern.trim()}") comes later and matches the same paths.`,
+					);
+			});
+			const w = byId('co-warn');
+			w.replaceChildren(
+				...warnings.map((t) => {
+					const p = document.createElement('p');
+					p.className = 'error';
+					p.textContent = t;
+					return p;
+				}),
+			);
+			const width = Math.max(...valid.map((r) => r.pattern.trim().length), 1);
+			const line = (r: Row) => `${r.pattern.trim().padEnd(width)} ${r.owners.trim().split(/\s+/).join(' ')}`.trimEnd();
+			const out: string[] = ['# Each line is a file pattern followed by one or more owners.', '# The last matching pattern takes precedence.', ''];
+			if (!gitlab) {
+				out.push(...valid.map(line));
+			} else {
+				const order: string[] = [];
+				valid.forEach((r) => order.includes(r.section.trim()) || order.push(r.section.trim()));
+				order.sort((a, b) => (a === '' ? -1 : b === '' ? 1 : 0));
+				order.forEach((name) => {
+					if (name) {
+						const o = sectionOpts[name] ?? { optional: false, approvals: 1 };
+						out.push('', `${o.optional ? '^' : ''}[${name}]${o.approvals > 1 ? `[${o.approvals}]` : ''}`);
+					}
+					out.push(...valid.filter((r) => r.section.trim() === name).map(line));
+				});
+			}
+			byId('co-out').textContent = `${out.join('\n').replace(/\n{3,}/g, '\n\n')}\n`;
+		};
+
+		const redraw = () => (drawRows(), drawSections(), render());
+		rowsEl.addEventListener('change', drawSections);
+		segmented(byId('co-platform'), (v) => ((platform = v), redraw()));
+		byId('co-add').addEventListener('click', () => {
+			rows.push({ section: '', pattern: '/new/path/', owners: '@user' });
+			redraw();
+		});
+		copyButton(byId('co-copy'), () => byId('co-out').textContent ?? '');
+		byId('co-dl').addEventListener('click', () => {
+			const link = document.createElement('a');
+			link.href = URL.createObjectURL(new Blob([byId('co-out').textContent ?? ''], { type: 'text/plain' }));
+			link.download = 'CODEOWNERS';
+			link.click();
+			URL.revokeObjectURL(link.href);
+		});
+		redraw();
+	});
+</script>
+
+<style>
+	.co-hint {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.co-rows,
+	.co-sections,
+	.co-warn {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.co-warn :global(p) {
+		margin: 0;
+	}
+	.co-sections {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		padding: 10px 14px;
+	}
+	.co-rows :global(.co-row),
+	.co-sections :global(.co-sec) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+	}
+	.co-rows :global(input) {
+		flex: 1 1 140px;
+		min-width: 0;
+		font-family: var(--mono);
+		font-size: 13px;
+		padding: 8px 10px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+		color: var(--ink);
+	}
+	.co-rows :global(input[hidden]) {
+		display: none;
+	}
+	.co-rows :global(.co-owners) {
+		flex-grow: 2;
+	}
+	.co-actions {
+		display: inline-flex;
+		gap: 6px;
+	}
+</style>

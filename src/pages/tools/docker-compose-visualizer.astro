@@ -1,0 +1,622 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `services:
+  web:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+    networks:
+      - frontend
+
+  api:
+    build: ./api
+    environment:
+      DATABASE_URL: postgres://app:secret@db:5432/app
+      REDIS_URL: redis://cache:6379
+    deploy:
+      replicas: 2
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+    networks:
+      - frontend
+      - backend
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 10s
+    networks:
+      - backend
+
+  cache:
+    image: redis:7-alpine
+    networks:
+      - backend
+
+networks:
+  frontend:
+  backend:
+    internal: true
+
+volumes:
+  pgdata:
+`;
+---
+
+<ToolShell
+	slug="docker-compose-visualizer"
+	title="Docker Compose Visualizer"
+	description="Paste a compose file to see its services, dependencies, networks, volumes and published ports as a diagram, with a plain-English summary of each service."
+>
+	<div class="cv" id="cv-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span>compose.yaml</span>
+				<button class="btn" id="cv-copy">
+					Copy
+				</button>
+			</div>
+			<textarea id="cv-in" spellcheck="false" aria-label="Compose YAML">{sample}</textarea>
+		</section>
+		<p class="error" id="cv-error" hidden></p>
+		<div class="cv-legend" aria-hidden="true">
+			<span>
+				<i class="lg-dep"></i>depends on
+			</span>
+			<span>
+				<i class="lg-port"></i>host port
+			</span>
+			<span>
+				<i class="lg-vol"></i>volume
+			</span>
+			<span>
+				<i class="lg-net"></i>network
+			</span>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Diagram</span>
+			</div>
+			<div class="cv-scroll" id="cv-scroll" tabindex="0" role="region" aria-label="Compose diagram, scrollable">
+				<svg id="cv-svg" role="group" aria-label="Compose diagram"></svg>
+			</div>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Services</span>
+			</div>
+			<ul class="cv-list" id="cv-list"></ul>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { parse } from 'yaml';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Svc = {
+		name: string;
+		image: string;
+		build: string;
+		ports: string[];
+		replicas: number;
+		deps: { name: string; condition: string }[];
+		networks: string[];
+		volumes: { source: string; target: string; named: boolean }[];
+		env: number;
+		health: boolean;
+	};
+
+	const NS = 'http://www.w3.org/2000/svg';
+	const s = (tag: string, attrs: Record<string, string | number>, parent?: Element, text?: string) => {
+		const e = document.createElementNS(NS, tag);
+		Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, String(v)));
+		if (text !== undefined) e.textContent = text;
+		parent?.appendChild(e);
+		return e;
+	};
+	const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+	const obj = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+	const list = (v: unknown) => (Array.isArray(v) ? v : v && typeof v === 'object' ? Object.keys(v) : []);
+
+	const read = (text: string) => {
+		const doc = obj(parse(text));
+		const services = obj(doc.services);
+		const names = Object.keys(services);
+		if (!names.length) throw new Error('No services found. A compose file needs a top-level services: key.');
+		const topVolumes = Object.keys(obj(doc.volumes));
+		const topNetworks = Object.keys(obj(doc.networks));
+		const svcs: Svc[] = names.map((name) => {
+			const raw = obj(services[name]);
+			const build = typeof raw.build === 'string' ? raw.build : raw.build ? String(obj(raw.build).context ?? '.') : '';
+			const ports = (Array.isArray(raw.ports) ? raw.ports : []).map((p) => {
+				if (typeof p === 'object' && p) {
+					const o = obj(p);
+					return `${o.published ?? '?'}:${o.target ?? '?'}`;
+				}
+				return String(p);
+			});
+			const depsRaw = raw.depends_on;
+			const deps = Array.isArray(depsRaw)
+				? depsRaw.map((d) => ({ name: String(d), condition: '' }))
+				: Object.entries(obj(depsRaw)).map(([d, v]) => ({ name: d, condition: String(obj(v).condition ?? '') }));
+			const volumes = (Array.isArray(raw.volumes) ? raw.volumes : []).map((v) => {
+				if (typeof v === 'object' && v) {
+					const o = obj(v);
+					return {
+						source: String(o.source ?? ''),
+						target: String(o.target ?? ''),
+						named: o.type === 'volume' || (!o.type && !!o.source && !/^[./~$]/.test(String(o.source))),
+					};
+				}
+				const [source, target] = String(v).split(':');
+				return target ? { source, target, named: !/^[./~$]/.test(source) } : { source: '', target: source, named: false };
+			});
+			const env = Array.isArray(raw.environment) ? raw.environment.length : Object.keys(obj(raw.environment)).length;
+			const nets = list(raw.networks).map(String);
+			return {
+				name,
+				image: typeof raw.image === 'string' ? raw.image : '',
+				build,
+				ports,
+				replicas: Number(obj(raw.deploy).replicas ?? 1) || 1,
+				deps,
+				networks: nets.length ? nets : ['default'],
+				volumes,
+				env,
+				health: !!raw.healthcheck,
+			};
+		});
+		const missing = svcs.flatMap((sv) => sv.deps.filter((d) => !names.includes(d.name)).map((d) => `${sv.name} depends on unknown service ${d.name}`));
+		const level: Record<string, number> = {};
+		const visit = (n: string, stack: string[]): number => {
+			if (level[n] !== undefined) return level[n];
+			if (stack.includes(n)) throw new Error(`Dependency cycle: ${[...stack, n].join(' → ')}`);
+			const sv = svcs.find((x) => x.name === n);
+			const deps = (sv?.deps ?? []).filter((d) => names.includes(d.name));
+			level[n] = deps.length ? 1 + Math.max(...deps.map((d) => visit(d.name, [...stack, n]))) : 0;
+			return level[n];
+		};
+		names.forEach((n) => visit(n, []));
+		const max = Math.max(...Object.values(level));
+		const volumeNames = [...new Set([...topVolumes, ...svcs.flatMap((sv) => sv.volumes.filter((v) => v.named).map((v) => v.source))])];
+		const networkNames = [...new Set([...topNetworks, ...svcs.flatMap((sv) => sv.networks)])].filter((n) => svcs.some((sv) => sv.networks.includes(n)));
+		return { svcs, layer: (n: string) => max - level[n], layers: max + 1, volumeNames, networkNames, missing };
+	};
+
+	const describe = (sv: Svc) => {
+		const parts = [sv.build ? `Built from ${sv.build}` : `Runs the image ${sv.image || '(none)'}`];
+		if (sv.replicas > 1) parts.push(`${sv.replicas} replicas behind the service name`);
+		if (sv.ports.length) parts.push(`published on host port${sv.ports.length > 1 ? 's' : ''} ${sv.ports.map((p) => p.split(':').slice(-2)[0]).join(', ')}`);
+		else parts.push('not published on the host, only reachable from other services');
+		if (sv.deps.length)
+			parts.push(`starts after ${sv.deps.map((d) => (d.condition ? `${d.name} (${d.condition.replace('service_', '')})` : d.name)).join(', ')}`);
+		parts.push(`on network${sv.networks.length > 1 ? 's' : ''} ${sv.networks.join(', ')}`);
+		const named = sv.volumes.filter((v) => v.named);
+		if (named.length) parts.push(`stores data in ${named.map((v) => `${v.source} at ${v.target}`).join(', ')}`);
+		const binds = sv.volumes.filter((v) => !v.named && v.source);
+		if (binds.length) parts.push(`bind-mounts ${binds.map((v) => v.source).join(', ')}`);
+		if (sv.env) parts.push(`${sv.env} environment variable${sv.env > 1 ? 's' : ''}`);
+		if (sv.health) parts.push('has a healthcheck');
+		return `${parts.join('; ')}.`;
+	};
+
+	onPage('cv-tool', () => {
+		const input = byId<HTMLTextAreaElement>('cv-in');
+		const svg = byId('cv-svg') as unknown as SVGSVGElement;
+		const scroll = byId('cv-scroll');
+		const root = byId('cv-tool');
+
+		const render = () => {
+			const error = byId('cv-error');
+			let model: ReturnType<typeof read>;
+			try {
+				model = read(input.value);
+				error.hidden = !model.missing.length;
+				error.textContent = model.missing.join('. ');
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+				return;
+			}
+			const { svcs, layer, layers, volumeNames, networkNames } = model;
+			const vertical = scroll.clientWidth < 620;
+			const CW = 176;
+			const CH = 96;
+			const GAP_MAIN = vertical ? 70 : 90;
+			const GAP_CROSS = 44;
+			const buckets: Svc[][] = Array.from({ length: layers }, () => []);
+			svcs.forEach((sv) => buckets[layer(sv.name)].push(sv));
+			const maxCross = Math.max(...buckets.map((b) => b.length));
+			const pad = 24 + networkNames.length * 8;
+			const hostH = 56;
+			const pos: Record<string, { x: number; y: number }> = {};
+			buckets.forEach((b, li) =>
+				b.forEach((sv, ci) => {
+					const offset = ((maxCross - b.length) * (vertical ? CW + GAP_CROSS : CH + GAP_CROSS)) / 2;
+					pos[sv.name] = vertical
+						? { x: pad + offset + ci * (CW + GAP_CROSS), y: hostH + pad + 20 + li * (CH + GAP_MAIN) }
+						: { x: pad + li * (CW + GAP_MAIN), y: hostH + pad + 20 + offset + ci * (CH + GAP_CROSS) };
+				}),
+			);
+			const contentW = vertical ? maxCross * (CW + GAP_CROSS) - GAP_CROSS : layers * (CW + GAP_MAIN) - GAP_MAIN;
+			const contentH = vertical ? layers * (CH + GAP_MAIN) - GAP_MAIN : maxCross * (CH + GAP_CROSS) - GAP_CROSS;
+			const volY = hostH + pad * 2 + 40 + contentH;
+			const volW = 130;
+			const W = Math.max(contentW + pad * 2, volumeNames.length * (volW + 20) + 40, 320);
+			const H = volY + (volumeNames.length ? 90 : 10);
+			svg.replaceChildren();
+			svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+			svg.setAttribute('width', String(W));
+			svg.setAttribute('height', String(H));
+			const defs = s('defs', {}, svg);
+			const marker = s('marker', { id: 'cv-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, defs);
+			s('path', { d: 'M0 0L10 5L0 10z', class: 'cv-head' }, marker);
+
+			s('rect', { x: 4, y: 4, width: W - 8, height: hostH - 12, rx: 12, class: 'cv-host' }, svg);
+			s('text', { x: 18, y: 32, class: 'cv-title' }, svg, 'Host');
+
+			const tints = ['t1', 't2', 't3'];
+			networkNames.forEach((net, ni) => {
+				const members = svcs.filter((sv) => sv.networks.includes(net)).map((sv) => pos[sv.name]);
+				const inset = 14 + ni * 8;
+				const x1 = Math.min(...members.map((p) => p.x)) - inset;
+				const y1 = Math.min(...members.map((p) => p.y)) - inset - 14;
+				const x2 = Math.max(...members.map((p) => p.x + CW)) + inset;
+				const y2 = Math.max(...members.map((p) => p.y + CH)) + inset;
+				const g = s('g', { class: `cv-net ${tints[ni % 3]}`, 'data-k': `net:${net}`, tabindex: 0, role: 'img', 'aria-label': `Network ${net}` }, svg);
+				s('rect', { x: x1, y: y1, width: x2 - x1, height: y2 - y1, rx: 14, class: 'cv-lane' }, g);
+				s('text', { x: x1 + 10, y: y1 + 14 + ni * 0, class: 'cv-net-label' }, g, `network ${net}`);
+			});
+
+			svcs.forEach((sv) =>
+				sv.deps.forEach((d) => {
+					const a = pos[sv.name];
+					const b = pos[d.name];
+					if (!b) return;
+					const [x1, y1, x2, y2] = vertical ? [a.x + CW / 2, a.y + CH, b.x + CW / 2, b.y] : [a.x + CW, a.y + CH / 2, b.x, b.y + CH / 2];
+					const g = s('g', { class: 'cv-dep', 'data-k': `svc:${sv.name}`, 'data-k2': `svc:${d.name}` }, svg);
+					const mx = (x1 + x2) / 2;
+					const my = (y1 + y2) / 2;
+					const d2 = vertical ? `M${x1} ${y1}C${x1} ${my} ${x2} ${my} ${x2} ${y2 - 2}` : `M${x1} ${y1}C${mx} ${y1} ${mx} ${y2} ${x2 - 2} ${y2}`;
+					s('path', { d: d2, class: 'cv-edge', 'marker-end': 'url(#cv-arrow)' }, g);
+					if (d.condition) {
+						const label = d.condition.replace('service_', '');
+						s('rect', { x: mx - 38, y: my - 10, width: 76, height: 18, rx: 9, class: 'cv-cond-bg' }, g);
+						s('text', { x: mx, y: my + 3, class: 'cv-cond cv-mid' }, g, label);
+					}
+				}),
+			);
+
+			const hostPorts: { x: number; label: string; name: string }[] = [];
+			svcs.forEach((sv) => {
+				const p = pos[sv.name];
+				sv.ports.forEach((port, pi) => hostPorts.push({ x: p.x + 20 + pi * 62, label: port.split(':').slice(-2)[0], name: sv.name }));
+			});
+			hostPorts.sort((a, b) => a.x - b.x);
+			hostPorts.forEach((hp, i) => {
+				if (i && hp.x < hostPorts[i - 1].x + 58) hp.x = hostPorts[i - 1].x + 58;
+			});
+			hostPorts.forEach((hp) => {
+				const p = pos[hp.name];
+				const g = s('g', { class: 'cv-port', 'data-k': `svc:${hp.name}` }, svg);
+				s('path', { d: `M${hp.x + 26} ${hostH - 8}C${hp.x + 26} ${p.y - 20} ${p.x + CW / 2} ${p.y - 30} ${p.x + CW / 2} ${p.y}`, class: 'cv-port-line' }, g);
+				s('rect', { x: hp.x, y: 12, width: 52, height: 26, rx: 13, class: 'cv-port-pill' }, g);
+				s('text', { x: hp.x + 26, y: 30, class: 'cv-port-text cv-mid' }, g, `:${cut(hp.label, 6)}`);
+			});
+
+			volumeNames.forEach((v, vi) => {
+				const vx = 20 + vi * (volW + 20);
+				const users = svcs.filter((sv) => sv.volumes.some((m) => m.named && m.source === v));
+				const g = s(
+					'g',
+					{
+						class: 'cv-vol',
+						'data-k': `vol:${v}`,
+						tabindex: 0,
+						role: 'img',
+						'aria-label': `Volume ${v}, used by ${users.map((u) => u.name).join(', ') || 'no service'}`,
+					},
+					svg,
+				);
+				users.forEach((u) => {
+					const p = pos[u.name];
+					s('path', { d: `M${p.x + CW / 2} ${p.y + CH}L${vx + volW / 2} ${volY}`, class: 'cv-vol-line' }, g);
+				});
+				s('path', { d: `M${vx} ${volY + 8}v34a${volW / 2} 8 0 0 0 ${volW} 0v-34`, class: 'cv-cyl' }, g);
+				s('ellipse', { cx: vx + volW / 2, cy: volY + 8, rx: volW / 2, ry: 8, class: 'cv-cyl' }, g);
+				s('text', { x: vx + volW / 2, y: volY + 36, class: 'cv-label cv-mid' }, g, cut(v, 16));
+			});
+
+			svcs.forEach((sv) => {
+				const p = pos[sv.name];
+				const g = s(
+					'g',
+					{
+						class: 'cv-card',
+						'data-k': `svc:${sv.name}`,
+						'data-service': sv.name,
+						tabindex: 0,
+						role: 'img',
+						'aria-label': `Service ${sv.name}: ${describe(sv)}`,
+					},
+					svg,
+				);
+				if (sv.replicas > 1) s('rect', { x: p.x + 6, y: p.y - 6, width: CW, height: CH, rx: 12, class: 'cv-card-bg back' }, g);
+				s('rect', { x: p.x, y: p.y, width: CW, height: CH, rx: 12, class: 'cv-card-bg' }, g);
+				s('text', { x: p.x + 12, y: p.y + 24, class: 'cv-title' }, g, cut(sv.name, 16));
+				if (sv.replicas > 1) s('text', { x: p.x + CW - 12, y: p.y + 24, class: 'cv-sub cv-end' }, g, `×${sv.replicas}`);
+				s('text', { x: p.x + 12, y: p.y + 46, class: 'cv-label' }, g, cut(sv.build ? `build ${sv.build}` : sv.image || 'no image', 22));
+				s('text', { x: p.x + 12, y: p.y + 66, class: 'cv-sub' }, g, cut(sv.ports.length ? `ports ${sv.ports.join(', ')}` : 'internal only', 24));
+				s('text', { x: p.x + 12, y: p.y + 84, class: 'cv-sub' }, g, cut(`${sv.env} env${sv.health ? ' · healthcheck' : ''}`, 24));
+			});
+
+			svg.setAttribute('aria-label', `Compose diagram: ${svcs.length} services, ${networkNames.length} networks, ${volumeNames.length} volumes`);
+			byId('cv-list').replaceChildren(
+				...svcs.map((sv) => {
+					const li = document.createElement('li');
+					li.dataset.k = `svc:${sv.name}`;
+					li.tabIndex = 0;
+					const b = document.createElement('strong');
+					b.textContent = sv.name;
+					const p = document.createElement('span');
+					p.textContent = describe(sv);
+					li.append(b, p);
+					return li;
+				}),
+				...networkNames.map((n) => {
+					const li = document.createElement('li');
+					li.dataset.k = `net:${n}`;
+					li.tabIndex = 0;
+					const b = document.createElement('strong');
+					b.textContent = `network ${n}`;
+					const p = document.createElement('span');
+					const members = svcs.filter((sv) => sv.networks.includes(n)).map((sv) => sv.name);
+					p.textContent = `${members.join(', ')} can reach each other by service name here.`;
+					li.append(b, p);
+					return li;
+				}),
+				...volumeNames.map((v) => {
+					const li = document.createElement('li');
+					li.dataset.k = `vol:${v}`;
+					li.tabIndex = 0;
+					const b = document.createElement('strong');
+					b.textContent = `volume ${v}`;
+					const p = document.createElement('span');
+					const users = svcs.filter((sv) => sv.volumes.some((m) => m.named && m.source === v)).map((sv) => sv.name);
+					p.textContent = `Named volume managed by Docker${users.length ? `, mounted by ${users.join(', ')}` : ', not mounted by any service'}; it survives docker compose down unless you add -v.`;
+					li.append(b, p);
+					return li;
+				}),
+			);
+		};
+
+		const highlight = (k: string | undefined) => {
+			root
+				.querySelectorAll<HTMLElement | SVGElement>('[data-k]')
+				.forEach((el) => el.classList.toggle('hl', !!k && (el.dataset.k === k || el.dataset.k2 === k)));
+		};
+		const target = (e: Event) => ((e.target as Element).closest?.('[data-k]') as HTMLElement | null)?.dataset.k;
+		root.addEventListener('pointerover', (e) => highlight(target(e)));
+		root.addEventListener('pointerleave', () => highlight(undefined));
+		root.addEventListener('focusin', (e) => highlight(target(e)));
+		root.addEventListener('focusout', () => highlight(undefined));
+
+		let lastVertical: boolean | undefined;
+		new ResizeObserver(() => {
+			const v = scroll.clientWidth < 620;
+			if (v !== lastVertical) {
+				lastVertical = v;
+				render();
+			}
+		}).observe(scroll);
+		input.addEventListener('input', render);
+		copyButton(byId('cv-copy'), () => input.value);
+		render();
+	});
+</script>
+
+<style is:global>
+	.cv {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	#cv-in {
+		min-height: 240px;
+	}
+	.cv-legend {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 14px;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.cv-legend span {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.cv-legend i {
+		display: inline-block;
+		width: 18px;
+		height: 0;
+		border-top: 3px solid var(--accent-strong);
+	}
+	.cv-legend .lg-port {
+		border-color: var(--tint-3);
+	}
+	.cv-legend .lg-vol {
+		border-top-style: dotted;
+		border-color: var(--tint-2);
+	}
+	.cv-legend .lg-net {
+		border-top-style: dashed;
+		border-color: var(--tint-1);
+	}
+	.cv-scroll {
+		overflow: auto;
+		padding: 12px;
+	}
+	.cv-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	#cv-svg {
+		display: block;
+		font-family: var(--sans);
+	}
+	.cv-host {
+		fill: var(--surface-2);
+		stroke: var(--border);
+	}
+	.cv-title {
+		fill: var(--ink);
+		font-size: 15px;
+		font-weight: 800;
+	}
+	.cv-sub {
+		fill: var(--ink-soft);
+		font-size: 12px;
+	}
+	.cv-label {
+		fill: var(--ink);
+		font-family: var(--mono);
+		font-size: 12px;
+	}
+	.cv-mid {
+		text-anchor: middle;
+	}
+	.cv-end {
+		text-anchor: end;
+	}
+	.cv-lane {
+		fill: none;
+		stroke-width: 1.5;
+		stroke-dasharray: 6 4;
+	}
+	.cv-net.t1 .cv-lane {
+		stroke: var(--tint-1);
+	}
+	.cv-net.t2 .cv-lane {
+		stroke: var(--tint-2);
+	}
+	.cv-net.t3 .cv-lane {
+		stroke: var(--tint-3);
+	}
+	.cv-net-label {
+		fill: var(--ink-soft);
+		font-size: 12px;
+		font-weight: 700;
+	}
+	.cv-net.hl .cv-lane {
+		stroke-width: 3.5;
+		stroke-dasharray: none;
+	}
+	.cv-card-bg {
+		fill: var(--surface);
+		stroke: var(--accent-strong);
+		stroke-width: 1.5;
+	}
+	.cv-card-bg.back {
+		fill: var(--surface-2);
+	}
+	.cv-card.hl .cv-card-bg:not(.back) {
+		fill: var(--accent);
+		stroke-width: 3;
+	}
+	.cv-edge {
+		fill: none;
+		stroke: var(--accent-strong);
+		stroke-width: 2;
+	}
+	.cv-dep.hl .cv-edge {
+		stroke-width: 4;
+	}
+	.cv-head {
+		fill: var(--accent-strong);
+	}
+	.cv-cond-bg {
+		fill: var(--surface);
+		stroke: var(--border);
+	}
+	.cv-cond {
+		fill: var(--ink);
+		font-size: 11px;
+		font-weight: 600;
+	}
+	.cv-port-line {
+		fill: none;
+		stroke: var(--tint-3);
+		stroke-width: 2;
+	}
+	.cv-port-pill {
+		fill: var(--surface);
+		stroke: var(--tint-3);
+		stroke-width: 1.5;
+	}
+	.cv-port.hl .cv-port-pill {
+		stroke-width: 3;
+	}
+	.cv-port-text {
+		fill: var(--ink);
+		font-family: var(--mono);
+		font-size: 12px;
+		font-weight: 700;
+	}
+	.cv-cyl {
+		fill: var(--surface);
+		stroke: var(--tint-2);
+		stroke-width: 1.5;
+	}
+	.cv-vol-line {
+		stroke: var(--tint-2);
+		stroke-width: 1.5;
+		stroke-dasharray: 2 4;
+	}
+	.cv-vol.hl .cv-cyl {
+		fill: var(--accent);
+		stroke-width: 3;
+	}
+	.cv-card,
+	.cv-vol,
+	.cv-net {
+		outline: none;
+	}
+	.cv-list {
+		margin: 0;
+		padding: 8px;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.cv-list li {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 8px 10px;
+		border-radius: 10px;
+		font-size: 14px;
+	}
+	.cv-list li.hl {
+		background: var(--accent);
+		outline: 2px solid var(--accent-strong);
+	}
+	.cv-list li:focus-visible {
+		outline: 2px solid var(--accent-strong);
+	}
+</style>

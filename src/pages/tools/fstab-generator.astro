@@ -1,0 +1,336 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const fsTypes = ['ext4', 'xfs', 'btrfs', 'vfat', 'ntfs3', 'nfs', 'cifs', 'tmpfs', 'swap'];
+const opts = ['defaults', 'noatime', 'nofail', 'ro', 'noexec', 'nosuid', 'nodev', 'x-systemd.automount', '_netdev'];
+---
+
+<ToolShell
+	slug="fstab-generator"
+	title="fstab Entry Generator"
+	description="Build a correct /etc/fstab line for disks, network shares, tmpfs and swap, with every field explained and common mistakes flagged."
+>
+	<div class="toolbar" id="fs-tool">
+		<label class="fs-select">
+			<span>Filesystem</span>
+			<select id="fs-type">
+				{fsTypes.map((t) => (
+					<option value={t}>{t}</option>
+				))}
+			</select>
+		</label>
+		<div class="seg" id="fs-by" role="group" aria-label="Identify the device by">
+			<button data-value="UUID" aria-pressed="true">
+				UUID
+			</button>
+			<button data-value="LABEL">LABEL</button>
+			<button data-value="PARTUUID">PARTUUID</button>
+			<button data-value="path">Path</button>
+		</div>
+	</div>
+	<div class="fields">
+		<div class="field">
+			<label for="fs-dev" id="fs-dev-label">
+				Device
+			</label>
+			<input id="fs-dev" spellcheck="false" value="3f8a1c2e-5b7d-4e9a-8c61-2d4f0b9e7a13" />
+		</div>
+		<div class="field">
+			<label for="fs-mount">Mount point</label>
+			<input id="fs-mount" spellcheck="false" value="/mnt/data" />
+		</div>
+		<div class="field" id="fs-uid-field">
+			<label for="fs-uid">uid</label>
+			<input id="fs-uid" spellcheck="false" inputmode="numeric" value="1000" />
+		</div>
+		<div class="field" id="fs-gid-field">
+			<label for="fs-gid">gid</label>
+			<input id="fs-gid" spellcheck="false" inputmode="numeric" value="1000" />
+		</div>
+		<div class="field" id="fs-cred-field">
+			<label for="fs-cred">credentials file</label>
+			<input id="fs-cred" spellcheck="false" value="/etc/samba/credentials-nas" />
+		</div>
+		<div class="field">
+			<label for="fs-extra">Extra options</label>
+			<input id="fs-extra" spellcheck="false" placeholder="size=2G,mode=1777" />
+		</div>
+		<div class="field">
+			<label for="fs-dump">dump</label>
+			<input id="fs-dump" spellcheck="false" inputmode="numeric" placeholder="auto" />
+		</div>
+		<div class="field">
+			<label for="fs-pass">pass</label>
+			<input id="fs-pass" spellcheck="false" inputmode="numeric" placeholder="auto" />
+		</div>
+	</div>
+	<div class="chips" id="fs-opts" role="group" aria-label="Mount options">
+		{opts.map((o) => (
+			<button data-opt={o} aria-pressed={o === 'noatime' || o === 'nofail' ? 'true' : 'false'}>
+				{o}
+			</button>
+		))}
+	</div>
+	<ul class="fs-warn" id="fs-warn"></ul>
+	<section class="panel">
+		<div class="panel-head">
+			<span>/etc/fstab</span>
+			<button class="btn" id="fs-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out fs-out" id="fs-out" tabindex="0" aria-label="fstab line"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Apply safely</span>
+			<button class="btn" id="fs-cmd-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out fs-cmd" id="fs-cmd"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Each field</span>
+		</div>
+		<dl class="fs-explain" id="fs-explain"></dl>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('fs-tool', () => {
+		let by = 'UUID';
+		const samples: Record<string, string> = {
+			nfs: 'nas.lan:/export/backups',
+			cifs: '//nas.lan/media',
+			tmpfs: 'tmpfs',
+		};
+		const mounts: Record<string, string> = { nfs: '/mnt/backups', cifs: '/mnt/media', tmpfs: '/tmp', swap: 'none', vfat: '/boot/efi' };
+		const network = (t: string) => t === 'nfs' || t === 'cifs';
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const q = (s: string) => (/^[A-Za-z0-9_/.,:@%+=-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
+		const esc = (s: string) => s.replace(/ /g, '\\040').replace(/\t/g, '\\011');
+		const chips = () => Array.from(document.querySelectorAll<HTMLButtonElement>('#fs-opts button'));
+		const picked = () =>
+			chips()
+				.filter((b) => b.getAttribute('aria-pressed') === 'true')
+				.map((b) => b.dataset.opt ?? '');
+
+		const render = () => {
+			const type = byId<HTMLSelectElement>('fs-type').value;
+			const raw = val('fs-dev');
+			const kindless = network(type) || type === 'tmpfs';
+			byId('fs-by').hidden = kindless;
+			byId('fs-dev-label').textContent =
+				type === 'nfs' ? 'Server:/export' : type === 'cifs' ? '//server/share' : type === 'tmpfs' ? 'Source' : by === 'path' ? 'Device path' : by;
+			const device = kindless || by === 'path' ? raw : `${by}=${raw}`;
+			const mount = type === 'swap' ? 'none' : val('fs-mount') || '/mnt/data';
+			const idOpts = type === 'vfat' || type === 'cifs' || type === 'ntfs3';
+			byId('fs-uid-field').hidden = !idOpts;
+			byId('fs-gid-field').hidden = !idOpts;
+			byId('fs-cred-field').hidden = type !== 'cifs';
+			let options = picked();
+			if (type === 'swap') options = options.filter((o) => o === 'defaults' || o === 'nofail');
+			if (idOpts && val('fs-uid')) options.push(`uid=${val('fs-uid')}`);
+			if (idOpts && val('fs-gid')) options.push(`gid=${val('fs-gid')}`);
+			if (type === 'cifs' && val('fs-cred')) options.push(`credentials=${val('fs-cred')}`);
+			if (val('fs-extra'))
+				options.push(
+					...val('fs-extra')
+						.split(',')
+						.map((s) => s.trim())
+						.filter(Boolean),
+				);
+			if (options.length > 1) options = options.filter((o) => o !== 'defaults');
+			if (!options.length) options = ['defaults'];
+			if (type === 'swap' && !options.includes('sw')) options.push('sw');
+			const autoPass = mount === '/' ? '1' : type === 'ext4' || type === 'vfat' ? '2' : '0';
+			const dump = val('fs-dump') || '0';
+			const pass = val('fs-pass') || autoPass;
+			const cols = [esc(device), esc(mount), type, options.join(','), dump, pass];
+			const head = ['# <device>', '<mount point>', '<type>', '<options>', '<dump>', '<pass>'];
+			const w = cols.map((c, i) => Math.max(c.length, head[i].length));
+			const pad = (row: string[]) => row.map((c, i) => (i === row.length - 1 ? c : c.padEnd(w[i]))).join('  ');
+			byId('fs-out').textContent = `${pad(head)}\n${pad(cols)}`;
+
+			const warns: string[] = [];
+			if (network(type) && !options.includes('_netdev'))
+				warns.push('Network filesystem without _netdev: systemd may try to mount it before the network is up.');
+			if (network(type) && !options.includes('nofail')) warns.push('Without nofail, an unreachable server can drop the machine into emergency mode at boot.');
+			if (!network(type) && type !== 'swap' && type !== 'tmpfs' && mount !== '/' && !options.includes('nofail'))
+				warns.push('Without nofail, a missing disk will stop the boot. Add it for removable or secondary drives.');
+			if ((type === 'swap' || network(type) || type === 'tmpfs') && pass !== '0') warns.push(`pass should be 0 for ${type}: fsck cannot check it.`);
+			if ((type === 'xfs' || type === 'btrfs') && pass !== '0') warns.push(`${type} has no boot-time fsck; pass 0 is the usual value.`);
+			if (type !== 'swap' && !mount.startsWith('/')) warns.push('The mount point must be an absolute path.');
+			if (type === 'cifs' && !val('fs-cred')) warns.push('Use a credentials file (chmod 600) rather than putting a password in fstab.');
+			if (options.includes('x-systemd.automount') && !network(type)) warns.push('x-systemd.automount mounts on first access; most useful for network shares.');
+			byId('fs-warn').replaceChildren(
+				...warns.map((t) => {
+					const li = document.createElement('li');
+					li.className = 'error';
+					li.textContent = t;
+					return li;
+				}),
+			);
+
+			const cmd = [
+				...(by !== 'path' && !kindless ? ['sudo blkid'] : []),
+				...(type === 'swap' ? [] : [`sudo mkdir -p ${q(mount)}`]),
+				'sudo cp /etc/fstab /etc/fstab.bak',
+				'sudo findmnt --verify',
+				'sudo systemctl daemon-reload',
+				type === 'swap' ? 'sudo swapon -a' : `sudo mount ${q(mount)}`,
+			];
+			byId('fs-cmd').textContent = cmd.join('\n');
+
+			const explain: [string, string][] = [
+				[
+					cols[0],
+					type === 'nfs'
+						? 'The NFS server and exported directory.'
+						: type === 'cifs'
+							? 'The SMB/CIFS share on the server.'
+							: type === 'tmpfs'
+								? 'tmpfs lives in RAM, so the source is just a name.'
+								: by === 'path'
+									? 'A kernel device path. It can change between boots; UUID is safer.'
+									: `The device identified by its ${by}, which stays stable even if disks are reordered. Find it with blkid.`,
+				],
+				[
+					cols[1],
+					type === 'swap' ? 'Swap is not mounted in the tree, so the mount point is none.' : 'The directory where the filesystem appears. It must exist.',
+				],
+				[type, `The filesystem type.`],
+				[cols[3], options.map((o) => describe(o)).join(' ')],
+				[dump, dump === '0' ? 'Not backed up by the legacy dump tool (the usual value).' : 'Included in dump backups.'],
+				[
+					pass,
+					pass === '0'
+						? 'Not checked by fsck at boot.'
+						: pass === '1'
+							? 'Checked first at boot (root filesystem).'
+							: 'Checked at boot after the root filesystem.',
+				],
+			];
+			byId('fs-explain').replaceChildren(
+				...explain.flatMap(([k, v]) => {
+					const dt = document.createElement('dt');
+					dt.textContent = k;
+					const dd = document.createElement('dd');
+					dd.textContent = v;
+					return [dt, dd];
+				}),
+			);
+		};
+
+		const describe = (o: string) => {
+			const map: Record<string, string> = {
+				defaults: 'defaults: rw, suid, dev, exec, auto, nouser, async.',
+				noatime: 'noatime: do not update access times on reads (faster).',
+				nofail: 'nofail: keep booting if the device is missing.',
+				ro: 'ro: read-only.',
+				noexec: 'noexec: forbid running binaries from it.',
+				nosuid: 'nosuid: ignore setuid bits.',
+				nodev: 'nodev: ignore device files.',
+				'x-systemd.automount': 'x-systemd.automount: mount lazily on first access.',
+				_netdev: '_netdev: wait for the network before mounting.',
+				sw: 'sw: use as swap.',
+			};
+			if (map[o]) return map[o];
+			if (o.startsWith('uid=')) return `${o}: files appear owned by this user id.`;
+			if (o.startsWith('gid=')) return `${o}: files appear owned by this group id.`;
+			if (o.startsWith('credentials=')) return `${o}: read username and password from this file.`;
+			return `${o}.`;
+		};
+
+		byId('fs-type').addEventListener('change', () => {
+			const type = byId<HTMLSelectElement>('fs-type').value;
+			if (samples[type]) byId<HTMLInputElement>('fs-dev').value = samples[type];
+			else if (!/^[\w-]+$/.test(val('fs-dev'))) byId<HTMLInputElement>('fs-dev').value = '3f8a1c2e-5b7d-4e9a-8c61-2d4f0b9e7a13';
+			byId<HTMLInputElement>('fs-mount').value = mounts[type] && mounts[type] !== 'none' ? mounts[type] : '/mnt/data';
+			const netOpt = network(type);
+			chips().forEach((b) => {
+				if (b.dataset.opt === '_netdev') b.setAttribute('aria-pressed', String(netOpt));
+				if (b.dataset.opt === 'x-systemd.automount') b.setAttribute('aria-pressed', String(netOpt));
+			});
+			render();
+		});
+		chips().forEach((b) =>
+			b.addEventListener('click', () => {
+				b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+				render();
+			}),
+		);
+		segmented(byId('fs-by'), (v) => ((by = v), render()));
+		document.querySelectorAll('main .field input').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('fs-copy'), () => (byId('fs-out').textContent ?? '').split('\n')[1] ?? '');
+		copyButton(byId('fs-cmd-copy'), () => byId('fs-cmd').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.fs-select {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--ink-soft);
+	}
+	.fs-select select {
+		font: inherit;
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+		color: var(--ink);
+	}
+	.fs-out {
+		min-height: auto !important;
+		white-space: pre !important;
+		word-break: normal !important;
+		overflow-x: auto;
+	}
+	.fs-cmd {
+		min-height: auto !important;
+	}
+	.fs-warn {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.fs-warn:empty {
+		display: none;
+	}
+	.fs-explain {
+		margin: 0;
+		padding: 12px 14px;
+		display: grid;
+		grid-template-columns: minmax(0, max-content) 1fr;
+		gap: 6px 16px;
+		font-size: 14px;
+	}
+	.fs-explain :global(dt) {
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--ink);
+		overflow-wrap: anywhere;
+		max-width: 320px;
+	}
+	.fs-explain :global(dd) {
+		margin: 0;
+	}
+	@media (max-width: 560px) {
+		.fs-explain {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>
