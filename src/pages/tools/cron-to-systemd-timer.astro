@@ -1,0 +1,484 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const examples = [
+	{ label: 'weekdays 9:30', expr: '30 9 * * 1-5' },
+	{ label: 'every 15 min', expr: '*/15 * * * *' },
+	{ label: 'hourly', expr: '@hourly' },
+	{ label: 'weekly', expr: '@weekly' },
+	{ label: '1st or Monday', expr: '0 3 1 * MON' },
+	{ label: 'quarterly', expr: '0 8 1 1,4,7,10 *' },
+	{ label: 'at boot', expr: '@reboot' },
+];
+---
+
+<ToolShell
+	slug="cron-to-systemd-timer"
+	title="Cron to systemd Timer"
+	description="Turn a cron expression into systemd .timer and .service units with OnCalendar, Persistent and RandomizedDelaySec, preview the next runs, or convert OnCalendar back to cron."
+>
+	<div class="st" id="st-tool">
+		<div class="fields">
+			<div class="field wide" id="st-field">
+				<label for="st-cron">Cron expression</label>
+				<input id="st-cron" spellcheck="false" autocomplete="off" value={examples[0].expr} />
+				<span class="field-note" id="st-note">
+					minute · hour · day of month · month · day of week, or @daily, @reboot…
+				</span>
+			</div>
+		</div>
+		<div class="chips" id="st-examples">
+			{examples.map((e) => (
+				<button data-expr={e.expr}>{e.label}</button>
+			))}
+		</div>
+		<div class="fields">
+			<div class="field">
+				<label for="st-name">Unit name</label>
+				<input id="st-name" spellcheck="false" autocomplete="off" value="backup" />
+			</div>
+			<div class="field">
+				<label for="st-desc">Description</label>
+				<input id="st-desc" autocomplete="off" value="Nightly database backup" />
+			</div>
+			<div class="field wide">
+				<label for="st-cmd">Command</label>
+				<input id="st-cmd" spellcheck="false" autocomplete="off" value="/usr/local/bin/backup.sh --compress" />
+			</div>
+			<div class="field">
+				<label for="st-user">Run as user (optional)</label>
+				<input id="st-user" spellcheck="false" autocomplete="off" value="" placeholder="root" />
+			</div>
+			<div class="field">
+				<label for="st-delay">RandomizedDelaySec</label>
+				<input id="st-delay" spellcheck="false" autocomplete="off" value="0" />
+				<span class="field-note">Seconds or a span like 5min. 0 disables it.</span>
+			</div>
+		</div>
+		<div class="toolbar">
+			<label class="check">
+				<input type="checkbox" id="st-persistent" checked /> Persistent (catch up missed runs)
+			</label>
+			<label class="check">
+				<input type="checkbox" id="st-wake" /> WakeSystem
+			</label>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="st-timer-title">backup.timer</span>
+				<button class="btn" id="st-copy-timer">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="st-timer" tabindex="0" aria-live="polite"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="st-service-title">backup.service</span>
+				<button class="btn" id="st-copy-service">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="st-service" tabindex="0"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Install</span>
+				<button class="btn" id="st-copy-install">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="st-install" tabindex="0"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>systemd-analyze calendar</span>
+				<button class="btn" id="st-copy-analyze">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="st-analyze" tabindex="0"></pre>
+		</section>
+		<h2 class="st-h">OnCalendar to cron</h2>
+		<div class="fields">
+			<div class="field wide" id="st-rev-field">
+				<label for="st-cal">OnCalendar expression</label>
+				<input id="st-cal" spellcheck="false" autocomplete="off" value="Mon..Fri *-*-* 09:30:00" />
+				<span class="field-note">Like Mon..Fri *-*-* 09:30:00, *:0/15 or weekly.</span>
+			</div>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Cron</span>
+				<button class="btn" id="st-copy-rev">
+					Copy
+				</button>
+			</div>
+			<pre class="out st-cron-out" id="st-rev" tabindex="0" aria-live="polite"></pre>
+			<p class="st-explain" id="st-rev-explain"></p>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+	const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+	const MACROS: Record<string, [string, string]> = {
+		'@yearly': ['0 0 1 1 *', 'yearly'],
+		'@annually': ['0 0 1 1 *', 'yearly'],
+		'@monthly': ['0 0 1 * *', 'monthly'],
+		'@weekly': ['0 0 * * 0', 'Sun *-*-* 00:00:00'],
+		'@daily': ['0 0 * * *', 'daily'],
+		'@midnight': ['0 0 * * *', 'daily'],
+		'@hourly': ['0 * * * *', 'hourly'],
+	};
+	const SHORTHANDS: Record<string, string> = {
+		minutely: '*-*-* *:*:00',
+		hourly: '*-*-* *:00:00',
+		daily: '*-*-* 00:00:00',
+		weekly: 'Mon *-*-* 00:00:00',
+		monthly: '*-*-01 00:00:00',
+		yearly: '*-01-01 00:00:00',
+		annually: '*-01-01 00:00:00',
+		quarterly: '*-01,04,07,10-01 00:00:00',
+		semiannually: '*-01,07-01 00:00:00',
+	};
+
+	type Spec = { min: number; max: number; label: string; names?: string[] };
+	const SPECS: Spec[] = [
+		{ min: 0, max: 59, label: 'minute' },
+		{ min: 0, max: 23, label: 'hour' },
+		{ min: 1, max: 31, label: 'day of month' },
+		{ min: 1, max: 12, label: 'month', names: MONTHS },
+		{ min: 0, max: 7, label: 'day of week', names: DAYS.map((d) => d.toLowerCase()) },
+	];
+	type Field = { src: string; any: boolean; values: number[] };
+
+	const parseField = (src: string, spec: Spec): Field => {
+		const values = new Set<number>();
+		const value = (v: string) => {
+			const idx = spec.names?.indexOf(v.toLowerCase().slice(0, 3)) ?? -1;
+			if (idx >= 0 && /^[a-z]+$/i.test(v)) return idx + spec.min;
+			if (!/^\d+$/.test(v)) throw new Error(`"${v}" is not a valid ${spec.label}`);
+			const n = Number(v);
+			if (n < spec.min || n > spec.max) throw new Error(`${spec.label} ${n} is out of range ${spec.min}-${spec.max}`);
+			return n;
+		};
+		for (const part of src.split(',')) {
+			const [range, stepSrc] = part.split('/');
+			const step = stepSrc === undefined ? 1 : Number(stepSrc);
+			if (!Number.isInteger(step) || step < 1) throw new Error(`Invalid step in ${spec.label}: "${part}"`);
+			let lo: number;
+			let hi: number;
+			if (range === '*' || range === '?') [lo, hi] = [spec.min, spec.label === 'day of week' ? 6 : spec.max];
+			else if (range.includes('-')) {
+				const [a, b] = range.split('-');
+				[lo, hi] = [value(a), value(b)];
+				if (lo > hi) throw new Error(`Range ${range} in ${spec.label} goes backwards`);
+			} else {
+				lo = value(range);
+				hi = stepSrc === undefined ? lo : spec.max;
+			}
+			for (let n = lo; n <= hi; n += step) values.add(spec.label === 'day of week' && n === 7 ? 0 : n);
+		}
+		return { src, any: src === '*' || src === '?', values: [...values].sort((a, b) => a - b) };
+	};
+
+	const pad = (n: number) => String(n).padStart(2, '0');
+
+	const compact = (values: number[], fmt: (n: number) => string, sep: string) => {
+		const groups: string[] = [];
+		for (let i = 0; i < values.length;) {
+			let j = i;
+			while (j + 1 < values.length && values[j + 1] === values[j] + 1) j++;
+			groups.push(
+				j - i >= 2
+					? `${fmt(values[i])}${sep}${fmt(values[j])}`
+					: values
+							.slice(i, j + 1)
+							.map(fmt)
+							.join(','),
+			);
+			i = j + 1;
+		}
+		return groups.join(',');
+	};
+
+	const calField = (f: Field, spec: Spec) => {
+		if (f.any) return '*';
+		const step = f.src.match(/^(\*|\d+)\/(\d+)$/);
+		if (step) {
+			const start = step[1] === '*' ? spec.min : Number(step[1]);
+			return `${pad(start)}/${step[2]}`;
+		}
+		return compact(f.values, pad, '..');
+	};
+
+	const toCalendar = (fields: Field[]) => {
+		const [min, hour, dom, mon, dow] = fields;
+		const time = `${calField(hour, SPECS[1])}:${calField(min, SPECS[0])}:00`;
+		const date = (day: string) => `*-${calField(mon, SPECS[3])}-${day}`;
+		const days = compact(dow.values, (n) => DAYS[n], '..');
+		const day = dom.any ? '*' : calField(dom, SPECS[2]);
+		if (!dom.any && !dow.any) return [`${date(day)} ${time}`, `${days} ${date('*')} ${time}`];
+		return [`${dow.any ? '' : `${days} `}${date(day)} ${time}`];
+	};
+
+	const matches = (fields: Field[], d: Date) => {
+		const [min, hour, dom, mon, dow] = fields;
+		if (!min.values.includes(d.getMinutes()) || !hour.values.includes(d.getHours()) || !mon.values.includes(d.getMonth() + 1)) return false;
+		const domOk = dom.values.includes(d.getDate());
+		const dowOk = dow.values.includes(d.getDay());
+		return dom.any && dow.any ? true : dom.any ? dowOk : dow.any ? domOk : domOk || dowOk;
+	};
+
+	const nextRuns = (fields: Field[], count: number) => {
+		const out: Date[] = [];
+		const t = new Date();
+		t.setSeconds(0, 0);
+		t.setMinutes(t.getMinutes() + 1);
+		const day = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+		for (let d = 0; d < 366 * 8 && out.length < count; d++) {
+			const current = new Date(day.getFullYear(), day.getMonth(), day.getDate() + d);
+			for (const h of fields[1].values)
+				for (const m of fields[0].values) {
+					const c = new Date(current.getFullYear(), current.getMonth(), current.getDate(), h, m);
+					if (c < t || c.getHours() !== h || !matches(fields, c)) continue;
+					out.push(c);
+					if (out.length >= count) return out;
+				}
+		}
+		return out;
+	};
+
+	const stamp = (d: Date, utc = false) => {
+		const g = (k: 'FullYear' | 'Month' | 'Date' | 'Hours' | 'Minutes' | 'Day') => (utc ? d[`getUTC${k}`]() : d[`get${k}`]());
+		const zone = utc
+			? 'UTC'
+			: (new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' }).formatToParts(d).find((p) => p.type === 'timeZoneName')?.value ?? '');
+		return `${DAYS[g('Day')]} ${g('FullYear')}-${pad(g('Month') + 1)}-${pad(g('Date'))} ${pad(g('Hours'))}:${pad(g('Minutes'))}:00 ${zone}`;
+	};
+	const left = (d: Date) => {
+		const mins = Math.round((d.getTime() - Date.now()) / 60000);
+		const days = Math.floor(mins / 1440);
+		const h = Math.floor((mins % 1440) / 60);
+		const m = mins % 60;
+		return `${days ? `${days}d ` : ''}${h ? `${h}h ` : ''}${m}min left`;
+	};
+
+	const revField = (src: string, spec: Spec, names?: string[]) => {
+		if (src === '*') return '*';
+		return src
+			.split(',')
+			.map((part) => {
+				const [range, step] = part.split('/');
+				const val = (v: string) => {
+					const idx = names ? names.findIndex((n) => n.toLowerCase() === v.toLowerCase().slice(0, 3)) : -1;
+					if (idx >= 0) return idx;
+					if (!/^\d+$/.test(v)) throw new Error(`"${v}" is not a valid ${spec.label}`);
+					const n = Number(v);
+					if (n < spec.min || n > spec.max) throw new Error(`${spec.label} ${n} is out of range`);
+					return n;
+				};
+				if (range.includes('~')) throw new Error('The ~ "last days of month" syntax has no cron equivalent.');
+				const [a, b] = range.split('..');
+				const lo = range === '*' ? spec.min : val(a);
+				const out = b !== undefined ? `${lo}-${val(b)}` : String(lo);
+				if (!step) return out;
+				if (range === '*' || lo === spec.min) return `*/${step}`;
+				return `${out}${b === undefined ? `-${spec.max}` : ''}/${step}`;
+			})
+			.join(',');
+	};
+
+	const toCron = (raw: string) => {
+		const notes: string[] = [];
+		let src = raw.trim();
+		if (!src) throw new Error('Enter an OnCalendar expression.');
+		const short = SHORTHANDS[src.toLowerCase()];
+		if (short) {
+			notes.push(`"${src}" is shorthand for ${short}.`);
+			src = short;
+		}
+		const tokens = src.split(/\s+/);
+		const last = tokens[tokens.length - 1];
+		if (/^[A-Za-z_]+\/[A-Za-z_]+$|^UTC$/.test(last))
+			throw new Error(`The time zone "${last}" is not expressible in a crontab line; use CRON_TZ where supported.`);
+		let dow = '*';
+		if (/^[a-z]/i.test(tokens[0])) {
+			dow = revField(tokens.shift()!.replace(/-/g, '..'), SPECS[4], DAYS);
+		}
+		let date = '*-*-*';
+		let time = '00:00:00';
+		for (const t of tokens) {
+			if (t.includes(':')) time = t;
+			else if (t.includes('-')) date = t;
+			else throw new Error(`Cannot read "${t}".`);
+		}
+		const dparts = date.split('-');
+		if (dparts.length === 2) dparts.unshift('*');
+		if (dparts.length !== 3) throw new Error(`Date "${date}" should look like *-*-* or YYYY-MM-DD.`);
+		const [year, month, day] = dparts;
+		if (year !== '*') throw new Error(`Year "${year}" is not expressible in cron: cron has no year field.`);
+		const tparts = time.split(':');
+		if (tparts.length < 2 || tparts.length > 3) throw new Error(`Time "${time}" should look like HH:MM or HH:MM:SS.`);
+		const [h, m, s = '00'] = tparts;
+		if (!/^0+(\.0+)?$/.test(s)) throw new Error(`Seconds "${s}" are not expressible in cron: cron runs at most once per minute.`);
+		const cron = [revField(m, SPECS[0]), revField(h, SPECS[1]), revField(day, SPECS[2]), revField(month, SPECS[3]), dow].join(' ');
+		if (day !== '*' && dow !== '*')
+			notes.push('systemd requires both the day and the weekday to match, but cron runs when either matches. This cron line is broader.');
+		return { cron, notes };
+	};
+
+	onPage('st-tool', () => {
+		const cron = byId<HTMLInputElement>('st-cron');
+		const name = byId<HTMLInputElement>('st-name');
+		const desc = byId<HTMLInputElement>('st-desc');
+		const cmd = byId<HTMLInputElement>('st-cmd');
+		const user = byId<HTMLInputElement>('st-user');
+		const delay = byId<HTMLInputElement>('st-delay');
+		const persistent = byId<HTMLInputElement>('st-persistent');
+		const wake = byId<HTMLInputElement>('st-wake');
+		const cal = byId<HTMLInputElement>('st-cal');
+
+		const render = () => {
+			const unit = (name.value.trim() || 'job').replace(/\.(timer|service)$/, '').replace(/[^\w@.:-]/g, '-');
+			byId('st-timer-title').textContent = `${unit}.timer`;
+			byId('st-service-title').textContent = `${unit}.service`;
+			const service = [
+				'[Unit]',
+				`Description=${desc.value.trim() || unit}`,
+				'',
+				'[Service]',
+				'Type=oneshot',
+				...(user.value.trim() ? [`User=${user.value.trim()}`] : []),
+				`ExecStart=${cmd.value.trim() || '/bin/true'}`,
+			].join('\n');
+			byId('st-service').textContent = service;
+			byId('st-install').textContent = [
+				`sudo cp ${unit}.service ${unit}.timer /etc/systemd/system/`,
+				'sudo systemctl daemon-reload',
+				`sudo systemctl enable --now ${unit}.timer`,
+				`systemctl list-timers ${unit}.timer`,
+			].join('\n');
+			try {
+				const src = cron.value.trim();
+				const lower = src.toLowerCase();
+				let calendars: string[];
+				let runs: Date[] = [];
+				let trigger: string[];
+				if (lower === '@reboot') {
+					calendars = [];
+					trigger = ['OnBootSec=1min'];
+				} else {
+					const macro = MACROS[lower];
+					const parts = (macro ? macro[0] : src).split(/\s+/).filter(Boolean);
+					if (parts.length !== 5) throw new Error(`Expected 5 fields, got ${parts.length}`);
+					const fields = parts.map((p, i) => parseField(p, SPECS[i]));
+					calendars = macro ? [macro[1]] : toCalendar(fields);
+					runs = nextRuns(fields, 5);
+					trigger = calendars.map((c) => `OnCalendar=${c}`);
+				}
+				const d = delay.value.trim();
+				const timer = [
+					'[Unit]',
+					`Description=Run ${unit}.service on a schedule`,
+					'',
+					'[Timer]',
+					...trigger,
+					...(persistent.checked && calendars.length ? ['Persistent=true'] : []),
+					...(d && d !== '0' ? [`RandomizedDelaySec=${d}`] : []),
+					...(wake.checked ? ['WakeSystem=true'] : []),
+					`Unit=${unit}.service`,
+					'',
+					'[Install]',
+					'WantedBy=timers.target',
+				].join('\n');
+				byId('st-timer').textContent = timer;
+				byId('st-analyze').textContent = calendars.length
+					? [
+							`$ systemd-analyze calendar --iterations=5 ${calendars.map((c) => `'${c}'`).join(' ')}`,
+							...calendars.map((c) => `  Original form: ${c}`),
+							...runs.flatMap((r, i) => [
+								`${i ? '       Iteration' : '    Next elapse'}: ${stamp(r)}`,
+								...(i ? [] : [`       (in UTC): ${stamp(r, true)}`, `       From now: ${left(r)}`]),
+							]),
+						].join('\n')
+					: 'Runs once, one minute after boot. No calendar to analyze.';
+				byId('st-field').classList.remove('invalid');
+				byId('st-note').textContent = 'minute · hour · day of month · month · day of week, or @daily, @reboot…';
+			} catch (e) {
+				byId('st-field').classList.add('invalid');
+				byId('st-note').textContent = (e as Error).message;
+				byId('st-timer').textContent = '';
+				byId('st-analyze').textContent = '';
+			}
+		};
+
+		const renderRev = () => {
+			try {
+				const { cron: line, notes } = toCron(cal.value);
+				byId('st-rev').textContent = line;
+				byId('st-rev-explain').textContent = notes.join(' ') || 'Exact equivalent.';
+				byId('st-rev-field').classList.remove('invalid');
+			} catch (e) {
+				byId('st-rev').textContent = 'Not expressible in cron';
+				byId('st-rev-explain').textContent = (e as Error).message;
+				byId('st-rev-field').classList.add('invalid');
+			}
+		};
+
+		byId('st-examples')
+			.querySelectorAll<HTMLButtonElement>('button')
+			.forEach((b) =>
+				b.addEventListener('click', () => {
+					cron.value = b.dataset.expr ?? '';
+					render();
+				}),
+			);
+		[cron, name, desc, cmd, user, delay].forEach((i) => i.addEventListener('input', render));
+		[persistent, wake].forEach((i) => i.addEventListener('change', render));
+		cal.addEventListener('input', renderRev);
+		copyButton(byId('st-copy-timer'), () => byId('st-timer').textContent ?? '');
+		copyButton(byId('st-copy-service'), () => byId('st-service').textContent ?? '');
+		copyButton(byId('st-copy-install'), () => byId('st-install').textContent ?? '');
+		copyButton(byId('st-copy-analyze'), () => byId('st-analyze').textContent ?? '');
+		copyButton(byId('st-copy-rev'), () => byId('st-rev').textContent ?? '');
+		render();
+		renderRev();
+	});
+</script>
+
+<style>
+	.st {
+		display: grid;
+		gap: 14px;
+		min-width: 0;
+	}
+	.st .toolbar {
+		flex-wrap: wrap;
+	}
+	.st .out {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	.st-cron-out {
+		font-size: 18px;
+		font-weight: 600;
+	}
+	.st-explain {
+		margin: 0;
+		padding: 0 14px 14px;
+		font-size: 13.5px;
+		color: var(--ink-soft);
+	}
+	.st-h {
+		margin: 10px 0 0;
+		font-size: 18px;
+	}
+	.chips :global(button) {
+		font-size: 12px;
+	}
+</style>
