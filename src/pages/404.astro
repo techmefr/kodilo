@@ -2,6 +2,7 @@
 import Header from '../components/Header.astro';
 import Base from '../layouts/Base.astro';
 import { icon } from '../scripts/icons';
+import { suggestUrl } from '../scripts/suggest';
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 ---
@@ -23,6 +24,9 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 					<span set:html={icon('search')} />
 					Search a tool
 				</button>
+				<a class="btn" id="nf-suggest-link" href={suggestUrl()} target="_blank" rel="noopener">
+					Suggest this tool
+				</a>
 			</div>
 			<section class="nf-suggest" id="nf-suggest" hidden>
 				<h2>Were you looking for</h2>
@@ -34,6 +38,7 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 
 <script>
 	import { loadCatalogue } from '../scripts/experience';
+	import { suggestUrl, humanize } from '../scripts/suggest';
 	import { byId, onPage } from '../scripts/ui';
 
 	function distance(a: string, b: string) {
@@ -62,6 +67,7 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 			.replace(/\/$/, '')
 			.toLowerCase();
 		if (!query) return;
+		byId('nf-suggest-link').setAttribute('href', suggestUrl(humanize(query)));
 		let catalogue;
 		try {
 			catalogue = await loadCatalogue();

@@ -1,4 +1,5 @@
 import { navigate } from 'astro:transitions/client';
+import { suggestUrl } from './suggest';
 import {
 	base,
 	favorites,
@@ -326,7 +327,11 @@ function setupPalette() {
 			nodes.push(...matches.map((m, i) => option(m.entry, i, m.needles, m.entry.c)));
 			status.textContent = matches.length ? `${matches.length} tool${matches.length === 1 ? '' : 's'} found` : '';
 		}
+		const suggest = document.getElementById('palette-suggest');
+		if (suggest) suggest.hidden = !!results.length;
 		if (!results.length) {
+			const link = document.getElementById('palette-suggest-link');
+			if (link instanceof HTMLAnchorElement) link.href = suggestUrl(query);
 			const li = document.createElement('li');
 			li.className = 'palette-empty';
 			li.textContent = `No tool matches “${query}”.`;

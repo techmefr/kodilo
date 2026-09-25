@@ -1,0 +1,55 @@
+name: Suggest a tool
+description: Propose a new tool for kodilo.
+title: '[Tool] '
+labels: [tool-suggestion]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Tool name
+      placeholder: TOML Formatter
+    validations:
+      required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: What should it do?
+      description: The problem it solves and how you would use it.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example input and output
+      description: What goes in, what comes out, and the options that matter.
+      render: text
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - 'Email'
+        - 'JSON'
+        - 'HTML / CSS'
+        - 'Markdown'
+        - 'SEO'
+        - 'Text'
+        - 'Encoding & Security'
+        - 'Generators'
+        - 'Converters'
+        - 'Network'
+        - 'Validators'
+        - 'Images'
+        - 'PDF'
+        - 'Dev Utilities'
+        - 'DevOps & Sysadmin'
+        - 'Calculators'
+        - 'Productivity'
+        - 'Testing'
+        - 'Design'
+        - Not sure
+  - type: textarea
+    id: similar
+    attributes:
+      label: Links to similar tools
+      description: Existing tools elsewhere that do something close.

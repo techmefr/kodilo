@@ -3,6 +3,7 @@ import Logo from './Logo.astro';
 import { builtCategories as categories } from '../data/tools';
 import { categoryId } from '../scripts/experience';
 import { icon, iconUse } from '../scripts/icons';
+import { suggestUrl } from '../scripts/suggest';
 
 interface Props {
 	activeSlug?: string;
@@ -75,6 +76,9 @@ const shortcuts = [
 			</a>
 		))}
 	</nav>
+	<a class="side-suggest" href={suggestUrl()} target="_blank" rel="noopener" aria-label="Suggest a tool (opens GitHub in a new tab)">
+		Suggest a tool
+	</a>
 	{categories.map((c, i) => (
 		<div class="mega" id={`mega-${i}`} data-category={c.name} role="region" aria-label={`${c.name} tools`} hidden>
 			<div class="mega-intro">
@@ -113,6 +117,11 @@ const shortcuts = [
 			<kbd>Esc</kbd>
 		</div>
 		<ul class="palette-list" id="palette-list" role="listbox" aria-label="Tools"></ul>
+		<p class="palette-suggest" id="palette-suggest" hidden>
+			<a id="palette-suggest-link" href={suggestUrl()} target="_blank" rel="noopener">
+				Suggest this tool on GitHub
+			</a>
+		</p>
 		<p class="visually-hidden" id="palette-status" role="status"></p>
 		<div class="palette-foot">
 			<span>
@@ -540,6 +549,27 @@ const shortcuts = [
 	.palette-list :global(.palette-empty) {
 		color: var(--ink-soft);
 		cursor: default;
+	}
+	.palette-suggest {
+		margin: 0;
+		padding: 0 16px 12px;
+	}
+	.palette-suggest a,
+	.side-suggest {
+		color: var(--accent-strong);
+		font-weight: 600;
+		font-size: 13px;
+	}
+	.side-suggest {
+		margin-top: auto;
+		padding: 6px 8px;
+		border-radius: 8px;
+		text-decoration: none;
+	}
+	.side-suggest:hover,
+	.side-suggest:focus-visible {
+		background: var(--surface-2);
+		text-decoration: underline;
 	}
 	.palette-foot {
 		display: flex;

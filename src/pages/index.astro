@@ -4,6 +4,7 @@ import { builtCategories as categories } from '../data/tools';
 import Base from '../layouts/Base.astro';
 import { categoryId } from '../scripts/experience';
 import { icon, iconUse } from '../scripts/icons';
+import { suggestUrl } from '../scripts/suggest';
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const total = categories.reduce((a, c) => a + c.tools.length, 0);
@@ -59,6 +60,12 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 					</ul>
 				</section>
 			))}
+			<p class="home-suggest">
+				Missing something?
+				<a href={suggestUrl()} target="_blank" rel="noopener">
+					Suggest a tool on GitHub
+				</a>
+			</p>
 		</main>
 	</div>
 </Base>
@@ -162,6 +169,14 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 		width: 16px;
 		height: 16px;
 		display: block;
+	}
+	.home-suggest {
+		margin: 8px 0 0;
+		color: var(--ink-soft);
+	}
+	.home-suggest a {
+		color: var(--accent-strong);
+		font-weight: 600;
 	}
 	.home-cat h2 {
 		display: flex;

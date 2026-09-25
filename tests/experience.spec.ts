@@ -149,3 +149,21 @@ test('skip link moves focus to the main content', async ({ page }) => {
 	await page.keyboard.press('Enter');
 	await expect(page.locator('#main')).toBeFocused();
 });
+
+test('suggest a tool links prefill the issue form from search and 404', async ({ page }) => {
+	await page.goto('./');
+	await openSearch(page);
+	await page.locator('#palette-q').fill('toml sorter');
+	const link = page.locator('#palette-suggest-link');
+	await expect(link).toBeVisible();
+	await expect(link).toHaveAttribute('href', /template=tool-suggestion\.yml/);
+	await expect(link).toHaveAttribute('href', /title=%5BTool%5D%20toml%20sorter/);
+	await expect(link).toHaveAttribute('target', '_blank');
+	await expect(link).toHaveAttribute('rel', 'noopener');
+
+	await page.goto('./tools/toml-sorter/');
+	const nf = page.locator('#nf-suggest-link');
+	await expect(nf).toHaveAttribute('href', /template=tool-suggestion\.yml/);
+	await expect(nf).toHaveAttribute('href', /title=%5BTool%5D%20Toml%20sorter/);
+	await expect(nf).toHaveAttribute('href', /name=Toml%20sorter/);
+});
