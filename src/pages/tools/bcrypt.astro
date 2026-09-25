@@ -10,7 +10,7 @@ import ToolShell from '../../components/ToolShell.astro';
 	<div class="fields" id="bc-tool">
 		<div class="field">
 			<label for="bc-pass">Password</label>
-			<input id="bc-pass" spellcheck="false" value="correct horse battery staple" />
+			<input id="bc-pass" data-no-share spellcheck="false" value="correct horse battery staple" />
 		</div>
 		<div class="field">
 			<label for="bc-cost">
@@ -37,7 +37,7 @@ import ToolShell from '../../components/ToolShell.astro';
 	<div class="fields">
 		<div class="field wide" id="bc-verify-field">
 			<label for="bc-verify">Check the password against a hash</label>
-			<input id="bc-verify" spellcheck="false" placeholder="$2b$10$..." />
+			<input id="bc-verify" data-no-share spellcheck="false" placeholder="$2b$10$..." />
 			<span class="field-note" id="bc-verify-note"></span>
 		</div>
 	</div>

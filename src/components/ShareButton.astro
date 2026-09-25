@@ -1,0 +1,65 @@
+<div class="share" data-share-ui>
+	<button type="button" class="btn share-btn" data-share-button>
+		Share link
+	</button>
+	<span class="share-status" data-share-status role="status" aria-live="polite"></span>
+</div>
+
+<script>
+	import { applyState, decodeState, readHashCode, SHARE_LIMIT, shareUrl, snapshotDefaults } from '../scripts/share-state';
+
+	document.addEventListener('astro:page-load', async () => {
+		const button = document.querySelector<HTMLButtonElement>('[data-share-button]');
+		const root = document.querySelector<HTMLElement>('main.tool');
+		const status = document.querySelector<HTMLElement>('[data-share-status]');
+		if (!button || !root || !status) return;
+		snapshotDefaults(root);
+
+		button.addEventListener('click', async () => {
+			const url = await shareUrl(root);
+			history.replaceState(history.state, '', url);
+			const size = new Blob([url]).size;
+			const warning = size > SHARE_LIMIT ? ` It is ${(size / 1024).toFixed(1)} KB, some apps truncate links over 8 KB.` : '';
+			try {
+				await navigator.clipboard.writeText(url);
+				button.textContent = 'Link copied';
+				status.textContent = `Link copied.${warning}`;
+			} catch {
+				status.textContent = `Copy failed, the link is in the address bar.${warning}`;
+			}
+			status.classList.toggle('share-warn', !!warning);
+			setTimeout(() => {
+				button.textContent = 'Share link';
+				if (!warning) status.textContent = '';
+			}, 1600);
+		});
+
+		const code = readHashCode();
+		if (!code) return;
+		try {
+			applyState(root, await decodeState(code));
+		} catch {
+			status.textContent = 'This shared link could not be read.';
+		}
+	});
+</script>
+
+<style>
+	.share {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px;
+		margin-top: 10px;
+	}
+	.share-status {
+		color: var(--ink-soft);
+		font-size: 13px;
+	}
+	.share-status:empty {
+		display: none;
+	}
+	.share-status.share-warn {
+		color: var(--warn);
+	}
+</style>

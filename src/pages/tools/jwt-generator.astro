@@ -43,7 +43,7 @@ const payload = JSON.stringify({ sub: 'user_4821', name: 'Ada Lovelace', role: '
 					New key
 				</button>
 			</div>
-			<textarea id="jg-key" spellcheck="false" aria-label="Key"></textarea>
+			<textarea id="jg-key" data-no-share spellcheck="false" aria-label="Key"></textarea>
 		</section>
 	</div>
 	<p class="error" id="jg-error" hidden></p>
@@ -68,7 +68,7 @@ const payload = JSON.stringify({ sub: 'user_4821', name: 'Ada Lovelace', role: '
 	<div class="fields">
 		<div class="field wide" id="jg-verify-field">
 			<label for="jg-verify">Verify a token with the key above</label>
-			<input id="jg-verify" spellcheck="false" placeholder="eyJhbGciOi..." />
+			<input id="jg-verify" data-no-share spellcheck="false" placeholder="eyJhbGciOi..." />
 			<span class="field-note" id="jg-verify-note"></span>
 		</div>
 	</div>

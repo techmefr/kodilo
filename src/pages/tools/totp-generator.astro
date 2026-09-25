@@ -10,7 +10,7 @@ import ToolShell from '../../components/ToolShell.astro';
 	<div class="fields" id="to-tool">
 		<div class="field wide" id="to-secret-field">
 			<label for="to-secret">Secret (Base32)</label>
-			<input id="to-secret" spellcheck="false" autocomplete="off" />
+			<input id="to-secret" data-no-share spellcheck="false" autocomplete="off" />
 			<span class="field-note" id="to-secret-note"></span>
 		</div>
 		<div class="field">
@@ -76,7 +76,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			</div>
 			<div class="field" id="to-check-field">
 				<label for="to-check">Check a code</label>
-				<input id="to-check" inputmode="numeric" autocomplete="off" placeholder="123456" />
+				<input id="to-check" data-no-share inputmode="numeric" autocomplete="off" placeholder="123456" />
 				<span class="field-note" id="to-check-note"></span>
 			</div>
 		</div>
