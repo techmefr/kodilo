@@ -1671,3 +1671,24 @@ export const categories: Category[] = [
 export const allTools: Tool[] = categories.flatMap((c) => c.tools);
 
 export const builtCategories: Category[] = categories.map((c) => ({ ...c, tools: c.tools.filter((t) => t.built) })).filter((c) => c.tools.length > 0);
+
+export const categorySlug = (name: string) =>
+	name
+		.toLowerCase()
+		.replace(/&/g, ' and ')
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-|-$/g, '');
+
+export const categoryOf = (slug: string) => builtCategories.find((c) => c.tools.some((t) => t.slug === slug));
+
+const listNames = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
+
+const plural = (c: Category) => `${c.tools.length} free ${c.name} tool${c.tools.length === 1 ? '' : 's'}`;
+
+export const categoryIntro = (c: Category) => {
+	const sample = listNames(c.tools.slice(0, 4).map((t) => t.name));
+	const more = c.tools.length > 4 ? ', and more' : '';
+	return `${c.blurb}. kodilo has ${plural(c)}, including ${sample}${more}. Every tool runs entirely in your browser, with no sign-up and no data sent to a server.`;
+};
+
+export const categoryDescription = (c: Category) => `${plural(c)} for developers. ${c.blurb}. No sign-up, and nothing leaves your browser.`;

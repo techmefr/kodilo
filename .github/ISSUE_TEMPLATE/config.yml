@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
+  - name: kodilo website
+    url: https://techmefr.github.io/kodilo/
+    about: Browse all the tools before opening an issue.
   - name: Report a security vulnerability
     url: https://github.com/techmefr/kodilo/security/advisories/new
     about: Please report security problems privately, not in a public issue.

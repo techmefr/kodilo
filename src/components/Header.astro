@@ -1,7 +1,8 @@
 ---
 import Logo from './Logo.astro';
-import { builtCategories as categories } from '../data/tools';
+import { builtCategories as categories, categorySlug } from '../data/tools';
 import { categoryId } from '../scripts/experience';
+import { sitePath } from '../scripts/seo';
 import { icon, iconUse } from '../scripts/icons';
 import { suggestUrl } from '../scripts/suggest';
 
@@ -76,6 +77,9 @@ const shortcuts = [
 			</a>
 		))}
 	</nav>
+	<a class="side-categories" href={sitePath('categories/')}>
+		All categories
+	</a>
 	<a class="side-suggest" href={suggestUrl()} target="_blank" rel="noopener" aria-label="Suggest a tool (opens GitHub in a new tab)">
 		Suggest a tool
 	</a>
@@ -86,7 +90,10 @@ const shortcuts = [
 				<div>
 					<b>{c.name}</b>
 					<p>
-						{c.blurb} · {c.tools.length} tool{c.tools.length === 1 ? '' : 's'}
+						{c.blurb} ·{' '}
+						<a class="mega-all" href={sitePath(`categories/${categorySlug(c.name)}/`)}>
+							All {c.tools.length} tool{c.tools.length === 1 ? '' : 's'}
+						</a>
 					</p>
 				</div>
 			</div>
@@ -384,6 +391,9 @@ const shortcuts = [
 		font-size: 13px;
 		color: var(--ink-soft);
 	}
+	.mega-all {
+		color: var(--accent-strong);
+	}
 	.mega-grid {
 		list-style: none;
 		margin: 0;
@@ -570,6 +580,15 @@ const shortcuts = [
 	.side-suggest:focus-visible {
 		background: var(--surface-2);
 		text-decoration: underline;
+	}
+	.side-categories {
+		padding: 6px 8px;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.side-categories:hover,
+	.side-categories:focus-visible {
+		color: var(--accent-strong);
 	}
 	.palette-foot {
 		display: flex;

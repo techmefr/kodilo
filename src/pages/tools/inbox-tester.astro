@@ -1,12 +1,12 @@
 ---
 import Base from '../../layouts/Base.astro';
 import Header from '../../components/Header.astro';
+import { toolJsonLd } from '../../scripts/seo';
+
+const description = 'Preview an HTML email as Gmail, Outlook, Yahoo Mail and Apple Mail would show it, on desktop and mobile, in light and dark mode.';
 ---
 
-<Base
-	title="Inbox Tester — kodilo"
-	description="Preview an HTML email as Gmail, Outlook, Yahoo Mail and Apple Mail would show it, on desktop and mobile, in light and dark mode."
->
+<Base title="Inbox Tester — kodilo" description={description} jsonLd={toolJsonLd(Astro.site, 'inbox-tester', 'Inbox Tester', description)}>
 	<div class="shell">
 		<Header activeSlug="inbox-tester" />
 		<main class="main" id="main" tabindex="-1">

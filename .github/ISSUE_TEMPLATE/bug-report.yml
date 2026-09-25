@@ -1,12 +1,13 @@
 name: Bug report
 description: A tool gives a wrong result, breaks or looks wrong.
+title: '[Bug] '
 labels: [bug]
 body:
   - type: input
-    id: tool
+    id: tool-url
     attributes:
-      label: Tool
-      description: Name or URL of the tool.
+      label: Tool URL
+      description: The page of the tool that has the problem.
       placeholder: https://techmefr.github.io/kodilo/tools/jwt-decoder/
     validations:
       required: true
@@ -15,12 +16,22 @@ body:
     attributes:
       label: Steps to reproduce
       description: The input you used and what you clicked. Never paste real secrets, keys or personal data.
+      placeholder: |
+        1. Paste this input: ...
+        2. Click ...
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Expected and actual result
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: What happened instead. Error messages from the browser console help.
     validations:
       required: true
   - type: input
@@ -28,3 +39,14 @@ body:
     attributes:
       label: Browser and device
       placeholder: Firefox 131 on macOS, Chrome on Android
+    validations:
+      required: true
+  - type: dropdown
+    id: theme
+    attributes:
+      label: Theme
+      options:
+        - Light
+        - Dark
+        - Both
+        - Not sure

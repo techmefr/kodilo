@@ -1,0 +1,25 @@
+---
+import type { Tool } from '../data/tools';
+import { iconUse } from '../scripts/icons';
+
+interface Props {
+	tools: Tool[];
+}
+
+const { tools } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+---
+
+<ul class="tool-grid">
+	{tools.map((t) => (
+		<li>
+			<a href={`${base}tools/${t.slug}/`}>
+				<i class="t-icon" set:html={iconUse(t.icon ?? 'wrench')} />
+				<div class="t-text">
+					<b>{t.name}</b>
+					<span>{t.description}</span>
+				</div>
+			</a>
+		</li>
+	))}
+</ul>
