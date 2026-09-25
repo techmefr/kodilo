@@ -1,0 +1,751 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const base = Date.UTC(2026, 8, 24, 9, 30, 0);
+const rows: [string, string, number, string, number, number[], number][] = [
+	['GET', 'https://shop.example.com/', 200, 'text/html; charset=utf-8', 18420, [2, 14, 22, 18, 96, 12], 0],
+	['GET', 'https://shop.example.com/assets/app.css', 200, 'text/css', 42310, [1, 0, 0, 0, 38, 20], 170],
+	['GET', 'https://shop.example.com/assets/app.js', 200, 'application/javascript', 184200, [1, 0, 0, 0, 44, 88], 172],
+	['GET', 'https://fonts.example.net/inter.woff2', 200, 'font/woff2', 48100, [3, 18, 24, 20, 30, 26], 180],
+	['GET', 'https://shop.example.com/img/hero.avif', 200, 'image/avif', 96400, [2, 0, 0, 0, 52, 64], 200],
+	['GET', 'https://shop.example.com/api/products?category=shoes&page=1', 200, 'application/json', 6120, [1, 0, 0, 0, 210, 8], 310],
+	['POST', 'https://shop.example.com/api/cart', 201, 'application/json', 512, [1, 0, 0, 0, 132, 2], 540],
+	['GET', 'https://shop.example.com/api/recommendations?user=42', 500, 'application/json', 184, [1, 0, 0, 0, 640, 1], 560],
+	['GET', 'https://cdn.example.org/analytics.js', 304, 'application/javascript', 0, [4, 22, 30, 26, 40, 0], 330],
+	['GET', 'https://shop.example.com/img/missing.png', 404, 'text/html', 1240, [1, 0, 0, 0, 24, 3], 420],
+	['GET', 'https://shop.example.com/favicon.ico', 200, 'image/x-icon', 4286, [1, 0, 0, 0, 18, 2], 460],
+];
+const har = {
+	log: {
+		version: '1.2',
+		creator: { name: 'Firefox', version: '131.0' },
+		pages: [{ startedDateTime: new Date(base).toISOString(), id: 'page_1', title: 'Shop', pageTimings: { onContentLoad: 480, onLoad: 1320 } }],
+		entries: rows.map(([method, url, status, mime, size, [blocked, dns, connect, ssl, wait, receive], offset]) => {
+			const u = new URL(url);
+			const json = mime.startsWith('application/json');
+			return {
+				pageref: 'page_1',
+				startedDateTime: new Date(base + offset).toISOString(),
+				time: blocked + dns + connect + wait + receive,
+				request: {
+					method,
+					url,
+					httpVersion: 'HTTP/2',
+					headers: [
+						{ name: 'Host', value: u.host },
+						{ name: 'User-Agent', value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) Firefox/131.0' },
+						{ name: 'Accept', value: json ? 'application/json' : '*/*' },
+						...(u.host === 'shop.example.com' ? [{ name: 'Cookie', value: 'session=9f2c1ab7e4; theme=dark' }] : []),
+						...(u.pathname.startsWith('/api/') ? [{ name: 'Authorization', value: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0MiJ9.sig' }] : []),
+					],
+					queryString: [...u.searchParams].map(([name, value]) => ({ name, value })),
+					cookies:
+						u.host === 'shop.example.com'
+							? [
+									{ name: 'session', value: '9f2c1ab7e4' },
+									{ name: 'theme', value: 'dark' },
+								]
+							: [],
+					headersSize: -1,
+					bodySize: method === 'POST' ? 38 : 0,
+					...(method === 'POST' ? { postData: { mimeType: 'application/json', text: '{"product":"sneaker-42","quantity":1}' } } : {}),
+				},
+				response: {
+					status,
+					statusText: { 200: 'OK', 201: 'Created', 304: 'Not Modified', 404: 'Not Found', 500: 'Internal Server Error' }[status],
+					httpVersion: 'HTTP/2',
+					headers: [
+						{ name: 'Content-Type', value: mime },
+						{ name: 'Content-Length', value: String(size) },
+						{ name: 'Cache-Control', value: json ? 'no-store' : 'public, max-age=31536000' },
+						...(url.endsWith('/api/cart') ? [{ name: 'Set-Cookie', value: 'cart=c-7781; Path=/; HttpOnly; Secure' }] : []),
+					],
+					cookies: [],
+					content: {
+						size,
+						mimeType: mime,
+						...(json
+							? {
+									text:
+										status === 500
+											? '{"error":"upstream timeout"}'
+											: url.includes('cart')
+												? '{"id":"c-7781","items":1}'
+												: '{"items":[{"id":"sneaker-42","price":89}],"page":1}',
+								}
+							: mime.startsWith('text/html')
+								? { text: '<!doctype html><html><head><title>Shop</title></head><body>…</body></html>' }
+								: {}),
+					},
+					redirectURL: '',
+					headersSize: -1,
+					bodySize: size,
+				},
+				cache: {},
+				timings: { blocked, dns, connect, ssl, send: 0, wait, receive },
+			};
+		}),
+	},
+};
+const sample = JSON.stringify(har, null, 2);
+---
+
+<ToolShell
+	slug="har-viewer"
+	title="HAR Viewer"
+	description="Open or paste a .har file from your browser's network panel to see a waterfall, filter and sort requests, inspect headers, cookies and bodies, and export a sanitized copy."
+>
+	<div class="hv" id="hv-tool">
+		<label class="drop" id="hv-drop">
+			<input type="file" id="hv-file" accept=".har,application/json" hidden />
+			<span id="hv-drop-label">Drop a .har file here or click to choose. A sample capture is loaded.</span>
+		</label>
+		<section class="panel" data-no-share>
+			<div class="panel-head">
+				<span>HAR JSON</span>
+				<button class="btn" id="hv-sanitize">
+					Export sanitized
+				</button>
+			</div>
+			<textarea id="hv-in" spellcheck="false" aria-label="HAR JSON">{sample}</textarea>
+		</section>
+		<p class="hv-warn" role="note">
+			HAR files often contain cookies, session tokens and Authorization headers. Everything stays in your browser. Share only the sanitized export, which strips
+			Authorization, Cookie and Set-Cookie headers and cookie lists.
+		</p>
+		<div class="error" id="hv-error" hidden></div>
+		<div class="stats" id="hv-stats" aria-live="polite"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Waterfall</span>
+				<span class="hv-legend" id="hv-legend">
+					<span>
+						<i class="ph-blocked"></i>blocked
+					</span>
+					<span>
+						<i class="ph-dns"></i>DNS
+					</span>
+					<span>
+						<i class="ph-connect"></i>connect
+					</span>
+					<span>
+						<i class="ph-ssl"></i>TLS
+					</span>
+					<span>
+						<i class="ph-wait"></i>wait
+					</span>
+					<span>
+						<i class="ph-receive"></i>receive
+					</span>
+				</span>
+			</div>
+			<div class="hv-fall" id="hv-fall" tabindex="0" role="region" aria-label="Waterfall timeline"></div>
+		</section>
+		<div class="toolbar">
+			<div class="seg" id="hv-type" role="group" aria-label="Resource type">
+				<button data-value="all" aria-pressed="true">
+					All
+				</button>
+				<button data-value="doc">Doc</button>
+				<button data-value="api">XHR</button>
+				<button data-value="js">JS</button>
+				<button data-value="css">CSS</button>
+				<button data-value="img">Img</button>
+				<button data-value="font">Font</button>
+			</div>
+			<input class="hv-search" id="hv-q" type="search" placeholder="Filter: URL, method or status" aria-label="Filter requests" />
+		</div>
+		<p class="hv-count" id="hv-count"></p>
+		<div class="hv-wrap" tabindex="0" role="region" aria-label="Requests">
+			<table class="hv-table">
+				<thead>
+					<tr>
+						<th>
+							<button data-sort="index">#</button>
+						</th>
+						<th>
+							<button data-sort="method">Method</button>
+						</th>
+						<th>
+							<button data-sort="status">Status</button>
+						</th>
+						<th>
+							<button data-sort="name">Name</button>
+						</th>
+						<th>
+							<button data-sort="type">Type</button>
+						</th>
+						<th>
+							<button data-sort="size">Size</button>
+						</th>
+						<th>
+							<button data-sort="time">Time</button>
+						</th>
+					</tr>
+				</thead>
+				<tbody id="hv-body"></tbody>
+			</table>
+		</div>
+		<section class="panel" id="hv-detail-panel">
+			<div class="panel-head">
+				<span id="hv-detail-title">Request details</span>
+				<button class="btn" id="hv-copy-curl">
+					Copy as cURL
+				</button>
+			</div>
+			<div class="hv-detail" id="hv-detail"></div>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+	import { fileZone, saveBlob } from '../../scripts/files';
+
+	type Pair = { name: string; value: string };
+	type Entry = {
+		startedDateTime: string;
+		time: number;
+		request: { method: string; url: string; headers: Pair[]; queryString?: Pair[]; cookies?: Pair[]; postData?: { mimeType?: string; text?: string } };
+		response: {
+			status: number;
+			statusText?: string;
+			headers: Pair[];
+			cookies?: Pair[];
+			content?: { size?: number; mimeType?: string; text?: string; encoding?: string };
+			bodySize?: number;
+		};
+		timings: Record<string, number>;
+	};
+	type Row = {
+		index: number;
+		method: string;
+		status: number;
+		name: string;
+		url: string;
+		type: string;
+		size: number;
+		time: number;
+		start: number;
+		entry: Entry;
+	};
+
+	const PHASES = ['blocked', 'dns', 'connect', 'ssl', 'wait', 'receive'] as const;
+	const SECRET = /^(authorization|cookie|set-cookie|proxy-authorization)$/i;
+
+	const typeOf = (mime: string, url: string) => {
+		const m = mime.toLowerCase();
+		if (m.includes('html')) return 'doc';
+		if (m.includes('json') || m.includes('xml')) return 'api';
+		if (m.includes('javascript') || /\.m?js(\?|$)/.test(url)) return 'js';
+		if (m.includes('css')) return 'css';
+		if (m.startsWith('image/')) return 'img';
+		if (m.startsWith('font/') || m.includes('woff')) return 'font';
+		return 'other';
+	};
+	const bytes = (n: number) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(2)} MB`);
+	const ms = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(2)} s` : `${Math.round(n)} ms`);
+	const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
+		const node = document.createElement(tag);
+		if (cls) node.className = cls;
+		if (text !== undefined) node.textContent = text;
+		return node;
+	};
+
+	const sanitize = (har: { log: { entries: Entry[] } }) => {
+		const copy = structuredClone(har);
+		copy.log.entries.forEach((e) => {
+			e.request.headers = e.request.headers.filter((h) => !SECRET.test(h.name));
+			e.response.headers = e.response.headers.filter((h) => !SECRET.test(h.name));
+			e.request.cookies = [];
+			e.response.cookies = [];
+		});
+		return copy;
+	};
+
+	onPage('hv-tool', () => {
+		const input = byId<HTMLTextAreaElement>('hv-in');
+		const q = byId<HTMLInputElement>('hv-q');
+		let type = 'all';
+		let sortKey: keyof Row = 'index';
+		let sortDir = 1;
+		let rows: Row[] = [];
+		let selected = 0;
+		let parsed: { log: { entries: Entry[] } } | null = null;
+
+		const pairsTable = (title: string, pairs: Pair[]) => {
+			const box = el('div', 'hv-block');
+			box.append(el('h2', '', `${title} · ${pairs.length}`));
+			if (!pairs.length) {
+				box.append(el('p', 'hv-empty', 'None'));
+				return box;
+			}
+			const dl = el('dl');
+			pairs.forEach((p) => {
+				const dt = el('dt', SECRET.test(p.name) ? 'hv-secret' : '', p.name);
+				dl.append(dt, el('dd', '', p.value));
+			});
+			box.append(dl);
+			return box;
+		};
+
+		const curl = (e: Entry) => {
+			const parts = [`curl '${e.request.url}'`];
+			if (e.request.method !== 'GET') parts.push(`-X ${e.request.method}`);
+			e.request.headers
+				.filter((h) => !/^(host|content-length)$/i.test(h.name) && !h.name.startsWith(':'))
+				.forEach((h) => parts.push(`-H '${h.name}: ${h.value.replace(/'/g, "'\\''")}'`));
+			if (e.request.postData?.text) parts.push(`--data-raw '${e.request.postData.text.replace(/'/g, "'\\''")}'`);
+			return parts.join(' \\\n  ');
+		};
+
+		const renderDetail = () => {
+			const row = rows.find((r) => r.index === selected) ?? rows[0];
+			const box = byId('hv-detail');
+			if (!row) {
+				box.replaceChildren();
+				byId('hv-detail-title').textContent = 'Request details';
+				return;
+			}
+			const e = row.entry;
+			byId('hv-detail-title').textContent = `${row.method} ${row.name}`;
+			const general: Pair[] = [
+				{ name: 'URL', value: e.request.url },
+				{ name: 'Status', value: `${e.response.status} ${e.response.statusText ?? ''}`.trim() },
+				{ name: 'Started', value: e.startedDateTime },
+				{ name: 'Total time', value: ms(row.time) },
+				...PHASES.filter((p) => (e.timings[p] ?? -1) > 0).map((p) => ({ name: p === 'ssl' ? 'TLS' : p, value: ms(e.timings[p]) })),
+			];
+			const body = el('div', 'hv-block');
+			const text = e.response.content?.text;
+			body.append(el('h2', '', 'Response body'));
+			if (text) {
+				let shown = e.response.content?.encoding === 'base64' ? `base64, ${text.length} characters` : text;
+				if (!e.response.content?.encoding && /json/.test(e.response.content?.mimeType ?? '')) {
+					try {
+						shown = JSON.stringify(JSON.parse(text), null, 2);
+					} catch {
+						shown = text;
+					}
+				}
+				body.append(el('pre', '', shown.slice(0, 4000)));
+			} else body.append(el('p', 'hv-empty', 'Not captured'));
+			const blocks = [
+				pairsTable('General', general),
+				pairsTable('Request headers', e.request.headers),
+				pairsTable('Query string', e.request.queryString ?? []),
+			];
+			if (e.request.postData?.text) {
+				const post = el('div', 'hv-block');
+				post.append(el('h2', '', 'Request body'), el('pre', '', e.request.postData.text.slice(0, 4000)));
+				blocks.push(post);
+			}
+			blocks.push(pairsTable('Request cookies', e.request.cookies ?? []), pairsTable('Response headers', e.response.headers), body);
+			box.replaceChildren(...blocks);
+		};
+
+		const renderTable = () => {
+			const term = q.value.trim().toLowerCase();
+			const shown = rows
+				.filter((r) => (type === 'all' || r.type === type) && (!term || `${r.method} ${r.status} ${r.url}`.toLowerCase().includes(term)))
+				.sort((a, b) => {
+					const x = a[sortKey];
+					const y = b[sortKey];
+					return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) * sortDir;
+				});
+			byId('hv-count').textContent = `${shown.length} of ${rows.length} requests`;
+			document.querySelectorAll<HTMLButtonElement>('.hv-table th button').forEach((b) => {
+				const th = b.parentElement!;
+				if (b.dataset.sort === sortKey) th.setAttribute('aria-sort', sortDir > 0 ? 'ascending' : 'descending');
+				else th.removeAttribute('aria-sort');
+			});
+			byId('hv-body').replaceChildren(
+				...shown.map((r) => {
+					const tr = el('tr', r.status >= 400 ? 'hv-bad' : '');
+					if (r.index === selected) tr.classList.add('hv-sel');
+					const pick = el('button', 'hv-pick', String(r.index + 1));
+					pick.setAttribute('aria-label', `Show details for request ${r.index + 1}`);
+					pick.setAttribute('aria-pressed', String(r.index === selected));
+					pick.addEventListener('click', () => {
+						selected = r.index;
+						renderTable();
+						renderDetail();
+					});
+					const first = el('td');
+					first.append(pick);
+					const name = el('td', 'hv-name', r.name);
+					name.title = r.url;
+					tr.append(
+						first,
+						el('td', '', r.method),
+						el('td', 'hv-status', String(r.status)),
+						name,
+						el('td', '', r.type),
+						el('td', '', bytes(r.size)),
+						el('td', '', ms(r.time)),
+					);
+					return tr;
+				}),
+			);
+		};
+
+		const renderFall = () => {
+			const ns = 'http://www.w3.org/2000/svg';
+			const start = Math.min(...rows.map((r) => r.start));
+			const end = Math.max(...rows.map((r) => r.start + r.time));
+			const span = Math.max(end - start, 1);
+			const rowH = 16;
+			const svg = document.createElementNS(ns, 'svg');
+			svg.setAttribute('viewBox', `0 0 1000 ${rows.length * rowH}`);
+			svg.setAttribute('preserveAspectRatio', 'none');
+			svg.setAttribute('role', 'img');
+			svg.setAttribute('aria-label', `Waterfall of ${rows.length} requests over ${ms(span)}`);
+			svg.style.height = `${rows.length * rowH}px`;
+			rows.forEach((r, i) => {
+				let x = ((r.start - start) / span) * 1000;
+				const g = document.createElementNS(ns, 'g');
+				const title = document.createElementNS(ns, 'title');
+				title.textContent = `${r.index + 1}. ${r.method} ${r.name} · ${ms(r.time)} · ${PHASES.map((p) => `${p === 'ssl' ? 'TLS' : p} ${ms(Math.max(r.entry.timings[p] ?? 0, 0))}`).join(', ')}`;
+				g.append(title);
+				PHASES.forEach((p) => {
+					const v = Math.max(p === 'connect' ? (r.entry.timings.connect ?? 0) - Math.max(r.entry.timings.ssl ?? 0, 0) : (r.entry.timings[p] ?? 0), 0);
+					if (!v) return;
+					const w = Math.max((v / span) * 1000, 1.5);
+					const rect = document.createElementNS(ns, 'rect');
+					rect.setAttribute('x', String(x));
+					rect.setAttribute('y', String(i * rowH + 3));
+					rect.setAttribute('width', String(w));
+					rect.setAttribute('height', String(rowH - 6));
+					rect.setAttribute('class', `ph-${p}`);
+					g.append(rect);
+					x += w;
+				});
+				svg.append(g);
+			});
+			const labels = el('ol', 'hv-fall-names');
+			labels.setAttribute('aria-hidden', 'true');
+			rows.forEach((r) => labels.append(el('li', '', `${r.index + 1}. ${r.name}`)));
+			byId('hv-fall').replaceChildren(labels, svg);
+		};
+
+		const render = () => {
+			try {
+				parsed = JSON.parse(input.value);
+				const entries = parsed?.log?.entries;
+				if (!Array.isArray(entries)) throw new Error('No log.entries array found. Is this a HAR file?');
+				rows = entries.map((e, index) => {
+					const u = (() => {
+						try {
+							return new URL(e.request.url);
+						} catch {
+							return null;
+						}
+					})();
+					const mime = e.response.content?.mimeType ?? '';
+					return {
+						index,
+						method: e.request.method,
+						status: e.response.status,
+						name: u ? `${u.pathname.split('/').filter(Boolean).pop() ?? u.host}${u.search}` || u.host : e.request.url,
+						url: e.request.url,
+						type: typeOf(mime, e.request.url),
+						size: Math.max(e.response.content?.size ?? e.response.bodySize ?? 0, 0),
+						time: e.time,
+						start: new Date(e.startedDateTime).getTime(),
+						entry: e,
+					};
+				});
+				if (!rows.some((r) => r.index === selected)) selected = 0;
+				byId('hv-error').hidden = true;
+			} catch (err) {
+				rows = [];
+				parsed = null;
+				byId('hv-error').hidden = false;
+				byId('hv-error').textContent = (err as Error).message;
+			}
+			const start = rows.length ? Math.min(...rows.map((r) => r.start)) : 0;
+			const finish = rows.length ? Math.max(...rows.map((r) => r.start + r.time)) : 0;
+			const secrets = rows.reduce((n, r) => n + [...r.entry.request.headers, ...r.entry.response.headers].filter((h) => SECRET.test(h.name)).length, 0);
+			const stats: [string, string][] = [
+				[String(rows.length), 'requests'],
+				[bytes(rows.reduce((n, r) => n + r.size, 0)), 'transferred'],
+				[ms(finish - start), 'finish'],
+				[String(rows.filter((r) => r.status >= 400).length), 'errors'],
+				[String(secrets), 'sensitive headers'],
+			];
+			byId('hv-stats').replaceChildren(
+				...stats.map(([v, l]) => {
+					const s = el('div', 'stat');
+					s.append(el('b', '', v), el('span', '', l));
+					return s;
+				}),
+			);
+			if (rows.length) renderFall();
+			else byId('hv-fall').replaceChildren();
+			renderTable();
+			renderDetail();
+		};
+
+		segmented(byId('hv-type'), (v) => {
+			type = v;
+			renderTable();
+		});
+		document.querySelectorAll<HTMLButtonElement>('.hv-table th button').forEach((b) =>
+			b.addEventListener('click', () => {
+				const key = b.dataset.sort as keyof Row;
+				sortDir = sortKey === key ? -sortDir : 1;
+				sortKey = key;
+				renderTable();
+			}),
+		);
+		fileZone(byId('hv-drop'), byId<HTMLInputElement>('hv-file'), async (files) => {
+			if (!files[0]) return;
+			input.value = await files[0].text();
+			byId('hv-drop-label').textContent = `Loaded ${files[0].name}`;
+			selected = 0;
+			render();
+		});
+		byId('hv-sanitize').addEventListener('click', () => {
+			if (!parsed) return;
+			saveBlob(new Blob([JSON.stringify(sanitize(parsed), null, 2)], { type: 'application/json' }), 'sanitized.har');
+		});
+		copyButton(byId('hv-copy-curl'), () => {
+			const row = rows.find((r) => r.index === selected);
+			return row ? curl(row.entry) : '';
+		});
+		input.addEventListener('input', render);
+		q.addEventListener('input', renderTable);
+		render();
+	});
+</script>
+
+<style>
+	.hv {
+		display: grid;
+		gap: 14px;
+		min-width: 0;
+	}
+	#hv-in {
+		min-height: 180px;
+	}
+	.hv-warn {
+		margin: 0;
+		padding: 10px 14px;
+		border-radius: 12px;
+		background: var(--warn-bg);
+		color: var(--warn);
+		font-size: 13.5px;
+	}
+	.hv-legend {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+		font-size: 12px;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+	.hv-legend i {
+		display: inline-block;
+		width: 10px;
+		height: 10px;
+		border-radius: 3px;
+		margin-right: 4px;
+		vertical-align: -1px;
+	}
+	.hv-fall {
+		display: grid;
+		grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+		gap: 10px;
+		padding: 10px 14px;
+		max-height: 420px;
+		overflow: auto;
+	}
+	.hv-fall :global(svg) {
+		width: 100%;
+		display: block;
+	}
+	.hv-fall-names {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		font-family: var(--mono);
+		font-size: 11px;
+		color: var(--ink-soft);
+	}
+	.hv-fall-names :global(li) {
+		height: 16px;
+		line-height: 16px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.hv :global(.ph-blocked) {
+		fill: var(--ink-soft);
+		background: var(--ink-soft);
+	}
+	.hv :global(.ph-dns) {
+		fill: var(--tint-3);
+		background: var(--tint-3);
+	}
+	.hv :global(.ph-connect) {
+		fill: var(--warn);
+		background: var(--warn);
+	}
+	.hv :global(.ph-ssl) {
+		fill: var(--tint-1);
+		background: var(--tint-1);
+	}
+	.hv :global(.ph-wait) {
+		fill: var(--ok);
+		background: var(--ok);
+	}
+	.hv :global(.ph-receive) {
+		fill: var(--accent-strong);
+		background: var(--accent-strong);
+	}
+	.hv-search {
+		flex: 1;
+		min-width: 0;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		background: var(--surface);
+		color: var(--ink);
+		font: inherit;
+		padding: 8px 12px;
+	}
+	.hv .seg {
+		flex-wrap: wrap;
+	}
+	.hv-count {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.hv-wrap {
+		overflow: auto;
+		max-height: 440px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+	}
+	.hv-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-family: var(--mono);
+		font-size: 12px;
+	}
+	.hv-table th {
+		text-align: left;
+		position: sticky;
+		top: 0;
+		background: var(--surface);
+		border-bottom: 1px solid var(--border);
+		padding: 0;
+	}
+	.hv-table th button {
+		width: 100%;
+		text-align: left;
+		border: 0;
+		background: transparent;
+		color: var(--ink-soft);
+		font: 600 12px var(--sans);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		padding: 9px 10px;
+		cursor: pointer;
+	}
+	.hv-table th[aria-sort='ascending'] button::after {
+		content: ' ↑' / '';
+	}
+	.hv-table th[aria-sort='descending'] button::after {
+		content: ' ↓' / '';
+	}
+	.hv-table :global(td) {
+		padding: 6px 10px;
+		border-bottom: 1px solid var(--border);
+		white-space: nowrap;
+		color: var(--ink);
+	}
+	.hv-table :global(.hv-name) {
+		max-width: 260px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.hv-table :global(.hv-bad .hv-status) {
+		color: var(--bad);
+		font-weight: 700;
+	}
+	.hv-table :global(.hv-sel) {
+		background: var(--accent);
+	}
+	.hv-table :global(.hv-pick) {
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface-2);
+		color: var(--ink);
+		font: inherit;
+		min-width: 32px;
+		padding: 3px 6px;
+		cursor: pointer;
+	}
+	.hv-table :global(.hv-pick:focus-visible),
+	.hv-table th button:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	.hv-detail {
+		display: grid;
+		gap: 14px;
+		padding: 12px 14px;
+		min-width: 0;
+	}
+	.hv-detail :global(h2) {
+		margin: 0 0 6px;
+		font-size: 13px;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--ink-soft);
+	}
+	.hv-detail :global(dl) {
+		display: grid;
+		grid-template-columns: minmax(90px, max-content) minmax(0, 1fr);
+		gap: 4px 12px;
+		margin: 0;
+		font-family: var(--mono);
+		font-size: 12px;
+	}
+	.hv-detail :global(dt) {
+		color: var(--ink-soft);
+	}
+	.hv-detail :global(dt.hv-secret) {
+		color: var(--bad);
+		font-weight: 700;
+	}
+	.hv-detail :global(dd) {
+		margin: 0;
+		overflow-wrap: anywhere;
+		color: var(--ink);
+	}
+	.hv-detail :global(pre) {
+		margin: 0;
+		padding: 10px;
+		border-radius: 10px;
+		background: var(--surface-2);
+		color: var(--ink);
+		font-size: 12px;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+		max-height: 260px;
+		overflow: auto;
+	}
+	.hv-detail :global(.hv-empty) {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	@media (max-width: 600px) {
+		.hv-fall {
+			grid-template-columns: minmax(0, 110px) minmax(0, 1fr);
+		}
+	}
+</style>
