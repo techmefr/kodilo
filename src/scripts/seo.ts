@@ -52,8 +52,6 @@ export const toolJsonLd = (site: URL | undefined, slug: string, title: string, d
 export const bugReportUrl = (site: URL | undefined, slug: string, title: string) =>
 	`${REPO}/issues/new?${new URLSearchParams({ template: 'bug-report.yml', 'tool-url': absoluteUrl(site, `tools/${slug}/`), title: `[Bug] ${title}` })}`;
 
-export const toolRequestUrl = `${REPO}/issues/new?template=tool-request.yml`;
-
 export const itemListLd = (site: URL | undefined, name: string, items: Crumb[]) => ({
 	'@context': 'https://schema.org',
 	'@type': 'ItemList',
