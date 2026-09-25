@@ -300,12 +300,13 @@ npm install
 npm run dev
 ```
 
-| Command           | Action                                     |
-| :---------------- | :----------------------------------------- |
-| `npm install`     | Install dependencies                       |
-| `npm run dev`     | Start local dev server at `localhost:4321` |
-| `npm run build`   | Build the production site to `./dist/`     |
-| `npm run preview` | Preview the build locally before deploying |
+| Command                | Action                                                               |
+| :--------------------- | :------------------------------------------------------------------- |
+| `npm install`          | Install dependencies                                                 |
+| `npm run dev`          | Start local dev server at `localhost:4321`                           |
+| `npm run build`        | Build the production site to `./dist/`                               |
+| `npm run preview`      | Preview the build locally before deploying                           |
+| `npm run test:changed` | Run Playwright only on specs and tools changed against `origin/main` |
 
 Node version is pinned via `.nvmrc` (`lts/*`).
 
