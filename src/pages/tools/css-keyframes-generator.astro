@@ -1,0 +1,321 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="css-keyframes-generator"
+	title="CSS Keyframes Generator"
+	description="Build a @keyframes animation step by step with transform and opacity, tune timing and iteration, watch it live and copy the CSS."
+>
+	<div class="kf" id="kf-tool">
+		<div class="chips" id="kf-presets" role="group" aria-label="Presets">
+			<button data-value="bounce" aria-pressed="true">
+				Bounce
+			</button>
+			<button data-value="pulse" aria-pressed="false">
+				Pulse
+			</button>
+			<button data-value="shake" aria-pressed="false">
+				Shake
+			</button>
+			<button data-value="fade" aria-pressed="false">
+				Fade in
+			</button>
+			<button data-value="spin" aria-pressed="false">
+				Spin
+			</button>
+		</div>
+		<div class="kf-stage">
+			<div class="kf-box" id="kf-box"></div>
+		</div>
+		<p class="kf-note" id="kf-note" role="note"></p>
+		<div class="toolbar kf-play">
+			<button class="btn primary" id="kf-replay">
+				Replay
+			</button>
+			<label class="check">
+				<input type="checkbox" id="kf-paused" /> Pause
+			</label>
+		</div>
+		<div class="fields">
+			<div class="field">
+				<label for="kf-name">Name</label>
+				<input id="kf-name" spellcheck="false" value="bounce" />
+			</div>
+			<div class="field">
+				<label for="kf-duration">Duration (ms)</label>
+				<input id="kf-duration" type="number" min="50" step="50" value="1000" />
+			</div>
+			<div class="field">
+				<label for="kf-timing">Timing</label>
+				<select id="kf-timing">
+					<option>ease</option>
+					<option selected>ease-in-out</option>
+					<option>ease-in</option>
+					<option>ease-out</option>
+					<option>linear</option>
+					<option value="cubic-bezier(0.34, 1.56, 0.64, 1)">back out</option>
+					<option value="steps(6)">steps(6)</option>
+				</select>
+			</div>
+			<div class="field">
+				<label for="kf-iter">Iterations</label>
+				<input id="kf-iter" spellcheck="false" value="infinite" />
+			</div>
+			<div class="field">
+				<label for="kf-dir">Direction</label>
+				<select id="kf-dir">
+					<option>normal</option>
+					<option>reverse</option>
+					<option>alternate</option>
+					<option>alternate-reverse</option>
+				</select>
+			</div>
+			<div class="field">
+				<label for="kf-fill">Fill mode</label>
+				<select id="kf-fill">
+					<option>none</option>
+					<option>forwards</option>
+					<option>backwards</option>
+					<option selected>both</option>
+				</select>
+			</div>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Steps</span>
+				<button class="btn" id="kf-add">
+					+ Step
+				</button>
+			</div>
+			<div class="kf-scroll">
+				<table class="kf-steps">
+					<thead>
+						<tr>
+							<th scope="col">At %</th>
+							<th scope="col">Move X px</th>
+							<th scope="col">Move Y px</th>
+							<th scope="col">Scale</th>
+							<th scope="col">Rotate °</th>
+							<th scope="col">Opacity</th>
+							<th scope="col">
+								<span class="sr-only">Actions</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody id="kf-rows"></tbody>
+				</table>
+			</div>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>CSS</span>
+				<button class="btn" id="kf-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="kf-css"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Step = { at: number; x: number; y: number; s: number; r: number; o: number };
+	const keys = ['at', 'x', 'y', 's', 'r', 'o'] as const;
+	const labels = ['At %', 'Move X px', 'Move Y px', 'Scale', 'Rotate °', 'Opacity'];
+	const st = (at: number, p: Partial<Step> = {}): Step => ({ at, x: 0, y: 0, s: 1, r: 0, o: 1, ...p });
+
+	const presets: Record<string, { steps: Step[]; timing: string; iter: string; dir: string; duration: number }> = {
+		bounce: { steps: [st(0), st(50, { y: -40, s: 1.05 }), st(100)], timing: 'ease-in-out', iter: 'infinite', dir: 'normal', duration: 1000 },
+		pulse: { steps: [st(0), st(50, { s: 1.2, o: 0.7 }), st(100)], timing: 'ease-in-out', iter: 'infinite', dir: 'normal', duration: 1200 },
+		shake: {
+			steps: [st(0), st(20, { x: -12 }), st(40, { x: 12 }), st(60, { x: -8 }), st(80, { x: 8 }), st(100)],
+			timing: 'linear',
+			iter: '3',
+			dir: 'normal',
+			duration: 600,
+		},
+		fade: { steps: [st(0, { y: 16, o: 0 }), st(100)], timing: 'ease-out', iter: '1', dir: 'normal', duration: 500 },
+		spin: { steps: [st(0), st(100, { r: 360 })], timing: 'linear', iter: 'infinite', dir: 'normal', duration: 1500 },
+	};
+
+	onPage('kf-tool', () => {
+		let steps: Step[] = [];
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const box = byId('kf-box');
+		const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+		byId('kf-note').textContent = reduced
+			? 'Your system asks for reduced motion, so the preview only plays once when you press Replay. The CSS includes a prefers-reduced-motion fallback.'
+			: 'The CSS includes a prefers-reduced-motion fallback that turns the animation off for people who ask for less motion.';
+
+		const frame = (s: Step) => {
+			const t: string[] = [];
+			if (s.x || s.y) t.push(`translate(${s.x}px, ${s.y}px)`);
+			if (s.s !== 1) t.push(`scale(${s.s})`);
+			if (s.r) t.push(`rotate(${s.r}deg)`);
+			const lines = [`transform: ${t.join(' ') || 'none'};`];
+			lines.push(`opacity: ${s.o};`);
+			return lines;
+		};
+
+		const css = () => {
+			const name = val('kf-name').replace(/[^\w-]/g, '') || 'animation';
+			const body = [...steps]
+				.sort((a, b) => a.at - b.at)
+				.map(
+					(s) =>
+						`  ${s.at}% {\n${frame(s)
+							.map((l) => `    ${l}`)
+							.join('\n')}\n  }`,
+				)
+				.join('\n');
+			const iter = val('kf-iter') || '1';
+			const shorthand = `${name} ${Number(val('kf-duration')) || 1000}ms ${byId<HTMLSelectElement>('kf-timing').value} ${iter} ${byId<HTMLSelectElement>('kf-dir').value} ${byId<HTMLSelectElement>('kf-fill').value}`;
+			return {
+				name,
+				body,
+				shorthand,
+				text: `@keyframes ${name} {\n${body}\n}\n\n.element {\n  animation: ${shorthand};\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .element {\n    animation: none;\n  }\n}\n`,
+			};
+		};
+
+		let styleEl = document.getElementById('kf-style') as HTMLStyleElement | null;
+		if (!styleEl) {
+			styleEl = document.createElement('style');
+			styleEl.id = 'kf-style';
+			document.head.append(styleEl);
+		}
+
+		const paint = () => {
+			const c = css();
+			byId('kf-css').textContent = c.text;
+			styleEl!.textContent = `@keyframes kf-preview-${c.name} {\n${c.body}\n}`;
+			const shorthand = c.shorthand.replace(c.name, `kf-preview-${c.name}`);
+			box.style.animation = 'none';
+			void box.offsetWidth;
+			box.style.animation = reduced ? shorthand.replace(/\s(infinite|\d+(\.\d+)?)\s/, ' 1 ') : shorthand;
+			box.style.animationPlayState = byId<HTMLInputElement>('kf-paused').checked ? 'paused' : 'running';
+		};
+
+		const rows = () => {
+			byId('kf-rows').replaceChildren(
+				...steps.map((s, i) => {
+					const tr = document.createElement('tr');
+					keys.forEach((k, j) => {
+						const td = document.createElement('td');
+						const input = document.createElement('input');
+						input.type = 'number';
+						input.className = 'num';
+						input.step = k === 's' || k === 'o' ? '0.05' : '1';
+						input.value = String(s[k]);
+						input.setAttribute('aria-label', `Step ${i + 1} ${labels[j]}`);
+						input.addEventListener('input', () => {
+							s[k] = Number(input.value) || 0;
+							paint();
+						});
+						td.append(input);
+						tr.append(td);
+					});
+					const td = document.createElement('td');
+					const remove = document.createElement('button');
+					remove.className = 'btn';
+					remove.textContent = 'Remove';
+					remove.setAttribute('aria-label', `Remove step ${i + 1}`);
+					remove.disabled = steps.length <= 2;
+					remove.addEventListener('click', () => {
+						steps.splice(i, 1);
+						rows();
+					});
+					td.append(remove);
+					tr.append(td);
+					return tr;
+				}),
+			);
+			paint();
+		};
+
+		const chips = Array.from(document.querySelectorAll<HTMLButtonElement>('#kf-presets button'));
+		const load = (b: HTMLButtonElement) => {
+			chips.forEach((c) => c.setAttribute('aria-pressed', String(c === b)));
+			const p = presets[b.dataset.value!];
+			steps = p.steps.map((s) => ({ ...s }));
+			byId<HTMLInputElement>('kf-name').value = b.dataset.value!;
+			byId<HTMLInputElement>('kf-duration').value = String(p.duration);
+			byId<HTMLSelectElement>('kf-timing').value = p.timing;
+			byId<HTMLInputElement>('kf-iter').value = p.iter;
+			byId<HTMLSelectElement>('kf-dir').value = p.dir;
+			rows();
+		};
+		chips.forEach((c) => c.addEventListener('click', () => load(c)));
+		['kf-name', 'kf-duration', 'kf-iter'].forEach((id) => byId(id).addEventListener('input', paint));
+		['kf-timing', 'kf-dir', 'kf-fill', 'kf-paused'].forEach((id) => byId(id).addEventListener('change', paint));
+		byId('kf-replay').addEventListener('click', paint);
+		byId('kf-add').addEventListener('click', () => {
+			steps.push(st(50));
+			rows();
+		});
+		copyButton(byId('kf-copy'), () => byId('kf-css').textContent ?? '');
+		load(chips[0]);
+	});
+</script>
+
+<style>
+	.kf {
+		display: grid;
+		gap: 16px;
+	}
+	.kf-stage {
+		display: grid;
+		place-items: center;
+		height: 200px;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+		overflow: hidden;
+	}
+	.kf-box {
+		width: 64px;
+		height: 64px;
+		border-radius: 16px;
+		background: linear-gradient(135deg, var(--tint-2), var(--tint-1));
+	}
+	.kf-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.kf-play {
+		justify-content: center;
+	}
+	.kf > * {
+		min-width: 0;
+	}
+	.kf-scroll {
+		position: relative;
+		overflow-x: auto;
+	}
+	.kf-steps {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 13px;
+	}
+	.kf-steps th {
+		text-align: left;
+		padding: 8px 6px;
+		color: var(--ink-soft);
+		font-weight: 600;
+		white-space: nowrap;
+	}
+	.kf-steps :global(td) {
+		padding: 4px 6px;
+	}
+	.kf-steps :global(input) {
+		width: 76px;
+	}
+	.kf-steps :global(.btn:disabled) {
+		opacity: 0.4;
+		cursor: default;
+	}
+</style>

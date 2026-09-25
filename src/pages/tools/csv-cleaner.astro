@@ -1,0 +1,209 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `name,email,city,notes,signup
+  Ada Lovelace ,ada@example.com,London,,2024-03-02
+Grace Hopper,grace@example.com,  New York,,2023-11-19
+Alan Turing,alan@example.com,Manchester,,2024-01-07
+Grace Hopper,grace@example.com,New York,,2023-11-19
+,,,,
+Linus Torvalds,linus@example.com,Portland ,,2022-08-25
+Ada Lovelace,ada@example.com,London,,2024-03-02`;
+---
+
+<ToolShell
+	slug="csv-cleaner"
+	title="CSV Cleaner"
+	description="Clean up CSV files: trim cells, drop duplicate and empty rows, remove empty columns and sort by any column, with a live preview table."
+>
+	<div class="toolbar" id="csc-tool">
+		<label class="check">
+			<input type="checkbox" id="csc-header" checked /> First row is header
+		</label>
+		<label class="check">
+			<input type="checkbox" id="csc-trim" checked /> Trim cells
+		</label>
+		<label class="check">
+			<input type="checkbox" id="csc-dedupe" checked /> Remove duplicate rows
+		</label>
+		<label class="check">
+			<input type="checkbox" id="csc-empty-rows" checked /> Remove empty rows
+		</label>
+		<label class="check">
+			<input type="checkbox" id="csc-empty-cols" checked /> Remove empty columns
+		</label>
+	</div>
+	<div class="fields">
+		<div class="field">
+			<label for="csc-sort">Sort by</label>
+			<select id="csc-sort"></select>
+		</div>
+		<div class="field">
+			<label for="csc-order">Order</label>
+			<select id="csc-order">
+				<option value="asc">Ascending</option>
+				<option value="desc">Descending</option>
+			</select>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">CSV</div>
+			<textarea id="csc-in" spellcheck="false" aria-label="CSV input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Cleaned CSV</span>
+				<button class="btn" id="csc-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="csc-out" tabindex="0"></pre>
+		</section>
+	</div>
+	<p class="error" id="csc-error" role="alert" hidden></p>
+	<div class="stats">
+		<div class="stat">
+			<b id="csc-rows">0</b>
+			<span>Rows kept</span>
+		</div>
+		<div class="stat">
+			<b id="csc-dupes">0</b>
+			<span>Duplicates removed</span>
+		</div>
+		<div class="stat">
+			<b id="csc-blank">0</b>
+			<span>Empty rows removed</span>
+		</div>
+		<div class="stat">
+			<b id="csc-cols">0</b>
+			<span>Empty columns removed</span>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">Preview</div>
+		<div class="csc-scroll" tabindex="0" role="region" aria-label="Cleaned data preview">
+			<table class="csc-table" id="csc-table"></table>
+		</div>
+	</section>
+</ToolShell>
+
+<style>
+	.csc-scroll {
+		overflow: auto;
+		max-height: 360px;
+	}
+	.csc-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 2px;
+	}
+	.csc-table {
+		border-collapse: collapse;
+		font-size: 13px;
+		width: 100%;
+	}
+	.csc-table :global(th),
+	.csc-table :global(td) {
+		border-bottom: 1px solid var(--border);
+		padding: 6px 10px;
+		text-align: left;
+		white-space: nowrap;
+	}
+	.csc-table :global(th) {
+		color: var(--ink-soft);
+		font-weight: 700;
+	}
+</style>
+
+<script>
+	import Papa from 'papaparse';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	onPage('csc-tool', () => {
+		const input = byId<HTMLTextAreaElement>('csc-in');
+		const output = byId('csc-out');
+		const error = byId('csc-error');
+		const sortSel = byId<HTMLSelectElement>('csc-sort');
+		const order = byId<HTMLSelectElement>('csc-order');
+		const box = (id: string) => byId<HTMLInputElement>(id).checked;
+
+		const render = () => {
+			const parsed = Papa.parse<string[]>(input.value, { skipEmptyLines: false });
+			const problem = parsed.errors.find((e) => e.code !== 'UndetectableDelimiter');
+			error.hidden = !problem;
+			if (problem) error.textContent = `Row ${(problem.row ?? 0) + 1}: ${problem.message}`;
+			let rows = parsed.data.filter((r) => !(r.length === 1 && r[0] === ''));
+			if (box('csc-trim')) rows = rows.map((r) => r.map((c) => c.trim()));
+			const header = box('csc-header') && rows.length ? rows[0] : null;
+			let body = header ? rows.slice(1) : rows;
+			const width = Math.max(header?.length ?? 0, ...body.map((r) => r.length), 0);
+			body = body.map((r) => Array.from({ length: width }, (_, i) => r[i] ?? ''));
+			let blank = 0;
+			if (box('csc-empty-rows')) {
+				const before = body.length;
+				body = body.filter((r) => r.some((c) => c.trim() !== ''));
+				blank = before - body.length;
+			}
+			let dupes = 0;
+			if (box('csc-dedupe')) {
+				const seen = new Set<string>();
+				body = body.filter((r) => {
+					const key = JSON.stringify(r);
+					if (seen.has(key)) return (dupes++, false);
+					seen.add(key);
+					return true;
+				});
+			}
+			let heads = header ? Array.from({ length: width }, (_, i) => header[i] ?? '') : Array.from({ length: width }, (_, i) => `Column ${i + 1}`);
+			let keep = heads.map((_, i) => i);
+			if (box('csc-empty-cols')) keep = keep.filter((i) => body.some((r) => r[i].trim() !== ''));
+			const removedCols = heads.length - keep.length;
+			heads = keep.map((i) => heads[i]);
+			body = body.map((r) => keep.map((i) => r[i]));
+
+			const previous = sortSel.value;
+			sortSel.replaceChildren(new Option('Original order', ''), ...heads.map((h, i) => new Option(h || `Column ${i + 1}`, String(i))));
+			sortSel.value = heads[Number(previous)] !== undefined && previous !== '' ? previous : '';
+			if (sortSel.value !== '') {
+				const col = Number(sortSel.value);
+				const dir = order.value === 'desc' ? -1 : 1;
+				const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+				body = [...body].sort((a, b) => dir * collator.compare(a[col], b[col]));
+			}
+
+			const all = header ? [heads, ...body] : body;
+			output.textContent = Papa.unparse(all, { delimiter: parsed.meta.delimiter || ',' });
+			const table = byId('csc-table');
+			const thead = document.createElement('thead');
+			const tr = document.createElement('tr');
+			heads.forEach((h) => {
+				const th = document.createElement('th');
+				th.scope = 'col';
+				th.textContent = h;
+				tr.append(th);
+			});
+			thead.append(tr);
+			const tbody = document.createElement('tbody');
+			body.slice(0, 100).forEach((r) => {
+				const row = document.createElement('tr');
+				r.forEach((c) => {
+					const td = document.createElement('td');
+					td.textContent = c;
+					row.append(td);
+				});
+				tbody.append(row);
+			});
+			table.replaceChildren(thead, tbody);
+			byId('csc-rows').textContent = String(body.length);
+			byId('csc-dupes').textContent = String(dupes);
+			byId('csc-blank').textContent = String(blank);
+			byId('csc-cols').textContent = String(removedCols);
+		};
+
+		['csc-header', 'csc-trim', 'csc-dedupe', 'csc-empty-rows', 'csc-empty-cols'].forEach((id) => byId(id).addEventListener('change', render));
+		[sortSel, order].forEach((el) => el.addEventListener('change', render));
+		input.addEventListener('input', render);
+		copyButton(byId('csc-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

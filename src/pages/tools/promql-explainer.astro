@@ -1,0 +1,749 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const examples = [
+	{
+		name: 'error ratio',
+		q: 'sum by (service) (rate(http_requests_total{job="api", status=~"5.."}[5m]))\n  /\nsum by (service) (rate(http_requests_total{job="api"}[5m])) > 0.05',
+	},
+	{ name: 'p95 latency', q: 'histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))' },
+	{ name: 'top memory', q: 'topk(5, container_memory_working_set_bytes{namespace="prod", container!=""})' },
+	{ name: 'disk full soon', q: 'predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[6h], 4 * 3600) < 0' },
+	{ name: 'subquery', q: 'max_over_time(rate(node_cpu_seconds_total{mode!="idle"}[1m])[1h:5m] offset 1d)' },
+];
+---
+
+<ToolShell
+	slug="promql-explainer"
+	title="PromQL Explainer"
+	description="Paste a PromQL query to see it broken down step by step: selectors, label matchers, ranges, functions, aggregations and vector matching, in the order Prometheus evaluates them."
+>
+	<div class="pq" id="pq-tool" data-examples={JSON.stringify(examples)}>
+		<div class="chips" id="pq-examples" role="group" aria-label="Examples"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Query</span>
+				<button class="btn" id="pq-copy">
+					Copy explanation
+				</button>
+			</div>
+			<textarea id="pq-in" spellcheck="false" aria-label="PromQL query">{examples[0].q}</textarea>
+		</section>
+		<p class="error" id="pq-error" hidden></p>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Structure</span>
+				<span class="pq-type" id="pq-type"></span>
+			</div>
+			<div class="pq-tree" id="pq-tree"></div>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Step by step</span>
+			</div>
+			<ol class="pq-steps" id="pq-steps"></ol>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Kind = 'instant vector' | 'range vector' | 'scalar' | 'string';
+	type Matcher = { label: string; op: string; value: string };
+	type Node =
+		| { t: 'num'; v: string }
+		| { t: 'str'; v: string }
+		| { t: 'sel'; name: string; matchers: Matcher[]; range?: string; offset?: string; at?: string }
+		| { t: 'sub'; expr: Node; range: string; step: string; offset?: string }
+		| { t: 'call'; fn: string; args: Node[] }
+		| { t: 'agg'; op: string; by?: string[]; without?: string[]; param?: Node; expr: Node }
+		| { t: 'bin'; op: string; l: Node; r: Node; bool: boolean; on?: string[]; ignoring?: string[]; group?: string; groupLabels?: string[] }
+		| { t: 'neg'; expr: Node }
+		| { t: 'paren'; expr: Node };
+
+	const AGGS = ['sum', 'min', 'max', 'avg', 'group', 'stddev', 'stdvar', 'count', 'count_values', 'bottomk', 'topk', 'quantile', 'limitk', 'limit_ratio'];
+	const PREC: Record<string, number> = {
+		or: 1,
+		and: 2,
+		unless: 2,
+		'==': 3,
+		'!=': 3,
+		'<=': 3,
+		'<': 3,
+		'>=': 3,
+		'>': 3,
+		'+': 4,
+		'-': 4,
+		'*': 5,
+		'/': 5,
+		'%': 5,
+		atan2: 5,
+		'^': 6,
+	};
+	const FN: Record<string, [string, Kind]> = {
+		rate: ['per-second average rate of increase of a counter, handling counter resets', 'instant vector'],
+		irate: ['per-second rate using only the last two samples (spiky, for fast-moving counters)', 'instant vector'],
+		increase: ['total increase of a counter over the range, extrapolated to the window edges', 'instant vector'],
+		delta: ['difference between the first and last value of a gauge over the range', 'instant vector'],
+		idelta: ['difference between the last two samples of a gauge', 'instant vector'],
+		deriv: ['per-second derivative of a gauge using linear regression', 'instant vector'],
+		predict_linear: ['predicts the value this many seconds in the future using linear regression', 'instant vector'],
+		histogram_quantile: ['estimates the quantile from histogram buckets (needs the le label kept)', 'instant vector'],
+		avg_over_time: ['average of every sample in the range', 'instant vector'],
+		min_over_time: ['lowest sample in the range', 'instant vector'],
+		max_over_time: ['highest sample in the range', 'instant vector'],
+		sum_over_time: ['sum of every sample in the range', 'instant vector'],
+		count_over_time: ['number of samples in the range', 'instant vector'],
+		quantile_over_time: ['quantile of the samples in the range', 'instant vector'],
+		last_over_time: ['most recent sample in the range', 'instant vector'],
+		stddev_over_time: ['standard deviation of the samples in the range', 'instant vector'],
+		present_over_time: ['1 for every series that has any sample in the range', 'instant vector'],
+		changes: ['number of times the value changed in the range', 'instant vector'],
+		resets: ['number of counter resets in the range', 'instant vector'],
+		absent: ['returns 1 if the vector is empty, nothing otherwise (for alerting on missing metrics)', 'instant vector'],
+		absent_over_time: ['returns 1 if no sample exists in the range', 'instant vector'],
+		abs: ['absolute value of each sample', 'instant vector'],
+		ceil: ['rounds each value up', 'instant vector'],
+		floor: ['rounds each value down', 'instant vector'],
+		round: ['rounds each value to the nearest integer or multiple', 'instant vector'],
+		clamp: ['clamps each value between a minimum and a maximum', 'instant vector'],
+		clamp_min: ['raises values below the minimum to the minimum', 'instant vector'],
+		clamp_max: ['lowers values above the maximum to the maximum', 'instant vector'],
+		exp: ['e raised to each value', 'instant vector'],
+		ln: ['natural logarithm of each value', 'instant vector'],
+		log2: ['base-2 logarithm of each value', 'instant vector'],
+		log10: ['base-10 logarithm of each value', 'instant vector'],
+		sqrt: ['square root of each value', 'instant vector'],
+		label_replace: ['writes a new label built from a regex capture of another label', 'instant vector'],
+		label_join: ['joins several label values into a new label', 'instant vector'],
+		sort: ['sorts series by value, ascending (instant queries only)', 'instant vector'],
+		sort_desc: ['sorts series by value, descending (instant queries only)', 'instant vector'],
+		time: ['current evaluation time as Unix seconds', 'scalar'],
+		timestamp: ['timestamp of each sample', 'instant vector'],
+		vector: ['turns a scalar into a single series without labels', 'instant vector'],
+		scalar: ['turns a single-series vector into a scalar (NaN if not exactly one)', 'scalar'],
+		hour: ['hour of the day (UTC) for each value or now', 'instant vector'],
+		day_of_week: ['day of the week (0 is Sunday, UTC)', 'instant vector'],
+		days_in_month: ['number of days in the month (UTC)', 'instant vector'],
+	};
+	const AGG_TEXT: Record<string, string> = {
+		sum: 'adds up',
+		min: 'keeps the lowest of',
+		max: 'keeps the highest of',
+		avg: 'averages',
+		group: 'collapses to 1 for each group of',
+		stddev: 'computes the standard deviation of',
+		stdvar: 'computes the variance of',
+		count: 'counts',
+		count_values: 'counts series per distinct value of',
+		topk: 'keeps the k largest of',
+		bottomk: 'keeps the k smallest of',
+		quantile: 'computes a quantile across',
+		limitk: 'keeps k arbitrary series of',
+		limit_ratio: 'keeps a sample ratio of',
+	};
+	const BIN_TEXT: Record<string, string> = {
+		'+': 'adds',
+		'-': 'subtracts',
+		'*': 'multiplies',
+		'/': 'divides',
+		'%': 'takes the remainder of',
+		'^': 'raises to the power',
+		atan2: 'computes atan2 of',
+		and: 'keeps left series that also exist on the right (intersection)',
+		or: 'keeps all left series plus right series with no match on the left (union)',
+		unless: 'keeps left series that have no match on the right',
+	};
+	const MATCH_TEXT: Record<string, string> = { '=': 'equals', '!=': 'is not', '=~': 'matches regex', '!~': 'does not match regex' };
+	const DUR: Record<string, string> = { ms: 'millisecond', s: 'second', m: 'minute', h: 'hour', d: 'day', w: 'week', y: 'year' };
+	const human = (d: string) =>
+		d
+			.match(/\d+(ms|[smhdwy])/g)
+			?.map((p) => {
+				const n = parseInt(p, 10);
+				const u = DUR[p.replace(/\d+/, '')];
+				return `${n} ${u}${n === 1 ? '' : 's'}`;
+			})
+			.join(' ') ?? d;
+
+	const lex = (src: string) => {
+		const re =
+			/\s+|#[^\n]*|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`)|(\d+(?:ms|[smhdwy])(?:\d+(?:ms|[smhdwy]))*)(?![\w.])|(0x[0-9a-f]+|(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?|inf|nan)(?![\w:])|([a-zA-Z_:][\w:.]*)|(==|!=|<=|>=|=~|!~|[-+*/%^<>=(){}[\],:@])/giy;
+		const tokens: { k: string; v: string; pos: number }[] = [];
+		let m: RegExpExecArray | null;
+		re.lastIndex = 0;
+		while (re.lastIndex < src.length) {
+			const pos = re.lastIndex;
+			m = re.exec(src);
+			if (!m) throw new Error(`Unexpected character "${src[pos]}" at position ${pos + 1}.`);
+			if (m[1]) tokens.push({ k: 'str', v: m[1].slice(1, -1).replace(/\\(.)/g, '$1'), pos });
+			else if (m[2]) tokens.push({ k: 'dur', v: m[2], pos });
+			else if (m[3]) tokens.push({ k: 'num', v: m[3], pos });
+			else if (m[4]) tokens.push({ k: 'id', v: m[4], pos });
+			else if (m[5]) tokens.push({ k: 'op', v: m[5], pos });
+		}
+		return tokens;
+	};
+
+	const parse = (src: string): Node => {
+		const tk = lex(src);
+		let i = 0;
+		const peek = () => tk[i];
+		const is = (v: string) => tk[i] && tk[i].v.toLowerCase() === v && (tk[i].k === 'op' || tk[i].k === 'id');
+		const eat = (v: string) => {
+			if (!is(v)) throw new Error(`Expected "${v}"${tk[i] ? ` but found "${tk[i].v}"` : ' at the end'}.`);
+			return tk[i++];
+		};
+		const labels = () => {
+			eat('(');
+			const out: string[] = [];
+			while (!is(')')) {
+				out.push(tk[i++].v);
+				if (is(',')) i++;
+			}
+			eat(')');
+			return out;
+		};
+		const duration = () => {
+			const t = tk[i++];
+			if (!t || (t.k !== 'dur' && t.k !== 'num')) throw new Error('Expected a duration like 5m.');
+			return t.k === 'num' ? `${t.v}s` : t.v;
+		};
+		const postfix = (node: Node): Node => {
+			for (;;) {
+				if (is('[')) {
+					i++;
+					const range = duration();
+					if (is(':')) {
+						i++;
+						const step = is(']') ? '' : duration();
+						eat(']');
+						node = { t: 'sub', expr: node, range, step };
+					} else {
+						eat(']');
+						if (node.t !== 'sel') throw new Error('A range [..] can only follow a metric selector. Use [range:step] for a subquery.');
+						node.range = range;
+					}
+				} else if (is('offset')) {
+					i++;
+					const neg = is('-') ? (i++, '-') : '';
+					const d = neg + duration();
+					if (node.t === 'sel' || node.t === 'sub') node.offset = d;
+				} else if (is('@')) {
+					i++;
+					const v = tk[i].k === 'id' ? `${tk[i++].v}()` : tk[i++].v;
+					if (is('(')) {
+						i++;
+						eat(')');
+					}
+					if (node.t === 'sel') node.at = v;
+				} else return node;
+			}
+		};
+		const selector = (name: string): Node => {
+			const matchers: Matcher[] = [];
+			if (is('{')) {
+				i++;
+				while (!is('}')) {
+					const label = tk[i++];
+					if (label.k === 'str') {
+						matchers.push({ label: '__name__', op: '=', value: label.v });
+					} else {
+						const op = tk[i++]?.v;
+						if (!op || !MATCH_TEXT[op]) throw new Error(`Expected =, !=, =~ or !~ after label ${label.v}.`);
+						const val = tk[i++];
+						if (!val || val.k !== 'str') throw new Error(`Label ${label.v} needs a quoted value.`);
+						matchers.push({ label: label.v, op, value: val.v });
+					}
+					if (is(',')) i++;
+				}
+				eat('}');
+			}
+			if (!name && !matchers.length) throw new Error('A selector needs a metric name or at least one matcher.');
+			return { t: 'sel', name, matchers };
+		};
+		const primary = (): Node => {
+			const t = peek();
+			if (!t) throw new Error('Query ends too early.');
+			if (t.v === '(' && t.k === 'op') {
+				i++;
+				const e = expr(0);
+				eat(')');
+				return postfix({ t: 'paren', expr: e });
+			}
+			if (t.v === '-' || t.v === '+') {
+				i++;
+				const e = unary();
+				return t.v === '-' ? { t: 'neg', expr: e } : e;
+			}
+			if (t.k === 'num' || t.k === 'dur') return (i++, { t: 'num', v: t.v });
+			if (t.k === 'str') return (i++, { t: 'str', v: t.v });
+			if (t.v === '{') return postfix(selector(''));
+			if (t.k === 'id') {
+				i++;
+				const low = t.v.toLowerCase();
+				if (AGGS.includes(low) && (is('(') || is('by') || is('without'))) {
+					let by: string[] | undefined;
+					let without: string[] | undefined;
+					if (is('by')) {
+						i++;
+						by = labels();
+					} else if (is('without')) {
+						i++;
+						without = labels();
+					}
+					eat('(');
+					let param: Node | undefined;
+					let e = expr(0);
+					if (is(',')) {
+						i++;
+						param = e;
+						e = expr(0);
+					}
+					eat(')');
+					if (is('by')) {
+						i++;
+						by = labels();
+					} else if (is('without')) {
+						i++;
+						without = labels();
+					}
+					return { t: 'agg', op: low, by, without, param, expr: e };
+				}
+				if (is('(')) {
+					i++;
+					const args: Node[] = [];
+					while (!is(')')) {
+						args.push(expr(0));
+						if (is(',')) i++;
+						else break;
+					}
+					eat(')');
+					return postfix({ t: 'call', fn: t.v, args });
+				}
+				return postfix(selector(t.v));
+			}
+			throw new Error(`Unexpected "${t.v}".`);
+		};
+		const unary = (): Node => {
+			let e = primary();
+			if (is('^')) {
+				i++;
+				e = { t: 'bin', op: '^', l: e, r: unary(), bool: false };
+			}
+			return e;
+		};
+		const expr = (min: number): Node => {
+			let left = unary();
+			for (;;) {
+				const t = peek();
+				const op = t && (t.k === 'op' || t.k === 'id') ? t.v.toLowerCase() : '';
+				const p = PREC[op];
+				if (!p || p < min || op === '^') break;
+				i++;
+				const node: Extract<Node, { t: 'bin' }> = { t: 'bin', op, l: left, r: left, bool: false };
+				if (is('bool')) {
+					i++;
+					node.bool = true;
+				}
+				if (is('on')) {
+					i++;
+					node.on = labels();
+				} else if (is('ignoring')) {
+					i++;
+					node.ignoring = labels();
+				}
+				if (is('group_left') || is('group_right')) {
+					node.group = tk[i++].v.toLowerCase();
+					node.groupLabels = is('(') ? labels() : [];
+				}
+				node.r = expr(p + 1);
+				left = node;
+			}
+			return left;
+		};
+		const root = expr(0);
+		if (i < tk.length) throw new Error(`Unexpected "${tk[i].v}" after the end of the query.`);
+		return root;
+	};
+
+	const kindOf = (n: Node): Kind => {
+		switch (n.t) {
+			case 'num':
+				return 'scalar';
+			case 'str':
+				return 'string';
+			case 'sel':
+				return n.range ? 'range vector' : 'instant vector';
+			case 'sub':
+				return 'range vector';
+			case 'call':
+				return FN[n.fn]?.[1] ?? 'instant vector';
+			case 'agg':
+				return 'instant vector';
+			case 'bin':
+				return kindOf(n.l) === 'scalar' && kindOf(n.r) === 'scalar' ? 'scalar' : 'instant vector';
+			default:
+				return kindOf(n.expr);
+		}
+	};
+
+	const show = (n: Node): string => {
+		switch (n.t) {
+			case 'num':
+				return n.v;
+			case 'str':
+				return `"${n.v}"`;
+			case 'sel':
+				return `${n.name}${n.matchers.length ? `{${n.matchers.map((m) => `${m.label}${m.op}"${m.value}"`).join(', ')}}` : ''}${n.range ? `[${n.range}]` : ''}${n.offset ? ` offset ${n.offset}` : ''}${n.at ? ` @ ${n.at}` : ''}`;
+			case 'sub':
+				return `${show(n.expr)}[${n.range}:${n.step}]${n.offset ? ` offset ${n.offset}` : ''}`;
+			case 'call':
+				return `${n.fn}(${n.args.map(show).join(', ')})`;
+			case 'agg':
+				return `${n.op}${n.by ? ` by (${n.by.join(', ')})` : ''}${n.without ? ` without (${n.without.join(', ')})` : ''} (${n.param ? `${show(n.param)}, ` : ''}${show(n.expr)})`;
+			case 'bin':
+				return `${show(n.l)} ${n.op}${n.bool ? ' bool' : ''}${n.on ? ` on (${n.on.join(', ')})` : ''}${n.ignoring ? ` ignoring (${n.ignoring.join(', ')})` : ''}${n.group ? ` ${n.group}(${n.groupLabels?.join(', ')})` : ''} ${show(n.r)}`;
+			case 'neg':
+				return `-${show(n.expr)}`;
+			case 'paren':
+				return `(${show(n.expr)})`;
+		}
+	};
+
+	type Step = { n: number; code: string; text: string; kind: Kind; warn?: string };
+
+	const explain = (root: Node) => {
+		const steps: Step[] = [];
+		const ref = new Map<Node, number>();
+		const name = (n: Node): string => {
+			if (n.t === 'num') return n.v;
+			if (n.t === 'str') return `"${n.v}"`;
+			if (n.t === 'paren') return name(n.expr);
+			return ref.has(n) ? `the result of step ${ref.get(n)}` : show(n);
+		};
+		const add = (node: Node, text: string, warn?: string) => {
+			const n = steps.length + 1;
+			ref.set(node, n);
+			steps.push({ n, code: show(node), text, kind: kindOf(node), warn });
+		};
+		const walk = (node: Node): void => {
+			switch (node.t) {
+				case 'num':
+				case 'str':
+					return;
+				case 'paren':
+					walk(node.expr);
+					if (ref.has(node.expr)) ref.set(node, ref.get(node.expr)!);
+					return;
+				case 'neg':
+					walk(node.expr);
+					return add(node, `Negates every value of ${name(node.expr)}.`);
+				case 'sel': {
+					const parts = node.matchers.map((m) => `${m.label} ${MATCH_TEXT[m.op]} "${m.value}"`);
+					const warns: string[] = [];
+					if (node.matchers.some((m) => (m.op === '=~' || m.op === '!~') && !m.value.includes('|') && !/[.*+?[\]()\\^$]/.test(m.value)))
+						warns.push('A regex matcher without special characters can be a plain = matcher, which is faster.');
+					if (node.matchers.some((m) => m.op === '=~')) warns.push('Regex matchers are fully anchored: "5.." matches 500 to 599 only, not 1500.');
+					if (!node.name && node.matchers.every((m) => m.op === '!=' || m.op === '!~' || m.value === ''))
+						warns.push('A selector needs at least one matcher that is not empty.');
+					if (/_total$|_count$|_sum$|_bucket$/.test(node.name) && !node.range)
+						warns.push(`${node.name} looks like a counter: its raw value only goes up. Wrap it in rate() or increase().`);
+					return add(
+						node,
+						`Selects every series${node.name ? ` of metric ${node.name}` : ''}${parts.length ? ` where ${parts.join(' and ')}` : ''}${node.range ? `, keeping all samples from the last ${human(node.range)} for each series` : ', taking the latest sample of each series (up to 5 minutes old)'}${node.offset ? `, shifted ${node.offset.startsWith('-') ? 'forward' : 'back'} by ${human(node.offset.replace('-', ''))}` : ''}${node.at ? `, evaluated at ${node.at}` : ''}.`,
+						warns.join(' ') || undefined,
+					);
+				}
+				case 'sub':
+					walk(node.expr);
+					return add(
+						node,
+						`Subquery: evaluates ${name(node.expr)} every ${node.step ? human(node.step) : 'default evaluation interval'} over the last ${human(node.range)}${node.offset ? `, shifted back by ${human(node.offset)}` : ''}, producing a range vector.`,
+					);
+				case 'call': {
+					node.args.forEach(walk);
+					const info = FN[node.fn];
+					const args = node.args.map(name);
+					const vecArg = node.args.find((a) => kindOf(a) !== 'scalar' && kindOf(a) !== 'string');
+					let warn: string | undefined;
+					if (['rate', 'irate', 'increase'].includes(node.fn) && node.args[0]?.t === 'sel' && !/_total$|_count$|_sum$|_bucket$/.test(node.args[0].name))
+						warn = `${node.fn}() is meant for counters. For a gauge use deriv() or delta().`;
+					if (node.fn === 'histogram_quantile') {
+						const inner = node.args[1];
+						if (inner?.t === 'agg' && inner.by && !inner.by.includes('le'))
+							warn = 'The aggregation drops the le label, so histogram_quantile cannot see the buckets. Add le to by (...).';
+						if (inner?.t === 'agg' && inner.without?.includes('le')) warn = 'without (le) removes the bucket label that histogram_quantile needs.';
+					}
+					if (
+						['rate', 'increase'].includes(node.fn) &&
+						node.args[0]?.t === 'sel' &&
+						node.args[0].range &&
+						/^\d+s$/.test(node.args[0].range) &&
+						parseInt(node.args[0].range, 10) < 60
+					)
+						warn = 'Very short range: use at least 4x the scrape interval, or the result may be empty.';
+					const main =
+						node.fn === 'histogram_quantile'
+							? `Estimates the ${Number(args[0]) * 100 || args[0]}th percentile from ${args[1] ?? 'the buckets'}`
+							: node.fn === 'predict_linear'
+								? `Predicts where ${args[0]} will be in ${args[1]} seconds using linear regression`
+								: info
+									? `${node.fn}() ${info[0]}, applied to ${vecArg ? name(vecArg) : args.join(', ') || 'the evaluation time'}`
+									: `Calls ${node.fn}(${args.join(', ')})`;
+					return add(node, `${main}.`, warn ?? (info ? undefined : `${node.fn} is not a function this explainer knows; check the spelling.`));
+				}
+				case 'agg': {
+					walk(node.expr);
+					if (node.param) walk(node.param);
+					const keep = node.by
+						? `, grouped by ${node.by.join(', ') || 'nothing (a single result)'}; every other label is dropped`
+						: node.without
+							? `, grouped by every label except ${node.without.join(', ')}`
+							: ' into one single series with no labels';
+					const p = node.param ? ` (parameter ${name(node.param)})` : '';
+					let warn: string | undefined;
+					if (node.op === 'sum' && node.expr.t === 'sel' && /_total$/.test(node.expr.name))
+						warn = 'Summing a raw counter hides resets. Take rate() first, then sum.';
+					return add(node, `${node.op}${p} ${AGG_TEXT[node.op] ?? 'aggregates'} ${name(node.expr)}${keep}.`, warn);
+				}
+				case 'bin': {
+					walk(node.l);
+					walk(node.r);
+					const cmp = ['==', '!=', '<', '<=', '>', '>='].includes(node.op);
+					const l = name(node.l);
+					const r = name(node.r);
+					let text: string;
+					if (cmp)
+						text = node.bool
+							? `Compares ${l} ${node.op} ${r} and returns 1 or 0 for every series.`
+							: `Filters ${l}: keeps only series where the value ${node.op} ${r}; the others disappear.`;
+					else if (['and', 'or', 'unless'].includes(node.op)) text = `${node.op.toUpperCase()} ${BIN_TEXT[node.op]}, between ${l} and ${r}.`;
+					else
+						text = `${BIN_TEXT[node.op][0].toUpperCase()}${BIN_TEXT[node.op].slice(1)} ${l} ${node.op === '/' ? 'by' : node.op === '-' ? 'minus' : 'with'} ${r}.`;
+					const vv = kindOf(node.l) !== 'scalar' && kindOf(node.r) !== 'scalar';
+					if (vv) {
+						if (node.on) text += ` Series are paired only on labels ${node.on.join(', ') || '(none)'}.`;
+						else if (node.ignoring) text += ` Series are paired on all labels except ${node.ignoring.join(', ')}.`;
+						else text += ' Series are paired when all their labels are identical.';
+						if (node.group)
+							text += ` ${node.group === 'group_left' ? 'Many left series' : 'Many right series'} can match one on the other side${node.groupLabels?.length ? `, copying ${node.groupLabels.join(', ')}` : ''}.`;
+					}
+					return add(node, text);
+				}
+			}
+		};
+		walk(root);
+		return steps;
+	};
+
+	const el = (tag: string, cls: string, text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	const tree = (n: Node): HTMLElement => {
+		if (n.t === 'paren') return tree(n.expr);
+		const box = el('div', `pq-node pq-${n.t}`);
+		const head = el('div', 'pq-head');
+		const label =
+			n.t === 'sel'
+				? 'selector'
+				: n.t === 'call'
+					? `${n.fn}()`
+					: n.t === 'agg'
+						? `${n.op}${n.by ? ` by (${n.by.join(', ')})` : n.without ? ` without (${n.without.join(', ')})` : ''}`
+						: n.t === 'bin'
+							? n.op
+							: n.t === 'sub'
+								? `subquery [${n.range}:${n.step}]`
+								: n.t === 'neg'
+									? 'negate'
+									: n.t === 'num'
+										? 'number'
+										: 'string';
+		head.append(el('span', 'pq-label', label), el('span', 'pq-kind', kindOf(n)));
+		box.append(head);
+		if (n.t === 'sel') box.append(el('code', 'pq-code', show(n)));
+		if (n.t === 'num' || n.t === 'str') box.append(el('code', 'pq-code', show(n)));
+		const kids =
+			n.t === 'call'
+				? n.args
+				: n.t === 'agg'
+					? [...(n.param ? [n.param] : []), n.expr]
+					: n.t === 'bin'
+						? [n.l, n.r]
+						: n.t === 'sub' || n.t === 'neg'
+							? [n.expr]
+							: [];
+		if (kids.length) {
+			const wrap = el('div', 'pq-kids');
+			kids.forEach((k) => wrap.append(tree(k)));
+			box.append(wrap);
+		}
+		return box;
+	};
+
+	onPage('pq-tool', () => {
+		const root = byId('pq-tool');
+		const input = byId<HTMLTextAreaElement>('pq-in');
+		const examples = JSON.parse(root.dataset.examples ?? '[]') as { name: string; q: string }[];
+		let text = '';
+
+		const render = () => {
+			const err = byId('pq-error');
+			try {
+				const ast = parse(input.value.trim());
+				err.hidden = true;
+				const steps = explain(ast);
+				byId('pq-type').textContent = `returns ${kindOf(ast)}`;
+				byId('pq-tree').replaceChildren(tree(ast));
+				byId('pq-steps').replaceChildren(
+					...steps.map((s) => {
+						const li = el('li', 'pq-step');
+						const top = el('div', 'pq-top');
+						top.append(el('span', 'pq-num', String(s.n)), el('code', 'pq-code', s.code), el('span', 'pq-kind', s.kind));
+						li.append(top, el('p', '', s.text));
+						if (s.warn) li.append(el('p', 'pq-warn', s.warn));
+						return li;
+					}),
+				);
+				text = steps.map((s) => `${s.n}. ${s.code}\n   ${s.text}${s.warn ? `\n   ! ${s.warn}` : ''}`).join('\n');
+			} catch (e) {
+				err.textContent = e instanceof Error ? e.message : String(e);
+				err.hidden = !input.value.trim();
+			}
+			byId('pq-examples')
+				.querySelectorAll<HTMLButtonElement>('button')
+				.forEach((b, i) => b.setAttribute('aria-pressed', String(examples[i].q === input.value)));
+		};
+
+		byId('pq-examples').replaceChildren(
+			...examples.map((ex) => {
+				const b = el('button', '', ex.name);
+				b.addEventListener('click', () => {
+					input.value = ex.q;
+					render();
+				});
+				return b;
+			}),
+		);
+		input.addEventListener('input', render);
+		copyButton(byId('pq-copy'), () => text);
+		render();
+	});
+</script>
+
+<style>
+	.pq {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.pq-type {
+		text-transform: none;
+		letter-spacing: 0;
+		color: var(--accent-strong);
+	}
+	.pq-tree {
+		padding: 12px;
+		overflow-x: auto;
+	}
+	.pq-tree :global(.pq-node) {
+		border: 1px solid var(--border);
+		border-left: 4px solid var(--accent-strong);
+		border-radius: 10px;
+		padding: 6px 8px;
+		background: var(--surface);
+		min-width: 0;
+	}
+	.pq-tree :global(.pq-node.pq-sel) {
+		border-left-color: var(--tint-3);
+	}
+	.pq-tree :global(.pq-node.pq-agg) {
+		border-left-color: var(--tint-1);
+	}
+	.pq-tree :global(.pq-node.pq-bin) {
+		border-left-color: var(--warn);
+	}
+	.pq-tree :global(.pq-node.pq-num),
+	.pq-tree :global(.pq-node.pq-str) {
+		border-left-color: var(--border);
+	}
+	.pq-tree :global(.pq-head) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: baseline;
+	}
+	.pq-tree :global(.pq-label) {
+		font-family: var(--mono);
+		font-weight: 700;
+		font-size: 13px;
+	}
+	.pq :global(.pq-kind) {
+		font-size: 11.5px;
+		color: var(--ink-soft);
+	}
+	.pq :global(.pq-code) {
+		display: block;
+		font-family: var(--mono);
+		font-size: 12.5px;
+		word-break: break-all;
+		margin-top: 2px;
+	}
+	.pq-tree :global(.pq-kids) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-top: 6px;
+	}
+	.pq-tree :global(.pq-kids > .pq-node) {
+		flex: 1 1 200px;
+	}
+	.pq-steps {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.pq-steps :global(.pq-step) {
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+	}
+	.pq-steps :global(.pq-top) {
+		display: flex;
+		align-items: flex-start;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+	.pq-steps :global(.pq-top .pq-code) {
+		flex: 1 1 200px;
+		min-width: 0;
+		margin: 0;
+	}
+	.pq-steps :global(.pq-num) {
+		display: inline-grid;
+		place-items: center;
+		width: 22px;
+		height: 22px;
+		border-radius: 999px;
+		background: var(--accent-strong);
+		color: var(--accent-ink);
+		font-size: 12px;
+		font-weight: 700;
+	}
+	.pq-steps :global(p) {
+		margin: 6px 0 0;
+		font-size: 14px;
+	}
+	.pq-steps :global(.pq-warn) {
+		color: var(--warn);
+		background: var(--warn-bg);
+		border-radius: 8px;
+		padding: 6px 10px;
+		font-size: 13px;
+	}
+</style>

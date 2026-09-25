@@ -1,0 +1,201 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const samples = {
+	js: `export function debounce(callback, delay = 250) {
+  let timer = null;
+
+  return function debounced(...args) {
+    // Reset the pending call on every keystroke
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      callback.apply(this, args);
+    }, delay);
+  };
+}
+
+const search = debounce((query) => {
+  console.log('Searching for', query);
+}, 300);
+`,
+	css: `/* Card component */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.card:hover,
+.card:focus-within {
+  transform: translateY(-2px);
+}
+
+@media (max-width: 600px) {
+  .card {
+    padding: 12px;
+  }
+}
+`,
+	html: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>  Pricing  </title>
+    <!-- Page styles -->
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <main class="pricing">
+      <h1>
+        Simple pricing
+      </h1>
+      <p>Start free, upgrade when you need more.</p>
+      <pre>
+  keep   this
+    spacing</pre>
+    </main>
+  </body>
+</html>
+`,
+};
+---
+
+<ToolShell slug="code-minifier" title="Code Minifier" description="Minify JavaScript, CSS or HTML and see how many bytes you saved.">
+	<div class="toolbar" id="cm-tool">
+		<div class="seg" id="cm-lang" aria-label="Language">
+			<button data-value="js" aria-pressed="true">
+				JavaScript
+			</button>
+			<button data-value="css" aria-pressed="false">
+				CSS
+			</button>
+			<button data-value="html" aria-pressed="false">
+				HTML
+			</button>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head" id="cm-in-label">
+				JavaScript
+			</div>
+			<textarea id="cm-in" spellcheck="false" aria-labelledby="cm-in-label">{samples.js}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Minified</span>
+				<button class="btn" id="cm-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="cm-out" tabindex="0" aria-label="Minified output"></pre>
+		</section>
+	</div>
+	<p class="error" id="cm-error" hidden></p>
+	<div class="stats" aria-live="polite">
+		<div class="stat">
+			<b id="cm-before">0 B</b>
+			<span>Original</span>
+		</div>
+		<div class="stat">
+			<b id="cm-after">0 B</b>
+			<span>Minified</span>
+		</div>
+		<div class="stat">
+			<b id="cm-saved">0%</b>
+			<span>Saved</span>
+		</div>
+	</div>
+	<script is:inline type="application/json" id="cm-samples" set:html={JSON.stringify(samples).replace(/</g, '\\u003c')}></script>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const bytes = (s: string) => new TextEncoder().encode(s).length;
+	const human = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(2)} KB`);
+
+	const minifyCss = (src: string) => {
+		const strings: string[] = [];
+		return src
+			.replace(/("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g, (m) => `\u0000${strings.push(m) - 1}\u0000`)
+			.replace(/\/\*[\s\S]*?\*\//g, '')
+			.replace(/\s+/g, ' ')
+			.replace(/\s*([{}:;,>~])\s*/g, '$1')
+			.replace(/;}/g, '}')
+			.replace(/([\s:,(])0\.(\d)/g, '$1.$2')
+			.replace(/\s*!important/g, '!important')
+			.trim()
+			.replace(/\u0000(\d+)\u0000/g, (_, i) => strings[Number(i)]);
+	};
+
+	const minifyHtml = (src: string) => {
+		const kept: string[] = [];
+		const keep = (s: string) => `\u0000${kept.push(s) - 1}\u0000`;
+		let out = src
+			.replace(/<(pre|textarea)\b[\s\S]*?<\/\1>/gi, keep)
+			.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (_, a, b, c) => keep(a + minifyCss(b) + c))
+			.replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi, (_, a, b, c) => keep(a + b.trim() + c))
+			.replace(/<!--(?!\[if)[\s\S]*?-->/g, '')
+			.replace(/\s+/g, ' ')
+			.replace(/>\s+</g, '><')
+			.replace(/\s+\/>/g, '/>');
+		out = out.trim();
+		return out.replace(/\u0000(\d+)\u0000/g, (_, i) => kept[Number(i)]);
+	};
+
+	onPage('cm-tool', () => {
+		const input = byId<HTMLTextAreaElement>('cm-in');
+		const output = byId('cm-out');
+		const error = byId('cm-error');
+		const samples = JSON.parse(byId('cm-samples').textContent ?? '{}') as Record<string, string>;
+		const buffers: Record<string, string> = { ...samples };
+		const labels: Record<string, string> = { js: 'JavaScript', css: 'CSS', html: 'HTML' };
+		let lang = 'js';
+		let run = 0;
+
+		const show = (code: string, out: string) => {
+			output.textContent = out;
+			const a = bytes(code);
+			const b = bytes(out);
+			byId('cm-before').textContent = human(a);
+			byId('cm-after').textContent = human(b);
+			byId('cm-saved').textContent = a ? `${Math.max(0, Math.round((1 - b / a) * 1000) / 10)}%` : '0%';
+			error.hidden = true;
+		};
+
+		const render = async () => {
+			const id = ++run;
+			const code = input.value;
+			buffers[lang] = code;
+			try {
+				if (lang === 'js') {
+					const { minify } = await import('terser');
+					const result = await minify(code, { module: true, compress: true, mangle: true });
+					if (id !== run) return;
+					show(code, result.code ?? '');
+				} else show(code, lang === 'css' ? minifyCss(code) : minifyHtml(code));
+			} catch (e) {
+				if (id !== run) return;
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+			}
+		};
+
+		segmented(byId('cm-lang'), (v) => {
+			lang = v;
+			input.value = buffers[v] ?? '';
+			byId('cm-in-label').textContent = labels[v];
+			render();
+		});
+		input.addEventListener('input', render);
+		copyButton(byId('cm-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

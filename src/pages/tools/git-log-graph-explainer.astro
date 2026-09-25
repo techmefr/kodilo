@@ -1,0 +1,307 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="git-log-graph-explainer"
+	title="Git Log Graph Explainer"
+	description="Paste the output of git log --graph --oneline --all and get a clean commit graph with branches, merges and tags explained."
+>
+	<div class="lg" id="lg-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<label for="lg-in">git log --graph --oneline --all</label>
+				<button class="btn" id="lg-copy">
+					Copy command
+				</button>
+			</div>
+			<textarea id="lg-in" spellcheck="false"></textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Graph</span>
+			</div>
+			<div class="lg-scroll" tabindex="0" role="region" aria-label="Commit graph, scrollable">
+				<svg id="lg-svg" role="img" aria-label="Commit graph"></svg>
+			</div>
+		</section>
+		<div class="stats" id="lg-stats"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>What this history says</span>
+			</div>
+			<ul class="lg-list" id="lg-list" aria-live="polite"></ul>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Commit = { id: number; hash: string; refs: string[]; msg: string; lane: number; row: number; parents: number[] };
+
+	const sample = `*   8d3f2a1 (HEAD -> main, origin/main) Merge branch 'feature/checkout'
+|\\
+| * 5b7c9e0 (feature/checkout) Add payment step
+| * 41aa0d3 Add cart summary
+* | c92e6b4 (tag: v1.2.0) Fix header on mobile
+* | e4d5f6a Update dependencies
+|/
+* 2a3b4c5 Add product page
+| * 9c8b7a6 (experiment/dark-mode) Try dark theme
+|/
+* 1a2b3c4 Initial commit`;
+
+	const NS = 'http://www.w3.org/2000/svg';
+	const el = (tag: string, attrs: Record<string, string | number>, text?: string) => {
+		const node = document.createElementNS(NS, tag);
+		Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, String(v)));
+		if (text !== undefined) node.textContent = text;
+		return node;
+	};
+
+	const parse = (text: string) => {
+		const commits: Commit[] = [];
+		const pending: number[][] = [];
+		const lane = (i: number) => (pending[i] ??= []);
+		text.split('\n').forEach((raw) => {
+			const line = raw.replace(/\t/g, '    ');
+			const g = line.match(/^([ |/\\_*o]*?)\s*([0-9a-f]{4,40})\b\s*(?:\(([^)]*)\))?\s*(.*)$/i);
+			const star = g ? g[1].search(/[*o]/) : -1;
+			if (g && star >= 0) {
+				const m = [g[0], g[2], g[3], g[4]];
+				const l = Math.floor(star / 2);
+				const c: Commit = {
+					id: commits.length,
+					hash: m[1],
+					refs: m[2] ? m[2].split(',').map((s) => s.trim()) : [],
+					msg: m[3],
+					lane: l,
+					row: commits.length,
+					parents: [],
+				};
+				lane(l).forEach((child) => commits[child].parents.push(c.id));
+				pending[l] = [c.id];
+				commits.push(c);
+				return;
+			}
+			if (!/^[\s|/\\_]+$/.test(line)) return;
+			for (let k = line.length - 1; k >= 0; k--) {
+				if (line[k] === '\\' && k % 2 === 1) {
+					const from = (k - 1) / 2;
+					pending[from + 1] = [...new Set([...lane(from + 1), ...lane(from)])];
+				}
+			}
+			for (let k = 0; k < line.length; k++) {
+				if (line[k] === '/' && k % 2 === 1) {
+					const to = (k - 1) / 2;
+					pending[to] = [...new Set([...lane(to), ...lane(to + 1)])];
+					pending[to + 1] = [];
+				}
+			}
+		});
+		commits.forEach((c) => c.parents.sort((a, b) => Number(commits[b].lane === c.lane) - Number(commits[a].lane === c.lane)));
+		return commits;
+	};
+
+	onPage('lg-tool', () => {
+		const input = byId<HTMLTextAreaElement>('lg-in');
+		input.value = sample;
+
+		const render = () => {
+			const commits = parse(input.value);
+			const svg = byId('lg-svg');
+			const lanes = Math.max(1, ...commits.map((c) => c.lane + 1));
+			const RH = 34;
+			const LW = 22;
+			const x = (l: number) => 16 + l * LW;
+			const y = (r: number) => 20 + r * RH;
+			const textX = x(lanes) + 8;
+			const width = Math.max(560, textX + 520);
+			const height = Math.max(60, y(commits.length) - 6);
+			svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+			svg.setAttribute('width', String(width));
+			svg.setAttribute('height', String(height));
+			const nodes: SVGElement[] = [];
+			commits.forEach((c) =>
+				c.parents.forEach((pid, i) => {
+					const p = commits[pid];
+					const lx = i === 0 && p.lane !== c.lane ? x(c.lane) : x(p.lane);
+					const my = y(p.row) - RH / 2;
+					const d =
+						c.lane === p.lane
+							? `M${x(c.lane)},${y(c.row)} L${x(p.lane)},${y(p.row)}`
+							: i === 0
+								? `M${x(c.lane)},${y(c.row)} L${lx},${my} Q${lx},${y(p.row)} ${x(p.lane)},${y(p.row)}`
+								: `M${x(c.lane)},${y(c.row)} Q${x(p.lane)},${y(c.row)} ${x(p.lane)},${y(c.row) + RH / 2} L${x(p.lane)},${y(p.row)}`;
+					nodes.push(el('path', { d, class: `lg-edge t${(i === 0 ? c.lane : p.lane) % 4}` }));
+				}),
+			);
+			commits.forEach((c) => {
+				const g = el('g', { class: 'lg-commit', 'data-hash': c.hash });
+				g.append(
+					el('circle', {
+						cx: x(c.lane),
+						cy: y(c.row),
+						r: c.parents.length > 1 ? 7 : 5,
+						class: `lg-node t${c.lane % 4}${c.parents.length > 1 ? ' merge' : ''}`,
+					}),
+				);
+				let tx = textX;
+				g.append(el('text', { x: tx, y: y(c.row) + 4, class: 'lg-hash' }, c.hash.slice(0, 7)));
+				tx += 64;
+				c.refs.forEach((ref) => {
+					const w = ref.length * 6.6 + 14;
+					const kind = ref.startsWith('HEAD')
+						? 'head'
+						: ref.startsWith('tag:')
+							? 'tag'
+							: ref.includes('/') && /^(origin|upstream)\//.test(ref)
+								? 'remote'
+								: 'branch';
+					g.append(el('rect', { x: tx, y: y(c.row) - 10, width: w, height: 20, rx: 10, class: `lg-ref ${kind}` }));
+					g.append(el('text', { x: tx + 7, y: y(c.row) + 4, class: 'lg-ref-text' }, ref));
+					tx += w + 6;
+				});
+				g.append(el('text', { x: tx + 2, y: y(c.row) + 4, class: 'lg-msg' }, c.msg));
+				nodes.push(g);
+			});
+			svg.replaceChildren(...nodes);
+
+			const merges = commits.filter((c) => c.parents.length > 1);
+			const roots = commits.filter((c) => !c.parents.length);
+			const refs = commits.flatMap((c) => c.refs.map((r) => ({ r, c })));
+			const branches = refs
+				.filter(({ r }) => !r.startsWith('tag:') && !/^HEAD$/.test(r) && !/^(origin|upstream)\//.test(r))
+				.map(({ r }) => r.replace('HEAD -> ', ''));
+			const tags = refs.filter(({ r }) => r.startsWith('tag:'));
+			const remotes = refs.filter(({ r }) => /^(origin|upstream)\//.test(r));
+			byId('lg-stats').innerHTML = [
+				[commits.length, 'commits'],
+				[branches.length, 'local branches'],
+				[merges.length, 'merges'],
+				[lanes, 'parallel lanes'],
+			]
+				.map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`)
+				.join('');
+			const items: string[] = [];
+			const head = refs.find(({ r }) => r.startsWith('HEAD'));
+			const t = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+			if (!commits.length) items.push('Paste the output of <code>git log --graph --oneline --all</code> to see the graph.');
+			if (head) {
+				const on = head.r.match(/HEAD -> (.+)/);
+				items.push(
+					on
+						? `You are on <b>${t(on[1])}</b> at <code>${head.c.hash}</code>.`
+						: `HEAD is detached at <code>${head.c.hash}</code>, so new commits will not belong to any branch.`,
+				);
+			}
+			branches.forEach((b) => {
+				const c = refs.find(({ r }) => r.replace('HEAD -> ', '') === b)!.c;
+				const merged = commits.some((m) => m.parents.slice(1).some((p) => p === c.id));
+				items.push(
+					`Branch <b>${t(b)}</b> points to <code>${c.hash}</code> ${t(c.msg ? `(${c.msg})` : '')}${merged ? ' and is already merged.' : c.lane > 0 ? ' and is not merged yet.' : '.'}`,
+				);
+			});
+			merges.forEach((m) =>
+				items.push(`<code>${m.hash}</code> is a merge commit that joins ${m.parents.map((p) => `<code>${commits[p].hash}</code>`).join(' and ')}.`),
+			);
+			tags.forEach(({ r, c }) => items.push(`Tag <b>${t(r.slice(4).trim())}</b> marks <code>${c.hash}</code>.`));
+			remotes.forEach(({ r, c }) => items.push(`<b>${t(r)}</b> is the last known state of the remote branch, at <code>${c.hash}</code>.`));
+			roots.forEach((r) => items.push(`<code>${r.hash}</code> has no parent in this output, it is the root or the log was cut.`));
+			byId('lg-list').innerHTML = items.map((i) => `<li>${i}</li>`).join('');
+		};
+
+		input.addEventListener('input', render);
+		copyButton(byId('lg-copy'), () => 'git log --graph --oneline --all');
+		render();
+	});
+</script>
+
+<style>
+	.lg {
+		display: grid;
+		gap: 16px;
+	}
+	#lg-in {
+		min-height: 260px;
+		word-break: normal;
+		white-space: pre;
+		overflow-x: auto;
+	}
+	.lg-scroll {
+		overflow-x: auto;
+		padding: 8px 0;
+	}
+	.lg-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	#lg-svg {
+		display: block;
+		font-family: var(--mono);
+		font-size: 12px;
+	}
+	#lg-svg :global(.lg-edge) {
+		fill: none;
+		stroke-width: 2.5;
+	}
+	#lg-svg :global(.t0) {
+		stroke: var(--accent-strong);
+	}
+	#lg-svg :global(.t1) {
+		stroke: var(--tint-1);
+	}
+	#lg-svg :global(.t2) {
+		stroke: var(--tint-3);
+	}
+	#lg-svg :global(.t3) {
+		stroke: var(--warn);
+	}
+	#lg-svg :global(.lg-node) {
+		fill: var(--surface);
+		stroke-width: 3;
+	}
+	#lg-svg :global(.lg-node.merge) {
+		fill: var(--surface-2);
+	}
+	#lg-svg :global(.lg-hash) {
+		fill: var(--ink-soft);
+	}
+	#lg-svg :global(.lg-msg) {
+		fill: var(--ink);
+		font-family: var(--sans);
+		font-size: 13px;
+	}
+	#lg-svg :global(.lg-ref) {
+		fill: var(--accent);
+	}
+	#lg-svg :global(.lg-ref.head) {
+		fill: var(--ok-bg);
+	}
+	#lg-svg :global(.lg-ref.tag) {
+		fill: var(--warn-bg);
+	}
+	#lg-svg :global(.lg-ref.remote) {
+		fill: var(--surface-2);
+	}
+	#lg-svg :global(.lg-ref-text) {
+		fill: var(--ink);
+		font-size: 11px;
+	}
+	.lg-list {
+		margin: 0;
+		padding: 12px 14px 12px 32px;
+		display: grid;
+		gap: 6px;
+		font-size: 14px;
+		line-height: 1.5;
+	}
+	.lg-list :global(code) {
+		font-family: var(--mono);
+		font-size: 12px;
+		background: var(--surface-2);
+		padding: 1px 5px;
+		border-radius: 5px;
+	}
+</style>

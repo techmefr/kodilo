@@ -1,0 +1,152 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `# Deployment settings
+service:   checkout
+replicas: 3
+env:
+    NODE_ENV: "production"
+    LOG_LEVEL: 'info'
+    API_URL:    https://api.example.com
+ports: [ 8080, 9090 ]
+resources:
+      limits: {cpu: "500m", memory: 512Mi}
+      requests:
+          memory: 256Mi
+          cpu: 250m
+healthcheck:
+  path: /health
+  interval: 10s
+---
+service: worker
+replicas: 1
+`;
+---
+
+<ToolShell
+	slug="yaml-formatter"
+	title="YAML Formatter"
+	description="Normalize YAML indentation, quotes and flow collections, optionally sort mapping keys, with comments and multi-document files kept intact."
+>
+	<div class="toolbar" id="ymf-tool">
+		<div class="seg" id="ymf-indent" aria-label="Indent">
+			<button data-value="2" aria-pressed="true">
+				2 spaces
+			</button>
+			<button data-value="4" aria-pressed="false">
+				4 spaces
+			</button>
+		</div>
+		<div class="seg" id="ymf-quote" aria-label="Quotes">
+			<button data-value="double" aria-pressed="true">
+				Double quotes
+			</button>
+			<button data-value="single" aria-pressed="false">
+				Single quotes
+			</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" id="ymf-sort" /> Sort keys
+		</label>
+		<label class="check">
+			<input type="checkbox" id="ymf-block" checked /> Expand flow collections
+		</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="ymf-in" spellcheck="false" aria-label="YAML input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="ymf-status">Output</span>
+				<button class="btn" id="ymf-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="ymf-out" tabindex="0"></pre>
+		</section>
+	</div>
+	<p class="error" id="ymf-error" role="alert" hidden></p>
+	<div class="stats">
+		<div class="stat">
+			<b id="ymf-docs">0</b>
+			<span>Documents</span>
+		</div>
+		<div class="stat">
+			<b id="ymf-keys">0</b>
+			<span>Keys</span>
+		</div>
+		<div class="stat">
+			<b id="ymf-lines">0</b>
+			<span>Lines</span>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { isScalar, parseAllDocuments, visit } from 'yaml';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('ymf-tool', () => {
+		const input = byId<HTMLTextAreaElement>('ymf-in');
+		const output = byId('ymf-out');
+		const error = byId('ymf-error');
+		const sort = byId<HTMLInputElement>('ymf-sort');
+		const block = byId<HTMLInputElement>('ymf-block');
+		let indent = 2;
+		let quote = 'double';
+
+		const render = () => {
+			const docs = parseAllDocuments(input.value);
+			const list = Array.isArray(docs) ? docs : [];
+			const problem = list.flatMap((d) => d.errors)[0];
+			if (problem) {
+				const pos = problem.linePos?.[0];
+				error.textContent = (pos ? `Line ${pos.line}, column ${pos.col}: ` : '') + problem.message.split('\n')[0];
+				error.hidden = false;
+				output.textContent = '';
+				byId('ymf-status').textContent = 'Output';
+				return;
+			}
+			let keys = 0;
+			list.forEach((doc) => {
+				visit(doc, {
+					Map(_, map) {
+						keys += map.items.length;
+						if (sort.checked)
+							map.items.sort((a, b) =>
+								String(isScalar(a.key) ? a.key.value : a.key).localeCompare(String(isScalar(b.key) ? b.key.value : b.key), undefined, { numeric: true }),
+							);
+						if (block.checked) map.flow = false;
+					},
+					Seq(_, seq) {
+						if (block.checked) seq.flow = false;
+					},
+					Scalar(_, scalar) {
+						if (scalar.type === 'QUOTE_DOUBLE' || scalar.type === 'QUOTE_SINGLE') scalar.type = quote === 'single' ? 'QUOTE_SINGLE' : 'QUOTE_DOUBLE';
+					},
+				});
+			});
+			const text = list
+				.map((doc, i) => {
+					const body = doc.toString({ indent, singleQuote: quote === 'single', lineWidth: 0 });
+					return i === 0 || body.startsWith('---') ? body : `---\n${body}`;
+				})
+				.join('');
+			output.textContent = text;
+			error.hidden = true;
+			byId('ymf-status').textContent = 'Formatted';
+			byId('ymf-docs').textContent = String(list.length);
+			byId('ymf-keys').textContent = String(keys);
+			byId('ymf-lines').textContent = String(text.split('\n').filter(Boolean).length);
+		};
+
+		segmented(byId('ymf-indent'), (v) => ((indent = Number(v)), render()));
+		segmented(byId('ymf-quote'), (v) => ((quote = v), render()));
+		[sort, block].forEach((el) => el.addEventListener('change', render));
+		input.addEventListener('input', render);
+		copyButton(byId('ymf-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

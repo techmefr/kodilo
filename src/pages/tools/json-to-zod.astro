@@ -1,0 +1,123 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = JSON.stringify(
+	{
+		id: 1024,
+		name: 'Ada Lovelace',
+		email: 'ada@example.com',
+		score: 98.5,
+		active: true,
+		manager: null,
+		tags: ['admin', 'beta'],
+		address: { street: '12 Analytical Row', city: 'London', zip: 'NW1' },
+		projects: [
+			{ id: 'p1', title: 'Engine', stars: 12 },
+			{ id: 'p2', title: 'Notes', stars: 4, archived: true },
+		],
+	},
+	null,
+	2,
+);
+---
+
+<ToolShell slug="json-to-zod" title="JSON to Zod" description="Generate a Zod schema from a JSON sample, with nested objects, arrays and optional keys.">
+	<div class="toolbar" id="jz-tool">
+		<div class="field jz-name">
+			<label for="jz-name">Schema name</label>
+			<input id="jz-name" spellcheck="false" autocomplete="off" value="User" />
+		</div>
+		<label class="check">
+			<input type="checkbox" id="jz-type" checked /> Export inferred type
+		</label>
+		<label class="check">
+			<input type="checkbox" id="jz-strict" /> Strict objects
+		</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">JSON</div>
+			<textarea id="jz-in" spellcheck="false" aria-label="JSON input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Zod schema</span>
+				<button class="btn" id="jz-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="jz-out" tabindex="0"></pre>
+		</section>
+	</div>
+	<p class="error" id="jz-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+	import { kinds, pascal, shapeOf, type ShapeNode } from '../../scripts/json-shape';
+
+	const PRIM: Record<string, string> = {
+		string: 'z.string()',
+		integer: 'z.number().int()',
+		number: 'z.number()',
+		boolean: 'z.boolean()',
+	};
+
+	const key = (k: string) => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k));
+
+	const emit = (node: ShapeNode, pad: string, strict: boolean): string => {
+		const parts: string[] = [...node.prims].map((p) => PRIM[p]);
+		if (node.object) {
+			const inner = pad + '  ';
+			const fields = node.object.map((f) => `${inner}${key(f.name)}: ${emit(f.node, inner, strict)}${f.optional ? '.optional()' : ''},`);
+			parts.push(`z.${strict ? 'strictObject' : 'object'}({${fields.length ? `\n${fields.join('\n')}\n${pad}` : ''}})`);
+		}
+		if (node.array) parts.push(`z.array(${node.array.empty ? 'z.unknown()' : emit(node.array, pad, strict)})`);
+		if (!kinds(node)) return node.nullable ? 'z.null()' : 'z.unknown()';
+		const base = parts.length > 1 ? `z.union([${parts.join(', ')}])` : parts[0];
+		return node.nullable ? `${base}.nullable()` : base;
+	};
+
+	onPage('jz-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jz-in');
+		const name = byId<HTMLInputElement>('jz-name');
+		const typeBox = byId<HTMLInputElement>('jz-type');
+		const strict = byId<HTMLInputElement>('jz-strict');
+		const output = byId('jz-out');
+		const error = byId('jz-error');
+
+		const render = () => {
+			let json: unknown;
+			try {
+				json = JSON.parse(input.value);
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = `Invalid JSON: ${(e as Error).message}`;
+				error.hidden = false;
+				return;
+			}
+			const base = pascal(name.value.trim() || 'Root');
+			const schema = emit(shapeOf([json]), '', strict.checked);
+			const lines = [`import { z } from 'zod';`, '', `export const ${base}Schema = ${schema};`];
+			if (typeBox.checked) lines.push('', `export type ${base} = z.infer<typeof ${base}Schema>;`);
+			output.textContent = lines.join('\n') + '\n';
+		};
+
+		input.addEventListener('input', render);
+		name.addEventListener('input', render);
+		[typeBox, strict].forEach((el) => el.addEventListener('change', render));
+		copyButton(byId('jz-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.jz-name {
+		padding: 8px 12px;
+		min-width: 0;
+		flex: 0 1 240px;
+	}
+	.jz-name input {
+		font-size: 16px;
+	}
+</style>

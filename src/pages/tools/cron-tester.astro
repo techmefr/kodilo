@@ -1,0 +1,300 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const examples = [
+	{ label: 'weekdays 9:30', expr: '30 9 * * 1-5' },
+	{ label: 'every 15 min', expr: '*/15 * * * *' },
+	{ label: 'hourly', expr: '@hourly' },
+	{ label: 'first of month', expr: '0 0 1 * *' },
+	{ label: 'Sunday 2am', expr: '0 2 * * SUN' },
+	{ label: 'quarterly', expr: '0 8 1 1,4,7,10 *' },
+	{ label: 'leap day', expr: '0 12 29 2 *' },
+];
+---
+
+<ToolShell
+	slug="cron-tester"
+	title="Cron Expression Tester"
+	description="Describe a cron expression in plain English and list its next 10 run times in your timezone."
+>
+	<div class="fields" id="ct-tool">
+		<div class="field wide" id="ct-field">
+			<label for="ct-expr">Cron expression</label>
+			<input id="ct-expr" spellcheck="false" autocomplete="off" value={examples[0].expr} />
+			<span class="field-note" id="ct-note">
+				minute · hour · day of month · month · day of week
+			</span>
+		</div>
+	</div>
+	<div class="chips" id="ct-examples">
+		{examples.map((e) => (
+			<button data-expr={e.expr}>{e.label}</button>
+		))}
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Description</span>
+			<button class="btn" id="ct-copy">
+				Copy
+			</button>
+		</div>
+		<p class="ct-desc" id="ct-desc" aria-live="polite"></p>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="ct-zone">Next runs</span>
+			<button class="btn" id="ct-copy-runs">
+				Copy
+			</button>
+		</div>
+		<ol class="ct-runs" id="ct-runs" tabindex="0" aria-label="Next run times"></ol>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+	const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+	const MACROS: Record<string, string> = {
+		'@yearly': '0 0 1 1 *',
+		'@annually': '0 0 1 1 *',
+		'@monthly': '0 0 1 * *',
+		'@weekly': '0 0 * * 0',
+		'@daily': '0 0 * * *',
+		'@midnight': '0 0 * * *',
+		'@hourly': '0 * * * *',
+	};
+
+	type Field = { values: Set<number>; any: boolean; src: string };
+	type Spec = { min: number; max: number; names?: string[]; label: string };
+
+	const SPECS: Spec[] = [
+		{ min: 0, max: 59, label: 'minute' },
+		{ min: 0, max: 23, label: 'hour' },
+		{ min: 1, max: 31, label: 'day of month' },
+		{ min: 1, max: 12, names: MONTHS, label: 'month' },
+		{ min: 0, max: 7, names: DAYS, label: 'day of week' },
+	];
+
+	const parseField = (src: string, spec: Spec): Field => {
+		const values = new Set<number>();
+		const value = (v: string) => {
+			if (spec.names) {
+				const idx = spec.names.findIndex((n) => n.slice(0, 3).toLowerCase() === v.toLowerCase());
+				if (idx >= 0) return idx + spec.min;
+			}
+			if (!/^\d+$/.test(v)) throw new Error(`"${v}" is not a valid ${spec.label}`);
+			const n = Number(v);
+			if (n < spec.min || n > spec.max) throw new Error(`${spec.label} ${n} is out of range ${spec.min}-${spec.max}`);
+			return n;
+		};
+		for (const part of src.split(',')) {
+			const [range, stepSrc] = part.split('/');
+			const step = stepSrc === undefined ? 1 : Number(stepSrc);
+			if (!Number.isInteger(step) || step < 1) throw new Error(`Invalid step in ${spec.label}: "${part}"`);
+			let lo: number;
+			let hi: number;
+			if (range === '*' || range === '?') [lo, hi] = [spec.min, spec.max];
+			else if (range.includes('-')) {
+				const [a, b] = range.split('-');
+				[lo, hi] = [value(a), value(b)];
+				if (lo > hi) throw new Error(`Range ${range} in ${spec.label} goes backwards`);
+			} else {
+				lo = value(range);
+				hi = stepSrc === undefined ? lo : spec.max;
+			}
+			for (let n = lo; n <= hi; n += step) values.add(spec.label === 'day of week' && n === 7 ? 0 : n);
+		}
+		return { values, any: src === '*' || src === '?', src };
+	};
+
+	const parse = (expr: string) => {
+		const trimmed = expr.trim().toLowerCase();
+		const full = MACROS[trimmed] ?? expr.trim();
+		const parts = full.split(/\s+/).filter(Boolean);
+		if (parts.length !== 5) throw new Error(`Expected 5 fields, got ${parts.length}`);
+		return parts.map((p, i) => parseField(p, SPECS[i]));
+	};
+
+	const pad = (n: number) => String(n).padStart(2, '0');
+	const ordinal = (n: number) => {
+		const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
+		return `${n}${suffix}`;
+	};
+	const join = (items: string[]) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}` : (items[0] ?? ''));
+
+	const listOf = (f: Field, spec: number, name: (n: number) => string) => {
+		const one = (v: string) => name([...parseField(v, SPECS[spec]).values][0]);
+		const parts = f.src.split(',').map((part) => {
+			const [range, step] = part.split('/');
+			if (step) {
+				const every = Number(step) === 1 ? `every ${SPECS[spec].label}` : `every ${ordinal(Number(step))} ${SPECS[spec].label}`;
+				if (range === '*') return every;
+				const [a, b] = range.split('-');
+				return `${every} from ${one(a)}${b ? ` through ${one(b)}` : ''}`;
+			}
+			if (range.includes('-')) {
+				const [a, b] = range.split('-');
+				return `${one(a)} through ${one(b)}`;
+			}
+			return one(range);
+		});
+		return join(parts);
+	};
+	const dayName = (n: number) => DAYS[n % 7];
+	const monthName = (n: number) => MONTHS[n - 1];
+
+	const describe = (fields: Field[], src: string) => {
+		const [min, hour, dom, mon, dow] = fields;
+		const single = (f: Field) => !f.any && /^\d+$/.test(f.src);
+		let time: string;
+		if (single(min) && single(hour)) time = `At ${pad([...hour.values][0])}:${pad([...min.values][0])}`;
+		else if (min.any && hour.any) time = 'Every minute';
+		else if (/^\*\/\d+$/.test(min.src) && hour.any) time = `Every ${min.src.slice(2)} minutes`;
+		else if (single(min) && hour.any) time = `At minute ${min.src} past every hour`;
+		else if (single(min) && /^\*\/\d+$/.test(hour.src)) time = `At minute ${min.src} past every ${hour.src.slice(2)} hours`;
+		else if (min.any) time = `Every minute during hour ${listOf(hour, 1, pad)}`;
+		else if (single(min) && !hour.any) time = `At minute ${min.src} past hour ${listOf(hour, 1, pad)}`;
+		else time = `At minute ${listOf(min, 0, String)}${hour.any ? '' : ` past hour ${listOf(hour, 1, pad)}`}`;
+		const parts = [time];
+		if (!dom.any) parts.push(`on day ${listOf(dom, 2, String)} of the month`);
+		if (!dom.any && !dow.any) parts.push('or');
+		if (!dow.any) parts.push(`on ${listOf(dow, 4, dayName)}`);
+		if (!mon.any) parts.push(`in ${listOf(mon, 3, monthName)}`);
+		const macro = src.trim().startsWith('@') ? ` (${src.trim().toLowerCase()})` : '';
+		return `${parts.join(', ').replace(', or,', ' or')}${macro}.`;
+	};
+
+	const nextRuns = (fields: Field[], count: number) => {
+		const [min, hour, dom, mon, dow] = fields;
+		const out: Date[] = [];
+		const start = new Date();
+		start.setSeconds(0, 0);
+		start.setMinutes(start.getMinutes() + 1);
+		const day = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+		const hours = [...hour.values].sort((a, b) => a - b);
+		const minutes = [...min.values].sort((a, b) => a - b);
+		for (let d = 0; d < 366 * 8 && out.length < count; d++) {
+			const current = new Date(day.getFullYear(), day.getMonth(), day.getDate() + d);
+			if (!mon.values.has(current.getMonth() + 1)) continue;
+			const domOk = dom.values.has(current.getDate());
+			const dowOk = dow.values.has(current.getDay());
+			const dayOk = dom.any && dow.any ? true : dom.any ? dowOk : dow.any ? domOk : domOk || dowOk;
+			if (!dayOk) continue;
+			for (const h of hours) {
+				for (const m of minutes) {
+					const t = new Date(current.getFullYear(), current.getMonth(), current.getDate(), h, m);
+					if (t.getHours() !== h || t < start) continue;
+					out.push(t);
+					if (out.length >= count) return out;
+				}
+			}
+		}
+		return out;
+	};
+
+	onPage('ct-tool', () => {
+		const expr = byId<HTMLInputElement>('ct-expr');
+		const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		const fmt = new Intl.DateTimeFormat('en-US', {
+			weekday: 'short',
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit',
+			hourCycle: 'h23',
+			timeZoneName: 'short',
+		});
+		const rel = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+		byId('ct-zone').textContent = `Next 10 runs · ${zone}`;
+		let runs: string[] = [];
+
+		const relative = (d: Date) => {
+			const mins = Math.round((d.getTime() - Date.now()) / 60000);
+			if (mins < 60) return rel.format(mins, 'minute');
+			if (mins < 60 * 48) return rel.format(Math.round(mins / 60), 'hour');
+			if (mins < 60 * 24 * 60) return rel.format(Math.round(mins / 1440), 'day');
+			return rel.format(Math.round(mins / 43200), 'month');
+		};
+
+		const render = () => {
+			try {
+				const fields = parse(expr.value);
+				byId('ct-desc').textContent = describe(fields, expr.value);
+				const dates = nextRuns(fields, 10);
+				runs = dates.map((d) => fmt.format(d));
+				byId('ct-runs').replaceChildren(
+					...dates.map((d, i) => {
+						const li = document.createElement('li');
+						const time = document.createElement('time');
+						time.dateTime = d.toISOString();
+						time.textContent = runs[i];
+						const small = document.createElement('span');
+						small.textContent = relative(d);
+						li.append(time, small);
+						return li;
+					}),
+				);
+				if (!dates.length) byId('ct-runs').replaceChildren(Object.assign(document.createElement('li'), { textContent: 'This expression never runs.' }));
+				byId('ct-field').classList.remove('invalid');
+				byId('ct-note').textContent = 'minute · hour · day of month · month · day of week';
+			} catch (e) {
+				byId('ct-field').classList.add('invalid');
+				byId('ct-note').textContent = (e as Error).message;
+				byId('ct-desc').textContent = '';
+				byId('ct-runs').replaceChildren();
+				runs = [];
+			}
+		};
+
+		byId('ct-examples')
+			.querySelectorAll<HTMLButtonElement>('button')
+			.forEach((b) =>
+				b.addEventListener('click', () => {
+					expr.value = b.dataset.expr ?? '';
+					render();
+				}),
+			);
+		expr.addEventListener('input', render);
+		copyButton(byId('ct-copy'), () => byId('ct-desc').textContent ?? '');
+		copyButton(byId('ct-copy-runs'), () => runs.join('\n'));
+		render();
+	});
+</script>
+
+<style>
+	.ct-desc {
+		margin: 0;
+		padding: 16px 14px;
+		font-size: 18px;
+		font-weight: 600;
+		color: var(--ink);
+		min-height: 1.5em;
+	}
+	.ct-runs {
+		margin: 0;
+		padding: 8px 14px 8px 42px;
+		font-variant-numeric: tabular-nums;
+		font-size: 14px;
+		color: var(--ink);
+		max-height: 420px;
+		overflow: auto;
+	}
+	.ct-runs :global(li) {
+		padding: 6px 0;
+		border-bottom: 1px solid var(--border);
+	}
+	.ct-runs :global(li:last-child) {
+		border-bottom: 0;
+	}
+	.ct-runs :global(span) {
+		margin-left: 10px;
+		color: var(--ink-soft);
+		font-size: 12.5px;
+	}
+	.chips :global(button) {
+		font-size: 12px;
+	}
+</style>

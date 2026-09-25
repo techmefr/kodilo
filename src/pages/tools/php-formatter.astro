@@ -1,0 +1,130 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `<?php
+namespace App\\Services;
+use App\\Models\\{User,Order};
+use Illuminate\\Support\\Collection;
+final class InvoiceService{
+public function __construct(private readonly TaxCalculator $taxes,private int $currencyScale=2){}
+public function totalFor(User $user,array $filters=[]):float{
+$orders=Order::query()->where('user_id',$user->id)->when($filters['status']??null,fn($q,$status)=>$q->where('status',$status))->get();
+return round($orders->sum(fn(Order $o)=>$o->amount+$this->taxes->for($o)),$this->currencyScale);
+}
+public function label(float $amount):string{if($amount<=0){return "Nothing due";}elseif($amount>1000){return "Large invoice";}else{return "Standard invoice";}}
+}
+`;
+---
+
+<ToolShell
+	slug="php-formatter"
+	title="PHP Formatter"
+	description="Beautify PHP code with Prettier and its official PHP plugin: PSR style braces, consistent indentation and wrapped long calls."
+>
+	<div class="toolbar" id="phf-tool">
+		<div class="seg" id="phf-indent" aria-label="Indent">
+			<button data-value="4" aria-pressed="true">
+				4 spaces
+			</button>
+			<button data-value="2" aria-pressed="false">
+				2 spaces
+			</button>
+			<button data-value="tab" aria-pressed="false">
+				Tab
+			</button>
+		</div>
+		<div class="seg" id="phf-brace" aria-label="Brace style">
+			<button data-value="per-cs" aria-pressed="true">
+				PER / PSR-12
+			</button>
+			<button data-value="1tbs" aria-pressed="false">
+				Same line
+			</button>
+		</div>
+		<div class="seg" id="phf-width" aria-label="Line width">
+			<button data-value="80" aria-pressed="true">
+				80
+			</button>
+			<button data-value="120" aria-pressed="false">
+				120
+			</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" id="phf-single" checked /> Single quotes
+		</label>
+		<label class="check">
+			<input type="checkbox" id="phf-trailing" checked /> Trailing commas
+		</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="phf-in" spellcheck="false" aria-label="PHP input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="phf-status">Output</span>
+				<button class="btn" id="phf-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="phf-out" tabindex="0"></pre>
+		</section>
+	</div>
+	<p class="error" id="phf-error" role="alert" hidden></p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('phf-tool', () => {
+		const input = byId<HTMLTextAreaElement>('phf-in');
+		const output = byId('phf-out');
+		const error = byId('phf-error');
+		const single = byId<HTMLInputElement>('phf-single');
+		const trailing = byId<HTMLInputElement>('phf-trailing');
+		let indent = '4';
+		let brace = 'per-cs';
+		let width = 80;
+		let run = 0;
+
+		const render = async () => {
+			const id = ++run;
+			try {
+				const [prettier, php] = await Promise.all([import('prettier/standalone'), import('@prettier/plugin-php/standalone')]);
+				const code = input.value.trimStart().startsWith('<?') ? input.value : `<?php\n${input.value}`;
+				const result = await prettier.format(code, {
+					parser: 'php',
+					plugins: [php.default ?? php],
+					useTabs: indent === 'tab',
+					tabWidth: indent === '2' ? 2 : 4,
+					printWidth: width,
+					singleQuote: single.checked,
+					trailingCommaPHP: trailing.checked,
+					braceStyle: brace,
+					phpVersion: '8.4',
+				} as Record<string, unknown>);
+				if (id !== run) return;
+				output.textContent = result;
+				byId('phf-status').textContent = 'Formatted';
+				error.hidden = true;
+			} catch (e) {
+				if (id !== run) return;
+				const err = e as { message?: string; loc?: { start?: { line: number; column: number } } };
+				const loc = err.loc?.start ? `Line ${err.loc.start.line}, column ${err.loc.start.column}: ` : '';
+				error.textContent = loc + String(err.message ?? e).split('\n')[0];
+				error.hidden = false;
+				output.textContent = '';
+				byId('phf-status').textContent = 'Output';
+			}
+		};
+
+		segmented(byId('phf-indent'), (v) => ((indent = v), render()));
+		segmented(byId('phf-brace'), (v) => ((brace = v), render()));
+		segmented(byId('phf-width'), (v) => ((width = Number(v)), render()));
+		[single, trailing].forEach((el) => el.addEventListener('change', render));
+		input.addEventListener('input', render);
+		copyButton(byId('phf-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

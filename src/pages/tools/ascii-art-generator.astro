@@ -1,0 +1,132 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="ascii-art-generator"
+	title="ASCII Art Generator"
+	description="Turn text into big ASCII banners with classic FIGlet fonts, for terminal splash screens, code headers and commit-friendly READMEs."
+>
+	<div class="toolbar" id="aag-tool">
+		<div class="seg" id="aag-font" aria-label="Font">
+			<button data-value="Standard" aria-pressed="true">
+				Standard
+			</button>
+			<button data-value="Slant" aria-pressed="false">
+				Slant
+			</button>
+			<button data-value="Big" aria-pressed="false">
+				Big
+			</button>
+			<button data-value="Small" aria-pressed="false">
+				Small
+			</button>
+			<button data-value="Banner" aria-pressed="false">
+				Banner
+			</button>
+			<button data-value="ANSI Shadow" aria-pressed="false">
+				ANSI Shadow
+			</button>
+		</div>
+		<div class="seg" id="aag-layout" aria-label="Letter spacing">
+			<button data-value="default" aria-pressed="true">
+				Smushed
+			</button>
+			<button data-value="fitted" aria-pressed="false">
+				Fitted
+			</button>
+			<button data-value="full" aria-pressed="false">
+				Full width
+			</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" id="aag-comment" /> Wrap in code comment
+		</label>
+	</div>
+	<div class="fields">
+		<div class="field wide">
+			<label for="aag-in">Text</label>
+			<input id="aag-in" value="kodilo" spellcheck="false" autocomplete="off" maxlength="80" />
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="aag-status">Banner</span>
+			<button class="btn" id="aag-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out aag-out" id="aag-out" tabindex="0" aria-label="ASCII art output"></pre>
+	</section>
+	<p class="error" id="aag-error" role="alert" hidden></p>
+</ToolShell>
+
+<style>
+	.aag-out {
+		overflow-x: auto;
+		line-height: 1.15;
+	}
+</style>
+
+<script>
+	import figlet from 'figlet';
+	import type { FontName } from 'figlet';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const FONTS: Record<string, () => Promise<{ default: string }>> = {
+		Standard: () => import('figlet/importable-fonts/Standard.js'),
+		Slant: () => import('figlet/importable-fonts/Slant.js'),
+		Big: () => import('figlet/importable-fonts/Big.js'),
+		Small: () => import('figlet/importable-fonts/Small.js'),
+		Banner: () => import('figlet/importable-fonts/Banner.js'),
+		'ANSI Shadow': () => import('figlet/importable-fonts/ANSI Shadow.js'),
+	};
+	const loaded = new Set<string>();
+
+	onPage('aag-tool', () => {
+		const input = byId<HTMLInputElement>('aag-in');
+		const output = byId('aag-out');
+		const error = byId('aag-error');
+		const comment = byId<HTMLInputElement>('aag-comment');
+		let font = 'Standard';
+		let layout = 'default';
+		let run = 0;
+
+		const render = async () => {
+			const id = ++run;
+			try {
+				if (!loaded.has(font)) {
+					const data = await FONTS[font]();
+					figlet.parseFont(font as FontName, data.default);
+					loaded.add(font);
+				}
+				if (id !== run) return;
+				const art = figlet
+					.textSync(input.value, { font: font as FontName, horizontalLayout: layout as 'default' | 'fitted' | 'full' })
+					.split('\n')
+					.map((l) => l.replace(/\s+$/, ''))
+					.filter((l, i, all) => l !== '' || (i > 0 && i < all.length - 1))
+					.join('\n');
+				output.textContent = comment.checked
+					? art
+							.split('\n')
+							.map((l) => `// ${l}`.trimEnd())
+							.join('\n')
+					: art;
+				byId('aag-status').textContent = `${font} banner`;
+				error.hidden = true;
+			} catch (e) {
+				if (id !== run) return;
+				error.textContent = String((e as Error).message ?? e);
+				error.hidden = false;
+			}
+		};
+
+		segmented(byId('aag-font'), (v) => ((font = v), render()));
+		segmented(byId('aag-layout'), (v) => ((layout = v), render()));
+		comment.addEventListener('change', render);
+		input.addEventListener('input', render);
+		copyButton(byId('aag-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

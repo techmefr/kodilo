@@ -1,0 +1,215 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `id,name,email,plan,credits,joined
+1,Ada Lovelace,ada@example.com,pro,120.5,2024-03-02
+2,Grace Hopper,grace@example.com,team,,2023-11-19
+3,Alan O'Brien,alan@example.com,free,0,2024-01-07`;
+---
+
+<ToolShell
+	slug="sql-csv-converter"
+	title="SQL ↔ CSV Converter"
+	description="Turn CSV rows into INSERT statements for MySQL, PostgreSQL, SQLite or SQL Server, or extract INSERT … VALUES back into CSV."
+>
+	<div class="toolbar" id="scc-tool">
+		<div class="seg" id="scc-mode" aria-label="Direction">
+			<button data-value="to-sql" aria-pressed="true">
+				CSV → SQL
+			</button>
+			<button data-value="to-csv" aria-pressed="false">
+				SQL → CSV
+			</button>
+		</div>
+		<label class="check scc-sql-only">
+			<input type="checkbox" id="scc-batch" checked /> Single multi-row INSERT
+		</label>
+		<label class="check scc-sql-only">
+			<input type="checkbox" id="scc-null" checked /> Empty cells as NULL
+		</label>
+	</div>
+	<div class="fields scc-sql-only">
+		<div class="field">
+			<label for="scc-table">Table name</label>
+			<input id="scc-table" value="users" spellcheck="false" autocomplete="off" />
+		</div>
+		<div class="field">
+			<label for="scc-dialect">Dialect</label>
+			<select id="scc-dialect">
+				<option value="mysql">MySQL / MariaDB</option>
+				<option value="postgres">PostgreSQL</option>
+				<option value="sqlite">SQLite</option>
+				<option value="mssql">SQL Server</option>
+			</select>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head" id="scc-in-label">
+				CSV
+			</div>
+			<textarea id="scc-in" spellcheck="false" aria-labelledby="scc-in-label">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="scc-out-label">SQL</span>
+				<button class="btn" id="scc-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="scc-out" tabindex="0" aria-labelledby="scc-out-label"></pre>
+		</section>
+	</div>
+	<p class="error" id="scc-error" role="alert" hidden></p>
+	<div class="stats">
+		<div class="stat">
+			<b id="scc-rows">0</b>
+			<span>Rows</span>
+		</div>
+		<div class="stat">
+			<b id="scc-cols">0</b>
+			<span>Columns</span>
+		</div>
+	</div>
+</ToolShell>
+
+<style>
+	.scc-sql-only[hidden] {
+		display: none;
+	}
+</style>
+
+<script>
+	import Papa from 'papaparse';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Value = string | number | null;
+
+	const quoteIdent = (name: string, dialect: string) => {
+		if (dialect === 'mysql') return `\`${name.replace(/`/g, '``')}\``;
+		if (dialect === 'mssql') return `[${name.replace(/]/g, ']]')}]`;
+		return `"${name.replace(/"/g, '""')}"`;
+	};
+
+	const literal = (v: string, nullEmpty: boolean, dialect: string) => {
+		if (v === '' && nullEmpty) return 'NULL';
+		if (/^-?(0|[1-9]\d*)(\.\d+)?$/.test(v)) return v;
+		if (/^(true|false)$/i.test(v) && dialect === 'postgres') return v.toUpperCase();
+		const s = `'${v.replace(/'/g, "''")}'`;
+		return dialect === 'mssql' && /[^\x20-\x7e]/.test(v) ? `N${s}` : s;
+	};
+
+	function csvToSql(csv: string, table: string, dialect: string, batch: boolean, nullEmpty: boolean) {
+		const parsed = Papa.parse<string[]>(csv.trim(), { skipEmptyLines: true });
+		const [head = [], ...rows] = parsed.data;
+		const target = table
+			.split('.')
+			.map((p) => quoteIdent(p.trim() || 'my_table', dialect))
+			.join('.');
+		const cols = head.map((h) => quoteIdent(h.trim(), dialect)).join(', ');
+		const tuples = rows.map((r) => `(${head.map((_, i) => literal(r[i] ?? '', nullEmpty, dialect)).join(', ')})`);
+		const prefix = `INSERT INTO ${target} (${cols}) VALUES`;
+		const sql = !rows.length ? '' : batch ? `${prefix}\n  ${tuples.join(',\n  ')};` : tuples.map((t) => `${prefix} ${t};`).join('\n');
+		return { sql, rows: rows.length, cols: head.length, error: parsed.errors[0]?.message };
+	}
+
+	function sqlToCsv(sql: string) {
+		let columns: string[] = [];
+		const rows: Value[][] = [];
+		const re = /INSERT\s+(?:INTO\s+)?[^\s(]+\s*(?:\(([^)]*)\))?\s*VALUES\s*/gi;
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(sql))) {
+			if (m[1] && !columns.length) columns = m[1].split(',').map((c) => c.trim().replace(/^[`"[]|[`"\]]$/g, ''));
+			let i = re.lastIndex;
+			while (i < sql.length) {
+				while (/[\s,]/.test(sql[i] ?? '')) i++;
+				if (sql[i] !== '(') break;
+				i++;
+				const row: Value[] = [];
+				let token = '';
+				let quoted = false;
+				while (i < sql.length) {
+					const ch = sql[i];
+					if (ch === "'" || (ch === 'N' && sql[i + 1] === "'" && !token.trim())) {
+						if (ch === 'N') i++;
+						i++;
+						let s = '';
+						while (i < sql.length) {
+							if (sql[i] === "'" && sql[i + 1] === "'") {
+								s += "'";
+								i += 2;
+							} else if (sql[i] === '\\' && sql[i + 1]) {
+								s += sql[i + 1];
+								i += 2;
+							} else if (sql[i] === "'") {
+								i++;
+								break;
+							} else s += sql[i++];
+						}
+						token = s;
+						quoted = true;
+						continue;
+					}
+					if (ch === ',' || ch === ')') {
+						const t = token.trim();
+						row.push(quoted ? token : /^null$/i.test(t) ? null : t);
+						token = '';
+						quoted = false;
+						i++;
+						if (ch === ')') break;
+						continue;
+					}
+					if (!quoted) token += ch;
+					i++;
+				}
+				rows.push(row);
+			}
+			re.lastIndex = i;
+		}
+		const width = Math.max(columns.length, ...rows.map((r) => r.length), 0);
+		const head = columns.length ? columns : Array.from({ length: width }, (_, i) => `column${i + 1}`);
+		const csv = rows.length ? Papa.unparse([head, ...rows.map((r) => r.map((v) => (v === null ? '' : String(v))))]) : '';
+		return { csv, rows: rows.length, cols: width };
+	}
+
+	const sqlSample = `INSERT INTO products (id, name, price, stock, tags) VALUES
+  (1, 'Mechanical keyboard', 89.9, 14, 'hardware,input'),
+  (2, 'USB-C hub', 34.5, NULL, 'hardware'),
+  (3, 'Monitor arm', 59, 3, 'desk''s best');`;
+
+	onPage('scc-tool', () => {
+		const input = byId<HTMLTextAreaElement>('scc-in');
+		const output = byId('scc-out');
+		const error = byId('scc-error');
+		const table = byId<HTMLInputElement>('scc-table');
+		const dialect = byId<HTMLSelectElement>('scc-dialect');
+		const batch = byId<HTMLInputElement>('scc-batch');
+		const nullEmpty = byId<HTMLInputElement>('scc-null');
+		let mode = 'to-sql';
+		const drafts: Record<string, string> = { 'to-sql': input.value, 'to-csv': sqlSample };
+
+		const render = () => {
+			const r = mode === 'to-sql' ? csvToSql(input.value, table.value, dialect.value, batch.checked, nullEmpty.checked) : sqlToCsv(input.value);
+			output.textContent = 'sql' in r ? r.sql : r.csv;
+			const message = 'error' in r ? r.error : !r.rows && input.value.trim() ? 'No INSERT … VALUES rows found.' : undefined;
+			error.textContent = message ?? '';
+			error.hidden = !message;
+			byId('scc-rows').textContent = String(r.rows);
+			byId('scc-cols').textContent = String(r.cols);
+		};
+
+		segmented(byId('scc-mode'), (v) => {
+			drafts[mode] = input.value;
+			mode = v;
+			input.value = drafts[mode];
+			byId('scc-in-label').textContent = mode === 'to-sql' ? 'CSV' : 'SQL';
+			byId('scc-out-label').textContent = mode === 'to-sql' ? 'SQL' : 'CSV';
+			document.querySelectorAll<HTMLElement>('.scc-sql-only').forEach((el) => (el.hidden = mode !== 'to-sql'));
+			render();
+		});
+		[dialect, batch, nullEmpty].forEach((el) => el.addEventListener('change', render));
+		[table, input].forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('scc-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

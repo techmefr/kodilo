@@ -1,0 +1,423 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = JSON.stringify(
+	{
+		Version: '2012-10-17',
+		Statement: [
+			{
+				Sid: 'PublicReadAssets',
+				Effect: 'Allow',
+				Principal: '*',
+				Action: 's3:GetObject',
+				Resource: 'arn:aws:s3:::shop-assets/*',
+			},
+			{
+				Sid: 'DeployRole',
+				Effect: 'Allow',
+				Principal: { AWS: 'arn:aws:iam::123456789012:role/ci-deploy' },
+				Action: ['s3:PutObject', 's3:DeleteObject', 's3:ListBucket'],
+				Resource: ['arn:aws:s3:::shop-assets', 'arn:aws:s3:::shop-assets/*'],
+			},
+			{
+				Sid: 'DenyInsecureTransport',
+				Effect: 'Deny',
+				Principal: '*',
+				Action: 's3:*',
+				Resource: ['arn:aws:s3:::shop-assets', 'arn:aws:s3:::shop-assets/*'],
+				Condition: { Bool: { 'aws:SecureTransport': 'false' } },
+			},
+			{
+				Sid: 'AdminEverything',
+				Effect: 'Allow',
+				Principal: { AWS: 'arn:aws:iam::123456789012:root' },
+				Action: '*',
+				Resource: '*',
+			},
+		],
+	},
+	null,
+	2,
+);
+---
+
+<ToolShell
+	slug="iam-policy-visualizer"
+	title="IAM Policy Visualizer"
+	description="Paste an AWS IAM or S3 bucket policy to see every statement as a plain-English allow or deny card, with wildcard, public access and privilege escalation risks flagged."
+>
+	<div class="iam" id="iam-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span>Policy JSON</span>
+				<button class="btn" id="iam-copy">
+					Copy summary
+				</button>
+			</div>
+			<textarea id="iam-in" spellcheck="false" aria-label="IAM policy JSON">{sample}</textarea>
+		</section>
+		<p class="error" id="iam-error" hidden></p>
+		<div class="stats" id="iam-stats"></div>
+		<p class="iam-rule">An explicit Deny always wins over any Allow. Anything not allowed is denied by default.</p>
+		<div class="iam-cards" id="iam-cards"></div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Stmt = Record<string, unknown>;
+	type Risk = { level: 'bad' | 'warn'; text: string };
+
+	const list = (v: unknown): string[] => (v === undefined ? [] : Array.isArray(v) ? v.map(String) : [String(v)]);
+
+	const SERVICES: Record<string, string> = {
+		s3: 'S3',
+		ec2: 'EC2',
+		iam: 'IAM',
+		sts: 'STS',
+		lambda: 'Lambda',
+		dynamodb: 'DynamoDB',
+		sqs: 'SQS',
+		sns: 'SNS',
+		kms: 'KMS',
+		logs: 'CloudWatch Logs',
+		cloudwatch: 'CloudWatch',
+		rds: 'RDS',
+		ecr: 'ECR',
+		ecs: 'ECS',
+		eks: 'EKS',
+		secretsmanager: 'Secrets Manager',
+		ssm: 'Systems Manager',
+		cloudformation: 'CloudFormation',
+		route53: 'Route 53',
+	};
+	const ESCALATION = [
+		'iam:passrole',
+		'iam:createaccesskey',
+		'iam:attachuserpolicy',
+		'iam:attachrolepolicy',
+		'iam:putuserpolicy',
+		'iam:putrolepolicy',
+		'iam:createpolicyversion',
+		'iam:updateassumerolepolicy',
+		'iam:createloginprofile',
+		'iam:updateloginprofile',
+		'sts:assumerole',
+		'lambda:updatefunctioncode',
+	];
+
+	const verbOf = (action: string) => {
+		const [svc, name = ''] = action.split(':');
+		const service = SERVICES[svc.toLowerCase()] ?? svc;
+		if (action === '*') return 'every action on every AWS service';
+		if (name === '*') return `every ${service} action`;
+		const human = name.replace(/\*/g, '…').replace(/([a-z])([A-Z])/g, '$1 $2');
+		const kind = /^(Get|List|Describe|Head|Search|Scan|Query|BatchGet|Select)/.test(name)
+			? 'read'
+			: /^(Delete|Remove|Terminate|Detach|Revoke|Disable)/.test(name)
+				? 'delete'
+				: /^(Put|Create|Update|Attach|Add|Modify|Set|Enable|Run|Start|Stop|Invoke|Pass|Assume|Tag|Untag|Upload|Copy|Restore|Send|Publish|Replicate)/.test(name)
+					? 'write'
+					: name.includes('*')
+						? 'pattern'
+						: 'other';
+		return `${service}: ${human}${kind === 'pattern' ? ' (wildcard pattern)' : ''}`;
+	};
+
+	const principalText = (p: unknown): string[] => {
+		if (p === undefined) return ['The identity this policy is attached to'];
+		if (p === '*') return ['Anyone, including anonymous internet users'];
+		if (typeof p === 'object' && p) {
+			return Object.entries(p as Record<string, unknown>).flatMap(([k, v]) =>
+				list(v).map((x) => {
+					if (x === '*') return k === 'AWS' ? 'Any AWS account or anonymous user' : `Any ${k} principal`;
+					const acct = x.match(/^(?:arn:aws:iam::)?(\d{12})(?::root)?$/);
+					if (acct) return `Any identity in account ${acct[1]} that is allowed by its own IAM policies`;
+					if (k === 'Service') return `AWS service ${x}`;
+					if (k === 'Federated') return `Federated users from ${x}`;
+					const role = x.match(/:(role|user|assumed-role)\/(.+)$/);
+					return role ? `${role[1] === 'user' ? 'IAM user' : 'Role'} ${role[2]}` : x;
+				}),
+			);
+		}
+		return [String(p)];
+	};
+
+	const resourceText = (r: string) => {
+		if (r === '*') return 'every resource';
+		const s3 = r.match(/^arn:aws:s3:::([^/]+)(\/(.*))?$/);
+		if (s3) return s3[2] ? (s3[3] === '*' ? `every object in bucket ${s3[1]}` : `objects ${s3[3]} in bucket ${s3[1]}`) : `the bucket ${s3[1]} itself`;
+		return r;
+	};
+
+	const OPS: Record<string, string> = {
+		StringEquals: 'equals',
+		StringNotEquals: 'does not equal',
+		StringLike: 'matches',
+		StringNotLike: 'does not match',
+		StringEqualsIgnoreCase: 'equals (any case)',
+		Bool: 'is',
+		IpAddress: 'is in',
+		NotIpAddress: 'is not in',
+		NumericLessThan: 'is below',
+		NumericGreaterThan: 'is above',
+		NumericLessThanEquals: 'is at most',
+		NumericGreaterThanEquals: 'is at least',
+		DateLessThan: 'is before',
+		DateGreaterThan: 'is after',
+		ArnEquals: 'equals',
+		ArnLike: 'matches',
+		Null: 'is missing:',
+	};
+	const conditionText = (c: unknown) => {
+		if (!c || typeof c !== 'object') return [];
+		return Object.entries(c as Record<string, Record<string, unknown>>).flatMap(([op, pairs]) => {
+			const base = op.replace(/^(ForAllValues|ForAnyValue):/, '').replace(/IfExists$/, '');
+			const set = op.startsWith('ForAllValues') ? 'every value of ' : op.startsWith('ForAnyValue') ? 'any value of ' : '';
+			return Object.entries(pairs ?? {}).map(
+				([key, v]) => `${set}${key} ${OPS[base] ?? op} ${list(v).join(' or ')}${op.endsWith('IfExists') ? ' (when present)' : ''}`,
+			);
+		});
+	};
+
+	const risksOf = (st: Stmt, resourcePolicy: boolean): Risk[] => {
+		const risks: Risk[] = [];
+		const allow = st.Effect === 'Allow';
+		const actions = list(st.Action).map((a) => a.toLowerCase());
+		const resources = list(st.Resource);
+		const p = st.Principal;
+		const pub = p === '*' || (typeof p === 'object' && p !== null && list((p as Record<string, unknown>).AWS).includes('*'));
+		if (!allow) return risks;
+		if (pub && !st.Condition) risks.push({ level: 'bad', text: 'Public: anyone on the internet gets this access, with no condition.' });
+		else if (pub) risks.push({ level: 'warn', text: 'Principal is * but restricted by a condition: make sure it really narrows access.' });
+		if (actions.includes('*')) risks.push({ level: 'bad', text: 'Action * grants full administrator access.' });
+		else if (actions.some((a) => a.endsWith(':*')))
+			risks.push({ level: 'warn', text: 'Service-wide wildcard: grants every current and future action of that service.' });
+		if (resources.includes('*') && !actions.every((a) => /:(get|list|describe)/.test(a)))
+			risks.push({ level: 'warn', text: 'Resource * applies to every resource in the account.' });
+		if (st.NotAction) risks.push({ level: 'bad', text: 'Allow with NotAction grants everything except the listed actions.' });
+		if (st.NotResource) risks.push({ level: 'warn', text: 'Allow with NotResource applies to every resource except the listed ones.' });
+		if (st.NotPrincipal) risks.push({ level: 'bad', text: 'Allow with NotPrincipal grants access to everyone except the listed principals.' });
+		const esc = actions.filter((a) => ESCALATION.includes(a) || (a.startsWith('iam:') && a.includes('*')));
+		if (esc.length) risks.push({ level: 'bad', text: `Privilege escalation: ${esc.join(', ')} can be used to gain more permissions.` });
+		if (actions.some((a) => a === 's3:putbucketpolicy' || a === 's3:putbucketacl'))
+			risks.push({ level: 'warn', text: 'Can rewrite bucket policies or ACLs, including making the bucket public.' });
+		if (resourcePolicy && !p && !st.NotPrincipal) risks.push({ level: 'warn', text: 'No Principal: invalid in a bucket policy, fine in an identity policy.' });
+		return risks;
+	};
+
+	const el = (tag: string, cls: string, text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	onPage('iam-tool', () => {
+		const input = byId<HTMLTextAreaElement>('iam-in');
+		let summary = '';
+
+		const column = (title: string, items: string[], negate: boolean) => {
+			const col = el('div', 'iam-col');
+			col.append(el('span', 'iam-col-title', negate ? `${title} (all except)` : title));
+			const ul = el('ul', '');
+			items.forEach((t) => ul.append(el('li', '', t)));
+			col.append(ul);
+			return col;
+		};
+
+		const render = () => {
+			const err = byId('iam-error');
+			err.hidden = true;
+			let stmts: Stmt[];
+			try {
+				const doc = JSON.parse(input.value);
+				stmts = Array.isArray(doc.Statement) ? doc.Statement : doc.Statement ? [doc.Statement] : Array.isArray(doc) ? doc : [];
+				if (!stmts.length) throw new Error('No Statement found. Paste a full policy document.');
+				if (doc.Version && doc.Version !== '2012-10-17') {
+					err.textContent = `Version ${doc.Version} is outdated: policy variables like \${aws:username} are not supported. Use 2012-10-17.`;
+					err.hidden = false;
+				}
+			} catch (e) {
+				err.textContent = e instanceof Error ? e.message : String(e);
+				err.hidden = false;
+				byId('iam-cards').replaceChildren();
+				byId('iam-stats').replaceChildren();
+				return;
+			}
+			const resourcePolicy = stmts.some((s) => s.Principal || s.NotPrincipal);
+			let bad = 0;
+			const lines: string[] = [];
+			const cards = stmts.map((st, i) => {
+				const allow = st.Effect === 'Allow';
+				const risks = risksOf(st, resourcePolicy);
+				if (risks.some((r) => r.level === 'bad')) bad++;
+				const card = el('article', `panel iam-card ${allow ? 'allow' : 'deny'}`);
+				card.dataset.effect = allow ? 'allow' : 'deny';
+				const head = el('div', 'panel-head');
+				head.append(
+					el('span', `iam-effect ${allow ? 'allow' : 'deny'}`, allow ? 'Allow' : 'Deny'),
+					el('span', 'iam-sid', String(st.Sid ?? `Statement ${i + 1}`)),
+				);
+				const flow = el('div', 'iam-flow');
+				const actions = list(st.Action ?? st.NotAction).map(verbOf);
+				const resources = list(st.Resource ?? st.NotResource).map(resourceText);
+				flow.append(
+					column('Who', principalText(st.Principal ?? st.NotPrincipal), !!st.NotPrincipal),
+					el('span', 'iam-arrow', allow ? 'can' : 'cannot'),
+					column('Do', actions.length ? actions : ['(no action)'], !!st.NotAction),
+					el('span', 'iam-arrow', 'on'),
+					column('What', resources.length ? resources : ['(no resource)'], !!st.NotResource),
+				);
+				card.append(head, flow);
+				const conds = conditionText(st.Condition);
+				if (conds.length) {
+					const c = el('div', 'iam-cond');
+					c.append(el('span', 'iam-col-title', 'Only when'));
+					const ul = el('ul', '');
+					conds.forEach((t) => ul.append(el('li', '', t)));
+					c.append(ul);
+					card.append(c);
+				}
+				if (risks.length) {
+					const ul = el('ul', 'iam-risks');
+					risks.forEach((r) => ul.append(el('li', r.level, r.text)));
+					card.append(ul);
+				}
+				lines.push(
+					`${allow ? 'ALLOW' : 'DENY '} ${st.Sid ?? `#${i + 1}`}: ${principalText(st.Principal).join(', ')} ${allow ? 'can' : 'cannot'} ${actions.join(', ')} on ${resources.join(', ')}${conds.length ? ` when ${conds.join(' and ')}` : ''}`,
+				);
+				risks.forEach((r) => lines.push(`  ! ${r.text}`));
+				return card;
+			});
+			byId('iam-cards').replaceChildren(...cards);
+			const stat = (n: number, label: string, cls: string) => {
+				const d = el('div', `stat ${cls}`);
+				d.append(el('b', '', String(n)), el('span', '', label));
+				return d;
+			};
+			byId('iam-stats').replaceChildren(
+				stat(stmts.length, 'Statements', ''),
+				stat(stmts.filter((s) => s.Effect === 'Allow').length, 'Allow', 'allow'),
+				stat(stmts.filter((s) => s.Effect !== 'Allow').length, 'Deny', 'deny'),
+				stat(bad, 'High risk', bad ? 'risk' : ''),
+			);
+			summary = lines.join('\n');
+		};
+
+		input.addEventListener('input', render);
+		copyButton(byId('iam-copy'), () => summary);
+		render();
+	});
+</script>
+
+<style>
+	.iam {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.iam-rule {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.iam :global(.stat.allow b) {
+		color: var(--ok);
+	}
+	.iam :global(.stat.deny b),
+	.iam :global(.stat.risk b) {
+		color: var(--bad);
+	}
+	.iam-cards {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	.iam-cards :global(.iam-card) {
+		border-left: 5px solid var(--ok);
+	}
+	.iam-cards :global(.iam-card.deny) {
+		border-left-color: var(--bad);
+	}
+	.iam-cards :global(.iam-effect) {
+		font-size: 13px;
+		padding: 2px 10px;
+		border-radius: 999px;
+		background: var(--ok-bg);
+		color: var(--ok);
+	}
+	.iam-cards :global(.iam-effect.deny) {
+		background: var(--surface);
+		border: 1px solid var(--bad);
+		color: var(--bad);
+	}
+	.iam-cards :global(.iam-sid) {
+		text-transform: none;
+		letter-spacing: 0;
+		font-family: var(--mono);
+		font-weight: 600;
+		word-break: break-all;
+		text-align: right;
+	}
+	.iam-cards :global(.iam-flow) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		gap: 10px;
+		padding: 12px 14px;
+	}
+	.iam-cards :global(.iam-col) {
+		flex: 1 1 180px;
+		min-width: 0;
+		background: var(--surface-2);
+		border-radius: 10px;
+		padding: 8px 10px;
+	}
+	.iam-cards :global(.iam-col-title) {
+		display: block;
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--ink-soft);
+	}
+	.iam-cards :global(.iam-col ul),
+	.iam-cards :global(.iam-cond ul) {
+		margin: 4px 0 0;
+		padding-left: 18px;
+		font-size: 13.5px;
+		word-break: break-word;
+	}
+	.iam-cards :global(.iam-arrow) {
+		align-self: center;
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--accent-strong);
+	}
+	.iam-cards :global(.iam-cond) {
+		margin: 0 14px 12px;
+		padding: 8px 10px;
+		border: 1px dashed var(--border);
+		border-radius: 10px;
+	}
+	.iam-cards :global(.iam-risks) {
+		list-style: none;
+		margin: 0;
+		padding: 0 14px 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.iam-cards :global(.iam-risks li) {
+		font-size: 13px;
+		padding: 6px 10px;
+		border-radius: 8px;
+		background: var(--warn-bg);
+		color: var(--warn);
+	}
+	.iam-cards :global(.iam-risks li.bad) {
+		font-weight: 700;
+	}
+</style>

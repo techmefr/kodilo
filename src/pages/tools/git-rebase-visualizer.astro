@@ -1,0 +1,334 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="git-rebase-visualizer"
+	title="Git Rebase vs Merge Visualizer"
+	description="See what rebase, merge, squash merge and cherry-pick do to the same history, before and after, with the exact commands to run."
+>
+	<div class="rv" id="rv-tool">
+		<div class="toolbar">
+			<div class="seg" id="rv-op" role="group" aria-label="Operation">
+				<button data-value="merge" aria-pressed="true">
+					Merge
+				</button>
+				<button data-value="rebase" aria-pressed="false">
+					Rebase
+				</button>
+				<button data-value="squash" aria-pressed="false">
+					Squash
+				</button>
+				<button data-value="pick" aria-pressed="false">
+					Cherry-pick
+				</button>
+			</div>
+			<label class="check" id="rv-ff-wrap">
+				<input type="checkbox" id="rv-ff" /> Fast-forward main after rebase
+			</label>
+		</div>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">
+					<span>Before</span>
+				</div>
+				<svg class="rv-svg" id="rv-before" viewBox="0 0 380 170" role="img" aria-label="History before"></svg>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span>After</span>
+				</div>
+				<svg class="rv-svg" id="rv-after" viewBox="0 0 380 170" role="img"></svg>
+			</section>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Commands</span>
+				<button class="btn" id="rv-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out rv-cmd" id="rv-cmd"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="rv-title"></span>
+			</div>
+			<p class="rv-text" id="rv-text" aria-live="polite"></p>
+			<ul class="rv-points" id="rv-points"></ul>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Node = { id: string; x: number; lane: number; kind?: 'new' | 'ghost' | 'merge' };
+	type Scene = { nodes: Node[]; edges: [string, string][]; refs: [string, string][] };
+
+	const before: Scene = {
+		nodes: [
+			{ id: 'A', x: 0, lane: 0 },
+			{ id: 'B', x: 1, lane: 0 },
+			{ id: 'C', x: 2, lane: 0 },
+			{ id: 'D', x: 2, lane: 1 },
+			{ id: 'E', x: 3, lane: 1 },
+		],
+		edges: [
+			['A', 'B'],
+			['B', 'C'],
+			['B', 'D'],
+			['D', 'E'],
+		],
+		refs: [
+			['C', 'main'],
+			['E', 'feature'],
+		],
+	};
+
+	const ops: Record<string, (ff: boolean) => { after: Scene; cmd: string; title: string; text: string; points: string[]; label: string }> = {
+		merge: () => ({
+			after: {
+				nodes: [...before.nodes, { id: 'M', x: 4, lane: 0, kind: 'merge' }],
+				edges: [...before.edges, ['C', 'M'], ['E', 'M']],
+				refs: [
+					['M', 'main'],
+					['E', 'feature'],
+				],
+			},
+			cmd: 'git switch main\ngit merge feature',
+			title: 'Merge',
+			text: 'Git creates a merge commit M with two parents, C and E. Every existing commit stays exactly as it was.',
+			points: [
+				'History is never rewritten, safe on shared branches.',
+				'The graph keeps the true shape of parallel work.',
+				'Many merge commits can make the log noisy.',
+			],
+			label: 'History after merge: merge commit M joins C and E on main',
+		}),
+		rebase: (ff) => ({
+			after: {
+				nodes: [
+					...before.nodes.slice(0, 3),
+					{ id: 'D', x: 3, lane: 1, kind: 'ghost' },
+					{ id: 'E', x: 4, lane: 1, kind: 'ghost' },
+					{ id: "D'", x: 3, lane: 0, kind: 'new' },
+					{ id: "E'", x: 4, lane: 0, kind: 'new' },
+				],
+				edges: [
+					['A', 'B'],
+					['B', 'C'],
+					['C', "D'"],
+					["D'", "E'"],
+				],
+				refs: ff
+					? [["E'", 'main, feature']]
+					: [
+							['C', 'main'],
+							["E'", 'feature'],
+						],
+			},
+			cmd: ff ? 'git switch feature\ngit rebase main\ngit switch main\ngit merge --ff-only feature' : 'git switch feature\ngit rebase main',
+			title: 'Rebase',
+			text: "Git replays D and E on top of C as new commits D' and E' with new hashes. The originals are left behind and later garbage collected.",
+			points: [
+				'A straight, linear history.',
+				'Rewrites commits: never rebase a branch others already pulled.',
+				'Conflicts are solved commit by commit.',
+				'After pushing a rebased branch use git push --force-with-lease.',
+			],
+			label: "History after rebase: D' and E' copied on top of C",
+		}),
+		squash: () => ({
+			after: {
+				nodes: [...before.nodes, { id: 'S', x: 3, lane: 0, kind: 'new' }],
+				edges: [...before.edges, ['C', 'S']],
+				refs: [
+					['S', 'main'],
+					['E', 'feature'],
+				],
+			},
+			cmd: 'git switch main\ngit merge --squash feature\ngit commit -m "Add feature"',
+			title: 'Squash merge',
+			text: 'The changes of D and E land on main as one single commit S. S has only one parent, so Git does not know feature was merged.',
+			points: [
+				'One clean commit per feature on main.',
+				'Individual commit messages of the branch are lost.',
+				'Delete the branch afterwards, merging it again brings duplicates.',
+			],
+			label: 'History after squash merge: single commit S on main',
+		}),
+		pick: () => ({
+			after: {
+				nodes: [...before.nodes, { id: "E'", x: 3, lane: 0, kind: 'new' }],
+				edges: [...before.edges, ['C', "E'"]],
+				refs: [
+					["E'", 'main'],
+					['E', 'feature'],
+				],
+			},
+			cmd: 'git switch main\ngit cherry-pick <hash-of-E>',
+			title: 'Cherry-pick',
+			text: "Git copies only the changes of E onto main as a new commit E'. D is not included, and feature stays untouched.",
+			points: [
+				'Handy for backporting a fix to a release branch.',
+				'Creates a duplicate commit with a different hash.',
+				'Add -x to record the original hash in the message.',
+			],
+			label: "History after cherry-pick: E' copied onto main",
+		}),
+	};
+
+	const NS = 'http://www.w3.org/2000/svg';
+	const el = (tag: string, attrs: Record<string, string | number>, text?: string) => {
+		const n = document.createElementNS(NS, tag);
+		Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, String(v)));
+		if (text !== undefined) n.textContent = text;
+		return n;
+	};
+
+	const draw = (svg: SVGElement, scene: Scene) => {
+		const pos = (n: Node) => [30 + n.x * 74, 60 + n.lane * 62];
+		const byName = Object.fromEntries(
+			scene.nodes.filter((n) => n.kind !== 'ghost' || !scene.nodes.some((m) => m.id === n.id && m !== n)).map((n) => [n.id, n]),
+		);
+		const out: SVGElement[] = [];
+		scene.edges.forEach(([a, b]) => {
+			const [x1, y1] = pos(byName[a]);
+			const [x2, y2] = pos(byName[b]);
+			out.push(
+				el('path', {
+					d: y1 === y2 ? `M${x1},${y1} L${x2},${y2}` : `M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`,
+					class: 'rv-edge',
+				}),
+			);
+		});
+		scene.nodes
+			.filter((n) => n.kind === 'ghost')
+			.forEach((n, i, all) => {
+				if (i) out.push(el('path', { d: `M${pos(all[i - 1]).join(',')} L${pos(n).join(',')}`, class: 'rv-edge ghost' }));
+			});
+		const ghostD = scene.nodes.find((n) => n.kind === 'ghost');
+		if (ghostD)
+			out.push(
+				el('path', {
+					d: `M${pos(byName.B).join(',')} C${pos(byName.B)[0] + 60},${pos(byName.B)[1]} ${pos(ghostD)[0] - 60},${pos(ghostD)[1]} ${pos(ghostD).join(',')}`,
+					class: 'rv-edge ghost',
+				}),
+			);
+		scene.nodes.forEach((n) => {
+			const [cx, cy] = pos(n);
+			const g = el('g', { class: `rv-node ${n.kind ?? ''}`, 'data-id': n.id });
+			g.append(el('circle', { cx, cy, r: 16 }));
+			g.append(el('text', { x: cx, y: cy + 4, 'text-anchor': 'middle' }, n.id));
+			out.push(g);
+		});
+		scene.refs.forEach(([id, name]) => {
+			const n = scene.nodes.find((m) => m.id === id && m.kind !== 'ghost')!;
+			const [cx, cy] = pos(n);
+			const w = name.length * 7 + 14;
+			const ry = n.lane === 0 ? cy - 44 : cy + 22;
+			out.push(el('rect', { x: cx - w / 2, y: ry, width: w, height: 20, rx: 10, class: 'rv-ref' }));
+			out.push(el('text', { x: cx, y: ry + 14, 'text-anchor': 'middle', class: 'rv-ref-text' }, name));
+		});
+		svg.replaceChildren(...out);
+	};
+
+	onPage('rv-tool', () => {
+		let op = 'merge';
+		const render = () => {
+			const r = ops[op](byId<HTMLInputElement>('rv-ff').checked);
+			byId('rv-ff-wrap').hidden = op !== 'rebase';
+			draw(byId('rv-before') as unknown as SVGElement, before);
+			draw(byId('rv-after') as unknown as SVGElement, r.after);
+			byId('rv-after').setAttribute('aria-label', r.label);
+			byId('rv-cmd').textContent = r.cmd;
+			byId('rv-title').textContent = r.title;
+			byId('rv-text').textContent = r.text;
+			byId('rv-points').replaceChildren(
+				...r.points.map((p) => {
+					const li = document.createElement('li');
+					li.textContent = p;
+					return li;
+				}),
+			);
+		};
+		segmented(byId('rv-op'), (v) => {
+			op = v;
+			render();
+		});
+		byId('rv-ff').addEventListener('change', render);
+		copyButton(byId('rv-copy'), () => byId('rv-cmd').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.rv {
+		display: grid;
+		gap: 16px;
+	}
+	.rv-svg {
+		display: block;
+		width: 100%;
+		height: auto;
+		font-family: var(--mono);
+		font-size: 13px;
+	}
+	.rv-svg :global(.rv-edge) {
+		fill: none;
+		stroke: var(--ink-soft);
+		stroke-width: 2.5;
+	}
+	.rv-svg :global(.rv-edge.ghost) {
+		stroke-dasharray: 4 4;
+		opacity: 0.6;
+	}
+	.rv-svg :global(.rv-node circle) {
+		fill: var(--surface-2);
+		stroke: var(--accent-strong);
+		stroke-width: 2.5;
+	}
+	.rv-svg :global(.rv-node text) {
+		fill: var(--ink);
+		font-weight: 700;
+	}
+	.rv-svg :global(.rv-node.new circle) {
+		fill: var(--accent);
+		stroke: var(--tint-1);
+	}
+	.rv-svg :global(.rv-node.merge circle) {
+		fill: var(--ok-bg);
+		stroke: var(--ok);
+	}
+	.rv-svg :global(.rv-node.ghost) {
+		opacity: 0.45;
+	}
+	.rv-svg :global(.rv-node.ghost circle) {
+		stroke-dasharray: 4 3;
+	}
+	.rv-svg :global(.rv-ref) {
+		fill: var(--accent-strong);
+	}
+	.rv-svg :global(.rv-ref-text) {
+		fill: var(--accent-ink);
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.rv-cmd {
+		min-height: auto !important;
+	}
+	.rv-text {
+		margin: 0;
+		padding: 14px 14px 0;
+		line-height: 1.55;
+	}
+	.rv-points {
+		margin: 0;
+		padding: 10px 14px 14px 32px;
+		display: grid;
+		gap: 4px;
+		color: var(--ink-soft);
+		font-size: 14px;
+	}
+</style>
