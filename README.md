@@ -6,189 +6,236 @@ Live at **https://techmefr.github.io/kodilo/**
 
 ## What's in here
 
-- **Inbox Tester** (`/tools/inbox-tester/`) — paste an HTML email, preview how it
-  renders across Outlook Desktop, Outlook.com, Gmail, Yahoo Mail, Apple Mail and Thunderbird
-  (client CSS-support quirks are simulated, not pixel-perfect), and check a
-  caniemail-style support grid for common CSS features.
-- **JSON Formatter** — JSON and JSON Lines (per-line errors, array ↔ JSONL conversion), format (2/4 spaces, tab), minify, sort keys, errors with line and column.
-- **Base64** — UTF-8 safe encode/decode, URL-safe alphabet.
-- **URL Encoder** — component or full-URL encode/decode, plus a breakdown of every URL part.
-- **UUID Generator** — v4 or time-ordered v7, bulk up to 1000, uppercase, no hyphens.
-- **Case Converter** — every case at once (camel, Pascal, snake, CONSTANT, kebab, dot, path, title…), click to copy.
-- **Lorem Ipsum** — 14 corpora: Latin, French accents, Malagasy long words, German compounds, Cyrillic,
-  Arabic (RTL), Japanese (no spaces), emoji and ZWJ sequences, an all-scripts stress test, plus cat, dog,
-  Elvish, pirate and robot. Paragraphs, sentences or words, as text or HTML.
-- **Word Counter** — words, characters (grapheme-aware), UTF-8 bytes, sentences, reading and speaking time, top keywords.
-- **Slugify** — URL slugs with transliteration, custom separator and max length, one per line.
-- **Text to Binary** — UTF-8 bytes as binary, hex, octal or decimal, both ways.
-- **NATO Alphabet** — spell text out, with optional ICAO digit pronunciation.
-- **Numeronym Generator** — internationalization → i18n.
-- **HTML Entities** — escape and unescape, optional non-ASCII encoding, common entities reference.
-- **Roman Numerals** — both ways with strict validation and a breakdown.
-- **Temperature** — Celsius, Fahrenheit, Kelvin and Rankine, with presets.
-- **Integer Base Converter** — bases 2 to 36, arbitrary precision, negatives.
-- **Hash** — MD5, SHA-1, SHA-256, SHA-384 and SHA-512 of text or a file, hex or Base64.
-- **HMAC Generator** — SHA-1/256/384/512 signatures with a compare field for webhook checks.
-- **Password Generator** — unbiased crypto randomness, character sets, look-alike exclusion, entropy meter.
-- **Token Generator** — alphanumeric, hex or base64url tokens with optional prefix, in bulk.
-- **ULID Generator** — monotonic ULIDs in bulk, and timestamp decoding.
-- **JWT Decoder** — header and payload, iat/nbf/exp as readable dates with expiry status, alg:none warning.
-- **Basic Auth** — build the Authorization header and curl command, or decode one.
-- **Chmod Calculator** — permission grid, octal, symbolic, setuid/setgid/sticky, common presets.
-- **HTTP Status Codes** — searchable and filterable by class.
-- **Credit Card Validator** — Luhn check, network detection, formatting, test card numbers.
-- **IBAN Validator** — mod-97 checksum, per-country length, country, check digits and BBAN.
-- **Email Validator** — bulk syntax checks, typo suggestions for popular domains, disposable providers.
-- **Date & Time Converter** — Unix seconds/ms/µs, ISO and date strings to every format, in any time zone.
-- **Color Converter** — any CSS color to HEX, RGB, HSL, HWB, OKLCH and CMYK, with WCAG contrast.
-- **IPv4 Subnet Calculator** — network, broadcast, host range, masks, address type, binary.
-- **Regex Tester** — live highlighting, flags, capture and named groups, replace preview.
-- **Box Shadow Generator** — multiple layers, presets, live preview.
-- **Gradient Generator** — linear, radial and conic with any number of stops.
-- **JSON to CSV** — arrays or JSON Lines, flattened keys, delimiter choice, preview and download.
-- **Image to Base64** — drop, pick or paste; data URI, raw, CSS, HTML or Markdown.
-- **Uptime / SLA Calculator** (`/tools/uptime-sla-calculator/`) — availability targets to downtime budgets, composite SLAs
-- **Byte Size Converter** (`/tools/byte-size-converter/`) — decimal and binary units side by side
-- **Transfer Time Calculator** (`/tools/transfer-time-calculator/`) — transfer duration and bandwidth needed for a deadline
-- **Kubernetes Resource Units** (`/tools/kubernetes-resource-units/`) — CPU millicores and memory Mi vs M, resources block
-- **Well-Known Ports** (`/tools/well-known-ports/`) — searchable TCP/UDP port reference
-- **Linux Signals & Exit Codes** (`/tools/linux-signals-exit-codes/`) — decode exit codes like 137 and a signal table
-- **.gitignore Generator** (`/tools/gitignore-generator/`) — pick a stack, get a deduplicated .gitignore
-- **SemVer Calculator** (`/tools/semver-calculator/`) — range matching, sorting and next versions
-- **DNS Record Builder** (`/tools/dns-record-builder/`) — zone file lines for A, MX, SPF, DMARC, CAA, SRV and more
-- **Security Headers Builder** (`/tools/security-headers-builder/`) — HSTS, CSP and friends for Nginx, Apache, Caddy, Netlify
-- **IPv4 Range Expander** (`/tools/ipv4-range-expander/`) — expand a CIDR or range into addresses and minimal CIDR blocks
-- **IPv6 ULA Generator** (`/tools/ipv6-ula-generator/`) — random RFC 4193 prefix and /64 subnets
-- **Text Statistics** (`/tools/text-statistics/`) — reading time, readability, lexical diversity and top words
-- **XOR Cipher** (`/tools/xor-cipher/`) — repeating-key XOR with text, hex and Base64
-- **Checksum Calculator** (`/tools/checksum-calculator/`) — CRC32, CRC32C, Adler-32, FNV-1a and SHA-256 with verification
-- **MAC Address Generator** (`/tools/mac-address-generator/`) — random MACs with prefix, separator and case options
-- **User Agent Parser** (`/tools/user-agent-parser/`) — browser, engine, OS and device from a User-Agent
-- **MIME Types** (`/tools/mime-types/`) — extension to Content-Type and back
-- **Regex Cheatsheet** (`/tools/regex-cheatsheet/`) — JavaScript regex syntax, click to copy
-- **.env Tool** (`/tools/env-file-tool/`) — validate, diff with .env.example, export to JSON, docker, Compose, Secret
-- **systemd Unit Generator** (`/tools/systemd-unit-generator/`) — service and timer units with hardening
-- **SSH Config Generator** (`/tools/ssh-config-generator/`) — Host blocks with jump hosts and forwarding
-- **Meta Tag Generator** (`/tools/meta-tag-generator/`) — title, description, robots, icons with a search preview
-- **Open Graph Generator** (`/tools/open-graph-generator/`) — Open Graph and Twitter cards with a link preview
-- **Crontab Generator** (`/tools/crontab-generator/`) — cron in plain English and the next runs
-- **Docker Run to Compose Converter** (`/tools/docker-run-to-compose/`) — docker run command to a compose.yaml service
-- **curl Converter** (`/tools/curl-converter/`) — curl to fetch, axios, Python, HTTPie or PHP
-- **JSON Log Viewer** (`/tools/json-log-viewer/`) — filter structured logs by level and field
-- **Unit Converter** (`/tools/unit-converter/`) — length, mass, speed, area, volume, time, pressure, energy, power
-- **Pomodoro Timer** (`/tools/pomodoro-timer/`) — focus and break intervals with sound
-- **Image Resizer** (`/tools/image-resizer/`) — resize by pixels or percentage, PNG/JPG/WebP
-- **PNG to JPG Converter** (`/tools/png-to-jpg/`) — batch PNG to JPG with quality and background
-- **JSON to YAML** (`/tools/json-to-yaml/`) — safe quoting, block strings, JSON Lines as multi-doc
-- **JSON Diff** (`/tools/json-diff/`) — structural diff with paths, optional unordered arrays
-- **JSON Viewer** (`/tools/json-viewer/`) — collapsible tree, search, click to copy a path
-- **Diff Checker** (`/tools/diff-checker/`) — line and word diff, split or unified
-- **Flexbox Generator** (`/tools/flexbox-generator/`) — visual flex container and per-item settings
-- **CSS Grid Generator** (`/tools/css-grid-generator/`) — tracks, gaps and drag-painted named areas
-- **Text Encryption** (`/tools/text-encryption/`) — AES-256-GCM with a PBKDF2 passphrase
-- **RSA Key Pair Generator** (`/tools/rsa-key-pair-generator/`) — PEM or JWK, 2048 to 4096 bits
-- **Image Compressor** (`/tools/image-compressor/`) — quality, max width, before/after slider
-- **Git Cheatsheet** (`/tools/git-cheatsheet/`) — commands by task, click to copy
-- **Docker Cheatsheet** (`/tools/docker-cheatsheet/`) — containers, images, compose, cleanup
-- **NPM Cheatsheet** (`/tools/npm-cheatsheet/`) — npm, pnpm, Yarn and Bun side by side
-- **Markdown to HTML** (`/tools/markdown-to-html/`) — GFM to HTML, tables, tasks, anchors
-- **Markdown Previewer** (`/tools/markdown-previewer/`) — live preview, outline, saved draft
-- **CSS Formatter & Minifier** (`/tools/css-formatter/`) — beautify or minify CSS
-- **SVG to JSX, TSX & Vue** (`/tools/svg-to-component/`) — React or Vue component with size and color props
-- **HTML Formatter** (`/tools/html-formatter/`) — beautify or minify HTML
-- **SQL Prettify** (`/tools/sql-prettify/`) — one clause per line, keyword case
-- **Math Evaluator** (`/tools/math-evaluator/`) — calculator notepad with variables
-- **Kubernetes Manifest Generator** (`/tools/kubernetes-manifest-generator/`) — Deployment, Service and Ingress YAML
-- **Nginx Config Generator** (`/tools/nginx-config-generator/`) — proxy, SPA, static or PHP with HTTPS
-- **Bcrypt** (`/tools/bcrypt/`) — hash and verify passwords, adjustable cost
-- **QR Code Generator** (`/tools/qr-code-generator/`) — text or URL to QR, PNG or SVG download
-- **WiFi QR Code Generator** (`/tools/wifi-qr-code-generator/`) — scan-to-join QR card, printable
-- **htpasswd Generator** (`/tools/htpasswd-generator/`) — bcrypt or SHA lines plus Nginx/Apache config
-- **YAML Validator & Formatter** (`/tools/yaml-validator/`) — line and column errors, format, YAML to JSON
-- **REST API Tester** (`/tools/rest-api-tester/`) — send requests, status, timing, headers, body
-- **Phone Parser & Formatter** (`/tools/phone-parser/`) — validity, country, line type, E.164 and more
-- **Developer Calculator** (`/tools/developer-calculator/`) — hex/dec/oct/bin with bitwise ops and bit grid
-- **PDF Merge** (`/tools/pdf-merge/`) — combine and reorder PDFs in the browser
-- **JPG to PDF** (`/tools/jpg-to-pdf/`) — images to a PDF, A4, Letter or fit
-- **Currency Converter** (`/tools/currency-converter/`) — ECB daily rates, 30 currencies
-- **BIP39 Generator** (`/tools/bip39-generator/`) — generate or check a mnemonic, entropy and seed
-- **MAC Address Lookup** (`/tools/mac-address-lookup/`) — vendor from the bundled IEEE OUI registry
-- **PDF Split** (`/tools/pdf-split/`) — extract a page range or one file per page
-- **PDF Compress** (`/tools/pdf-compress/`) — lossless repack or pages as JPEG
-- **PDF to JPG** (`/tools/pdf-to-jpg/`) — render pages as JPG or PNG at 72-300 DPI
-- **X.509 Certificate Decoder** (`/tools/x509-certificate-decoder/`) — subject, SANs, validity, key, fingerprints
-- **JSON to TypeScript** (`/tools/json-to-typescript/`) — interfaces or types, merged arrays, optional keys
-- **JSON Schema Validator** (`/tools/json-schema-validator/`) — draft-07 and 2020-12, errors with paths, schema from a sample
-- **XML Formatter** (`/tools/xml-formatter/`) — format or minify, errors with line numbers
-- **TOML Formatter & Converter** (`/tools/toml-formatter/`) — format, TOML to JSON and back
-- **GraphQL Formatter** (`/tools/graphql-formatter/`) — queries, fragments and schemas, format or minify
-- **HTML to Markdown** (`/tools/html-to-markdown/`) — headings, lists, code blocks and tables, rich text paste
-- **URL Parser** (`/tools/url-parser/`) — every part editable, query parameters as a table
-- **String Escaper** (`/tools/string-escaper/`) — JSON, JS, SQL, shell, regex, CSV, HTML both ways
-- **WCAG Contrast Checker** (`/tools/wcag-contrast-checker/`) — AA/AAA ratios, preview, nearest passing color
-- **px, rem & em Converter** (`/tools/px-rem-converter/`) — any root size, scale table, CSS px to rem
-- **Cubic Bezier Editor** (`/tools/cubic-bezier-editor/`) — drag handles, presets, animated preview against linear
-- **Image Color Palette** (`/tools/image-color-palette/`) — dominant colors with shares, CSS variables export
-- **Favicon Generator** (`/tools/favicon-generator/`) — ico, PNG sizes, Apple icon, manifest and HTML as a zip
-- **SVG Optimizer** (`/tools/svg-optimizer/`) — SVGO in the browser, precision, before/after preview
-- **WebP & AVIF Converter** (`/tools/webp-avif-converter/`) — WebP, AVIF, JPG and PNG with size comparison
-- **EXIF Viewer & Remover** (`/tools/exif-viewer/`) — camera, date and GPS shown, clean copy without metadata
-- **QR Code Reader** (`/tools/qr-code-reader/`) — image, paste or camera, WiFi and 2FA codes explained
-- **TOTP / 2FA Generator** (`/tools/totp-generator/`) — live codes, check a code, otpauth URI and QR
-- **JWT Generator** (`/tools/jwt-generator/`) — HS256/HS512/RS256/ES256, expiry, key pairs, verify
-- **CSP Generator** (`/tools/csp-generator/`) — presets, per-directive fields, warnings, header/meta/Nginx/Apache
-- **robots.txt Generator** (`/tools/robots-txt-generator/`) — rules per crawler, AI bot blocking, path tester
-- **Sitemap Generator** (`/tools/sitemap-generator/`) — paths or URLs, lastmod, changefreq, priority by depth
-- **Redirect Generator** (`/tools/redirect-generator/`) — Nginx, .htaccess, Netlify, Vercel and Caddy with wildcards
-- **Unicode Inspector** (`/tools/unicode-inspector/`) — code points, UTF-8 bytes, escapes, invisible characters
-- **Keyboard Event Info** (`/tools/keycode-info/`) — key, code, keyCode, modifiers and a handler snippet
-- **Aspect Ratio Calculator** (`/tools/aspect-ratio-calculator/`) — ratio, resize, common formats and CSS
-- **JavaScript Formatter & Minifier** (`/tools/javascript-formatter/`) — Prettier beautify and Terser minify for JS/TS
-- **CSV to JSON** (`/tools/csv-to-json/`) — CSV to JSON with delimiter detection and typed values
-- **JSONPath Tester** (`/tools/jsonpath-tester/`) — live JSONPath queries with matched paths
-- **Fake Data Generator** (`/tools/fake-data-generator/`) — seeded fake records as JSON, CSV or SQL
-- **Mermaid Live Editor** (`/tools/mermaid-editor/`) — live Mermaid diagram editor with SVG export
-- **Time Zone Converter** (`/tools/timezone-converter/`) — a date-time across any time zones, DST-aware
-- **Line Tools** (`/tools/line-tools/`) — sort, dedupe, filter and number lines
-- **Base32, Base58 & Hex Encoder** (`/tools/base-encoder/`) — Base32, Base58 and hex encoding with character codes
-- **Markdown Table Generator** (`/tools/markdown-table-generator/`) — editable grid or CSV to an aligned Markdown table
-- **Color Shades Generator** (`/tools/color-shades-generator/`) — OKLCH shade scale from 50 to 950 with contrast ratios
-- **HTTP Headers & Cookie Parser** (`/tools/http-headers-parser/`) — explain raw HTTP headers, Set-Cookie and Cookie
-- **License Generator** (`/tools/license-generator/`) — MIT, Apache, GPL, BSD, ISC, MPL and Unlicense files
-- **CSR Generator** (`/tools/csr-generator/`) — PKCS#10 CSR and private key, generated in the browser
-- **Code Screenshot** (`/tools/code-screenshot/`) — beautiful code images as PNG
-- **Placeholder Image Generator** (`/tools/placeholder-image-generator/`) — placeholder images, data URIs and SVG
-- **GitHub Actions Workflow Generator** (`/tools/github-actions-generator/`) — CI workflows with matrix, cache and pinned actions
-- **Dockerfile Generator & Linter** (`/tools/dockerfile-generator/`) — multi-stage Dockerfiles and a best-practice linter
-- **Docker Compose Validator** (`/tools/docker-compose-validator/`) — compose syntax and semantic checks with a service summary
-- **Kubernetes Secret Encoder** (`/tools/kubernetes-secret-encoder/`) — Secret YAML from key/values, TLS or registry credentials, and back
-- **Caddyfile Generator** (`/tools/caddyfile-generator/`) — Caddyfiles with proxy, static files, headers and auth
-- **CIDR Aggregator & Splitter** (`/tools/cidr-aggregator/`) — merge, exclude and split IPv4 CIDR blocks
-- **Firewall Rule Generator** (`/tools/firewall-rule-generator/`) — ufw, iptables and nftables from one rule list, with an SSH lockout warning
-- **Logrotate Config Generator** (`/tools/logrotate-generator/`) — logrotate.d files explained line by line
-- **fstab Entry Generator** (`/tools/fstab-generator/`) — aligned fstab lines with _netdev/nofail and pass checks
-- **RAID Calculator** (`/tools/raid-calculator/`) — RAID capacity and fault tolerance in TB or TiB
-- **rsync Command Builder** (`/tools/rsync-command-builder/`) — rsync flags, SSH options and the trailing slash explained
-- **find Command Builder** (`/tools/find-command-builder/`) — find with prune, -exec and xargs -0, explained
-- **tar Command Builder** (`/tools/tar-command-builder/`) — tar create, extract and list with the reverse command
-- **GitLab CI Generator** (`/tools/gitlab-ci-generator/`) — pipelines for Node, Python, Go, Docker or GitLab Pages
-- **CODEOWNERS Generator** (`/tools/codeowners-generator/`) — code owners with sections and order checks
-- **README Badge Generator** (`/tools/readme-badge-generator/`) — shields.io badges with GitHub and GitLab presets
-- **Issue & PR Template Generator** (`/tools/issue-pr-template-generator/`) — issue forms and PR/MR templates
-- **Conventional Commit Builder** (`/tools/conventional-commit-builder/`) — build and validate commit messages, predict the semver bump
-- **Git Undo Guide** (`/tools/git-undo-guide/`) — the right command to undo almost anything in Git
-- **Docker Command Explainer** (`/tools/docker-command-explainer/`) — explain any docker command, flag by flag
-- **Docker Compose Visualizer** (`/tools/docker-compose-visualizer/`) — compose.yaml as a diagram of services, networks and volumes
-- **Dockerfile Layer Visualizer** (`/tools/dockerfile-layer-visualizer/`) — stages, layers and cache invalidation of a Dockerfile
-- **Docker Container Lifecycle** (`/tools/docker-container-lifecycle/`) — interactive container state diagram and simulator
+**170 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
+
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
-No sign-up, no account, no tracking. Every tool runs entirely client-side.
+### Email (1)
 
-Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools),
-[it-tools.tech](https://it-tools.tech/) (its live deployment), [devbench.site](https://devbench.site/),
-[OpenFormatter](https://openformatter.com/tools), [productivite.loan-thomas.com](https://productivite.loan-thomas.com/)
-and [CyberChef](https://github.com/gchq/CyberChef) — kodilo picks a subset and adds its own (Inbox Tester).
+- [Inbox Tester](https://techmefr.github.io/kodilo/tools/inbox-tester/) — Paste an HTML email, pick a client tab, see the render and which CSS features it supports.
+
+### JSON (8)
+
+- [JSON Formatter & Validator](https://techmefr.github.io/kodilo/tools/json-formatter/) — Format, validate and minify JSON data.
+- [JSON to YAML](https://techmefr.github.io/kodilo/tools/json-to-yaml/) — Convert JSON to YAML.
+- [JSON to CSV](https://techmefr.github.io/kodilo/tools/json-to-csv/) — Convert JSON arrays to CSV.
+- [JSON Diff](https://techmefr.github.io/kodilo/tools/json-diff/) — Compare two JSON documents and highlight what changed.
+- [JSON Viewer](https://techmefr.github.io/kodilo/tools/json-viewer/) — Explore a JSON document as a collapsible tree.
+- [JSON to TypeScript](https://techmefr.github.io/kodilo/tools/json-to-typescript/) — Generate TypeScript interfaces or types from a JSON sample.
+- [JSON Schema Validator](https://techmefr.github.io/kodilo/tools/json-schema-validator/) — Validate JSON against a JSON Schema, or generate a schema from data.
+- [JSONPath Tester](https://techmefr.github.io/kodilo/tools/jsonpath-tester/) — Run JSONPath expressions against a JSON document and see every match with its exact path, live as you type.
+
+### HTML / CSS (8)
+
+- [HTML Formatter](https://techmefr.github.io/kodilo/tools/html-formatter/) — Beautify and format HTML code.
+- [CSS Formatter & Minifier](https://techmefr.github.io/kodilo/tools/css-formatter/) — Format and minify CSS stylesheets.
+- [SVG to JSX, TSX & Vue](https://techmefr.github.io/kodilo/tools/svg-to-component/) — Turn an SVG into a React or Vue component with size and color props.
+- [Box Shadow Generator](https://techmefr.github.io/kodilo/tools/box-shadow-generator/) — Generate CSS box-shadow values with a live preview.
+- [Gradient Generator](https://techmefr.github.io/kodilo/tools/gradient-generator/) — Generate CSS gradients with a live preview.
+- [CSS Grid Generator](https://techmefr.github.io/kodilo/tools/css-grid-generator/) — Build a CSS grid layout visually and copy the code.
+- [Flexbox Generator](https://techmefr.github.io/kodilo/tools/flexbox-generator/) — Build a CSS flexbox layout visually and copy the code.
+- [XML Formatter](https://techmefr.github.io/kodilo/tools/xml-formatter/) — Pretty-print or minify XML and catch well-formedness errors.
+
+### Markdown (7)
+
+- [Markdown to HTML](https://techmefr.github.io/kodilo/tools/markdown-to-html/) — Convert Markdown to HTML.
+- [Markdown Previewer](https://techmefr.github.io/kodilo/tools/markdown-previewer/) — Write Markdown and preview the rendered result live.
+- [HTML to Markdown](https://techmefr.github.io/kodilo/tools/html-to-markdown/) — Convert HTML or pasted rich text to clean Markdown.
+- [Mermaid Live Editor](https://techmefr.github.io/kodilo/tools/mermaid-editor/) — Write Mermaid diagrams and see them rendered live, then copy or download the SVG. Flowcharts, sequences, classes, Gantt and ER.
+- [Markdown Table Generator](https://techmefr.github.io/kodilo/tools/markdown-table-generator/) — Build a Markdown table in an editable grid or import CSV or TSV, with per-column alignment, padded columns and escaped pipes.
+- [README Badge Generator](https://techmefr.github.io/kodilo/tools/readme-badge-generator/) — Build shields.io badges for your README, with GitHub and GitLab presets, a live preview and Markdown, HTML or reStructuredText output.
+- [Issue & PR Template Generator](https://techmefr.github.io/kodilo/tools/issue-pr-template-generator/) — Create GitHub issue forms and pull request templates, and GitLab issue and merge request templates with quick actions, ready to drop in your repo.
+
+### SEO (4)
+
+- [Meta Tag Generator](https://techmefr.github.io/kodilo/tools/meta-tag-generator/) — Generate HTML meta tags.
+- [Open Graph Generator](https://techmefr.github.io/kodilo/tools/open-graph-generator/) — Generate Open Graph tags for link previews.
+- [robots.txt Generator](https://techmefr.github.io/kodilo/tools/robots-txt-generator/) — Write robots.txt rules per crawler, block AI bots and test a path.
+- [Sitemap Generator](https://techmefr.github.io/kodilo/tools/sitemap-generator/) — Turn a list of pages into a valid sitemap.xml.
+
+### Text (12)
+
+- [Regex Tester](https://techmefr.github.io/kodilo/tools/regex-tester/) — Test regular expressions against sample text.
+- [Diff Checker](https://techmefr.github.io/kodilo/tools/diff-checker/) — Compare two texts side by side.
+- [Case Converter](https://techmefr.github.io/kodilo/tools/case-converter/) — Convert text between case styles (camel, snake, kebab...).
+- [Word Counter](https://techmefr.github.io/kodilo/tools/word-counter/) — Count words, characters and lines.
+- [Slugify](https://techmefr.github.io/kodilo/tools/slugify/) — Turn text into a URL-friendly slug.
+- [Lorem Ipsum Generator](https://techmefr.github.io/kodilo/tools/lorem-ipsum-generator/) — Generate placeholder text.
+- [Text to Binary](https://techmefr.github.io/kodilo/tools/text-to-binary/) — Convert text to and from binary.
+- [Text to NATO Alphabet](https://techmefr.github.io/kodilo/tools/text-to-nato-alphabet/) — Spell out text using the NATO phonetic alphabet.
+- [Text Statistics](https://techmefr.github.io/kodilo/tools/text-statistics/) — Reading time, sentence count and other text metrics.
+- [Numeronym Generator](https://techmefr.github.io/kodilo/tools/numeronym-generator/) — Generate numeronyms like i18n or a11y from a word.
+- [Unicode Inspector](https://techmefr.github.io/kodilo/tools/unicode-inspector/) — Inspect every character with its code point, bytes and escapes, and find invisible ones.
+- [Line Tools](https://techmefr.github.io/kodilo/tools/line-tools/) — Sort, deduplicate, trim, filter, reverse, shuffle or number lines of text, with input and output line counts.
+
+### Encoding & Security (20)
+
+- [Base64 Encoder & Decoder](https://techmefr.github.io/kodilo/tools/base64/) — Encode and decode Base64 strings.
+- [JWT Decoder](https://techmefr.github.io/kodilo/tools/jwt-decoder/) — Decode and inspect JWT tokens.
+- [URL Encoder & Decoder](https://techmefr.github.io/kodilo/tools/url-encoder/) — Encode and decode URL strings.
+- [HTML Entities](https://techmefr.github.io/kodilo/tools/html-entities/) — Encode and decode HTML entities.
+- [Hash Text](https://techmefr.github.io/kodilo/tools/hash-text/) — Generate MD5, SHA-1, SHA-256 and other hashes.
+- [HMAC Generator](https://techmefr.github.io/kodilo/tools/hmac-generator/) — Generate an HMAC signature for a message and key.
+- [Bcrypt](https://techmefr.github.io/kodilo/tools/bcrypt/) — Hash and verify passwords with bcrypt.
+- [Basic Auth Generator](https://techmefr.github.io/kodilo/tools/basic-auth-generator/) — Generate an HTTP Basic Authentication header.
+- [Token Generator](https://techmefr.github.io/kodilo/tools/token-generator/) — Generate random tokens with a custom charset and length.
+- [RSA Key Pair Generator](https://techmefr.github.io/kodilo/tools/rsa-key-pair-generator/) — Generate an RSA public/private key pair.
+- [Text Encryption](https://techmefr.github.io/kodilo/tools/text-encryption/) — Encrypt and decrypt text with AES and a passphrase.
+- [BIP39 Generator](https://techmefr.github.io/kodilo/tools/bip39-generator/) — Generate a BIP39 mnemonic seed phrase.
+- [XOR Cipher](https://techmefr.github.io/kodilo/tools/xor-cipher/) — Encrypt or decrypt text/bytes with a repeating XOR key.
+- [Checksum Calculator](https://techmefr.github.io/kodilo/tools/checksum-calculator/) — Compute a CRC32 or other checksum for text or a file.
+- [String Escaper](https://techmefr.github.io/kodilo/tools/string-escaper/) — Escape or unescape strings for JSON, JS, SQL, shell, regex, CSV and HTML.
+- [TOTP / 2FA Generator](https://techmefr.github.io/kodilo/tools/totp-generator/) — Generate and check time-based one-time passwords with a QR code.
+- [JWT Generator](https://techmefr.github.io/kodilo/tools/jwt-generator/) — Sign JSON Web Tokens with HS256, RS256 or ES256 and verify them.
+- [CSP Generator](https://techmefr.github.io/kodilo/tools/csp-generator/) — Build a Content-Security-Policy with warnings for risky values.
+- [Base32, Base58 & Hex Encoder](https://techmefr.github.io/kodilo/tools/base-encoder/) — Encode and decode UTF-8 text as Base32 (RFC 4648), Base58 (Bitcoin alphabet) or hex, and list each character's code point and bytes.
+- [CSR Generator](https://techmefr.github.io/kodilo/tools/csr-generator/) — Create a certificate signing request and its private key for RSA or ECDSA, with subject fields and DNS alternative names.
+
+### Generators (8)
+
+- [UUID Generator](https://techmefr.github.io/kodilo/tools/uuid-generator/) — Generate random UUIDs.
+- [ULID Generator](https://techmefr.github.io/kodilo/tools/ulid-generator/) — Generate ULIDs (sortable unique identifiers).
+- [Password Generator](https://techmefr.github.io/kodilo/tools/password-generator/) — Generate secure random passwords.
+- [QR Code Generator](https://techmefr.github.io/kodilo/tools/qr-code-generator/) — Generate QR codes from text or URLs.
+- [WiFi QR Code Generator](https://techmefr.github.io/kodilo/tools/wifi-qr-code-generator/) — Generate a QR code that connects to a WiFi network.
+- [Crontab Generator](https://techmefr.github.io/kodilo/tools/crontab-generator/) — Build and explain a cron expression.
+- [Fake Data Generator](https://techmefr.github.io/kodilo/tools/fake-data-generator/) — Generate realistic fake records as JSON, CSV or SQL INSERT statements, with a seed for reproducible output.
+- [License Generator](https://techmefr.github.io/kodilo/tools/license-generator/) — Pick an open source license, enter the year and copyright holder, and get a ready LICENSE file with what it allows, requires and limits.
+
+### Converters (8)
+
+- [Date/Time Converter](https://techmefr.github.io/kodilo/tools/date-time-converter/) — Convert between timestamps, ISO dates and time zones.
+- [Color Converter](https://techmefr.github.io/kodilo/tools/color-converter/) — Convert colors between HEX, RGB, HSL and more.
+- [Integer Base Converter](https://techmefr.github.io/kodilo/tools/integer-base-converter/) — Convert numbers between binary, octal, decimal and hex.
+- [Roman Numeral Converter](https://techmefr.github.io/kodilo/tools/roman-numeral-converter/) — Convert numbers to and from Roman numerals.
+- [Temperature Converter](https://techmefr.github.io/kodilo/tools/temperature-converter/) — Convert between Celsius, Fahrenheit and Kelvin.
+- [TOML Formatter & Converter](https://techmefr.github.io/kodilo/tools/toml-formatter/) — Validate and format TOML, convert it to and from JSON.
+- [CSV to JSON](https://techmefr.github.io/kodilo/tools/csv-to-json/) — Turn CSV into JSON with automatic delimiter detection, header rows and typed numbers, booleans and nulls.
+- [Time Zone Converter](https://techmefr.github.io/kodilo/tools/timezone-converter/) — Convert a date and time from one time zone to many others, with UTC offsets, day changes and daylight saving handled automatically.
+
+### Network (11)
+
+- [IPv4 Subnet Calculator](https://techmefr.github.io/kodilo/tools/ipv4-subnet-calculator/) — Calculate subnet ranges, masks and host counts.
+- [IPv4 Range Expander](https://techmefr.github.io/kodilo/tools/ipv4-range-expander/) — Expand an IPv4 range or CIDR into individual addresses.
+- [IPv6 ULA Generator](https://techmefr.github.io/kodilo/tools/ipv6-ula-generator/) — Generate a unique local IPv6 address prefix.
+- [MAC Address Generator](https://techmefr.github.io/kodilo/tools/mac-address-generator/) — Generate random MAC addresses.
+- [MAC Address Lookup](https://techmefr.github.io/kodilo/tools/mac-address-lookup/) — Look up the vendor for a MAC address.
+- [User Agent Parser](https://techmefr.github.io/kodilo/tools/user-agent-parser/) — Parse a User-Agent string into browser, engine and OS.
+- [HTTP Status Codes](https://techmefr.github.io/kodilo/tools/http-status-codes/) — Look up the meaning of an HTTP status code.
+- [Phone Parser & Formatter](https://techmefr.github.io/kodilo/tools/phone-parser/) — Parse and format international phone numbers.
+- [URL Parser](https://techmefr.github.io/kodilo/tools/url-parser/) — Split a URL into its parts and edit query parameters.
+- [HTTP Headers & Cookie Parser](https://techmefr.github.io/kodilo/tools/http-headers-parser/) — Paste raw request or response headers to see each one explained, with Cache-Control, CSP and Set-Cookie decoded and common mistakes flagged.
+- [CIDR Aggregator & Splitter](https://techmefr.github.io/kodilo/tools/cidr-aggregator/) — Merge IPv4 addresses, ranges and CIDRs into the smallest CIDR list, subtract exclusions, or split a network into equal subnets.
+
+### Validators (3)
+
+- [Email Validator](https://techmefr.github.io/kodilo/tools/email-validator/) — Validate email address syntax.
+- [Credit Card Validator](https://techmefr.github.io/kodilo/tools/credit-card-validator/) — Validate a credit card number with the Luhn check.
+- [IBAN Validator & Parser](https://techmefr.github.io/kodilo/tools/iban-validator/) — Validate an IBAN and break it down by country/bank/account.
+
+### Images (10)
+
+- [Image Resizer](https://techmefr.github.io/kodilo/tools/image-resizer/) — Resize images entirely in the browser.
+- [Image Compressor](https://techmefr.github.io/kodilo/tools/image-compressor/) — Compress images without uploading them anywhere.
+- [PNG to JPG Converter](https://techmefr.github.io/kodilo/tools/png-to-jpg/) — Convert PNG images to JPG.
+- [Image to Base64](https://techmefr.github.io/kodilo/tools/image-to-base64/) — Convert an image to a Base64 data URI.
+- [SVG Optimizer](https://techmefr.github.io/kodilo/tools/svg-optimizer/) — Shrink SVG files with SVGO and compare the result.
+- [WebP & AVIF Converter](https://techmefr.github.io/kodilo/tools/webp-avif-converter/) — Convert images to WebP or AVIF, or back to JPG and PNG.
+- [EXIF Viewer & Remover](https://techmefr.github.io/kodilo/tools/exif-viewer/) — See photo metadata such as camera and GPS, and download a clean copy.
+- [QR Code Reader](https://techmefr.github.io/kodilo/tools/qr-code-reader/) — Read a QR code from an image, a pasted screenshot or the camera.
+- [Code Screenshot](https://techmefr.github.io/kodilo/tools/code-screenshot/) — Turn a code snippet into a clean image with syntax highlighting, window chrome and a gradient background, exported as a 2x PNG.
+- [Placeholder Image Generator](https://techmefr.github.io/kodilo/tools/placeholder-image-generator/) — Make placeholder images of any size with your colors and label, as PNG, JPG, WebP or SVG, plus a data URI and an SVG snippet.
+
+### PDF (5)
+
+- [PDF Merge](https://techmefr.github.io/kodilo/tools/pdf-merge/) — Combine multiple PDFs into one.
+- [PDF Split](https://techmefr.github.io/kodilo/tools/pdf-split/) — Extract pages from a PDF.
+- [PDF Compress](https://techmefr.github.io/kodilo/tools/pdf-compress/) — Reduce PDF file size.
+- [PDF to JPG](https://techmefr.github.io/kodilo/tools/pdf-to-jpg/) — Convert PDF pages to JPG images.
+- [JPG to PDF](https://techmefr.github.io/kodilo/tools/jpg-to-pdf/) — Convert JPG images to a PDF.
+
+### Dev Utilities (16)
+
+- [SQL Prettify](https://techmefr.github.io/kodilo/tools/sql-prettify/) — Format SQL queries.
+- [Math Evaluator](https://techmefr.github.io/kodilo/tools/math-evaluator/) — Evaluate a math expression on the fly.
+- [Docker Run to Compose Converter](https://techmefr.github.io/kodilo/tools/docker-run-to-compose/) — Convert a docker run command to a docker-compose.yml.
+- [MIME Types](https://techmefr.github.io/kodilo/tools/mime-types/) — Look up the MIME type for a file extension.
+- [Chmod Calculator](https://techmefr.github.io/kodilo/tools/chmod-calculator/) — Compute and explain Unix file permission values.
+- [Regex Cheatsheet](https://techmefr.github.io/kodilo/tools/regex-cheatsheet/) — Quick reference for common regular expression syntax.
+- [REST API Tester](https://techmefr.github.io/kodilo/tools/rest-api-tester/) — Send a request and inspect the response, no app install needed.
+- [Docker Cheatsheet](https://techmefr.github.io/kodilo/tools/docker-cheatsheet/) — Quick reference for common Docker commands.
+- [Git Cheatsheet](https://techmefr.github.io/kodilo/tools/git-cheatsheet/) — Quick reference for common Git commands.
+- [NPM Cheatsheet](https://techmefr.github.io/kodilo/tools/npm-cheatsheet/) — Quick reference for common npm/pnpm/yarn commands.
+- [GraphQL Formatter](https://techmefr.github.io/kodilo/tools/graphql-formatter/) — Format or minify GraphQL queries and schemas.
+- [Keyboard Event Info](https://techmefr.github.io/kodilo/tools/keycode-info/) — Press a key to see event.key, event.code, keyCode and modifiers.
+- [JavaScript Formatter & Minifier](https://techmefr.github.io/kodilo/tools/javascript-formatter/) — Beautify JavaScript or TypeScript with Prettier, or minify it with Terser and see how many bytes you save.
+- [CODEOWNERS Generator](https://techmefr.github.io/kodilo/tools/codeowners-generator/) — Map paths to owners for GitHub or GitLab, with sections and approvals, owner validation and shadowed pattern warnings.
+- [Conventional Commit Builder](https://techmefr.github.io/kodilo/tools/conventional-commit-builder/) — Write a Conventional Commits message with live checks and a ready git commit command, or paste one to validate it and see the semver bump.
+- [Git Undo Guide](https://techmefr.github.io/kodilo/tools/git-undo-guide/) — Pick what went wrong and get the exact Git commands to fix it, with a warning on the ones that rewrite history.
+
+### DevOps & Sysadmin (37)
+
+- [Uptime / SLA Calculator](https://techmefr.github.io/kodilo/tools/uptime-sla-calculator/) — Turn 99.9% into allowed downtime per day, month and year, and back.
+- [Byte Size Converter](https://techmefr.github.io/kodilo/tools/byte-size-converter/) — B, KB, KiB, MB, MiB, GB, GiB, TB, TiB: decimal and binary units side by side.
+- [Transfer Time Calculator](https://techmefr.github.io/kodilo/tools/transfer-time-calculator/) — How long a file takes to move over a given bandwidth, and the bandwidth a deadline needs.
+- [Kubernetes Resource Units](https://techmefr.github.io/kodilo/tools/kubernetes-resource-units/) — CPU millicores and memory quantities (Mi, Gi, M, G) converted and explained.
+- [Kubernetes Manifest Generator](https://techmefr.github.io/kodilo/tools/kubernetes-manifest-generator/) — Deployment, Service and Ingress YAML from a short form.
+- [.env Tool](https://techmefr.github.io/kodilo/tools/env-file-tool/) — Validate, diff and convert .env files to JSON, docker -e flags or a Kubernetes Secret.
+- [YAML Validator & Formatter](https://techmefr.github.io/kodilo/tools/yaml-validator/) — Validate YAML with line-precise errors, format it, convert it to JSON.
+- [Nginx Config Generator](https://techmefr.github.io/kodilo/tools/nginx-config-generator/) — Reverse proxy, static site, SPA fallback, HTTPS redirect and gzip in a few clicks.
+- [systemd Unit Generator](https://techmefr.github.io/kodilo/tools/systemd-unit-generator/) — Service and timer units with restart policy, user, environment and hardening options.
+- [SSH Config Generator](https://techmefr.github.io/kodilo/tools/ssh-config-generator/) — Host blocks for ~/.ssh/config with jump hosts, identity files and port forwarding.
+- [htpasswd Generator](https://techmefr.github.io/kodilo/tools/htpasswd-generator/) — bcrypt or SHA entries for Nginx and Apache basic auth.
+- [DNS Record Builder](https://techmefr.github.io/kodilo/tools/dns-record-builder/) — SPF, DMARC, CAA and MX records built and explained, ready to paste.
+- [Security Headers Builder](https://techmefr.github.io/kodilo/tools/security-headers-builder/) — Content-Security-Policy, HSTS, Permissions-Policy and friends, for Nginx, Apache or a meta tag.
+- [X.509 Certificate Decoder](https://techmefr.github.io/kodilo/tools/x509-certificate-decoder/) — Paste a PEM certificate: subject, issuer, SANs, validity, fingerprints.
+- [SemVer Calculator](https://techmefr.github.io/kodilo/tools/semver-calculator/) — Compare versions and test ranges like ^1.2.0, ~2.3 or >=1 <2.
+- [.gitignore Generator](https://techmefr.github.io/kodilo/tools/gitignore-generator/) — Combine templates for languages, frameworks, editors and operating systems.
+- [JSON Log Viewer](https://techmefr.github.io/kodilo/tools/json-log-viewer/) — Paste structured logs, filter by level and field, read them as a table.
+- [curl Converter](https://techmefr.github.io/kodilo/tools/curl-converter/) — Turn a curl command into fetch, axios, Python requests or HTTPie.
+- [Well-Known Ports](https://techmefr.github.io/kodilo/tools/well-known-ports/) — Searchable reference of common TCP and UDP ports and the services behind them.
+- [Linux Signals & Exit Codes](https://techmefr.github.io/kodilo/tools/linux-signals-exit-codes/) — What SIGTERM, SIGKILL or exit code 137 actually mean.
+- [Redirect Generator](https://techmefr.github.io/kodilo/tools/redirect-generator/) — Write redirects once and get Nginx, Apache, Netlify, Vercel and Caddy rules.
+- [GitHub Actions Workflow Generator](https://techmefr.github.io/kodilo/tools/github-actions-generator/) — Generate a CI workflow for Node, Python, Go, Docker or GitHub Pages with a version matrix, caching, least-privilege permissions and concurrency control.
+- [Dockerfile Generator & Linter](https://techmefr.github.io/kodilo/tools/dockerfile-generator/) — Generate a multi-stage Dockerfile with a non-root user, health check and .dockerignore, or lint an existing Dockerfile line by line.
+- [Docker Compose Validator](https://techmefr.github.io/kodilo/tools/docker-compose-validator/) — Validate a compose file for YAML errors and semantic mistakes like bad ports, unknown services, undefined networks and volumes.
+- [Kubernetes Secret Encoder](https://techmefr.github.io/kodilo/tools/kubernetes-secret-encoder/) — Turn key/value pairs or a .env file into a Secret manifest with UTF-8 safe base64, or decode an existing Secret.
+- [Caddyfile Generator](https://techmefr.github.io/kodilo/tools/caddyfile-generator/) — Build a Caddyfile with a reverse proxy or static site, www redirect, basic auth, security headers, compression and logging.
+- [Firewall Rule Generator](https://techmefr.github.io/kodilo/tools/firewall-rule-generator/) — Describe your firewall rules once and get them as ufw commands, an iptables-save file or a complete nftables ruleset.
+- [Logrotate Config Generator](https://techmefr.github.io/kodilo/tools/logrotate-generator/) — Build an /etc/logrotate.d file with schedule, compression, permissions and a reload script, then dry-run it with logrotate -d.
+- [fstab Entry Generator](https://techmefr.github.io/kodilo/tools/fstab-generator/) — Build a correct /etc/fstab line for disks, network shares, tmpfs and swap, with every field explained and common mistakes flagged.
+- [rsync Command Builder](https://techmefr.github.io/kodilo/tools/rsync-command-builder/) — Build a safe rsync command for local or SSH copies, with excludes, bandwidth limits and a live explanation of the trailing slash rule.
+- [find Command Builder](https://techmefr.github.io/kodilo/tools/find-command-builder/) — Compose a find command from name, type, size, age, owner and permission filters, prune folders and pick an action.
+- [tar Command Builder](https://techmefr.github.io/kodilo/tools/tar-command-builder/) — Create, extract or list tar archives with gzip, bzip2, xz or zstd, and get the matching opposite command.
+- [GitLab CI Generator](https://techmefr.github.io/kodilo/tools/gitlab-ci-generator/) — Generate a modern .gitlab-ci.yml with stages, cache keyed on the lockfile, artifacts, rules, needs and a manual deploy job.
+- [Docker Command Explainer](https://techmefr.github.io/kodilo/tools/docker-command-explainer/) — Paste a docker command to see every flag explained in plain English, risky options flagged, and a host-to-container diagram of ports, mounts, network and env.
+- [Docker Compose Visualizer](https://techmefr.github.io/kodilo/tools/docker-compose-visualizer/) — Paste a compose file to see its services, dependencies, networks, volumes and published ports as a diagram, with a plain-English summary of each service.
+- [Dockerfile Layer Visualizer](https://techmefr.github.io/kodilo/tools/dockerfile-layer-visualizer/) — Paste a Dockerfile to see its stages and layers, how stages copy from each other, and which layers a file change rebuilds.
+- [Docker Container Lifecycle](https://techmefr.github.io/kodilo/tools/docker-container-lifecycle/) — Explore the states a container goes through, the command behind every transition, the signals sent and what exit codes mean, then drive a demo container yourself.
+
+### Calculators (5)
+
+- [Developer Calculator](https://techmefr.github.io/kodilo/tools/developer-calculator/) — A calculator with hex, octal and binary modes.
+- [Currency Converter](https://techmefr.github.io/kodilo/tools/currency-converter/) — Convert between currencies.
+- [Unit Converter](https://techmefr.github.io/kodilo/tools/unit-converter/) — Convert length, weight, speed and other units.
+- [Aspect Ratio Calculator](https://techmefr.github.io/kodilo/tools/aspect-ratio-calculator/) — Find an aspect ratio or the missing width or height.
+- [RAID Calculator](https://techmefr.github.io/kodilo/tools/raid-calculator/) — See usable capacity, overhead, fault tolerance and relative speed for RAID 0, 1, 5, 6, 10, 50 and 60, compared side by side.
+
+### Productivity (1)
+
+- [Pomodoro Timer](https://techmefr.github.io/kodilo/tools/pomodoro-timer/) — A simple focus timer with work/break intervals.
+
+### Design (6)
+
+- [WCAG Contrast Checker](https://techmefr.github.io/kodilo/tools/wcag-contrast-checker/) — Check text and background contrast against WCAG AA and AAA.
+- [px, rem & em Converter](https://techmefr.github.io/kodilo/tools/px-rem-converter/) — Convert px, rem, em, pt and percent, or a whole CSS snippet to rem.
+- [Cubic Bezier Editor](https://techmefr.github.io/kodilo/tools/cubic-bezier-editor/) — Shape a CSS easing curve with draggable handles and preview it.
+- [Image Color Palette](https://techmefr.github.io/kodilo/tools/image-color-palette/) — Extract the dominant colors of an image as HEX, RGB or HSL.
+- [Favicon Generator](https://techmefr.github.io/kodilo/tools/favicon-generator/) — Create favicon.ico, PNG sizes, Apple icon and a web manifest from a letter or an image.
+- [Color Shades Generator](https://techmefr.github.io/kodilo/tools/color-shades-generator/) — Generate a Tailwind-style 50 to 950 shade scale from one color in OKLCH, with WCAG contrast for each shade and export as Tailwind config, CSS variables or a list.
+
+Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools), [devbench.site](https://devbench.site/),
+[OpenFormatter](https://openformatter.com/tools) and [CyberChef](https://github.com/gchq/CyberChef).
 
 ## Stack
 

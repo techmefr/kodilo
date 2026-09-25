@@ -20,7 +20,8 @@
 		"prebuild": "node scripts/build-oui.mjs",
 		"predev": "node scripts/build-oui.mjs",
 		"budget": "node scripts/check-budget.mjs",
-		"test:a11y": "playwright test --project=a11y --project=a11y-dark --workers=2"
+		"test:a11y": "playwright test --project=a11y --project=a11y-dark --workers=2",
+		"readme": "node scripts/build-readme.mjs"
 	},
 	"dependencies": {
 		"@astrojs/sitemap": "^3.7.4",
