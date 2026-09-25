@@ -1,0 +1,212 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const langs = [
+	['web', 'Web (JS, TS, CSS, HTML)', true],
+	['php', 'PHP', false],
+	['python', 'Python', false],
+	['go', 'Go', false],
+	['java', 'Java / Kotlin', false],
+	['csharp', 'C# / .NET', true],
+	['shell', 'Shell scripts', true],
+	['windows', 'Windows scripts (bat, ps1)', false],
+	['images', 'Images', true],
+	['fonts', 'Fonts', false],
+	['archives', 'Archives', false],
+	['office', 'Office documents', false],
+] as const;
+---
+
+<ToolShell
+	slug="gitattributes-generator"
+	title=".gitattributes Generator"
+	description="Pick your stack and options to build a .gitattributes file with line endings, binary files, Git LFS patterns, linguist overrides and diff drivers."
+>
+	<div class="ga" id="ga-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span>File types</span>
+			</div>
+			<div class="ga-grid" id="ga-langs">
+				{langs.map(([value, label, on]) => (
+					<label class="check">
+						<input type="checkbox" value={value} checked={on} /> {label}
+					</label>
+				))}
+			</div>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Options</span>
+			</div>
+			<div class="ga-opts">
+				<div class="ga-row">
+					<span class="ga-label" id="ga-eol-label">
+						Line endings
+					</span>
+					<div class="seg" id="ga-eol" role="group" aria-labelledby="ga-eol-label">
+						<button data-value="auto" aria-pressed="true">
+							Auto
+						</button>
+						<button data-value="lf" aria-pressed="false">
+							Force LF
+						</button>
+						<button data-value="none" aria-pressed="false">
+							Untouched
+						</button>
+					</div>
+				</div>
+				<label class="check">
+					<input type="checkbox" id="ga-lfs" checked /> Store binaries in Git LFS
+				</label>
+				<label class="check">
+					<input type="checkbox" id="ga-linguist" checked /> Linguist overrides (vendored, generated, docs)
+				</label>
+				<label class="check">
+					<input type="checkbox" id="ga-diff" checked /> Language diff drivers
+				</label>
+				<label class="check">
+					<input type="checkbox" id="ga-export" /> Exclude dev files from git archive
+				</label>
+			</div>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>.gitattributes</span>
+				<button class="btn" id="ga-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="ga-out"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Group = { text?: string[]; binary?: string[]; diff?: [string, string][]; crlf?: string[] };
+
+	const groups: Record<string, Group> = {
+		web: {
+			text: ['*.js', '*.mjs', '*.ts', '*.tsx', '*.jsx', '*.vue', '*.css', '*.scss', '*.html', '*.json', '*.md', '*.yml', '*.yaml', '*.svg'],
+			diff: [
+				['*.css', 'css'],
+				['*.html', 'html'],
+				['*.md', 'markdown'],
+			],
+		},
+		php: { text: ['*.php', '*.blade.php', '*.phtml'], diff: [['*.php', 'php']] },
+		python: { text: ['*.py', '*.pyi', '*.toml', '*.cfg'], binary: ['*.pyc', '*.pkl'], diff: [['*.py', 'python']] },
+		go: { text: ['*.go', 'go.mod', 'go.sum'], diff: [['*.go', 'golang']] },
+		java: {
+			text: ['*.java', '*.kt', '*.kts', '*.gradle', '*.properties'],
+			binary: ['*.jar', '*.class'],
+			diff: [
+				['*.java', 'java'],
+				['*.kt', 'kotlin'],
+			],
+		},
+		csharp: { text: ['*.cs', '*.csproj', '*.props', '*.targets', '*.razor'], crlf: ['*.sln'], binary: ['*.dll', '*.exe'], diff: [['*.cs', 'csharp']] },
+		shell: { text: ['*.sh', '*.bash', '*.zsh', 'Dockerfile'], diff: [['*.sh', 'bash']] },
+		windows: { crlf: ['*.bat', '*.cmd', '*.ps1'] },
+		images: { binary: ['*.png', '*.jpg', '*.jpeg', '*.gif', '*.webp', '*.avif', '*.ico', '*.psd'] },
+		fonts: { binary: ['*.woff', '*.woff2', '*.ttf', '*.otf', '*.eot'] },
+		archives: { binary: ['*.zip', '*.gz', '*.tar', '*.7z', '*.rar'] },
+		office: { binary: ['*.pdf', '*.docx', '*.xlsx', '*.pptx'] },
+	};
+
+	onPage('ga-tool', () => {
+		let eol = 'auto';
+		const checked = (id: string) => byId<HTMLInputElement>(id).checked;
+
+		const render = () => {
+			const picked = Array.from(document.querySelectorAll<HTMLInputElement>('#ga-langs input:checked')).map((i) => groups[i.value]);
+			const lines: string[] = [];
+			const pad = (s: string) => s.padEnd(18);
+			if (eol === 'auto') lines.push('# Normalize line endings', `${pad('*')}text=auto`, '');
+			if (eol === 'lf') lines.push('# Normalize line endings to LF everywhere', `${pad('*')}text=auto eol=lf`, '');
+			const text = picked.flatMap((g) => g.text ?? []);
+			if (text.length && eol !== 'none') {
+				lines.push('# Source files');
+				text.forEach((p) => lines.push(`${pad(p)}text${eol === 'lf' ? '' : ' eol=lf'}`));
+				lines.push('');
+			}
+			const crlf = picked.flatMap((g) => g.crlf ?? []);
+			if (crlf.length && eol !== 'none') {
+				lines.push('# Windows-only files');
+				crlf.forEach((p) => lines.push(`${pad(p)}text eol=crlf`));
+				lines.push('');
+			}
+			const binary = picked.flatMap((g) => g.binary ?? []);
+			if (binary.length) {
+				lines.push(checked('ga-lfs') ? '# Binary files stored in Git LFS' : '# Binary files');
+				binary.forEach((p) => lines.push(`${pad(p)}${checked('ga-lfs') ? 'filter=lfs diff=lfs merge=lfs -text' : 'binary'}`));
+				lines.push('');
+			}
+			const diff = picked.flatMap((g) => g.diff ?? []);
+			if (checked('ga-diff') && diff.length) {
+				lines.push('# Language-aware diff hunks');
+				diff.forEach(([p, d]) => lines.push(`${pad(p)}diff=${d}`));
+				lines.push('');
+			}
+			if (checked('ga-linguist')) {
+				lines.push(
+					'# GitHub linguist',
+					`${pad('vendor/**')}linguist-vendored`,
+					`${pad('dist/**')}linguist-generated`,
+					`${pad('*.min.js')}linguist-generated`,
+					`${pad('docs/**')}linguist-documentation`,
+					'',
+				);
+			}
+			if (checked('ga-export')) {
+				lines.push(
+					'# Left out of git archive',
+					`${pad('.gitattributes')}export-ignore`,
+					`${pad('.gitignore')}export-ignore`,
+					`${pad('.github/')}export-ignore`,
+					`${pad('tests/')}export-ignore`,
+					'',
+				);
+			}
+			byId('ga-out').textContent = lines.join('\n').trimEnd() + '\n';
+		};
+
+		segmented(byId('ga-eol'), (v) => {
+			eol = v;
+			render();
+		});
+		byId('ga-tool').addEventListener('change', render);
+		copyButton(byId('ga-copy'), () => byId('ga-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.ga {
+		display: grid;
+		gap: 16px;
+	}
+	.ga-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+		gap: 10px;
+		padding: 14px;
+	}
+	.ga-opts {
+		display: grid;
+		gap: 10px;
+		padding: 14px;
+	}
+	.ga-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 12px;
+	}
+	.ga-label {
+		font-size: 14px;
+		color: var(--ink-soft);
+	}
+</style>

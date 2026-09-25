@@ -6,7 +6,7 @@ Live at **https://techmefr.github.io/kodilo/**
 
 ## What's in here
 
-**170 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
+**203 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
 
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
@@ -14,7 +14,7 @@ Live at **https://techmefr.github.io/kodilo/**
 
 - [Inbox Tester](https://techmefr.github.io/kodilo/tools/inbox-tester/) — Paste an HTML email, pick a client tab, see the render and which CSS features it supports.
 
-### JSON (8)
+### JSON (10)
 
 - [JSON Formatter & Validator](https://techmefr.github.io/kodilo/tools/json-formatter/) — Format, validate and minify JSON data.
 - [JSON to YAML](https://techmefr.github.io/kodilo/tools/json-to-yaml/) — Convert JSON to YAML.
@@ -24,8 +24,10 @@ Live at **https://techmefr.github.io/kodilo/**
 - [JSON to TypeScript](https://techmefr.github.io/kodilo/tools/json-to-typescript/) — Generate TypeScript interfaces or types from a JSON sample.
 - [JSON Schema Validator](https://techmefr.github.io/kodilo/tools/json-schema-validator/) — Validate JSON against a JSON Schema, or generate a schema from data.
 - [JSONPath Tester](https://techmefr.github.io/kodilo/tools/jsonpath-tester/) — Run JSONPath expressions against a JSON document and see every match with its exact path, live as you type.
+- [JSON to Zod](https://techmefr.github.io/kodilo/tools/json-to-zod/) — Generate a Zod schema from a JSON sample, with nested objects, arrays and optional keys.
+- [JSON to Go](https://techmefr.github.io/kodilo/tools/json-to-go/) — Generate Go structs with json tags from a JSON sample.
 
-### HTML / CSS (8)
+### HTML / CSS (11)
 
 - [HTML Formatter](https://techmefr.github.io/kodilo/tools/html-formatter/) — Beautify and format HTML code.
 - [CSS Formatter & Minifier](https://techmefr.github.io/kodilo/tools/css-formatter/) — Format and minify CSS stylesheets.
@@ -35,6 +37,9 @@ Live at **https://techmefr.github.io/kodilo/**
 - [CSS Grid Generator](https://techmefr.github.io/kodilo/tools/css-grid-generator/) — Build a CSS grid layout visually and copy the code.
 - [Flexbox Generator](https://techmefr.github.io/kodilo/tools/flexbox-generator/) — Build a CSS flexbox layout visually and copy the code.
 - [XML Formatter](https://techmefr.github.io/kodilo/tools/xml-formatter/) — Pretty-print or minify XML and catch well-formedness errors.
+- [Code Minifier](https://techmefr.github.io/kodilo/tools/code-minifier/) — Minify JavaScript, CSS or HTML and see how many bytes you saved.
+- [CSS clip-path Editor](https://techmefr.github.io/kodilo/tools/clip-path-editor/) — Drag handles to shape a polygon, circle, ellipse or inset clip-path and copy the CSS.
+- [CSS Keyframes Generator](https://techmefr.github.io/kodilo/tools/css-keyframes-generator/) — Build @keyframes animations step by step with timing, iteration and a live preview.
 
 ### Markdown (7)
 
@@ -53,7 +58,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [robots.txt Generator](https://techmefr.github.io/kodilo/tools/robots-txt-generator/) — Write robots.txt rules per crawler, block AI bots and test a path.
 - [Sitemap Generator](https://techmefr.github.io/kodilo/tools/sitemap-generator/) — Turn a list of pages into a valid sitemap.xml.
 
-### Text (12)
+### Text (14)
 
 - [Regex Tester](https://techmefr.github.io/kodilo/tools/regex-tester/) — Test regular expressions against sample text.
 - [Diff Checker](https://techmefr.github.io/kodilo/tools/diff-checker/) — Compare two texts side by side.
@@ -67,8 +72,10 @@ Live at **https://techmefr.github.io/kodilo/**
 - [Numeronym Generator](https://techmefr.github.io/kodilo/tools/numeronym-generator/) — Generate numeronyms like i18n or a11y from a word.
 - [Unicode Inspector](https://techmefr.github.io/kodilo/tools/unicode-inspector/) — Inspect every character with its code point, bytes and escapes, and find invisible ones.
 - [Line Tools](https://techmefr.github.io/kodilo/tools/line-tools/) — Sort, deduplicate, trim, filter, reverse, shuffle or number lines of text, with input and output line counts.
+- [ASCII Table Generator](https://techmefr.github.io/kodilo/tools/ascii-table-generator/) — Draw CSV or TSV data as ASCII or Unicode box tables in several styles.
+- [ASCII Art Generator](https://techmefr.github.io/kodilo/tools/ascii-art-generator/) — Turn text into ASCII banners with classic FIGlet fonts.
 
-### Encoding & Security (20)
+### Encoding & Security (23)
 
 - [Base64 Encoder & Decoder](https://techmefr.github.io/kodilo/tools/base64/) — Encode and decode Base64 strings.
 - [JWT Decoder](https://techmefr.github.io/kodilo/tools/jwt-decoder/) — Decode and inspect JWT tokens.
@@ -90,6 +97,9 @@ Live at **https://techmefr.github.io/kodilo/**
 - [CSP Generator](https://techmefr.github.io/kodilo/tools/csp-generator/) — Build a Content-Security-Policy with warnings for risky values.
 - [Base32, Base58 & Hex Encoder](https://techmefr.github.io/kodilo/tools/base-encoder/) — Encode and decode UTF-8 text as Base32 (RFC 4648), Base58 (Bitcoin alphabet) or hex, and list each character's code point and bytes.
 - [CSR Generator](https://techmefr.github.io/kodilo/tools/csr-generator/) — Create a certificate signing request and its private key for RSA or ECDSA, with subject fields and DNS alternative names.
+- [RBAC Matrix Builder](https://techmefr.github.io/kodilo/tools/rbac-matrix-builder/) — Build a roles × resources × actions grid with scopes and inheritance, then export JSON, YAML, a Spatie seeder, CASL or SQL.
+- [Permission Tester](https://techmefr.github.io/kodilo/tools/permission-tester/) — Check whether a role may perform an action on a record, with the deciding rule and the inheritance chain.
+- [Policy Diff](https://techmefr.github.io/kodilo/tools/policy-diff/) — Compare two role matrices: granted, revoked, widened and narrowed permissions per role, with risky escalations flagged.
 
 ### Generators (8)
 
@@ -102,7 +112,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [Fake Data Generator](https://techmefr.github.io/kodilo/tools/fake-data-generator/) — Generate realistic fake records as JSON, CSV or SQL INSERT statements, with a seed for reproducible output.
 - [License Generator](https://techmefr.github.io/kodilo/tools/license-generator/) — Pick an open source license, enter the year and copyright holder, and get a ready LICENSE file with what it allows, requires and limits.
 
-### Converters (8)
+### Converters (12)
 
 - [Date/Time Converter](https://techmefr.github.io/kodilo/tools/date-time-converter/) — Convert between timestamps, ISO dates and time zones.
 - [Color Converter](https://techmefr.github.io/kodilo/tools/color-converter/) — Convert colors between HEX, RGB, HSL and more.
@@ -112,6 +122,10 @@ Live at **https://techmefr.github.io/kodilo/**
 - [TOML Formatter & Converter](https://techmefr.github.io/kodilo/tools/toml-formatter/) — Validate and format TOML, convert it to and from JSON.
 - [CSV to JSON](https://techmefr.github.io/kodilo/tools/csv-to-json/) — Turn CSV into JSON with automatic delimiter detection, header rows and typed numbers, booleans and nulls.
 - [Time Zone Converter](https://techmefr.github.io/kodilo/tools/timezone-converter/) — Convert a date and time from one time zone to many others, with UTC offsets, day changes and daylight saving handled automatically.
+- [XML ⇄ JSON Converter](https://techmefr.github.io/kodilo/tools/xml-json-converter/) — Convert XML to JSON and JSON back to XML, with attributes and repeated elements preserved.
+- [SQL to TypeScript & Prisma](https://techmefr.github.io/kodilo/tools/sql-to-typescript/) — Turn CREATE TABLE statements into TypeScript interfaces and Prisma models.
+- [CSV Cleaner](https://techmefr.github.io/kodilo/tools/csv-cleaner/) — Trim cells, drop duplicate and empty rows, remove empty columns and sort CSV.
+- [SQL ↔ CSV Converter](https://techmefr.github.io/kodilo/tools/sql-csv-converter/) — Turn CSV into INSERT statements for four SQL dialects, or INSERT VALUES back into CSV.
 
 ### Network (11)
 
@@ -154,7 +168,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [PDF to JPG](https://techmefr.github.io/kodilo/tools/pdf-to-jpg/) — Convert PDF pages to JPG images.
 - [JPG to PDF](https://techmefr.github.io/kodilo/tools/jpg-to-pdf/) — Convert JPG images to a PDF.
 
-### Dev Utilities (16)
+### Dev Utilities (24)
 
 - [SQL Prettify](https://techmefr.github.io/kodilo/tools/sql-prettify/) — Format SQL queries.
 - [Math Evaluator](https://techmefr.github.io/kodilo/tools/math-evaluator/) — Evaluate a math expression on the fly.
@@ -172,8 +186,16 @@ Live at **https://techmefr.github.io/kodilo/**
 - [CODEOWNERS Generator](https://techmefr.github.io/kodilo/tools/codeowners-generator/) — Map paths to owners for GitHub or GitLab, with sections and approvals, owner validation and shadowed pattern warnings.
 - [Conventional Commit Builder](https://techmefr.github.io/kodilo/tools/conventional-commit-builder/) — Write a Conventional Commits message with live checks and a ready git commit command, or paste one to validate it and see the semver bump.
 - [Git Undo Guide](https://techmefr.github.io/kodilo/tools/git-undo-guide/) — Pick what went wrong and get the exact Git commands to fix it, with a warning on the ones that rewrite history.
+- [Regex Explainer](https://techmefr.github.io/kodilo/tools/regex-explainer/) — Break a regular expression into tokens and read what each one does in plain English.
+- [Glob Tester](https://techmefr.github.io/kodilo/tools/glob-tester/) — Test glob patterns against a list of paths and see which ones match, live.
+- [PHP Formatter](https://techmefr.github.io/kodilo/tools/php-formatter/) — Beautify PHP with Prettier and its PHP plugin, PER brace style and quote options.
+- [Python Formatter](https://techmefr.github.io/kodilo/tools/python-formatter/) — Normalize Python indentation, PEP 8 spacing, quotes and blank lines.
+- [YAML Formatter](https://techmefr.github.io/kodilo/tools/yaml-formatter/) — Reformat YAML with consistent indentation and quotes, optionally sorting keys.
+- [Git Log Graph Explainer](https://techmefr.github.io/kodilo/tools/git-log-graph-explainer/) — Paste git log --graph output and get a clean commit graph with branches, merges and tags explained.
+- [Git Rebase vs Merge Visualizer](https://techmefr.github.io/kodilo/tools/git-rebase-visualizer/) — Before and after diagrams of merge, rebase, squash and cherry-pick on the same history, with the commands.
+- [.gitattributes Generator](https://techmefr.github.io/kodilo/tools/gitattributes-generator/) — Build a .gitattributes file with line endings, binary files, Git LFS, linguist overrides and diff drivers.
 
-### DevOps & Sysadmin (37)
+### DevOps & Sysadmin (46)
 
 - [Uptime / SLA Calculator](https://techmefr.github.io/kodilo/tools/uptime-sla-calculator/) — Turn 99.9% into allowed downtime per day, month and year, and back.
 - [Byte Size Converter](https://techmefr.github.io/kodilo/tools/byte-size-converter/) — B, KB, KiB, MB, MiB, GB, GiB, TB, TiB: decimal and binary units side by side.
@@ -212,6 +234,15 @@ Live at **https://techmefr.github.io/kodilo/**
 - [Docker Compose Visualizer](https://techmefr.github.io/kodilo/tools/docker-compose-visualizer/) — Paste a compose file to see its services, dependencies, networks, volumes and published ports as a diagram, with a plain-English summary of each service.
 - [Dockerfile Layer Visualizer](https://techmefr.github.io/kodilo/tools/dockerfile-layer-visualizer/) — Paste a Dockerfile to see its stages and layers, how stages copy from each other, and which layers a file change rebuilds.
 - [Docker Container Lifecycle](https://techmefr.github.io/kodilo/tools/docker-container-lifecycle/) — Explore the states a container goes through, the command behind every transition, the signals sent and what exit codes mean, then drive a demo container yourself.
+- [Cron Expression Tester](https://techmefr.github.io/kodilo/tools/cron-tester/) — Describe a cron expression in plain English and list its next 10 run times in your timezone.
+- [Terraform Plan Visualizer](https://techmefr.github.io/kodilo/tools/terraform-plan-visualizer/) — See what a terraform plan will create, update, replace and destroy, grouped by resource with risky changes flagged
+- [Helm Values Converter](https://techmefr.github.io/kodilo/tools/helm-values-converter/) — Convert a values.yaml into helm --set flags and back, with dots, commas, lists and strings escaped
+- [Nginx Location Tester](https://techmefr.github.io/kodilo/tools/nginx-location-tester/) — Find which nginx location block matches a request URI and why, following the real matching order
+- [SSH Key Fingerprint](https://techmefr.github.io/kodilo/tools/ssh-key-fingerprint/) — Get the type, size, SHA256 and MD5 fingerprints and comment of an OpenSSH public key
+- [IAM Policy Visualizer](https://techmefr.github.io/kodilo/tools/iam-policy-visualizer/) — Read an AWS IAM or S3 bucket policy as allow and deny cards, with wildcard and public access risks flagged
+- [PromQL Explainer](https://techmefr.github.io/kodilo/tools/promql-explainer/) — Break a PromQL query down step by step: selectors, ranges, functions, aggregations and vector matching
+- [iptables Explainer](https://techmefr.github.io/kodilo/tools/iptables-explainer/) — Read iptables -L -n -v or iptables-save rules in plain English, chain by chain, with packet flow
+- [ps and top Explainer](https://techmefr.github.io/kodilo/tools/ps-top-explainer/) — Explain ps aux and top output: columns, process states and a sortable table of the heaviest processes
 
 ### Calculators (5)
 
@@ -225,7 +256,7 @@ Live at **https://techmefr.github.io/kodilo/**
 
 - [Pomodoro Timer](https://techmefr.github.io/kodilo/tools/pomodoro-timer/) — A simple focus timer with work/break intervals.
 
-### Design (6)
+### Design (8)
 
 - [WCAG Contrast Checker](https://techmefr.github.io/kodilo/tools/wcag-contrast-checker/) — Check text and background contrast against WCAG AA and AAA.
 - [px, rem & em Converter](https://techmefr.github.io/kodilo/tools/px-rem-converter/) — Convert px, rem, em, pt and percent, or a whole CSS snippet to rem.
@@ -233,6 +264,8 @@ Live at **https://techmefr.github.io/kodilo/**
 - [Image Color Palette](https://techmefr.github.io/kodilo/tools/image-color-palette/) — Extract the dominant colors of an image as HEX, RGB or HSL.
 - [Favicon Generator](https://techmefr.github.io/kodilo/tools/favicon-generator/) — Create favicon.ico, PNG sizes, Apple icon and a web manifest from a letter or an image.
 - [Color Shades Generator](https://techmefr.github.io/kodilo/tools/color-shades-generator/) — Generate a Tailwind-style 50 to 950 shade scale from one color in OKLCH, with WCAG contrast for each shade and export as Tailwind config, CSS variables or a list.
+- [Color Blindness Simulator](https://techmefr.github.io/kodilo/tools/color-blindness-simulator/) — Render your HTML or an image as people with protanopia, deuteranopia, tritanopia or achromatopsia see it.
+- [SVG Wave & Blob Generator](https://techmefr.github.io/kodilo/tools/svg-shape-generator/) — Generate SVG waves and blobs with sliders and a seed, then copy the SVG or a CSS background.
 
 Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools), [devbench.site](https://devbench.site/),
 [OpenFormatter](https://openformatter.com/tools) and [CyberChef](https://github.com/gchq/CyberChef).

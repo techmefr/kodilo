@@ -1,0 +1,230 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const patterns = `src/**/*.{ts,tsx}
+!**/*.test.ts
+docs/*.md`;
+
+const paths = `src/index.ts
+src/app.tsx
+src/components/Button.tsx
+src/components/Button.test.ts
+src/utils/format.ts
+src/styles/main.css
+docs/README.md
+docs/guide/setup.md
+package.json
+.github/workflows/ci.yml
+src/.hidden/secret.ts`;
+---
+
+<ToolShell slug="glob-tester" title="Glob Tester" description="Test glob patterns against a list of paths and see which ones match, live.">
+	<div class="toolbar" id="gt-tool">
+		<label class="check">
+			<input type="checkbox" id="gt-dot" /> Match dotfiles
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gt-case" /> Case insensitive
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gt-only" /> Show matches only
+		</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Patterns, one per line</div>
+			<textarea id="gt-patterns" spellcheck="false" aria-label="Glob patterns">{patterns}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">Paths, one per line</div>
+			<textarea id="gt-paths" spellcheck="false" aria-label="Paths to test">{paths}</textarea>
+		</section>
+	</div>
+	<p class="error" id="gt-error" hidden></p>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="gt-count">Results</span>
+			<button class="btn" id="gt-copy">
+				Copy matches
+			</button>
+		</div>
+		<ul class="gt-list" id="gt-list" tabindex="0" aria-label="Path results"></ul>
+	</section>
+	<p class="gt-hint">
+		<code>*</code> any characters except /, <code>**</code> any number of folders, <code>?</code> one character,
+		<code>[abc]</code> a character set, <code>{'{a,b}'}</code> alternatives. Lines starting with <code>!</code> exclude, and the last matching pattern wins.
+	</p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const escape = (c: string) => c.replace(/[.+^$()|\\/]/g, '\\$&');
+
+	const toRegex = (glob: string, dot: boolean, flags: string) => {
+		let re = '';
+		const seg = dot ? '[^/]' : '(?!\\.)[^/]';
+		let depth = 0;
+		for (let i = 0; i < glob.length; i++) {
+			const c = glob[i];
+			const atStart = i === 0 || glob[i - 1] === '/';
+			if (c === '*') {
+				if (glob[i + 1] === '*') {
+					const slash = glob[i + 2] === '/';
+					const piece = dot ? '(?:[^/]*(?:/|$))*' : '(?:(?!\\.)[^/]*(?:/|$))*';
+					re += slash ? piece : dot ? '.*' : '(?:(?!\\.)[^/]*/?)*';
+					i += slash ? 2 : 1;
+				} else re += atStart && !dot ? '(?!\\.)[^/]*' : '[^/]*';
+			} else if (c === '?') re += atStart ? seg : '[^/]';
+			else if (c === '[') {
+				const end = glob.indexOf(']', i + 2);
+				if (end < 0) re += '\\[';
+				else {
+					const body = glob
+						.slice(i + 1, end)
+						.replace(/^!/, '^')
+						.replace(/\\/g, '\\\\');
+					re += `[${body}]`;
+					i = end;
+				}
+			} else if (c === '{') {
+				depth++;
+				re += '(?:';
+			} else if (c === '}' && depth > 0) {
+				depth--;
+				re += ')';
+			} else if (c === ',' && depth > 0) re += '|';
+			else if (c === '\\' && i + 1 < glob.length) re += escape(glob[++i]);
+			else re += escape(c);
+		}
+		if (depth > 0) throw new Error(`Unclosed brace in "${glob}"`);
+		return new RegExp(`^${re}$`, flags);
+	};
+
+	onPage('gt-tool', () => {
+		const patternsIn = byId<HTMLTextAreaElement>('gt-patterns');
+		const pathsIn = byId<HTMLTextAreaElement>('gt-paths');
+		const dot = byId<HTMLInputElement>('gt-dot');
+		const nocase = byId<HTMLInputElement>('gt-case');
+		const only = byId<HTMLInputElement>('gt-only');
+		const error = byId('gt-error');
+		let matched: string[] = [];
+
+		const render = () => {
+			const lines = patternsIn.value
+				.split('\n')
+				.map((l) => l.trim())
+				.filter((l) => l && !l.startsWith('#'));
+			let rules: { src: string; negate: boolean; re: RegExp }[];
+			try {
+				rules = lines.map((l) => {
+					const negate = l.startsWith('!');
+					const src = negate ? l.slice(1) : l;
+					return { src: l, negate, re: toRegex(src.replace(/^\.\//, ''), dot.checked, nocase.checked ? 'i' : '') };
+				});
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+				return;
+			}
+			const paths = pathsIn.value
+				.split('\n')
+				.map((p) => p.trim())
+				.filter(Boolean);
+			const results = paths.map((path) => {
+				let hit: (typeof rules)[number] | undefined;
+				const clean = path.replace(/^\.\//, '');
+				for (const r of rules) if (r.re.test(clean)) hit = r;
+				return { path, match: !!hit && !hit.negate, rule: hit?.src };
+			});
+			matched = results.filter((r) => r.match).map((r) => r.path);
+			byId('gt-count').textContent = `${matched.length} of ${paths.length} paths match`;
+			byId('gt-list').replaceChildren(
+				...results
+					.filter((r) => r.match || !only.checked)
+					.map((r) => {
+						const li = document.createElement('li');
+						li.className = r.match ? 'hit' : r.rule ? 'excluded' : 'miss';
+						li.dataset.match = String(r.match);
+						const mark = document.createElement('span');
+						mark.className = 'mark';
+						mark.textContent = r.match ? 'Match' : r.rule ? 'Excluded' : 'No match';
+						const code = document.createElement('code');
+						code.textContent = r.path;
+						const rule = document.createElement('span');
+						rule.className = 'rule';
+						rule.textContent = r.rule ?? '';
+						li.append(mark, code, rule);
+						return li;
+					}),
+			);
+		};
+
+		[patternsIn, pathsIn].forEach((el) => el.addEventListener('input', render));
+		[dot, nocase, only].forEach((el) => el.addEventListener('change', render));
+		copyButton(byId('gt-copy'), () => matched.join('\n'));
+		render();
+	});
+</script>
+
+<style>
+	.gt-list {
+		list-style: none;
+		margin: 0;
+		padding: 6px 0;
+		max-height: 420px;
+		overflow: auto;
+	}
+	.gt-list :global(li) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px 10px;
+		padding: 6px 14px;
+		border-bottom: 1px solid var(--border);
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.gt-list :global(li:last-child) {
+		border-bottom: 0;
+	}
+	.gt-list :global(code) {
+		font-family: var(--mono);
+		color: var(--ink);
+		word-break: break-all;
+		min-width: 0;
+	}
+	.gt-list :global(li.hit) {
+		background: var(--ok-bg);
+	}
+	.gt-list :global(.mark) {
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		min-width: 72px;
+	}
+	.gt-list :global(li.hit .mark),
+	.gt-list :global(li.hit code) {
+		color: var(--ink);
+	}
+	.gt-list :global(.rule) {
+		margin-left: auto;
+		font-family: var(--mono);
+		font-size: 12px;
+	}
+	.gt-hint {
+		margin: 0;
+		font-size: 13px;
+		line-height: 1.7;
+		color: var(--ink-soft);
+	}
+	.gt-hint code {
+		font-family: var(--mono);
+		background: var(--surface-2);
+		color: var(--ink);
+		padding: 1px 5px;
+		border-radius: 5px;
+	}
+</style>

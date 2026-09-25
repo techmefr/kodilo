@@ -1,0 +1,324 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  display_name TEXT,
+  is_admin BOOLEAN NOT NULL DEFAULT false,
+  balance NUMERIC(10, 2) DEFAULT 0,
+  settings JSONB,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE posts (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  author_id INTEGER NOT NULL REFERENCES users(id),
+  title VARCHAR(200) NOT NULL,
+  body TEXT,
+  status VARCHAR(20) NOT NULL DEFAULT 'draft',
+  published_at TIMESTAMP NULL,
+  PRIMARY KEY (id)
+);`;
+---
+
+<ToolShell slug="sql-to-typescript" title="SQL to TypeScript & Prisma" description="Turn CREATE TABLE statements into TypeScript interfaces and Prisma models.">
+	<div class="toolbar" id="st-tool">
+		<div class="seg" id="st-case" aria-label="Field names">
+			<button data-value="keep" aria-pressed="true">
+				Keep column names
+			</button>
+			<button data-value="camel" aria-pressed="false">
+				camelCase
+			</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" id="st-type" /> Use type instead of interface
+		</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">SQL</div>
+		<textarea id="st-in" spellcheck="false" aria-label="CREATE TABLE statements">{sample}</textarea>
+	</section>
+	<p class="error" id="st-error" hidden></p>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">
+				<span id="st-ts-label">TypeScript</span>
+				<button class="btn" id="st-copy-ts">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="st-ts" tabindex="0" aria-labelledby="st-ts-label"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="st-prisma-label">Prisma</span>
+				<button class="btn" id="st-copy-prisma">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="st-prisma" tabindex="0" aria-labelledby="st-prisma-label"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Column = {
+		name: string;
+		sqlType: string;
+		args: string;
+		nullable: boolean;
+		primary: boolean;
+		unique: boolean;
+		auto: boolean;
+		def?: string;
+		ref?: { table: string; column: string };
+	};
+	type Table = { name: string; columns: Column[] };
+
+	const unquote = (s: string) => s.trim().replace(/^[`"[]|[`"\]]$/g, '');
+	const lastPart = (s: string) => unquote(s.split('.').pop() ?? s);
+
+	const splitTop = (s: string) => {
+		const out: string[] = [];
+		let depth = 0;
+		let quote = '';
+		let cur = '';
+		for (const c of s) {
+			if (quote) {
+				if (c === quote) quote = '';
+			} else if (c === "'" || c === '"' || c === '`') quote = c;
+			else if (c === '(') depth++;
+			else if (c === ')') depth--;
+			else if (c === ',' && depth === 0) {
+				out.push(cur.trim());
+				cur = '';
+				continue;
+			}
+			cur += c;
+		}
+		if (cur.trim()) out.push(cur.trim());
+		return out;
+	};
+
+	const names = (list: string) => list.split(',').map(lastPart);
+
+	const parseSql = (sql: string): Table[] => {
+		const clean = sql.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+		const tables: Table[] = [];
+		const re = /create\s+(?:temporary\s+|temp\s+)?table\s+(?:if\s+not\s+exists\s+)?([`"[\]\w.]+)\s*\(/gi;
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(clean))) {
+			let depth = 1;
+			let i = re.lastIndex;
+			for (; i < clean.length && depth; i++) {
+				if (clean[i] === '(') depth++;
+				else if (clean[i] === ')') depth--;
+			}
+			if (depth) throw new Error(`Unclosed parenthesis in table ${lastPart(m[1])}`);
+			const body = clean.slice(re.lastIndex, i - 1);
+			const table: Table = { name: lastPart(m[1]), columns: [] };
+			const constraints: string[] = [];
+			for (const def of splitTop(body)) {
+				if (/^(constraint|primary\s+key|foreign\s+key|unique|key|index|check|fulltext)\b/i.test(def)) {
+					constraints.push(def);
+					continue;
+				}
+				const cm =
+					/^([`"[]?[\w$ ]+?[`"\]]?)\s+([a-z][\w ]*?)(?:\s*\(([^)]*)\))?(?:\s+(?:unsigned|signed|zerofill|varying|with(?:out)?\s+time\s+zone))*(\s+.*)?$/is.exec(
+						def,
+					);
+				if (!cm) continue;
+				const rest = cm[4] ?? '';
+				const col: Column = {
+					name: unquote(cm[1]),
+					sqlType: cm[2].trim().toLowerCase().replace(/\s+/g, ' '),
+					args: cm[3] ?? '',
+					nullable: !/\bnot\s+null\b/i.test(rest),
+					primary: /\bprimary\s+key\b/i.test(rest),
+					unique: /\bunique\b/i.test(rest),
+					auto: /\b(auto_increment|autoincrement|identity|generated\s+\w+\s+as\s+identity)\b/i.test(rest) || /serial/.test(cm[2].toLowerCase()),
+				};
+				const dm = /\bdefault\s+('(?:[^']|'')*'|\([^)]*\)|[\w.:()-]+)/i.exec(rest);
+				if (dm) col.def = dm[1];
+				const rm = /\breferences\s+([`"[\]\w.]+)\s*\(\s*([`"[\]\w]+)\s*\)/i.exec(rest);
+				if (rm) col.ref = { table: lastPart(rm[1]), column: unquote(rm[2]) };
+				if (col.primary) col.nullable = false;
+				table.columns.push(col);
+			}
+			for (const c of constraints) {
+				const find = (n: string) => table.columns.find((col) => col.name === n);
+				const pk = /primary\s+key\s*\(([^)]+)\)/i.exec(c);
+				if (pk) {
+					const cols = names(pk[1]);
+					cols.forEach((n) => {
+						const col = find(n);
+						if (col) {
+							col.nullable = false;
+							if (cols.length === 1) col.primary = true;
+						}
+					});
+				}
+				const fk = /foreign\s+key\s*\(([^)]+)\)\s*references\s+([`"[\]\w.]+)\s*\(([^)]+)\)/i.exec(c);
+				if (fk) {
+					const col = find(names(fk[1])[0]);
+					if (col) col.ref = { table: lastPart(fk[2]), column: names(fk[3])[0] };
+				}
+				const uq = /^(?:constraint\s+\S+\s+)?unique(?:\s+(?:key|index))?(?:\s+[`"\w]+)?\s*\(([^)]+)\)/i.exec(c);
+				if (uq && names(uq[1]).length === 1) {
+					const col = find(names(uq[1])[0]);
+					if (col) col.unique = true;
+				}
+			}
+			tables.push(table);
+		}
+		return tables;
+	};
+
+	const pascal = (s: string) =>
+		s
+			.split(/[^A-Za-z0-9]+/)
+			.filter(Boolean)
+			.map((w) => w[0].toUpperCase() + w.slice(1))
+			.join('');
+	const camel = (s: string) => {
+		const p = pascal(s);
+		return p[0].toLowerCase() + p.slice(1);
+	};
+	const singular = (s: string) => (/ies$/i.test(s) ? s.slice(0, -3) + 'y' : /(ss|us)$/i.test(s) ? s : s.replace(/s$/i, ''));
+	const modelName = (table: string) => pascal(singular(table)) || 'Model';
+
+	const mapType = (c: Column) => {
+		const t = c.sqlType;
+		if (/^(tinyint)$/.test(t) && c.args === '1') return { ts: 'boolean', prisma: 'Boolean' };
+		if (/^(bool|boolean|bit)$/.test(t)) return { ts: 'boolean', prisma: 'Boolean' };
+		if (/^(bigint|int8|bigserial)$/.test(t)) return { ts: 'bigint', prisma: 'BigInt' };
+		if (/(int|serial)/.test(t)) return { ts: 'number', prisma: 'Int' };
+		if (/^(decimal|numeric|money)/.test(t)) return { ts: 'string', prisma: 'Decimal' };
+		if (/(float|double|real)/.test(t)) return { ts: 'number', prisma: 'Float' };
+		if (/(timestamp|datetime|^date$|^time)/.test(t)) return { ts: 'Date', prisma: 'DateTime' };
+		if (/^json/.test(t)) return { ts: 'unknown', prisma: 'Json' };
+		if (/(blob|bytea|binary)/.test(t)) return { ts: 'Uint8Array', prisma: 'Bytes' };
+		return { ts: 'string', prisma: 'String' };
+	};
+
+	const prismaDefault = (c: Column, type: string) => {
+		if (c.auto) return type === 'Int' || type === 'BigInt' ? '@default(autoincrement())' : '';
+		if (!c.def) return '';
+		const d = c.def.replace(/^\((.*)\)$/, '$1');
+		if (/^(current_timestamp|now)(\(\))?$/i.test(d)) return '@default(now())';
+		if (/^(gen_random_uuid|uuid_generate_v4|uuid)\(\)$/i.test(d)) return '@default(uuid())';
+		if (/^null$/i.test(d)) return '';
+		if (type === 'Boolean') return `@default(${/^(true|1|'1'|'t')$/i.test(d)})`;
+		if (/^'.*'$/.test(d)) return `@default(${JSON.stringify(d.slice(1, -1).replace(/''/g, "'"))})`;
+		if (/^-?\d+(\.\d+)?$/.test(d)) return `@default(${d})`;
+		return `@default(dbgenerated(${JSON.stringify(d)}))`;
+	};
+
+	const nativeType = (c: Column, type: string) => {
+		if (type === 'String' && /^(varchar|character varying)$/.test(c.sqlType) && c.args) return `@db.VarChar(${c.args})`;
+		if (type === 'String' && /^(char|character)$/.test(c.sqlType) && c.args) return `@db.Char(${c.args})`;
+		if (type === 'String' && c.sqlType === 'uuid') return '@db.Uuid';
+		if (type === 'Decimal' && c.args) return `@db.Decimal(${c.args.replace(/\s+/g, '')})`;
+		return '';
+	};
+
+	const generate = (tables: Table[], fieldCase: string, useType: boolean) => {
+		const fname = (n: string) => (fieldCase === 'camel' ? camel(n) : n);
+		const map = (orig: string, name: string) => (orig !== name ? ` @map("${orig}")` : '');
+		const ts = tables.map((t) => {
+			const lines = t.columns.map((c) => {
+				const n = fname(c.name);
+				const key = /^[A-Za-z_$][\w$]*$/.test(n) ? n : JSON.stringify(n);
+				return `  ${key}: ${mapType(c).ts}${c.nullable ? ' | null' : ''};`;
+			});
+			const head = useType ? `export type ${modelName(t.name)} = {` : `export interface ${modelName(t.name)} {`;
+			return `${head}\n${lines.join('\n')}\n}${useType ? ';' : ''}`;
+		});
+		const back = new Map<string, string[]>();
+		const known = new Set(tables.map((t) => t.name));
+		const prisma = tables.map((t) => {
+			const model = modelName(t.name);
+			const rows: string[][] = [];
+			const pks = t.columns.filter((c) => c.primary);
+			for (const c of t.columns) {
+				const { prisma: type } = mapType(c);
+				const n = fname(c.name);
+				const attrs = [
+					c.primary && pks.length === 1 ? '@id' : '',
+					prismaDefault(c, type),
+					c.unique && !c.primary ? '@unique' : '',
+					nativeType(c, type),
+					map(c.name, n).trim(),
+				].filter(Boolean);
+				rows.push([n, `${type}${c.nullable ? '?' : ''}`, attrs.join(' ')]);
+				if (c.ref && known.has(c.ref.table)) {
+					const target = modelName(c.ref.table);
+					let rel = fname(c.name.replace(/_?id$/i, '')) || camel(target);
+					if (rel === n || t.columns.some((x) => fname(x.name) === rel)) rel = `${rel}Rel`;
+					rows.push([rel, `${target}${c.nullable ? '?' : ''}`, `@relation(fields: [${n}], references: [${fname(c.ref.column)}])`]);
+					const list = back.get(c.ref.table) ?? [];
+					list.push(model);
+					back.set(c.ref.table, list);
+				}
+			}
+			return { t, model, rows };
+		});
+		const models = prisma.map(({ t, model, rows }) => {
+			for (const m of back.get(t.name) ?? []) {
+				const base = camel(m) + 's';
+				let n = base;
+				for (let i = 2; rows.some((r) => r[0] === n); i++) n = `${base}${i}`;
+				rows.push([n, `${m}[]`, '']);
+			}
+			const w1 = Math.max(...rows.map((r) => r[0].length));
+			const w2 = Math.max(...rows.map((r) => r[1].length));
+			const body = rows.map((r) => `  ${r[0].padEnd(w1)} ${r[2] ? r[1].padEnd(w2) + ' ' + r[2] : r[1]}`.trimEnd());
+			const pks = t.columns.filter((c) => c.primary);
+			if (pks.length > 1) body.push('', `  @@id([${pks.map((c) => fname(c.name)).join(', ')}])`);
+			if (model !== t.name) body.push(...(pks.length > 1 ? [] : ['']), `  @@map("${t.name}")`);
+			return `model ${model} {\n${body.join('\n')}\n}`;
+		});
+		return { ts: ts.join('\n\n') + '\n', prisma: models.join('\n\n') + '\n' };
+	};
+
+	onPage('st-tool', () => {
+		const input = byId<HTMLTextAreaElement>('st-in');
+		const useType = byId<HTMLInputElement>('st-type');
+		const error = byId('st-error');
+		let fieldCase = 'keep';
+
+		const render = () => {
+			try {
+				const tables = parseSql(input.value);
+				if (!tables.length) throw new Error('No CREATE TABLE statement found');
+				const out = generate(tables, fieldCase, useType.checked);
+				byId('st-ts').textContent = out.ts;
+				byId('st-prisma').textContent = out.prisma;
+				const label = `${tables.length} ${tables.length === 1 ? 'table' : 'tables'}`;
+				byId('st-ts-label').textContent = `TypeScript · ${label}`;
+				byId('st-prisma-label').textContent = `Prisma · ${label}`;
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+			}
+		};
+
+		segmented(byId('st-case'), (v) => ((fieldCase = v), render()));
+		useType.addEventListener('change', render);
+		input.addEventListener('input', render);
+		copyButton(byId('st-copy-ts'), () => byId('st-ts').textContent ?? '');
+		copyButton(byId('st-copy-prisma'), () => byId('st-prisma').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	#st-in {
+		min-height: 260px;
+	}
+</style>

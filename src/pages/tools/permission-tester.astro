@@ -1,0 +1,166 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="permission-tester"
+	title="Permission Tester"
+	description="Paste a role matrix, pick a role, a resource, an action and how the record relates to the user. See Allowed or Denied, the rule that decided it and the inheritance chain."
+>
+	<div class="grid-2" id="pt-tool">
+		<section class="panel">
+			<div class="panel-head">Matrix JSON</div>
+			<textarea id="pt-in" spellcheck="false" aria-label="Matrix JSON"></textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">Request</div>
+			<div class="fields pt-fields">
+				<label class="field">
+					<span>Role</span>
+					<select id="pt-role"></select>
+				</label>
+				<label class="field">
+					<span>Resource</span>
+					<select id="pt-resource"></select>
+				</label>
+				<label class="field">
+					<span>Action</span>
+					<select id="pt-action"></select>
+				</label>
+				<label class="field">
+					<span>Target record</span>
+					<select id="pt-target">
+						<option value="own">owned by the user</option>
+						<option value="team" selected>
+							in the user's team
+						</option>
+						<option value="agency">in the user's agency</option>
+						<option value="all">anywhere</option>
+					</select>
+				</label>
+			</div>
+			<div class="pt-verdict" id="pt-verdict" role="status" aria-live="polite">
+				<b id="pt-answer"></b>
+				<p id="pt-rule"></p>
+			</div>
+			<ol class="pt-chain" id="pt-chain" aria-label="Inheritance chain"></ol>
+		</section>
+	</div>
+	<p class="error" id="pt-error" role="alert" hidden></p>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+	import { decide, direct, parseMatrix, rank, sampleMatrix, toJson, type Matrix, type Scope } from '../../scripts/rbac';
+
+	const reach: Record<Scope, string> = {
+		none: 'no access',
+		own: 'records the user owns',
+		team: 'records in the user’s team',
+		agency: 'records in the user’s agency',
+		all: 'every record',
+	};
+
+	onPage('pt-tool', () => {
+		const input = byId<HTMLTextAreaElement>('pt-in');
+		const role = byId<HTMLSelectElement>('pt-role');
+		const resource = byId<HTMLSelectElement>('pt-resource');
+		const action = byId<HTMLSelectElement>('pt-action');
+		const target = byId<HTMLSelectElement>('pt-target');
+		const error = byId('pt-error');
+		let m: Matrix | null = null;
+		input.value = toJson(sampleMatrix());
+
+		const fill = (sel: HTMLSelectElement, values: string[], preferred: string) => {
+			const keep = sel.value || preferred;
+			sel.replaceChildren(...values.map((v) => new Option(v, v, false, v === keep)));
+			if (!values.includes(keep) && values.length) sel.value = values[0];
+		};
+
+		const evaluate = () => {
+			if (!m) return;
+			const d = decide(m, role.value, resource.value, action.value);
+			const need = target.value as Scope;
+			const ok = rank(d.scope) >= rank(need);
+			const verdict = byId('pt-verdict');
+			verdict.dataset.ok = String(ok);
+			byId('pt-answer').textContent = ok ? 'Allowed' : 'Denied';
+			byId('pt-rule').textContent =
+				d.scope === 'none'
+					? `No role in the chain grants ${resource.value}.${action.value}.`
+					: `${d.source}: ${resource.value}.${action.value} = ${d.scope}, which covers ${reach[d.scope]}.` + (ok ? '' : ` The record needs ${need}.`);
+			byId('pt-chain').replaceChildren(
+				...d.chain.map((r) => {
+					const li = document.createElement('li');
+					const s = direct(m!, r, resource.value, action.value);
+					li.textContent = `${r}: ${s}`;
+					if (r === d.source) li.className = 'pt-decides';
+					return li;
+				}),
+			);
+		};
+
+		const load = () => {
+			try {
+				m = parseMatrix(input.value);
+				error.hidden = true;
+			} catch (e) {
+				m = null;
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+				return;
+			}
+			fill(
+				role,
+				m.roles.map((r) => r.name),
+				'editor',
+			);
+			fill(resource, m.resources, 'customers');
+			fill(action, m.actions, 'update');
+			evaluate();
+		};
+
+		input.addEventListener('input', load);
+		[role, resource, action, target].forEach((s) => s.addEventListener('change', evaluate));
+		load();
+	});
+</script>
+
+<style>
+	#pt-in {
+		min-height: 360px;
+	}
+	.pt-fields {
+		padding: 12px;
+	}
+	.pt-verdict {
+		margin: 0 12px 12px;
+		padding: 14px 16px;
+		border-radius: 14px;
+		background: var(--warn-bg);
+		color: var(--ink);
+	}
+	.pt-verdict[data-ok='true'] {
+		background: var(--ok-bg);
+	}
+	.pt-verdict b {
+		font-size: 22px;
+		color: var(--bad);
+	}
+	.pt-verdict[data-ok='true'] b {
+		color: var(--ok);
+	}
+	.pt-verdict p {
+		margin: 6px 0 0;
+	}
+	.pt-chain {
+		margin: 0 12px 14px;
+		padding-left: 22px;
+		font-family: var(--mono);
+		font-size: 13px;
+	}
+	.pt-chain :global(.pt-decides) {
+		font-weight: 700;
+		color: var(--accent-strong);
+	}
+</style>

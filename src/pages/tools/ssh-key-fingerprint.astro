@@ -1,0 +1,401 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKMyCWr+NQ4hfYhFaQ+6a2oHbM0CjtpKFT+8DCu1cEfO alice@laptop
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC1NYnfv20wS4D7HoExrGzhewCsn+Hr8a5RCrds00VvPVGnhaiVYNayn62OAVWdUpMkdtvFPiaDH69iuRhscT5H+Xt1FMHzxcZfnFJReWav3d53Nu7TjySvyyld0+5MYHEsnx/G4/m0ZUGodjYD/4krk9Zxt9CydmtKKA/uJ57UIEAVPmhcGk/MpajBxq/IIrBH6cdCK6rrjjnZifKSMjbAsBg6z1KH4GMpGOOR/pE1TAWf2aKzUPTXw4o6xY88RnimcjdZm9ZH0XofBd2Nfdb0Ha0BZxXyN288DuC3W5T4NxH/nMg0OdJadHvLIqBRCNmJY4w/7I8owY+OYgFnAbCuhTaOu+OrLQBas4zeB2bEQh3rfbxQNyf21fuPXPsJ0ID5+x6ixBqPJG6Ln8dKuxiUMsstwALkVNz1yjhemoDd59hbkXSHN/YDrifb6gKijEAKcB681CLP+31iNzJ6hDF3eu4Y8bCXS7hPq7DS38sHaq3vP621mtTF1F0aBnWZlS0= deploy@ci`;
+---
+
+<ToolShell
+	slug="ssh-key-fingerprint"
+	title="SSH Key Fingerprint"
+	description="Paste OpenSSH public keys to get their type, size, SHA256 and MD5 fingerprints and comment, computed in your browser exactly like ssh-keygen -lf."
+>
+	<div class="sk" id="sk-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span>Public keys, one per line</span>
+			</div>
+			<textarea id="sk-in" spellcheck="false" aria-label="OpenSSH public keys">{sample}</textarea>
+		</section>
+		<p class="sk-note">Only public keys belong here. Private keys never leave your machine, and neither does anything typed on this page.</p>
+		<div class="sk-list" id="sk-list" aria-live="polite"></div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Info = { type: string; bits: number; algo: string; strength: 'ok' | 'warn' | 'bad'; advice: string; fields: [string, number][] };
+
+	const b64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+	const reader = (buf: Uint8Array) => {
+		let pos = 0;
+		const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+		return {
+			next() {
+				if (pos + 4 > buf.length) throw new Error('Key data is truncated.');
+				const len = view.getUint32(pos);
+				pos += 4;
+				if (pos + len > buf.length) throw new Error('Key data is truncated.');
+				const out = buf.subarray(pos, pos + len);
+				pos += len;
+				return out;
+			},
+			done: () => pos === buf.length,
+		};
+	};
+
+	const bitLength = (mpint: Uint8Array) => {
+		let i = 0;
+		while (i < mpint.length && mpint[i] === 0) i++;
+		if (i === mpint.length) return 0;
+		return (mpint.length - i - 1) * 8 + (32 - Math.clz32(mpint[i]));
+	};
+
+	const inspect = (type: string, blob: Uint8Array): Info => {
+		const r = reader(blob);
+		const inner = new TextDecoder().decode(r.next());
+		if (inner !== type) throw new Error(`Key says ${type} but the data contains ${inner}.`);
+		const base = type.replace(/-cert-v01@openssh\.com$/, '');
+		if (type !== base) r.next();
+		if (base === 'ssh-rsa') {
+			const e = r.next();
+			const n = r.next();
+			const bits = bitLength(n);
+			return {
+				type: 'RSA',
+				bits,
+				algo: 'RSA',
+				strength: bits < 2048 ? 'bad' : bits < 3072 ? 'warn' : 'ok',
+				advice:
+					bits < 2048
+						? 'Too short: rejected by modern OpenSSH. Generate a new ed25519 key.'
+						: bits < 3072
+							? 'Acceptable, but 3072 bits or ed25519 is recommended.'
+							: 'Strong RSA key.',
+				fields: [
+					['exponent', e.length],
+					['modulus', n.length],
+				],
+			};
+		}
+		if (base === 'ssh-ed25519' || base === 'sk-ssh-ed25519@openssh.com') {
+			const k = r.next();
+			return {
+				type: base.startsWith('sk') ? 'ED25519-SK' : 'ED25519',
+				bits: 256,
+				algo: 'Ed25519',
+				strength: 'ok',
+				advice: base.startsWith('sk') ? 'Hardware-backed Ed25519 key (FIDO security key).' : 'Modern, fast and recommended.',
+				fields: [['public key', k.length]],
+			};
+		}
+		if (base.startsWith('ecdsa-sha2-') || base.startsWith('sk-ecdsa-sha2-')) {
+			const curve = new TextDecoder().decode(r.next());
+			const q = r.next();
+			const bits = curve === 'nistp256' ? 256 : curve === 'nistp384' ? 384 : curve === 'nistp521' ? 521 : 0;
+			return {
+				type: base.startsWith('sk') ? 'ECDSA-SK' : 'ECDSA',
+				bits,
+				algo: `ECDSA ${curve}`,
+				strength: 'ok',
+				advice: 'Secure, though ed25519 is simpler and preferred.',
+				fields: [['curve point', q.length]],
+			};
+		}
+		if (base === 'ssh-dss') {
+			const p = r.next();
+			return {
+				type: 'DSA',
+				bits: bitLength(p),
+				algo: 'DSA',
+				strength: 'bad',
+				advice: 'DSA is disabled since OpenSSH 7.0. Replace this key.',
+				fields: [['p', p.length]],
+			};
+		}
+		throw new Error(`Unsupported key type ${type}.`);
+	};
+
+	const hex = (buf: ArrayBuffer | Uint8Array) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0'));
+
+	const md5 = (data: Uint8Array) => {
+		const K = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) >>> 0);
+		const S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+		const len = data.length;
+		const padded = new Uint8Array((((len + 8) >> 6) + 1) * 64);
+		padded.set(data);
+		padded[len] = 0x80;
+		const view = new DataView(padded.buffer);
+		view.setUint32(padded.length - 8, (len * 8) >>> 0, true);
+		view.setUint32(padded.length - 4, Math.floor(len / 0x20000000), true);
+		let [a0, b0, c0, d0] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476];
+		for (let off = 0; off < padded.length; off += 64) {
+			let [a, b, c, d] = [a0, b0, c0, d0];
+			for (let i = 0; i < 64; i++) {
+				const round = i >> 4;
+				const f = round === 0 ? (b & c) | (~b & d) : round === 1 ? (d & b) | (~d & c) : round === 2 ? b ^ c ^ d : c ^ (b | ~d);
+				const g = round === 0 ? i : round === 1 ? (5 * i + 1) % 16 : round === 2 ? (3 * i + 5) % 16 : (7 * i) % 16;
+				const tmp = d;
+				d = c;
+				c = b;
+				const x = (a + f + K[i] + view.getUint32(off + g * 4, true)) >>> 0;
+				const sh = S[round * 4 + (i % 4)];
+				b = (b + ((x << sh) | (x >>> (32 - sh)))) >>> 0;
+				a = tmp;
+			}
+			a0 = (a0 + a) >>> 0;
+			b0 = (b0 + b) >>> 0;
+			c0 = (c0 + c) >>> 0;
+			d0 = (d0 + d) >>> 0;
+		}
+		const out = new Uint8Array(16);
+		const ov = new DataView(out.buffer);
+		[a0, b0, c0, d0].forEach((w, i) => ov.setUint32(i * 4, w, true));
+		return out;
+	};
+
+	const randomart = (digest: Uint8Array, title: string, foot: string) => {
+		const W = 17;
+		const H = 9;
+		const field = Array.from({ length: H }, () => new Array(W).fill(0));
+		let x = 8;
+		let y = 4;
+		digest.forEach((byte) => {
+			for (let i = 0; i < 4; i++) {
+				const bits = (byte >> (i * 2)) & 3;
+				x = Math.max(0, Math.min(W - 1, x + (bits & 1 ? 1 : -1)));
+				y = Math.max(0, Math.min(H - 1, y + (bits & 2 ? 1 : -1)));
+				field[y][x]++;
+			}
+		});
+		const chars = ' .o+=*BOX@%&#/^';
+		const rows = field.map((row, ry) =>
+			row.map((v, rx) => (rx === 8 && ry === 4 ? 'S' : rx === x && ry === y ? 'E' : chars[Math.min(v, chars.length - 1)])).join(''),
+		);
+		const frame = (t: string) => {
+			const inner = `[${t}]`.slice(0, W);
+			const left = Math.floor((W - inner.length) / 2);
+			return `+${'-'.repeat(left)}${inner}${'-'.repeat(W - left - inner.length)}+`;
+		};
+		return [frame(title), ...rows.map((r) => `|${r}|`), frame(foot)].join('\n');
+	};
+
+	const el = (tag: string, cls: string, text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	onPage('sk-tool', () => {
+		const input = byId<HTMLTextAreaElement>('sk-in');
+		let token = 0;
+
+		const card = async (line: string, index: number) => {
+			const sec = el('section', 'panel sk-card');
+			sec.setAttribute('aria-label', `Key ${index + 1}`);
+			if (/PRIVATE KEY/.test(line)) {
+				sec.append(el('p', 'error', 'This looks like a private key. Delete it from this page and never share it; paste the .pub file instead.'));
+				return sec;
+			}
+			const m = line.match(/^(?:(.*?)\s+)?((?:ssh|ecdsa|sk)-[\w@.-]+)\s+([A-Za-z0-9+/=]+)(?:\s+(.*))?$/);
+			if (!m) {
+				sec.append(el('p', 'error', `Line ${index + 1}: expected "type base64 comment", like the content of id_ed25519.pub.`));
+				return sec;
+			}
+			const [, options, type, data, comment = ''] = m;
+			try {
+				const blob = b64(data);
+				const info = inspect(type, blob);
+				const sha = await crypto.subtle.digest('SHA-256', blob);
+				const sha256 = `SHA256:${btoa(String.fromCharCode(...new Uint8Array(sha))).replace(/=+$/, '')}`;
+				const md5fp = `MD5:${hex(md5(blob)).join(':')}`;
+				const head = el('div', 'panel-head');
+				head.append(
+					el('span', '', `${info.type} ${info.bits}`),
+					el('span', `sk-badge ${info.strength}`, info.strength === 'ok' ? 'Strong' : info.strength === 'warn' ? 'Acceptable' : 'Weak'),
+				);
+				const body = el('div', 'sk-body');
+				const dl = el('dl', 'sk-dl');
+				const rows: [string, string, boolean][] = [
+					['SHA256', sha256, true],
+					['MD5', md5fp, true],
+					['Algorithm', info.algo, false],
+					['Size', `${info.bits} bits`, false],
+					['Comment', comment || '(none)', false],
+					...(options ? ([['Options', options, false]] as [string, string, boolean][]) : []),
+					['ssh-keygen -lf', `${info.bits} ${sha256} ${comment || 'no comment'} (${info.type})`, true],
+				];
+				rows.forEach(([k, v, copy]) => {
+					const row = el('div', 'sk-row');
+					const dd = el('dd', '');
+					dd.append(el('code', '', v));
+					if (copy) {
+						const b = el('button', 'btn', 'Copy');
+						b.setAttribute('aria-label', `Copy ${k}`);
+						copyButton(b, () => v);
+						dd.append(b);
+					}
+					row.append(el('dt', '', k), dd);
+					dl.append(row);
+				});
+				const art = el('pre', 'sk-art', randomart(new Uint8Array(sha), `${info.type} ${info.bits}`, 'SHA256'));
+				art.setAttribute('role', 'img');
+				art.setAttribute('aria-label', 'Randomart image of the SHA256 fingerprint');
+				body.append(dl, art);
+				const advice = el('p', `sk-advice ${info.strength}`, info.advice);
+				const layout = el('div', 'sk-layout');
+				const bar = el('div', 'sk-blob');
+				bar.setAttribute('aria-hidden', 'true');
+				const total = info.fields.reduce((n, [, l]) => n + l, 0) + type.length;
+				[['type', type.length] as [string, number], ...info.fields].forEach(([name, l]) => {
+					const seg = el('span', 'sk-seg', name);
+					seg.style.flexGrow = String(Math.max(l / total, 0.08));
+					bar.append(seg);
+				});
+				layout.append(el('span', 'sk-cap', `Decoded blob: ${blob.length} bytes`), bar);
+				sec.append(head, body, advice, layout);
+			} catch (e) {
+				sec.append(el('p', 'error', `Line ${index + 1}: ${e instanceof Error ? e.message : 'invalid base64 data.'}`));
+			}
+			return sec;
+		};
+
+		const render = async () => {
+			const t = ++token;
+			const lines = input.value
+				.split('\n')
+				.map((l) => l.trim())
+				.filter((l) => l && !l.startsWith('#'));
+			const cards = await Promise.all(lines.map(card));
+			if (t === token) byId('sk-list').replaceChildren(...cards);
+		};
+
+		input.addEventListener('input', render);
+		render();
+	});
+</script>
+
+<style>
+	.sk {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.sk-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.sk-list {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.sk-list :global(.sk-card > .error) {
+		margin: 12px;
+	}
+	.sk-list :global(.sk-badge) {
+		text-transform: none;
+		letter-spacing: 0;
+		padding: 2px 10px;
+		border-radius: 999px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+	}
+	.sk-list :global(.sk-badge.ok) {
+		color: var(--ok);
+	}
+	.sk-list :global(.sk-badge.warn) {
+		color: var(--warn);
+	}
+	.sk-list :global(.sk-badge.bad) {
+		color: var(--bad);
+	}
+	.sk-list :global(.sk-body) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 16px;
+		padding: 12px 14px;
+	}
+	.sk-list :global(.sk-dl) {
+		flex: 1 1 300px;
+		min-width: 0;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.sk-list :global(.sk-row dt) {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+	}
+	.sk-list :global(.sk-row dd) {
+		margin: 2px 0 0;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.sk-list :global(.sk-row code) {
+		font-family: var(--mono);
+		font-size: 13px;
+		word-break: break-all;
+		min-width: 0;
+		flex: 1;
+	}
+	.sk-list :global(.sk-art) {
+		margin: 0;
+		padding: 8px 10px;
+		background: var(--surface-2);
+		border-radius: 10px;
+		font-family: var(--mono);
+		font-size: 12px;
+		line-height: 1.25;
+		color: var(--ink);
+	}
+	.sk-list :global(.sk-advice) {
+		margin: 0;
+		padding: 0 14px 10px;
+		font-size: 14px;
+	}
+	.sk-list :global(.sk-advice.bad) {
+		color: var(--bad);
+	}
+	.sk-list :global(.sk-advice.warn) {
+		color: var(--warn);
+	}
+	.sk-list :global(.sk-layout) {
+		padding: 0 14px 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.sk-list :global(.sk-cap) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.sk-list :global(.sk-blob) {
+		display: flex;
+		gap: 2px;
+		border-radius: 8px;
+		overflow: hidden;
+	}
+	.sk-list :global(.sk-seg) {
+		flex-basis: 0;
+		min-width: 0;
+		padding: 4px 6px;
+		font-size: 11px;
+		font-weight: 700;
+		background: var(--accent);
+		color: var(--ink);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.sk-list :global(.sk-seg:first-child) {
+		background: var(--surface-2);
+	}
+</style>

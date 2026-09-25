@@ -1,0 +1,154 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = JSON.stringify(
+	{
+		id: 42,
+		login: 'octocat',
+		html_url: 'https://github.com/octocat',
+		site_admin: false,
+		score: 0.87,
+		company: null,
+		created_at: '2011-01-25T18:44:36Z',
+		plan: { name: 'pro', space: 976562499, private_repos: 9999 },
+		repos: [
+			{ id: 1296269, full_name: 'octocat/Hello-World', topics: ['demo'], fork: false },
+			{ id: 1300192, full_name: 'octocat/Spoon-Knife', topics: [], fork: true, license: 'MIT' },
+		],
+	},
+	null,
+	2,
+);
+---
+
+<ToolShell slug="json-to-go" title="JSON to Go" description="Generate Go structs with json tags from a JSON sample.">
+	<div class="toolbar" id="jg-tool">
+		<div class="field jg-name">
+			<label for="jg-name">Root struct</label>
+			<input id="jg-name" spellcheck="false" autocomplete="off" value="User" />
+		</div>
+		<label class="check">
+			<input type="checkbox" id="jg-omit" checked /> omitempty on optional fields
+		</label>
+		<label class="check">
+			<input type="checkbox" id="jg-ptr" checked /> Pointers for nullable fields
+		</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">JSON</div>
+			<textarea id="jg-in" spellcheck="false" aria-label="JSON input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="jg-count">Go</span>
+				<button class="btn" id="jg-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="jg-out" tabindex="0"></pre>
+		</section>
+	</div>
+	<p class="error" id="jg-error" hidden></p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+	import { kinds, pascal, shapeOf, singular, type ShapeNode } from '../../scripts/json-shape';
+
+	const INITIALISMS = ['id', 'url', 'uri', 'api', 'http', 'https', 'json', 'xml', 'html', 'sql', 'ip', 'uuid', 'cpu', 'ttl', 'ui', 'css', 'dns', 'ssh', 'tls'];
+	const PRIM: Record<string, string> = { string: 'string', integer: 'int64', number: 'float64', boolean: 'bool' };
+
+	const goName = (raw: string) => {
+		const words = raw
+			.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+			.split(/[^A-Za-z0-9]+/)
+			.filter(Boolean);
+		const out = words.map((w) => (INITIALISMS.includes(w.toLowerCase()) ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1))).join('');
+		return /^[0-9]/.test(out) ? `N${out}` : out || 'Field';
+	};
+
+	const generate = (root: unknown, rootName: string, omit: boolean, ptr: boolean) => {
+		const structs: string[] = [];
+		const used = new Set<string>();
+		const unique = (n: string) => {
+			let name = n;
+			for (let i = 2; used.has(name); i++) name = `${n}${i}`;
+			used.add(name);
+			return name;
+		};
+
+		const typeOf = (node: ShapeNode, hint: string): string => {
+			if (kinds(node) !== 1) return 'any';
+			let t: string;
+			if (node.object) t = struct(node, hint);
+			else if (node.array) t = `[]${node.array.empty ? 'any' : typeOf(node.array, singular(hint))}`;
+			else t = PRIM[[...node.prims][0]];
+			return node.nullable && ptr && !node.array ? `*${t}` : t;
+		};
+
+		const struct = (node: ShapeNode, hint: string): string => {
+			const name = unique(goName(hint));
+			const slot = structs.push('') - 1;
+			const fields = (node.object ?? []).map((f) => {
+				const type = typeOf(f.node, pascal(f.name));
+				const tag = `json:"${f.name}${omit && (f.optional || f.node.nullable) ? ',omitempty' : ''}"`;
+				return { name: goName(f.name), type, tag };
+			});
+			const w1 = Math.max(0, ...fields.map((f) => f.name.length));
+			const w2 = Math.max(0, ...fields.map((f) => f.type.length));
+			const body = fields.map((f) => `\t${f.name.padEnd(w1)} ${f.type.padEnd(w2)} \`${f.tag}\``);
+			structs[slot] = `type ${name} struct {\n${body.join('\n')}${body.length ? '\n' : ''}}`;
+			return name;
+		};
+
+		const node = shapeOf([root]);
+		if (node.object) struct(node, rootName);
+		else structs.push(`type ${unique(goName(rootName))} ${typeOf(node, rootName + 'Item')}`);
+		return structs.filter(Boolean);
+	};
+
+	onPage('jg-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jg-in');
+		const name = byId<HTMLInputElement>('jg-name');
+		const omit = byId<HTMLInputElement>('jg-omit');
+		const ptr = byId<HTMLInputElement>('jg-ptr');
+		const output = byId('jg-out');
+		const error = byId('jg-error');
+
+		const render = () => {
+			let json: unknown;
+			try {
+				json = JSON.parse(input.value);
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = `Invalid JSON: ${(e as Error).message}`;
+				error.hidden = false;
+				return;
+			}
+			const structs = generate(json, name.value.trim() || 'Root', omit.checked, ptr.checked);
+			output.textContent = structs.join('\n\n') + '\n';
+			byId('jg-count').textContent = `${structs.length} ${structs.length === 1 ? 'type' : 'types'}`;
+		};
+
+		input.addEventListener('input', render);
+		name.addEventListener('input', render);
+		[omit, ptr].forEach((el) => el.addEventListener('change', render));
+		copyButton(byId('jg-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.jg-name {
+		padding: 8px 12px;
+		min-width: 0;
+		flex: 0 1 240px;
+	}
+	.jg-name input {
+		font-size: 16px;
+	}
+	#jg-out {
+		tab-size: 4;
+	}
+</style>

@@ -1,0 +1,223 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="clip-path-editor"
+	title="CSS clip-path Editor"
+	description="Drag the handles to shape a CSS clip-path with polygon presets, circle, ellipse or inset, then copy the CSS."
+>
+	<div class="cp" id="cp-tool">
+		<div class="toolbar">
+			<div class="seg" id="cp-shape" role="group" aria-label="Shape">
+				<button data-value="polygon" aria-pressed="true">
+					Polygon
+				</button>
+				<button data-value="circle" aria-pressed="false">
+					Circle
+				</button>
+				<button data-value="ellipse" aria-pressed="false">
+					Ellipse
+				</button>
+				<button data-value="inset" aria-pressed="false">
+					Inset
+				</button>
+			</div>
+		</div>
+		<div class="chips" id="cp-presets" role="group" aria-label="Polygon presets">
+			<button data-points="50 0,100 100,0 100" aria-pressed="false">
+				Triangle
+			</button>
+			<button data-points="50 0,100 50,50 100,0 50" aria-pressed="false">
+				Rhombus
+			</button>
+			<button data-points="50 0,100 38,82 100,18 100,0 38" aria-pressed="false">
+				Pentagon
+			</button>
+			<button data-points="25 0,75 0,100 50,75 100,25 100,0 50" aria-pressed="true">
+				Hexagon
+			</button>
+			<button data-points="50 0,61 35,98 35,68 57,79 91,50 70,21 91,32 57,2 35,39 35" aria-pressed="false">
+				Star
+			</button>
+			<button data-points="0 0,75 0,100 50,75 100,0 100" aria-pressed="false">
+				Arrow
+			</button>
+			<button data-points="0 15,15 15,15 0,85 0,85 15,100 15,100 85,85 85,85 100,15 100,15 85,0 85" aria-pressed="false">
+				Frame
+			</button>
+		</div>
+		<div class="cp-stage">
+			<div class="cp-ghost" aria-hidden="true"></div>
+			<div class="cp-clip" id="cp-clip" aria-hidden="true"></div>
+			<div class="cp-handles" id="cp-handles"></div>
+		</div>
+		<p class="cp-hint">Drag a handle or focus it and use the arrow keys. Shift moves by 10%.</p>
+		<section class="panel">
+			<div class="panel-head">
+				<span>CSS</span>
+				<button class="btn" id="cp-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out cp-css" id="cp-css"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type P = { x: number; y: number; name: string };
+
+	onPage('cp-tool', () => {
+		let shape = 'polygon';
+		let poly: P[] = [];
+		const state = {
+			circle: [
+				{ x: 50, y: 50, name: 'Center' },
+				{ x: 90, y: 50, name: 'Radius' },
+			],
+			ellipse: [
+				{ x: 50, y: 50, name: 'Center' },
+				{ x: 90, y: 75, name: 'Radii' },
+			],
+			inset: [
+				{ x: 10, y: 15, name: 'Top left' },
+				{ x: 90, y: 85, name: 'Bottom right' },
+			],
+		} as Record<string, P[]>;
+		const clip = byId('cp-clip');
+		const handles = byId('cp-handles');
+		const r = (n: number) => Math.round(n);
+
+		const points = () => (shape === 'polygon' ? poly : state[shape]);
+
+		const css = () => {
+			const p = points();
+			if (shape === 'polygon') return `polygon(${p.map((q) => `${r(q.x)}% ${r(q.y)}%`).join(', ')})`;
+			if (shape === 'circle') return `circle(${r(Math.hypot(p[1].x - p[0].x, p[1].y - p[0].y))}% at ${r(p[0].x)}% ${r(p[0].y)}%)`;
+			if (shape === 'ellipse') return `ellipse(${r(Math.abs(p[1].x - p[0].x))}% ${r(Math.abs(p[1].y - p[0].y))}% at ${r(p[0].x)}% ${r(p[0].y)}%)`;
+			return `inset(${r(p[0].y)}% ${r(100 - p[1].x)}% ${r(100 - p[1].y)}% ${r(p[0].x)}% round 8px)`;
+		};
+
+		const paint = () => {
+			const value = css();
+			clip.style.clipPath = value;
+			byId('cp-css').textContent = `clip-path: ${value};`;
+			points().forEach((p, i) => {
+				const h = handles.children[i] as HTMLElement;
+				h.style.left = `${p.x}%`;
+				h.style.top = `${p.y}%`;
+				h.setAttribute('aria-valuenow', String(r(p.x)));
+				h.setAttribute('aria-valuetext', `${r(p.x)}% ${r(p.y)}%`);
+			});
+		};
+
+		const build = () => {
+			handles.replaceChildren(
+				...points().map((p, i) => {
+					const h = document.createElement('button');
+					h.className = 'cp-handle';
+					h.setAttribute('role', 'slider');
+					h.setAttribute('aria-valuemin', '0');
+					h.setAttribute('aria-valuemax', '100');
+					h.setAttribute('aria-label', shape === 'polygon' ? `Point ${i + 1}` : p.name);
+					h.addEventListener('pointerdown', (e) => {
+						h.setPointerCapture(e.pointerId);
+						const move = (ev: PointerEvent) => {
+							const box = handles.getBoundingClientRect();
+							p.x = Math.min(100, Math.max(0, ((ev.clientX - box.left) / box.width) * 100));
+							p.y = Math.min(100, Math.max(0, ((ev.clientY - box.top) / box.height) * 100));
+							paint();
+						};
+						h.addEventListener('pointermove', move);
+						h.addEventListener('pointerup', () => h.removeEventListener('pointermove', move), { once: true });
+					});
+					h.addEventListener('keydown', (e) => {
+						const step = e.shiftKey ? 10 : 1;
+						const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+						if (!d) return;
+						e.preventDefault();
+						p.x = Math.min(100, Math.max(0, p.x + d[0]));
+						p.y = Math.min(100, Math.max(0, p.y + d[1]));
+						paint();
+					});
+					return h;
+				}),
+			);
+			byId('cp-presets').hidden = shape !== 'polygon';
+			paint();
+		};
+
+		const presets = Array.from(document.querySelectorAll<HTMLButtonElement>('#cp-presets button'));
+		const load = (button: HTMLButtonElement) => {
+			presets.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+			poly = button.dataset.points!.split(',').map((s) => {
+				const [x, y] = s.split(' ').map(Number);
+				return { x, y, name: '' };
+			});
+			build();
+		};
+		presets.forEach((b) => b.addEventListener('click', () => load(b)));
+		segmented(byId('cp-shape'), (v) => {
+			shape = v;
+			build();
+		});
+		copyButton(byId('cp-copy'), () => byId('cp-css').textContent ?? '');
+		load(presets[3]);
+	});
+</script>
+
+<style>
+	.cp {
+		display: grid;
+		gap: 16px;
+	}
+	.cp-stage {
+		position: relative;
+		width: min(100%, 420px);
+		aspect-ratio: 4 / 3;
+		margin: 0 auto;
+		touch-action: none;
+	}
+	.cp-ghost,
+	.cp-clip,
+	.cp-handles {
+		position: absolute;
+		inset: 0;
+		border-radius: 8px;
+	}
+	.cp-ghost {
+		background: var(--surface-2);
+		border: 1px dashed var(--border);
+	}
+	.cp-clip {
+		background: linear-gradient(135deg, var(--tint-2), var(--tint-1));
+	}
+	.cp-handles :global(.cp-handle) {
+		position: absolute;
+		width: 22px;
+		height: 22px;
+		margin: -11px 0 0 -11px;
+		padding: 0;
+		border-radius: 50%;
+		border: 2px solid var(--surface);
+		background: var(--accent-strong);
+		box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+		cursor: grab;
+	}
+	.cp-handles :global(.cp-handle:focus-visible) {
+		outline: 3px solid var(--ink);
+		outline-offset: 2px;
+	}
+	.cp-hint {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+		text-align: center;
+	}
+	.cp-css {
+		min-height: auto !important;
+	}
+</style>

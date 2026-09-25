@@ -1,0 +1,175 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="policy-diff"
+	title="Policy Diff"
+	description="Compare two role matrices and see, role by role, which permissions were granted, revoked, widened or narrowed. Risky escalations are flagged."
+>
+	<div class="toolbar" id="pd-tool">
+		<button class="btn" id="pd-swap">
+			Swap
+		</button>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Before</div>
+			<textarea id="pd-a" spellcheck="false" aria-label="Matrix before"></textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">After</div>
+			<textarea id="pd-b" spellcheck="false" aria-label="Matrix after"></textarea>
+		</section>
+	</div>
+	<p class="error" id="pd-error" role="alert" hidden></p>
+	<div class="stats" id="pd-stats"></div>
+	<div id="pd-roles" class="pd-roles"></div>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+	import { diffMatrices, parseMatrix, sampleMatrix, setScope, toJson } from '../../scripts/rbac';
+
+	onPage('pd-tool', () => {
+		const a = byId<HTMLTextAreaElement>('pd-a');
+		const b = byId<HTMLTextAreaElement>('pd-b');
+		const error = byId('pd-error');
+		const before = sampleMatrix();
+		const after = sampleMatrix();
+		setScope(after, 'editor', 'invoices', 'delete', 'own');
+		setScope(after, 'editor', 'customers', 'update', 'team');
+		setScope(after, 'manager', 'users', 'update', 'all');
+		setScope(after, 'manager', 'customers', 'delete', 'none');
+		setScope(after, 'viewer', 'customers', 'read', 'own');
+		a.value = toJson(before);
+		b.value = toJson(after);
+
+		const render = () => {
+			let changes;
+			try {
+				changes = diffMatrices(parseMatrix(a.value), parseMatrix(b.value));
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+				return;
+			}
+			const count = (k: string) => String(changes.filter((c) => c.kind === k).length);
+			const stats: [string, string][] = [
+				['Granted', count('granted')],
+				['Revoked', count('revoked')],
+				['Widened', count('widened')],
+				['Narrowed', count('narrowed')],
+				['Risky', String(changes.filter((c) => c.risky).length)],
+			];
+			byId('pd-stats').replaceChildren(
+				...stats.map(([label, value]) => {
+					const el = document.createElement('div');
+					el.className = 'stat';
+					el.innerHTML = '<b></b><span></span>';
+					el.querySelector('b')!.textContent = value;
+					el.querySelector('span')!.textContent = label;
+					return el;
+				}),
+			);
+			const out = byId('pd-roles');
+			if (!changes.length) {
+				const p = document.createElement('p');
+				p.textContent = 'The two matrices grant exactly the same access.';
+				out.replaceChildren(p);
+				return;
+			}
+			const roles = [...new Set(changes.map((c) => c.role))];
+			out.replaceChildren(
+				...roles.map((role) => {
+					const section = document.createElement('section');
+					section.className = 'panel';
+					const head = document.createElement('h2');
+					head.className = 'panel-head';
+					head.textContent = role;
+					const ul = document.createElement('ul');
+					ul.className = 'pd-list';
+					changes
+						.filter((c) => c.role === role)
+						.forEach((c) => {
+							const li = document.createElement('li');
+							li.dataset.kind = c.kind;
+							li.innerHTML = '<span class="pd-kind"></span><code></code><span class="pd-scope"></span>';
+							li.querySelector('.pd-kind')!.textContent = c.kind;
+							li.querySelector('code')!.textContent = `${c.resource}.${c.action}`;
+							li.querySelector('.pd-scope')!.textContent = `${c.before} → ${c.after}`;
+							if (c.risky) {
+								const flag = document.createElement('strong');
+								flag.className = 'pd-risk';
+								flag.textContent = 'Risky escalation';
+								li.append(flag);
+							}
+							ul.append(li);
+						});
+					section.append(head, ul);
+					return section;
+				}),
+			);
+		};
+
+		[a, b].forEach((el) => el.addEventListener('input', render));
+		byId('pd-swap').addEventListener('click', () => {
+			[a.value, b.value] = [b.value, a.value];
+			render();
+		});
+		render();
+	});
+</script>
+
+<style>
+	#pd-a,
+	#pd-b {
+		min-height: 260px;
+	}
+	.pd-roles {
+		display: grid;
+		gap: 12px;
+	}
+	.pd-roles :global(h2.panel-head) {
+		margin: 0;
+		font-size: inherit;
+	}
+	.pd-list {
+		list-style: none;
+		margin: 0;
+		padding: 8px 12px 12px;
+		display: grid;
+		gap: 6px;
+	}
+	.pd-list :global(li) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: center;
+		font-size: 14px;
+	}
+	.pd-list :global(.pd-kind) {
+		min-width: 76px;
+		font-weight: 700;
+	}
+	.pd-list :global(li[data-kind='granted'] .pd-kind),
+	.pd-list :global(li[data-kind='widened'] .pd-kind) {
+		color: var(--ok);
+	}
+	.pd-list :global(li[data-kind='revoked'] .pd-kind),
+	.pd-list :global(li[data-kind='narrowed'] .pd-kind) {
+		color: var(--bad);
+	}
+	.pd-list :global(.pd-scope) {
+		font-family: var(--mono);
+		color: var(--ink-soft);
+	}
+	.pd-list :global(.pd-risk) {
+		background: var(--warn-bg);
+		color: var(--warn);
+		border-radius: 999px;
+		padding: 2px 10px;
+		font-size: 12px;
+	}
+</style>

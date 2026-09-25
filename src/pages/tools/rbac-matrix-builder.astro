@@ -1,0 +1,404 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="rbac-matrix-builder"
+	title="RBAC Matrix Builder"
+	description="Lay out roles, resources and actions in one grid, give each cell a scope and let roles inherit from each other. Export JSON, YAML, a Spatie seeder, CASL abilities or SQL."
+>
+	<div class="rb-lists" id="rb-tool">
+		<section class="panel">
+			<div class="panel-head">Roles</div>
+			<ul class="rb-items" id="rb-roles"></ul>
+			<form class="rb-add" id="rb-add-role">
+				<input id="rb-new-role" placeholder="New role" aria-label="New role name" spellcheck="false" />
+				<button class="btn" type="submit">
+					Add role
+				</button>
+			</form>
+		</section>
+		<section class="panel">
+			<div class="panel-head">Resources</div>
+			<ul class="rb-items" id="rb-resources"></ul>
+			<form class="rb-add" id="rb-add-resource">
+				<input id="rb-new-resource" placeholder="New resource" aria-label="New resource name" spellcheck="false" />
+				<button class="btn" type="submit">
+					Add resource
+				</button>
+			</form>
+		</section>
+		<section class="panel">
+			<div class="panel-head">Actions</div>
+			<ul class="rb-items" id="rb-actions"></ul>
+			<form class="rb-add" id="rb-add-action">
+				<input id="rb-new-action" placeholder="New action" aria-label="New action name" spellcheck="false" />
+				<button class="btn" type="submit">
+					Add action
+				</button>
+			</form>
+		</section>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Matrix</span>
+			<span class="rb-legend">
+				<span class="rb-swatch"></span> inherited from a parent role
+			</span>
+		</div>
+		<div id="rb-grid" class="rb-grid"></div>
+	</section>
+	<div class="toolbar">
+		<div class="seg" id="rb-tab" role="group" aria-label="Export format">
+			<button data-value="json" aria-pressed="true">
+				JSON
+			</button>
+			<button data-value="yaml">YAML</button>
+			<button data-value="spatie">Spatie seeder</button>
+			<button data-value="casl">CASL</button>
+			<button data-value="sql">SQL</button>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="rb-file"></span>
+			<button class="btn" id="rb-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out" id="rb-out" tabindex="0"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Import JSON</span>
+			<button class="btn" id="rb-import">
+				Import
+			</button>
+		</div>
+		<textarea id="rb-json" spellcheck="false" aria-label="Matrix JSON to import"></textarea>
+	</section>
+	<p class="error" id="rb-error" role="alert" hidden></p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+	import {
+		decide,
+		direct,
+		sampleMatrix,
+		scopes,
+		setScope,
+		parseMatrix,
+		toCasl,
+		toJson,
+		toSpatie,
+		toSql,
+		toYaml,
+		type Matrix,
+		type Scope,
+	} from '../../scripts/rbac';
+
+	const files: Record<string, [string, (m: Matrix) => string]> = {
+		json: ['rbac.json', toJson],
+		yaml: ['rbac.yaml', toYaml],
+		spatie: ['database/seeders/RolesAndPermissionsSeeder.php', toSpatie],
+		casl: ['src/abilities.ts', toCasl],
+		sql: ['permissions.sql', toSql],
+	};
+
+	onPage('rb-tool', () => {
+		let m = sampleMatrix();
+		let tab = 'json';
+		const error = byId('rb-error');
+		const clean = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '_');
+
+		const renamePerm = (kind: 'role' | 'resource' | 'action', from: string, to: string) => {
+			const move = (o: Record<string, unknown>) => {
+				if (!(from in o)) return;
+				o[to] = o[from];
+				delete o[from];
+			};
+			const p = m.permissions;
+			if (kind === 'role') {
+				move(p);
+				m.roles.forEach((r) => r.extends === from && (r.extends = to));
+			}
+			for (const byRes of Object.values(p)) {
+				if (kind === 'resource') move(byRes);
+				if (kind === 'action') Object.values(byRes).forEach(move);
+			}
+		};
+
+		const removePerm = (kind: 'role' | 'resource' | 'action', name: string) => {
+			if (kind === 'role') {
+				delete m.permissions[name];
+				m.roles.forEach((r) => r.extends === name && delete r.extends);
+				return;
+			}
+			for (const role of Object.keys(m.permissions))
+				for (const res of Object.keys(m.permissions[role]))
+					for (const act of Object.keys(m.permissions[role][res]))
+						if ((kind === 'resource' && res === name) || (kind === 'action' && act === name)) setScope(m, role, res, act, 'none');
+		};
+
+		const listFor = (kind: 'role' | 'resource' | 'action') => (kind === 'role' ? m.roles.map((r) => r.name) : kind === 'resource' ? m.resources : m.actions);
+
+		const renderList = (kind: 'role' | 'resource' | 'action', el: HTMLElement) => {
+			const names = listFor(kind);
+			el.replaceChildren(
+				...names.map((name, i) => {
+					const li = document.createElement('li');
+					const input = document.createElement('input');
+					input.value = name;
+					input.spellcheck = false;
+					input.setAttribute('aria-label', `Rename ${kind} ${name}`);
+					input.addEventListener('change', () => {
+						const to = clean(input.value);
+						if (!to || listFor(kind).includes(to)) return (input.value = name);
+						renamePerm(kind, name, to);
+						if (kind === 'role') m.roles[i].name = to;
+						else names[i] = to;
+						render();
+					});
+					li.append(input);
+					if (kind === 'role') {
+						const sel = document.createElement('select');
+						sel.setAttribute('aria-label', `Role ${name} extends`);
+						sel.append(new Option('extends nothing', ''));
+						m.roles.forEach((r) => r.name !== name && sel.append(new Option(`extends ${r.name}`, r.name, false, m.roles[i].extends === r.name)));
+						sel.addEventListener('change', () => {
+							let cursor: string | undefined = sel.value;
+							while (cursor) {
+								if (cursor === name) {
+									error.textContent = `${name} cannot extend ${sel.value}: that would create a cycle.`;
+									error.hidden = false;
+									sel.value = m.roles[i].extends ?? '';
+									return;
+								}
+								cursor = m.roles.find((r) => r.name === cursor)?.extends;
+							}
+							error.hidden = true;
+							if (sel.value) m.roles[i].extends = sel.value;
+							else delete m.roles[i].extends;
+							render();
+						});
+						li.append(sel);
+					}
+					const rm = document.createElement('button');
+					rm.className = 'btn';
+					rm.textContent = '✕';
+					rm.setAttribute('aria-label', `Remove ${kind} ${name}`);
+					rm.disabled = names.length < 2;
+					rm.addEventListener('click', () => {
+						removePerm(kind, name);
+						if (kind === 'role') m.roles.splice(i, 1);
+						else names.splice(i, 1);
+						render();
+					});
+					li.append(rm);
+					return li;
+				}),
+			);
+		};
+
+		const renderGrid = () => {
+			const wrap = byId('rb-grid');
+			wrap.replaceChildren(
+				...m.resources.map((res) => {
+					const box = document.createElement('div');
+					box.className = 'rb-scroll';
+					box.tabIndex = 0;
+					box.setAttribute('role', 'region');
+					box.setAttribute('aria-label', `${res} permissions`);
+					const table = document.createElement('table');
+					table.createCaption().textContent = res;
+					const head = table.createTHead().insertRow();
+					const corner = document.createElement('th');
+					corner.scope = 'col';
+					corner.textContent = 'Role';
+					head.append(corner);
+					m.actions.forEach((a) => {
+						const th = document.createElement('th');
+						th.scope = 'col';
+						th.textContent = a;
+						head.append(th);
+					});
+					const body = table.createTBody();
+					m.roles.forEach((role) => {
+						const tr = body.insertRow();
+						const th = document.createElement('th');
+						th.scope = 'row';
+						th.textContent = role.name;
+						tr.append(th);
+						m.actions.forEach((act) => {
+							const own = direct(m, role.name, res, act);
+							const eff = decide(m, role.name, res, act);
+							const sel = document.createElement('select');
+							sel.setAttribute('aria-label', `${role.name} ${act} ${res} scope`);
+							const inherited = own === 'none' && eff.scope !== 'none';
+							scopes.forEach((s) => sel.append(new Option(s === 'none' && inherited ? `${eff.scope} (via ${eff.source})` : s, s, false, s === own)));
+							const td = tr.insertCell();
+							td.dataset.scope = eff.scope;
+							if (inherited) td.dataset.inherited = eff.source ?? '';
+							sel.addEventListener('change', () => {
+								setScope(m, role.name, res, act, sel.value as Scope);
+								render();
+							});
+							td.append(sel);
+						});
+					});
+					box.append(table);
+					return box;
+				}),
+			);
+		};
+
+		const renderOut = () => {
+			const [file, fn] = files[tab];
+			byId('rb-file').textContent = file;
+			byId('rb-out').textContent = fn(m);
+		};
+
+		const render = () => {
+			renderList('role', byId('rb-roles'));
+			renderList('resource', byId('rb-resources'));
+			renderList('action', byId('rb-actions'));
+			renderGrid();
+			renderOut();
+		};
+
+		const adder = (form: string, input: string, kind: 'role' | 'resource' | 'action') =>
+			byId(form).addEventListener('submit', (e) => {
+				e.preventDefault();
+				const field = byId<HTMLInputElement>(input);
+				const name = clean(field.value);
+				if (!name || listFor(kind).includes(name)) return;
+				if (kind === 'role') m.roles.push({ name });
+				else listFor(kind).push(name);
+				field.value = '';
+				render();
+			});
+		adder('rb-add-role', 'rb-new-role', 'role');
+		adder('rb-add-resource', 'rb-new-resource', 'resource');
+		adder('rb-add-action', 'rb-new-action', 'action');
+
+		segmented(byId('rb-tab'), (v) => ((tab = v), renderOut()));
+		copyButton(byId('rb-copy'), () => byId('rb-out').textContent ?? '');
+		const json = byId<HTMLTextAreaElement>('rb-json');
+		json.value = toJson(m);
+		byId('rb-import').addEventListener('click', () => {
+			try {
+				m = parseMatrix(json.value);
+				error.hidden = true;
+				render();
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+			}
+		});
+		render();
+	});
+</script>
+
+<style>
+	.rb-lists {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		gap: 14px;
+	}
+	.rb-items {
+		list-style: none;
+		margin: 0;
+		padding: 8px 12px;
+		display: grid;
+		gap: 6px;
+	}
+	.rb-items :global(li) {
+		display: flex;
+		gap: 6px;
+		align-items: center;
+	}
+	.rb-items :global(input),
+	.rb-add input {
+		flex: 1;
+		min-width: 0;
+		font-family: var(--mono);
+		font-size: 13px;
+		padding: 6px 9px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface-2);
+		color: var(--ink);
+	}
+	.rb-items :global(select) {
+		max-width: 50%;
+	}
+	.rb-add {
+		display: flex;
+		gap: 6px;
+		padding: 0 12px 12px;
+	}
+	.rb-legend {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-weight: 400;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.rb-swatch {
+		width: 14px;
+		height: 14px;
+		border-radius: 4px;
+		border: 2px dashed var(--accent-strong);
+	}
+	.rb-grid {
+		padding: 8px 12px 12px;
+		display: grid;
+		gap: 12px;
+	}
+	.rb-scroll {
+		overflow-x: auto;
+	}
+	.rb-scroll :global(table) {
+		border-collapse: separate;
+		border-spacing: 4px;
+	}
+	.rb-scroll :global(caption) {
+		text-align: left;
+		font-weight: 700;
+		padding: 2px 4px;
+	}
+	.rb-scroll :global(th) {
+		text-align: left;
+		font-size: 13px;
+		white-space: nowrap;
+		padding: 2px 6px;
+	}
+	.rb-scroll :global(td select) {
+		min-width: 96px;
+		font-family: var(--mono);
+		font-size: 13px;
+		border-radius: 8px;
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+		color: var(--ink);
+		padding: 5px 6px;
+	}
+	.rb-scroll :global(td:not([data-scope='none']) select) {
+		background: var(--accent);
+	}
+	.rb-scroll :global(td[data-inherited] select) {
+		background: var(--surface);
+		border: 2px dashed var(--accent-strong);
+		font-style: italic;
+	}
+	.rb-scroll :global(select:focus-visible),
+	.rb-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 1px;
+	}
+	#rb-json {
+		min-height: 160px;
+	}
+</style>
