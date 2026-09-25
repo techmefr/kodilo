@@ -1,0 +1,88 @@
+---
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import Header from '../../components/Header.astro';
+import ToolGrid from '../../components/ToolGrid.astro';
+import { builtCategories, categoryDescription, categoryIntro, categorySlug, type Category } from '../../data/tools';
+import Base from '../../layouts/Base.astro';
+import { iconUse } from '../../scripts/icons';
+import { breadcrumbLd, itemListLd } from '../../scripts/seo';
+
+export function getStaticPaths() {
+	return builtCategories.map((category) => ({ params: { slug: categorySlug(category.name) }, props: { category } }));
+}
+
+interface Props {
+	category: Category;
+}
+
+const { category } = Astro.props;
+const slug = categorySlug(category.name);
+const crumbs = [
+	{ name: 'Home', path: '' },
+	{ name: 'Categories', path: 'categories/' },
+	{ name: category.name, path: `categories/${slug}/` },
+];
+const jsonLd = [
+	breadcrumbLd(Astro.site, crumbs),
+	itemListLd(
+		Astro.site,
+		`${category.name} tools`,
+		category.tools.map((t) => ({ name: t.name, path: `tools/${t.slug}/` })),
+	),
+];
+---
+
+<Base title={`${category.name} tools — free, in your browser — kodilo`} description={categoryDescription(category)} jsonLd={jsonLd}>
+	<div class="shell">
+		<Header />
+		<main class="home category-page" id="main" tabindex="-1">
+			<Breadcrumbs crumbs={crumbs} />
+			<section class="home-cat" aria-labelledby="category-title">
+				<h1 id="category-title">
+					<span class="home-icon" set:html={iconUse(category.icon)} />
+					{category.name} tools
+				</h1>
+				<p class="category-intro">{categoryIntro(category)}</p>
+				<ToolGrid tools={category.tools} />
+			</section>
+		</main>
+	</div>
+</Base>
+
+<style>
+	.shell {
+		display: flex;
+		min-height: 100vh;
+	}
+	@media (max-width: 760px) {
+		.shell {
+			display: block;
+		}
+	}
+	.category-page {
+		flex: 1;
+		min-width: 0;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 32px 16px 64px;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	h1 {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin: 0;
+		font-size: 30px;
+		font-weight: 800;
+		letter-spacing: -0.02em;
+	}
+	.category-intro {
+		margin: 8px 0 20px;
+		max-width: 70ch;
+		color: var(--ink-soft);
+		font-size: 15px;
+		line-height: 1.5;
+	}
+</style>

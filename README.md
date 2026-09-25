@@ -293,6 +293,12 @@ Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools), [devbench
 - kodilo is an installable PWA. The production build ships a service worker that precaches the app shell and the tool catalogue, then keeps every tool page you open available offline. A new deploy shows an "Update available" prompt.
 - Every tool has a **Share link** button. It packs the current inputs into the URL hash (compressed, never sent to a server) so the link reopens the tool in the same state. Secrets such as keys, passwords and tokens are left out, and links over 8 KB show a warning.
 
+## Privacy
+
+- No cookies, no accounts and no personal data. kodilo has no backend: tools process your input in your browser.
+- Anonymous page view counts can optionally be collected with [GoatCounter](https://www.goatcounter.com/), a privacy-friendly counter without cookies. It is off by default and only loads when the site is built with the `PUBLIC_GOATCOUNTER_CODE` environment variable (set in CI from the `GOATCOUNTER_CODE` repository variable).
+- When counting is enabled, the counter script is not loaded at all if your browser sends Do Not Track or Global Privacy Control.
+
 ## Developing
 
 ```sh

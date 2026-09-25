@@ -14,7 +14,7 @@ function luminance(rgb: string) {
 test('home lists every built tool', async ({ page }) => {
 	await page.goto('./');
 	const built = allTools.filter((t) => t.built).length;
-	await expect(page.locator('.home-cat a')).toHaveCount(built);
+	await expect(page.locator('.home-cat li > a')).toHaveCount(built);
 });
 
 for (const tool of allTools.filter((t) => t.built)) {

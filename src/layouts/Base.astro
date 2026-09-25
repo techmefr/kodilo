@@ -7,13 +7,17 @@ interface Props {
 	title?: string;
 	description?: string;
 	noindex?: boolean;
+	jsonLd?: object[];
 }
 
 const {
 	title = 'kodilo',
 	description = 'Open-source tools for developers. No sign-up, no account, nothing leaves your browser.',
 	noindex = false,
+	jsonLd = [],
 } = Astro.props;
+const counterCode = String(import.meta.env.PUBLIC_GOATCOUNTER_CODE ?? '').trim();
+const goatcounter = /^[a-z0-9-]+$/i.test(counterCode) ? counterCode : '';
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const image = new URL(`${base}og-image.png`, Astro.site).href;
@@ -40,6 +44,9 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 		<meta property="og:image:height" content="630" />
 		<meta name="twitter:card" content="summary_large_image" />
 		<title>{title}</title>
+		{jsonLd.map((data) => (
+			<script is:inline type="application/ld+json" set:html={JSON.stringify(data).replace(/</g, '\\u003c')}></script>
+		))}
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link
@@ -56,6 +63,19 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 			applyStoredTheme(document.documentElement);
 			document.addEventListener('astro:before-swap', (event) => applyStoredTheme(event.newDocument.documentElement));
 		</script>
+		{goatcounter && <script is:inline id="goatcounter-loader" data-goatcounter={`https://${goatcounter}.goatcounter.com/count`}>
+			(function loadGoatCounter(current) {
+				const nav = navigator;
+				if (window.kodiloCounter || nav.doNotTrack === '1' || window.doNotTrack === '1' || nav.globalPrivacyControl === true) return;
+				window.kodiloCounter = true;
+				const script = document.createElement('script');
+				script.async = true;
+				script.src = 'https://gc.zgo.at/count.js';
+				script.dataset.goatcounter = current.dataset.goatcounter;
+				document.head.appendChild(script);
+				document.addEventListener('astro:after-swap', () => window.goatcounter?.count?.({ path: location.pathname }));
+			})(document.currentScript);
+		</script>}
 		<Pwa />
 		<ClientRouter />
 	</head>

@@ -1,8 +1,10 @@
 ---
 import Base from '../layouts/Base.astro';
 import Header from './Header.astro';
+import Breadcrumbs from './Breadcrumbs.astro';
 import ShareButton from './ShareButton.astro';
 import { icon } from '../scripts/icons';
+import { bugReportUrl, toolCrumbs, toolJsonLd } from '../scripts/seo';
 
 interface Props {
 	slug: string;
@@ -11,12 +13,16 @@ interface Props {
 }
 
 const { slug, title, description } = Astro.props;
+const crumbs = toolCrumbs(slug, title);
+const jsonLd = toolJsonLd(Astro.site, slug, title, description);
+const reportUrl = bugReportUrl(Astro.site, slug, title);
 ---
 
-<Base title={`${title} — kodilo`} description={description}>
+<Base title={`${title} — kodilo`} description={description} jsonLd={jsonLd}>
 	<div class="shell">
 		<Header activeSlug={slug} />
 		<main class="tool" id="main" tabindex="-1">
+			<Breadcrumbs crumbs={crumbs} />
 			<header class="tool-head">
 				<div class="tool-title">
 					<h1>{title}</h1>
@@ -29,6 +35,11 @@ const { slug, title, description } = Astro.props;
 				<ShareButton />
 			</header>
 			<slot />
+			<p class="tool-report">
+				<a href={reportUrl} target="_blank" rel="noopener">
+					Report a problem with this tool
+				</a>
+			</p>
 		</main>
 	</div>
 </Base>
@@ -69,6 +80,17 @@ const { slug, title, description } = Astro.props;
 		margin: 4px 0 0;
 		color: var(--ink-soft);
 		font-size: 14px;
+	}
+	.tool-report {
+		margin: 12px 0 0;
+		font-size: 13px;
+	}
+	.tool-report a {
+		color: var(--ink-soft);
+	}
+	.tool-report a:hover,
+	.tool-report a:focus-visible {
+		color: var(--accent-strong);
 	}
 	.pin-btn {
 		display: inline-flex;
