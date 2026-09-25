@@ -1,0 +1,613 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const ips = ['203.0.113.24', '198.51.100.7', '192.0.2.91', '203.0.113.24', '66.249.66.1', '203.0.113.88', '198.51.100.7', '40.77.167.12'];
+const paths = [
+	'/',
+	'/pricing',
+	'/api/orders',
+	'/blog/astro-7',
+	'/login',
+	'/api/orders/1042',
+	'/static/app.css',
+	'/wp-login.php',
+	'/robots.txt',
+	'/api/search?q=shoes',
+];
+const agents = [
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36',
+	'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36',
+	'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+	'curl/8.9.1',
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+	'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+];
+const refs = ['-', 'https://www.google.com/', 'https://example.com/pricing', '-', 'https://news.ycombinator.com/', '-'];
+const statusFor = (i: number) => (i % 17 === 5 ? 500 : i % 11 === 3 ? 404 : i % 13 === 7 ? 302 : i % 19 === 9 ? 503 : i % 9 === 4 ? 304 : 200);
+const pad = (n: number) => String(n).padStart(2, '0');
+const sample = Array.from({ length: 72 }, (_, i) => {
+	const ip = ips[(i * 5) % ips.length];
+	const path = paths[(i * 7) % paths.length];
+	const status = path === '/wp-login.php' ? 404 : statusFor(i);
+	const method = path.startsWith('/api/orders') && i % 3 === 0 ? 'POST' : 'GET';
+	const minute = Math.floor((i * 41) / 60);
+	const second = (i * 41) % 60;
+	const bytes = status === 304 ? 0 : 300 + ((i * 937) % 18000);
+	return `${ip} - - [24/Sep/2026:14:${pad(minute)}:${pad(second)} +0000] "${method} ${path} HTTP/1.1" ${status} ${bytes} "${refs[i % refs.length]}" "${agents[(i * 5) % agents.length]}"`;
+}).join('\n');
+---
+
+<ToolShell
+	slug="access-log-analyzer"
+	title="Access Log Analyzer"
+	description="Paste nginx or Apache access logs to get totals, status codes, top IPs, URLs, user agents and referrers, traffic over time and every error, all analyzed in your browser."
+>
+	<div class="al" id="al-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span>Access log</span>
+				<span class="al-format" id="al-format"></span>
+			</div>
+			<textarea id="al-in" spellcheck="false" aria-label="Access log lines">{sample}</textarea>
+		</section>
+		<div class="toolbar">
+			<div class="seg" id="al-mode" role="group" aria-label="Log format">
+				<button data-value="auto" aria-pressed="true">
+					Auto-detect
+				</button>
+				<button data-value="custom">Custom format</button>
+			</div>
+			<input class="al-search" id="al-q" type="search" placeholder="Filter: IP, path, status, agent" aria-label="Filter log lines" />
+		</div>
+		<div class="field" id="al-custom-box" hidden>
+			<label for="al-custom">log_format or LogFormat</label>
+			<input
+				id="al-custom"
+				spellcheck="false"
+				value='$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"'
+			/>
+			<span class="field-note">nginx variables like $remote_addr or Apache directives like %h %t "%r" %&gt;s %b.</span>
+		</div>
+		<div class="error" id="al-error" hidden></div>
+		<p class="al-note">Logs are parsed locally. Nothing you paste leaves your browser.</p>
+		<div class="stats" id="al-stats" aria-live="polite"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Requests over time</span>
+				<span class="al-format" id="al-bucket"></span>
+			</div>
+			<div class="al-chart" id="al-chart"></div>
+		</section>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">Status codes</div>
+				<ul class="al-bars" id="al-status"></ul>
+			</section>
+			<section class="panel">
+				<div class="panel-head">Bots vs humans</div>
+				<ul class="al-bars" id="al-bots"></ul>
+			</section>
+		</div>
+		<div class="grid-2" id="al-tops"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Client and server errors</span>
+				<button class="btn" id="al-copy">
+					Copy
+				</button>
+			</div>
+			<div class="al-scroll" tabindex="0" role="region" aria-label="Error requests, scrollable">
+				<table class="al-table">
+					<thead>
+						<tr>
+							<th>Time</th>
+							<th>Status</th>
+							<th>IP</th>
+							<th>Request</th>
+						</tr>
+					</thead>
+					<tbody id="al-errors"></tbody>
+				</table>
+			</div>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Hit = { ip: string; time: Date | null; method: string; path: string; status: number; bytes: number; ref: string; ua: string; raw: string };
+
+	const MONTHS: Record<string, number> = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+	const BOT = /bot|crawl|spider|slurp|curl|wget|python|httpclient|okhttp|go-http|headless|monitor|scan|java\/|libwww|facebookexternalhit|preview/i;
+	const COMBINED = /^(\S+) \S+ (\S+) \[([^\]]+)\] "([^"]*)" (\d{3}) (\S+)(?: "([^"]*)" "([^"]*)")?/;
+
+	const parseTime = (s: string) => {
+		const m = s.match(/^(\d{2})\/(\w{3})\/(\d{4}):(\d{2}):(\d{2}):(\d{2})\s*([+-]\d{4})?/);
+		if (!m) {
+			const d = new Date(s);
+			return Number.isNaN(d.getTime()) ? null : d;
+		}
+		const offset = m[7] ? (m[7][0] === '-' ? -1 : 1) * (Number(m[7].slice(1, 3)) * 60 + Number(m[7].slice(3))) : 0;
+		return new Date(Date.UTC(+m[3], MONTHS[m[2]] ?? 0, +m[1], +m[4], +m[5], +m[6]) - offset * 60000);
+	};
+
+	const splitRequest = (r: string) => {
+		const [method = '-', path = r, proto] = r.split(' ');
+		return proto || path ? { method, path: path || '-' } : { method: '-', path: r };
+	};
+
+	const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+	const NAMES: Record<string, string> = {
+		remote_addr: 'ip',
+		h: 'ip',
+		a: 'ip',
+		time_local: 'time',
+		time_iso8601: 'time',
+		t: 'time',
+		request: 'request',
+		r: 'request',
+		status: 'status',
+		'>s': 'status',
+		s: 'status',
+		body_bytes_sent: 'bytes',
+		bytes_sent: 'bytes',
+		b: 'bytes',
+		B: 'bytes',
+		http_referer: 'ref',
+		'{Referer}i': 'ref',
+		http_user_agent: 'ua',
+		'{User-agent}i': 'ua',
+		'{User-Agent}i': 'ua',
+	};
+
+	const compile = (format: string) => {
+		const names: string[] = [];
+		const token = /\$([a-z_0-9]+)|%(>?[a-zA-Z]|\{[^}]+\}[a-zA-Z])/g;
+		let source = '^';
+		let last = 0;
+		for (const m of format.matchAll(token)) {
+			source += escape(format.slice(last, m.index)).replace(/ /g, '\\s+');
+			const before = format[m.index - 1];
+			names.push(NAMES[m[1] ?? m[2]] ?? '');
+			last = m.index + m[0].length;
+			const after = format[last];
+			source +=
+				before === '"'
+					? '([^"]*)'
+					: before === '['
+						? '([^\\]]+)'
+						: after && after !== ' ' && after !== '$' && after !== '%'
+							? `([^${escape(after)}]*)`
+							: '(\\S+)';
+		}
+		source += escape(format.slice(last)).replace(/ /g, '\\s+');
+		if (!names.includes('status')) throw new Error('The format needs a status field: $status or %>s.');
+		const re = new RegExp(source);
+		return (line: string): Hit | null => {
+			const m = line.match(re);
+			if (!m) return null;
+			const f: Record<string, string> = {};
+			names.forEach((n, i) => n && (f[n] = m[i + 1]));
+			const time = (f.time ?? '').replace(/^\[|\]$/g, '');
+			const req = splitRequest(f.request ?? '');
+			return {
+				ip: f.ip ?? '-',
+				time: time ? parseTime(time) : null,
+				method: req.method,
+				path: req.path,
+				status: Number(f.status),
+				bytes: Number(f.bytes) || 0,
+				ref: f.ref ?? '-',
+				ua: f.ua ?? '-',
+				raw: line,
+			};
+		};
+	};
+
+	const parseAuto = (line: string): Hit | null => {
+		const m = line.match(COMBINED);
+		if (!m) return null;
+		const req = splitRequest(m[4]);
+		return {
+			ip: m[1],
+			time: parseTime(m[3]),
+			method: req.method,
+			path: req.path,
+			status: Number(m[5]),
+			bytes: Number(m[6]) || 0,
+			ref: m[7] ?? '-',
+			ua: m[8] ?? '-',
+			raw: line,
+		};
+	};
+
+	const el = (tag: string, cls = '', text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	const fmtBytes = (n: number) => {
+		const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+		let i = 0;
+		while (n >= 1024 && i < units.length - 1) {
+			n /= 1024;
+			i++;
+		}
+		return `${n.toFixed(i ? 1 : 0)} ${units[i]}`;
+	};
+
+	const count = <T,>(items: T[], key: (t: T) => string) => {
+		const map = new Map<string, number>();
+		items.forEach((t) => {
+			const k = key(t);
+			map.set(k, (map.get(k) ?? 0) + 1);
+		});
+		return [...map.entries()].sort((a, b) => b[1] - a[1]);
+	};
+
+	const bars = (rows: [string, number][], total: number, cls: (k: string) => string = () => '') =>
+		rows.map(([k, n]) => {
+			const li = el('li', cls(k));
+			const pct = total ? (n / total) * 100 : 0;
+			const label = el('span', 'al-bar-label');
+			label.append(el('span', 'al-key', k), el('span', 'al-num', `${n} · ${pct.toFixed(1)}%`));
+			const track = el('span', 'al-track');
+			track.setAttribute('aria-hidden', 'true');
+			const fill = el('span', 'al-fill');
+			fill.style.width = `${pct}%`;
+			track.append(fill);
+			li.append(label, track);
+			return li;
+		});
+
+	const statusClass = (k: string) => (k.startsWith('5') ? 's5' : k.startsWith('4') ? 's4' : k.startsWith('3') ? 's3' : 's2');
+
+	const time = (d: Date | null) => (d ? d.toISOString().replace('T', ' ').slice(0, 19) : '-');
+
+	const chart = (hits: Hit[]) => {
+		const times = hits.map((h) => h.time?.getTime()).filter((t): t is number => t !== undefined);
+		const box = byId('al-chart');
+		if (!times.length) {
+			box.replaceChildren(el('p', 'al-empty', 'No timestamps found.'));
+			byId('al-bucket').textContent = '';
+			return;
+		}
+		const min = Math.min(...times);
+		const max = Math.max(...times);
+		const steps: [number, string][] = [
+			[60e3, 'per minute'],
+			[300e3, 'per 5 minutes'],
+			[900e3, 'per 15 minutes'],
+			[3600e3, 'per hour'],
+			[6 * 3600e3, 'per 6 hours'],
+			[86400e3, 'per day'],
+		];
+		const [size, label] = steps.find(([s]) => (max - min) / s <= 60) ?? steps[steps.length - 1];
+		const start = Math.floor(min / size) * size;
+		const n = Math.floor((max - start) / size) + 1;
+		const buckets = Array.from({ length: n }, () => ({ ok: 0, err: 0 }));
+		hits.forEach((h) => {
+			if (!h.time) return;
+			const b = buckets[Math.floor((h.time.getTime() - start) / size)];
+			if (h.status >= 400) b.err++;
+			else b.ok++;
+		});
+		const peak = Math.max(...buckets.map((b) => b.ok + b.err), 1);
+		const W = 600;
+		const H = 160;
+		const bw = W / n;
+		const ns = 'http://www.w3.org/2000/svg';
+		const svg = document.createElementNS(ns, 'svg');
+		svg.setAttribute('viewBox', `0 0 ${W} ${H + 20}`);
+		svg.setAttribute('role', 'img');
+		const peakIndex = buckets.findIndex((b) => b.ok + b.err === peak);
+		svg.setAttribute(
+			'aria-label',
+			`${hits.length} requests ${label}, from ${time(new Date(start))} to ${time(new Date(max))} UTC. Peak of ${peak} at ${time(new Date(start + peakIndex * size))}.`,
+		);
+		buckets.forEach((b, i) => {
+			const g = document.createElementNS(ns, 'g');
+			const title = document.createElementNS(ns, 'title');
+			title.textContent = `${time(new Date(start + i * size))}: ${b.ok + b.err} requests, ${b.err} errors`;
+			g.append(title);
+			[
+				[b.ok, 0, 'al-ok'],
+				[b.err, b.ok, 'al-err'],
+			].forEach(([v, offset, cls]) => {
+				if (!v) return;
+				const r = document.createElementNS(ns, 'rect');
+				const h = ((v as number) / peak) * H;
+				r.setAttribute('x', String(i * bw + bw * 0.1));
+				r.setAttribute('width', String(Math.max(bw * 0.8, 1)));
+				r.setAttribute('y', String(H - (((offset as number) + (v as number)) / peak) * H));
+				r.setAttribute('height', String(h));
+				r.setAttribute('rx', '2');
+				r.setAttribute('class', cls as string);
+				g.append(r);
+			});
+			svg.append(g);
+		});
+		[
+			[0, 'start', time(new Date(start)).slice(11, 16)],
+			[W, 'end', time(new Date(start + (n - 1) * size)).slice(11, 16)],
+		].forEach(([x, anchor, text]) => {
+			const t = document.createElementNS(ns, 'text');
+			t.setAttribute('x', String(x));
+			t.setAttribute('y', String(H + 16));
+			t.setAttribute('text-anchor', anchor as string);
+			t.setAttribute('class', 'al-axis');
+			t.textContent = text as string;
+			svg.append(t);
+		});
+		box.replaceChildren(svg);
+		byId('al-bucket').textContent = `${label} · peak ${peak}`;
+	};
+
+	onPage('al-tool', () => {
+		const input = byId<HTMLTextAreaElement>('al-in');
+		const q = byId<HTMLInputElement>('al-q');
+		const custom = byId<HTMLInputElement>('al-custom');
+		let mode = 'auto';
+		let errorsText = '';
+
+		const render = () => {
+			const err = byId('al-error');
+			err.hidden = true;
+			let parse = parseAuto;
+			if (mode === 'custom') {
+				try {
+					parse = compile(custom.value.trim());
+				} catch (e) {
+					err.hidden = false;
+					err.textContent = e instanceof Error ? e.message : 'Invalid format.';
+					return;
+				}
+			}
+			const lines = input.value.split('\n').filter((l) => l.trim());
+			const parsed = lines.map((l) => parse(l.trim()));
+			const valid = parsed.filter((h): h is Hit => !!h);
+			const skipped = parsed.length - valid.length;
+			const needle = q.value.trim().toLowerCase();
+			const hits = needle ? valid.filter((h) => h.raw.toLowerCase().includes(needle)) : valid;
+			const combined = valid.some((h) => h.ua !== '-');
+			byId('al-format').textContent = valid.length ? (mode === 'custom' ? 'Custom format' : combined ? 'Combined format' : 'Common format') : '';
+			if (lines.length && !valid.length) {
+				err.hidden = false;
+				err.textContent =
+					mode === 'custom'
+						? 'No line matches this format. Check spaces, quotes and brackets.'
+						: 'No line looks like the nginx or Apache combined or common format. Try Custom format.';
+			}
+			const bots = hits.filter((h) => BOT.test(h.ua));
+			const errors = hits.filter((h) => h.status >= 400);
+			const stats: [string, string][] = [
+				[String(hits.length), needle ? `requests matching, of ${valid.length}` : 'requests'],
+				[String(new Set(hits.map((h) => h.ip)).size), 'unique IPs'],
+				[fmtBytes(hits.reduce((n, h) => n + h.bytes, 0)), 'sent'],
+				[`${hits.length ? ((errors.length / hits.length) * 100).toFixed(1) : '0'}%`, 'errors (4xx and 5xx)'],
+				[`${hits.length ? ((bots.length / hits.length) * 100).toFixed(0) : '0'}%`, 'from bots'],
+				...(skipped ? ([[String(skipped), 'lines skipped']] as [string, string][]) : []),
+			];
+			byId('al-stats').replaceChildren(
+				...stats.map(([v, l]) => {
+					const s = el('div', 'stat');
+					s.append(el('b', '', v), el('span', '', l));
+					return s;
+				}),
+			);
+			chart(hits);
+			const classes = count(hits, (h) => `${String(h.status)[0]}xx`).sort((a, b) => a[0].localeCompare(b[0]));
+			const codes = count(hits, (h) => String(h.status)).sort((a, b) => a[0].localeCompare(b[0]));
+			byId('al-status').replaceChildren(...bars(classes, hits.length, (k) => `${statusClass(k)} al-class`), ...bars(codes, hits.length, statusClass));
+			byId('al-bots').replaceChildren(
+				...bars(
+					[
+						['Humans', hits.length - bots.length],
+						['Bots and scripts', bots.length],
+					],
+					hits.length,
+				),
+				...bars(count(bots, (h) => (h.ua.match(/[\w-]*(?:bot|crawl|spider|slurp|curl|wget|python)[\w./-]*/i) ?? [h.ua])[0]).slice(0, 5), hits.length),
+			);
+			const tops: [string, [string, number][]][] = [
+				['Top IPs', count(hits, (h) => h.ip)],
+				['Top URLs', count(hits, (h) => `${h.method} ${h.path}`)],
+				['Top user agents', count(hits, (h) => h.ua)],
+				['Top referrers', count(hits, (h) => h.ref)],
+			];
+			byId('al-tops').replaceChildren(
+				...tops.map(([title, rows]) => {
+					const sec = el('section', 'panel');
+					const head = el('div', 'panel-head', title);
+					const list = el('ol', 'al-bars al-top');
+					list.setAttribute('aria-label', title);
+					list.append(...bars(rows.slice(0, 8), hits.length));
+					if (!rows.length) list.append(el('li', 'al-empty', 'Nothing yet.'));
+					sec.append(head, list);
+					return sec;
+				}),
+			);
+			const tbody = byId('al-errors');
+			tbody.replaceChildren(
+				...errors.slice(0, 200).map((h) => {
+					const tr = el('tr', statusClass(String(h.status)));
+					tr.append(el('td', '', time(h.time)), el('td', 'al-code', String(h.status)), el('td', '', h.ip), el('td', 'al-req', `${h.method} ${h.path}`));
+					return tr;
+				}),
+			);
+			if (!errors.length) {
+				const tr = el('tr');
+				const td = el('td', 'al-empty', 'No 4xx or 5xx responses.');
+				td.setAttribute('colspan', '4');
+				tr.append(td);
+				tbody.append(tr);
+			}
+			errorsText = errors.map((h) => h.raw).join('\n');
+		};
+
+		segmented(byId('al-mode'), (v) => {
+			mode = v;
+			byId('al-custom-box').hidden = v !== 'custom';
+			render();
+		});
+		input.addEventListener('input', render);
+		q.addEventListener('input', render);
+		custom.addEventListener('input', render);
+		copyButton(byId('al-copy'), () => errorsText);
+		render();
+	});
+</script>
+
+<style>
+	.al {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.al-format {
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 600;
+	}
+	.al-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.al-search {
+		flex: 1 1 220px;
+		min-width: 0;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 8px 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font: inherit;
+	}
+	.al-search:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 2px;
+	}
+	.field > input#al-custom {
+		font-size: 14px;
+	}
+	.al-chart {
+		padding: 12px 14px;
+	}
+	.al-chart :global(svg) {
+		display: block;
+		width: 100%;
+		height: auto;
+	}
+	.al-chart :global(.al-ok) {
+		fill: var(--accent-strong);
+	}
+	.al-chart :global(.al-err) {
+		fill: var(--warn);
+	}
+	.al-chart :global(.al-axis) {
+		fill: var(--ink-soft);
+		font-size: 12px;
+		font-family: var(--sans);
+	}
+	.al-bars {
+		list-style: none;
+		margin: 0;
+		padding: 10px 14px 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.al-bars :global(li) {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		min-width: 0;
+	}
+	.al-bars :global(.al-bar-label) {
+		display: flex;
+		justify-content: space-between;
+		gap: 10px;
+		font-size: 13px;
+		min-width: 0;
+	}
+	.al-bars :global(.al-key) {
+		font-family: var(--mono);
+		font-size: 12px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		min-width: 0;
+	}
+	.al-bars :global(.al-num) {
+		flex: none;
+		color: var(--ink-soft);
+		font-variant-numeric: tabular-nums;
+	}
+	.al-bars :global(.al-class .al-key) {
+		font-weight: 700;
+	}
+	.al-bars :global(.al-track) {
+		height: 5px;
+		border-radius: 3px;
+		background: var(--surface-2);
+		overflow: hidden;
+	}
+	.al-bars :global(.al-fill) {
+		display: block;
+		height: 100%;
+		background: var(--accent-strong);
+	}
+	.al-bars :global(.s4 .al-fill),
+	.al-bars :global(.s5 .al-fill) {
+		background: var(--warn);
+	}
+	.al-bars :global(.s3 .al-fill) {
+		background: var(--ink-soft);
+	}
+	.al-scroll {
+		overflow-x: auto;
+		max-height: 360px;
+	}
+	.al-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	.al-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 13px;
+		font-variant-numeric: tabular-nums;
+	}
+	.al-table th,
+	.al-table :global(td) {
+		padding: 6px 10px;
+		border-bottom: 1px solid var(--border);
+		text-align: left;
+		white-space: nowrap;
+	}
+	.al-table th {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.al-table :global(.al-req) {
+		font-family: var(--mono);
+		font-size: 12px;
+	}
+	.al-table :global(.s5 .al-code),
+	.al-table :global(.s4 .al-code) {
+		color: var(--warn);
+		font-weight: 700;
+	}
+	.al :global(.al-empty) {
+		color: var(--ink-soft);
+		font-size: 13px;
+		margin: 0;
+	}
+</style>

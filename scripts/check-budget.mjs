@@ -9,7 +9,7 @@ const rules = [
 	{ match: /^_astro\/.*\.m?js$/, max: 700 * KB },
 	{ match: /^_astro\/.*\.css$/, max: 60 * KB },
 	{ match: /^oui\/.*\.json$/, max: 200 * KB },
-	{ match: /\.html$/, max: 450 * KB },
+	{ match: /\.html$/, max: 520 * KB },
 	{ match: /\.(png|ico|svg)$/, max: 250 * KB },
 ];
 

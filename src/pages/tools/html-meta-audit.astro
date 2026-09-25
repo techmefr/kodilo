@@ -1,0 +1,411 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="html-meta-audit"
+	title="HTML Meta Audit"
+	description="Paste a page's HTML and audit its title, description, canonical, robots, Open Graph and Twitter cards, icons, hreflang, headings, image alt text and JSON-LD, with a score and a social card preview."
+>
+	<div class="ma" id="ma-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span id="ma-html-label">HTML</span>
+				<button class="btn" id="ma-reset">
+					Reset sample
+				</button>
+			</div>
+			<textarea id="ma-html" spellcheck="false" aria-labelledby="ma-html-label"></textarea>
+		</section>
+		<div class="stats" aria-live="polite">
+			<div class="stat">
+				<b id="ma-score">0</b>
+				<span>Score out of 100</span>
+			</div>
+			<div class="stat">
+				<b id="ma-pass">0</b>
+				<span>Passed</span>
+			</div>
+			<div class="stat">
+				<b id="ma-warn">0</b>
+				<span>Warnings</span>
+			</div>
+			<div class="stat">
+				<b id="ma-fail">0</b>
+				<span>Failed</span>
+			</div>
+		</div>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">
+					<span>Social card preview</span>
+				</div>
+				<div class="ma-card">
+					<div class="ma-card-img" id="ma-card-img"></div>
+					<div class="ma-card-body">
+						<span id="ma-card-host"></span>
+						<b id="ma-card-title"></b>
+						<p id="ma-card-desc"></p>
+					</div>
+				</div>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span>Headings outline</span>
+				</div>
+				<ol class="ma-outline" id="ma-outline"></ol>
+			</section>
+		</div>
+		<div id="ma-groups" class="ma-groups"></div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	const sample = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acme Analytics — Privacy-first product analytics</title>
+  <meta name="description" content="Understand how people use your product without cookies. Funnels, retention and live dashboards.">
+  <link rel="canonical" href="https://acme.example/">
+  <meta name="robots" content="index, follow">
+  <link rel="alternate" hreflang="en" href="https://acme.example/">
+  <link rel="alternate" hreflang="fr" href="https://acme.example/fr/">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Acme Analytics">
+  <meta property="og:description" content="Privacy-first product analytics for modern teams.">
+  <meta property="og:url" content="https://acme.example/">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"Organization","name":"Acme","url":"https://acme.example/"}
+  ${'<'}/script>
+</head>
+<body>
+  <h1>Product analytics without the creepiness</h1>
+  <h3>Funnels</h3>
+  <img src="/funnel.png">
+  <h2>Retention</h2>
+  <img src="/retention.png" alt="Weekly retention chart">
+</body>
+</html>`;
+
+	type Status = 'pass' | 'warn' | 'fail';
+	type Item = { status: Status; label: string; detail: string };
+
+	onPage('ma-tool', () => {
+		const input = byId<HTMLTextAreaElement>('ma-html');
+		input.value = sample;
+
+		const audit = () => {
+			const doc = new DOMParser().parseFromString(input.value, 'text/html');
+			const meta = (key: string) => doc.querySelector(`meta[name="${key}" i], meta[property="${key}" i]`)?.getAttribute('content')?.trim() ?? '';
+			const groups: Record<string, Item[]> = {};
+			const add = (group: string, status: Status, label: string, detail: string) => (groups[group] ??= []).push({ status, label, detail });
+			const length = (group: string, label: string, value: string, min: number, max: number) => {
+				if (!value) add(group, 'fail', label, 'Missing.');
+				else if (value.length < min || value.length > max) add(group, 'warn', label, `${value.length} characters, aim for ${min} to ${max}.`);
+				else add(group, 'pass', label, `${value.length} characters.`);
+			};
+
+			const title = doc.querySelector('title')?.textContent?.trim() ?? '';
+			const desc = meta('description');
+			length('Basics', 'Title', title, 30, 60);
+			length('Basics', 'Meta description', desc, 70, 160);
+			const lang = doc.documentElement.getAttribute('lang');
+			add('Basics', lang ? 'pass' : 'fail', 'Language', lang ? `lang="${lang}"` : 'Add a lang attribute to the html element.');
+			const charset = doc.querySelector('meta[charset]') || doc.querySelector('meta[http-equiv="content-type" i]');
+			add('Basics', charset ? 'pass' : 'fail', 'Charset', charset ? 'Declared.' : 'Add <meta charset="utf-8">.');
+			const viewport = meta('viewport');
+			add(
+				'Basics',
+				viewport.includes('width=device-width') ? 'pass' : viewport ? 'warn' : 'fail',
+				'Viewport',
+				viewport || 'Missing, mobile browsers will zoom out.',
+			);
+
+			const canonical = doc.querySelector('link[rel="canonical" i]')?.getAttribute('href') ?? '';
+			add(
+				'Indexing',
+				canonical ? (/^https?:\/\//.test(canonical) ? 'pass' : 'warn') : 'warn',
+				'Canonical',
+				canonical ? (/^https?:\/\//.test(canonical) ? canonical : `${canonical} should be an absolute URL.`) : 'No canonical link.',
+			);
+			const robots = meta('robots');
+			add(
+				'Indexing',
+				/noindex/i.test(robots) ? 'warn' : 'pass',
+				'Robots',
+				robots ? (/noindex/i.test(robots) ? `${robots}, the page will not be indexed.` : robots) : 'Not set, defaults to index, follow.',
+			);
+			const alternates = [...doc.querySelectorAll('link[rel="alternate" i][hreflang]')];
+			if (!alternates.length) add('Indexing', 'pass', 'hreflang', 'None, fine for a single-language site.');
+			else {
+				const codes = alternates.map((l) => l.getAttribute('hreflang')!.toLowerCase());
+				const self = lang && codes.includes(lang.toLowerCase());
+				add(
+					'Indexing',
+					self ? 'pass' : 'warn',
+					'hreflang',
+					`${codes.join(', ')}${self ? '' : `. No entry for the page language${lang ? ` ${lang}` : ''}.`}${codes.includes('x-default') ? '' : ' Consider an x-default.'}`,
+				);
+			}
+
+			const og = (k: string) => meta(`og:${k}`);
+			for (const k of ['title', 'description', 'url', 'type'])
+				add('Open Graph', og(k) ? 'pass' : k === 'type' ? 'warn' : 'fail', `og:${k}`, og(k) || 'Missing.');
+			add('Open Graph', og('image') ? 'pass' : 'fail', 'og:image', og('image') || 'Missing, shares will show no picture.');
+			const card = meta('twitter:card');
+			add('Twitter', card ? 'pass' : 'warn', 'twitter:card', card || 'Missing, X falls back to a small summary.');
+			add(
+				'Twitter',
+				meta('twitter:title') || og('title') ? 'pass' : 'warn',
+				'twitter:title',
+				meta('twitter:title') || (og('title') ? 'Falls back to og:title.' : 'Missing.'),
+			);
+			add(
+				'Twitter',
+				meta('twitter:image') || og('image') ? 'pass' : 'warn',
+				'twitter:image',
+				meta('twitter:image') || (og('image') ? 'Falls back to og:image.' : 'Missing.'),
+			);
+
+			const icon = doc.querySelector('link[rel~="icon" i]');
+			add('Icons', icon ? 'pass' : 'fail', 'Favicon', icon?.getAttribute('href') ?? 'No link rel="icon".');
+			const apple = doc.querySelector('link[rel="apple-touch-icon" i]');
+			add('Icons', apple ? 'pass' : 'warn', 'Apple touch icon', apple?.getAttribute('href') ?? 'Missing.');
+			const manifest = doc.querySelector('link[rel="manifest" i]');
+			add('Icons', manifest ? 'pass' : 'warn', 'Web app manifest', manifest?.getAttribute('href') ?? 'Missing.');
+
+			const headings = [...doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6')];
+			const h1 = headings.filter((h) => h.tagName === 'H1').length;
+			add('Content', h1 === 1 ? 'pass' : h1 ? 'warn' : 'fail', 'Single h1', `${h1} h1 found.`);
+			const skips: string[] = [];
+			let prev = 0;
+			const outline = headings.map((h) => {
+				const level = Number(h.tagName[1]);
+				if (prev && level > prev + 1) skips.push(`h${prev} to h${level}`);
+				prev = level;
+				const li = document.createElement('li');
+				li.style.paddingLeft = `${(level - 1) * 14}px`;
+				const tag = document.createElement('code');
+				tag.textContent = `h${level}`;
+				li.append(tag, ` ${h.textContent?.trim() || '(empty)'}`);
+				return li;
+			});
+			add('Content', skips.length ? 'warn' : 'pass', 'Heading levels', skips.length ? `Skipped: ${skips.join(', ')}.` : 'No skipped levels.');
+			const noAlt = [...doc.body.querySelectorAll('img:not([alt])')].map((i) => i.getAttribute('src') ?? '');
+			add(
+				'Content',
+				noAlt.length ? 'fail' : 'pass',
+				'Image alt text',
+				noAlt.length ? `${noAlt.length} without alt: ${noAlt.join(', ')}` : 'Every image has an alt attribute.',
+			);
+			const outlineEl = byId('ma-outline');
+			if (outline.length) outlineEl.replaceChildren(...outline);
+			else {
+				const li = document.createElement('li');
+				li.textContent = 'No headings.';
+				outlineEl.replaceChildren(li);
+			}
+
+			const scripts = [...doc.querySelectorAll('script[type="application/ld+json" i]')];
+			if (!scripts.length) add('Structured data', 'warn', 'JSON-LD', 'No structured data found.');
+			scripts.forEach((s, i) => {
+				try {
+					const data = JSON.parse(s.textContent ?? '');
+					const list = (Array.isArray(data) ? data : (data['@graph'] ?? [data])) as Record<string, unknown>[];
+					const types = list.map((d) => String(d['@type'] ?? 'unknown type')).join(', ');
+					add('Structured data', 'pass', `JSON-LD block ${i + 1}`, `${types}${list[0]?.name ? `, ${list[0].name}` : ''}`);
+				} catch (e) {
+					add('Structured data', 'fail', `JSON-LD block ${i + 1}`, `Invalid JSON: ${(e as Error).message}`);
+				}
+			});
+
+			const all = Object.values(groups).flat();
+			const count = (s: Status) => all.filter((i) => i.status === s).length;
+			byId('ma-score').textContent = String(Math.round(((count('pass') + count('warn') * 0.5) / all.length) * 100));
+			byId('ma-pass').textContent = String(count('pass'));
+			byId('ma-warn').textContent = String(count('warn'));
+			byId('ma-fail').textContent = String(count('fail'));
+			const names: Record<Status, string> = { pass: 'Pass', warn: 'Warn', fail: 'Fail' };
+			byId('ma-groups').replaceChildren(
+				...Object.entries(groups).map(([name, items]) => {
+					const section = document.createElement('section');
+					section.className = 'panel';
+					const head = document.createElement('div');
+					head.className = 'panel-head';
+					const h = document.createElement('h2');
+					h.textContent = name;
+					head.append(h);
+					const ul = document.createElement('ul');
+					ul.className = 'ma-list';
+					ul.append(
+						...items.map((item) => {
+							const li = document.createElement('li');
+							li.dataset.status = item.status;
+							const badge = document.createElement('span');
+							badge.className = 'ma-badge';
+							badge.textContent = names[item.status];
+							const text = document.createElement('div');
+							const b = document.createElement('b');
+							b.textContent = item.label;
+							const p = document.createElement('span');
+							p.textContent = item.detail;
+							text.append(b, p);
+							li.append(badge, text);
+							return li;
+						}),
+					);
+					section.append(head, ul);
+					return section;
+				}),
+			);
+
+			const url = og('url') || canonical;
+			let host = url;
+			try {
+				host = new URL(url).hostname;
+			} catch {}
+			byId('ma-card-host').textContent = host || 'example.com';
+			byId('ma-card-title').textContent = meta('twitter:title') || og('title') || title || 'No title';
+			byId('ma-card-desc').textContent = meta('twitter:description') || og('description') || desc;
+			const image = meta('twitter:image') || og('image');
+			const box = byId('ma-card-img');
+			if (image) {
+				const img = document.createElement('img');
+				img.alt = '';
+				img.referrerPolicy = 'no-referrer';
+				img.src = image;
+				img.addEventListener('error', () => (box.textContent = 'Image could not be loaded'));
+				box.replaceChildren(img);
+			} else box.textContent = 'No og:image';
+		};
+
+		let timer = 0;
+		input.addEventListener('input', () => {
+			clearTimeout(timer);
+			timer = window.setTimeout(audit, 200);
+		});
+		byId('ma-reset').addEventListener('click', () => {
+			input.value = sample;
+			audit();
+		});
+		audit();
+	});
+</script>
+
+<style>
+	.ma {
+		display: grid;
+		gap: 16px;
+	}
+	#ma-html {
+		min-height: 320px;
+		word-break: normal;
+	}
+	.ma-groups {
+		display: grid;
+		gap: 16px;
+	}
+	.ma-groups :global(h2) {
+		margin: 0;
+		font: inherit;
+	}
+	.ma-groups :global(.ma-list) {
+		list-style: none;
+		margin: 0;
+		padding: 4px 14px;
+	}
+	.ma-groups :global(.ma-list li) {
+		display: flex;
+		gap: 12px;
+		align-items: flex-start;
+		padding: 10px 0;
+		border-bottom: 1px solid var(--border);
+		font-size: 14px;
+	}
+	.ma-groups :global(.ma-list li:last-child) {
+		border-bottom: 0;
+	}
+	.ma-groups :global(.ma-list div) {
+		display: grid;
+		gap: 2px;
+		min-width: 0;
+	}
+	.ma-groups :global(.ma-list div span) {
+		color: var(--ink-soft);
+		font-size: 13px;
+		overflow-wrap: anywhere;
+	}
+	.ma-groups :global(.ma-badge) {
+		flex: none;
+		width: 44px;
+		text-align: center;
+		font-size: 12px;
+		font-weight: 700;
+		padding: 2px 0;
+		border-radius: 99px;
+	}
+	.ma-groups :global(li[data-status='pass'] .ma-badge) {
+		background: var(--ok-bg);
+		color: var(--ok);
+	}
+	.ma-groups :global(li[data-status='warn'] .ma-badge) {
+		background: var(--warn-bg);
+		color: var(--warn);
+	}
+	.ma-groups :global(li[data-status='fail'] .ma-badge) {
+		background: var(--bad);
+		color: var(--surface);
+	}
+	.ma-card {
+		margin: 14px;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		overflow: hidden;
+	}
+	.ma-card-img {
+		aspect-ratio: 1.91 / 1;
+		display: grid;
+		place-items: center;
+		background: var(--surface-2);
+		color: var(--ink-soft);
+		font-size: 13px;
+	}
+	.ma-card-img :global(img) {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.ma-card-body {
+		padding: 10px 12px;
+		display: grid;
+		gap: 2px;
+		font-size: 14px;
+	}
+	.ma-card-body span,
+	.ma-card-body p {
+		color: var(--ink-soft);
+		font-size: 13px;
+		margin: 0;
+		overflow-wrap: anywhere;
+	}
+	.ma-outline {
+		list-style: none;
+		margin: 0;
+		padding: 10px 14px;
+		display: grid;
+		gap: 6px;
+		font-size: 14px;
+	}
+	.ma-outline :global(code) {
+		font-family: var(--mono);
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+</style>
