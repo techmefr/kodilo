@@ -275,7 +275,7 @@ const sample = JSON.stringify(har, null, 2);
 
 		const pairsTable = (title: string, pairs: Pair[]) => {
 			const box = el('div', 'hv-block');
-			box.append(el('h3', '', `${title} · ${pairs.length}`));
+			box.append(el('h2', '', `${title} · ${pairs.length}`));
 			if (!pairs.length) {
 				box.append(el('p', 'hv-empty', 'None'));
 				return box;
@@ -318,7 +318,7 @@ const sample = JSON.stringify(har, null, 2);
 			];
 			const body = el('div', 'hv-block');
 			const text = e.response.content?.text;
-			body.append(el('h3', '', 'Response body'));
+			body.append(el('h2', '', 'Response body'));
 			if (text) {
 				let shown = e.response.content?.encoding === 'base64' ? `base64, ${text.length} characters` : text;
 				if (!e.response.content?.encoding && /json/.test(e.response.content?.mimeType ?? '')) {
@@ -337,7 +337,7 @@ const sample = JSON.stringify(har, null, 2);
 			];
 			if (e.request.postData?.text) {
 				const post = el('div', 'hv-block');
-				post.append(el('h3', '', 'Request body'), el('pre', '', e.request.postData.text.slice(0, 4000)));
+				post.append(el('h2', '', 'Request body'), el('pre', '', e.request.postData.text.slice(0, 4000)));
 				blocks.push(post);
 			}
 			blocks.push(pairsTable('Request cookies', e.request.cookies ?? []), pairsTable('Response headers', e.response.headers), body);
@@ -699,7 +699,7 @@ const sample = JSON.stringify(har, null, 2);
 		padding: 12px 14px;
 		min-width: 0;
 	}
-	.hv-detail :global(h3) {
+	.hv-detail :global(h2) {
 		margin: 0 0 6px;
 		font-size: 13px;
 		text-transform: uppercase;
