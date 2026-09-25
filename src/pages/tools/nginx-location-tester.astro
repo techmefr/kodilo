@@ -1,0 +1,476 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `server {
+    listen 80;
+    server_name shop.example.com;
+
+    location = / {
+        return 302 /home;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location ^~ /static/ {
+        root /var/www;
+        expires 30d;
+    }
+
+    location ~* \\.(png|jpe?g|gif|svg|webp)$ {
+        expires 7d;
+        access_log off;
+    }
+
+    location ~ ^/api/v[0-9]+/ {
+        proxy_pass http://api:8080;
+    }
+
+    location /api/ {
+        proxy_pass http://legacy-api:8080;
+    }
+
+    location @fallback {
+        proxy_pass http://app:3000;
+    }
+}`;
+const uris = ['/', '/api/v2/orders?page=2', '/api/health', '/static/logo.png', '/images/hero.JPG', '/checkout'];
+---
+
+<ToolShell
+	slug="nginx-location-tester"
+	title="Nginx Location Tester"
+	description="Paste nginx location blocks and a request URI to see which location wins and why, following nginx's real matching order: exact, longest prefix, ^~, then regex in order."
+>
+	<div class="nl" id="nl-tool" data-uris={JSON.stringify(uris)}>
+		<div class="field">
+			<label for="nl-uri">Request URI</label>
+			<input id="nl-uri" value="/api/v2/orders?page=2" spellcheck="false" autocomplete="off" />
+		</div>
+		<div class="chips" id="nl-uris" role="group" aria-label="Sample URIs"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Server block</span>
+				<button class="btn" id="nl-copy">
+					Copy winning block
+				</button>
+			</div>
+			<textarea id="nl-in" spellcheck="false" aria-label="nginx configuration">{sample}</textarea>
+		</section>
+		<p class="error" id="nl-error" hidden></p>
+		<section class="panel nl-result" aria-live="polite">
+			<div class="panel-head">
+				<span>Winner</span>
+			</div>
+			<div class="nl-win" id="nl-win"></div>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Matching steps</span>
+			</div>
+			<div class="nl-scroll" tabindex="0" role="region" aria-label="Matching flow, scrollable">
+				<svg id="nl-svg" role="img" aria-labelledby="nl-svg-title">
+					<title id="nl-svg-title">Matching flow</title>
+				</svg>
+			</div>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Every location, in file order</span>
+			</div>
+			<ol class="nl-list" id="nl-list"></ol>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Loc = { mod: string; pattern: string; body: string; line: number; re?: RegExp; bad?: string };
+	type Verdict = { loc: Loc; status: 'win' | 'match' | 'skip' | 'miss'; why: string };
+
+	const MOD_NAME: Record<string, string> = {
+		'=': 'exact',
+		'^~': 'prefix, stops regex',
+		'~': 'regex, case-sensitive',
+		'~*': 'regex, case-insensitive',
+		'': 'prefix',
+		'@': 'named',
+	};
+
+	const parse = (text: string): Loc[] => {
+		const locs: Loc[] = [];
+		const re = /(^|[;{}\s])location\s+(=|\^~|~\*|~)?\s*("(?:[^"\\]|\\.)*"|'[^']*'|[^\s{]+)\s*\{/g;
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(text))) {
+			let pattern = m[3];
+			if (/^["']/.test(pattern)) pattern = pattern.slice(1, -1);
+			let mod = m[2] ?? '';
+			if (!mod && pattern.startsWith('@')) mod = '@';
+			let depth = 1;
+			let i = re.lastIndex;
+			for (; i < text.length && depth; i++) {
+				if (text[i] === '{') depth++;
+				else if (text[i] === '}') depth--;
+			}
+			const body = text.slice(re.lastIndex, i - 1);
+			const loc: Loc = { mod, pattern, body, line: text.slice(0, m.index + m[1].length).split('\n').length };
+			if (mod === '~' || mod === '~*') {
+				try {
+					loc.re = new RegExp(pattern.replace(/\(\?P</g, '(?<'), mod === '~*' ? 'i' : '');
+				} catch {
+					loc.bad = 'Not a valid regular expression';
+				}
+			}
+			locs.push(loc);
+		}
+		return locs;
+	};
+
+	const normalize = (raw: string) => {
+		let uri =
+			raw
+				.trim()
+				.replace(/^https?:\/\/[^/]+/i, '')
+				.split(/[?#]/)[0] || '/';
+		try {
+			uri = decodeURIComponent(uri);
+		} catch {
+			uri = uri.trim();
+		}
+		uri = uri.replace(/\/{2,}/g, '/');
+		const out: string[] = [];
+		uri.split('/').forEach((seg, i) => {
+			if (seg === '..') {
+				if (out.length > 1) out.pop();
+			} else if (seg !== '.' || i === 0) out.push(seg);
+		});
+		uri = out.join('/') || '/';
+		return uri.startsWith('/') ? uri : `/${uri}`;
+	};
+
+	const label = (l: Loc) => `location ${l.mod && l.mod !== '@' ? `${l.mod} ` : ''}${l.pattern}`;
+
+	const decide = (locs: Loc[], uri: string) => {
+		const steps: { title: string; detail: string; hit: boolean; reached: boolean }[] = [];
+		const verdicts: Verdict[] = locs.map((loc) => ({ loc, status: 'miss', why: '' }));
+		const v = (l: Loc) => verdicts.find((x) => x.loc === l)!;
+		let winner: Loc | null = null;
+
+		const exact = locs.find((l) => l.mod === '=' && l.pattern === uri);
+		locs
+			.filter((l) => l.mod === '=')
+			.forEach((l) => (v(l).why = l === exact ? 'Exact match: nginx stops searching right here.' : `Exact match only for "${l.pattern}".`));
+		steps.push({ title: '1. Exact (=)', detail: exact ? label(exact) : 'no exact match', hit: !!exact, reached: true });
+		if (exact) winner = exact;
+
+		const prefixes = locs.filter((l) => l.mod === '' || l.mod === '^~');
+		const hits = prefixes.filter((l) => uri.startsWith(l.pattern));
+		const longest = hits.sort((a, b) => b.pattern.length - a.pattern.length)[0];
+		prefixes.forEach((l) => {
+			if (winner) return ((v(l).why = 'Not checked: an exact match already won.'), (v(l).status = 'skip'));
+			if (!uri.startsWith(l.pattern)) return (v(l).why = `URI does not start with "${l.pattern}".`);
+			v(l).status = 'match';
+			v(l).why = l === longest ? `Longest matching prefix (${l.pattern.length} characters), remembered.` : `Prefix matches but "${longest.pattern}" is longer.`;
+		});
+		steps.push({
+			title: '2. Longest prefix',
+			detail: winner ? 'skipped' : longest ? label(longest) : 'no prefix matches',
+			hit: !winner && !!longest,
+			reached: !winner,
+		});
+
+		if (!winner && longest?.mod === '^~') {
+			winner = longest;
+			v(longest).why = 'Longest prefix has ^~: regex locations are not checked.';
+		}
+		steps.push({
+			title: '3. ^~ on longest?',
+			detail: winner === longest && longest ? 'yes, stop' : longest && !exact ? 'no, go on' : 'skipped',
+			hit: !!longest && winner === longest,
+			reached: !exact && !!longest,
+		});
+
+		const regexes = locs.filter((l) => l.re || l.bad);
+		let regexWin: Loc | null = null;
+		regexes.forEach((l) => {
+			if (winner || regexWin) {
+				v(l).status = 'skip';
+				v(l).why = winner ? 'Not checked: the search already stopped.' : 'Not checked: an earlier regex already matched.';
+				return;
+			}
+			if (l.bad) return (v(l).why = l.bad);
+			if (l.re!.test(uri)) regexWin = l;
+			else v(l).why = `Regex does not match${l.mod === '~' ? ' (case-sensitive)' : ''}.`;
+		});
+		if (regexWin) {
+			winner = regexWin;
+			v(regexWin).why = 'First regex in file order that matches: it beats the remembered prefix.';
+		}
+		steps.push({
+			title: '4. Regex in order',
+			detail: exact || (longest && longest.mod === '^~') ? 'skipped' : regexWin ? label(regexWin) : 'no regex matches',
+			hit: !!regexWin,
+			reached: !exact && !(longest && longest.mod === '^~'),
+		});
+
+		if (!winner && longest) {
+			winner = longest;
+			v(longest).why = 'No regex matched, so the remembered longest prefix is used.';
+		}
+		steps.push({
+			title: '5. Fallback',
+			detail: winner && winner === longest && longest.mod !== '^~' ? label(longest) : winner ? 'not needed' : 'nothing matched: 404',
+			hit: !!winner && winner === longest && longest.mod !== '^~',
+			reached: !!(winner === longest && longest && longest.mod !== '^~') || !winner,
+		});
+
+		locs.filter((l) => l.mod === '@').forEach((l) => (v(l).why = 'Named location: only reachable via try_files, error_page or rewrite.'));
+		if (winner) v(winner).status = 'win';
+		return { winner, steps, verdicts };
+	};
+
+	const NS = 'http://www.w3.org/2000/svg';
+	const s = (tag: string, attrs: Record<string, string | number>, parent: Element, text?: string) => {
+		const e = document.createElementNS(NS, tag);
+		Object.entries(attrs).forEach(([k, val]) => e.setAttribute(k, String(val)));
+		if (text !== undefined) e.textContent = text;
+		parent.appendChild(e);
+		return e;
+	};
+	const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+
+	onPage('nl-tool', () => {
+		const root = byId('nl-tool');
+		const input = byId<HTMLTextAreaElement>('nl-in');
+		const uriInput = byId<HTMLInputElement>('nl-uri');
+		let winnerText = '';
+		const uris = JSON.parse(root.dataset.uris ?? '[]') as string[];
+
+		const render = () => {
+			const locs = parse(input.value);
+			const uri = normalize(uriInput.value);
+			const err = byId('nl-error');
+			err.hidden = !!locs.length;
+			err.textContent = 'No location blocks found.';
+			const { winner, steps, verdicts } = decide(locs, uri);
+			winnerText = winner ? `${label(winner)} {${winner.body}}` : '';
+
+			const win = byId('nl-win');
+			win.replaceChildren();
+			const h = document.createElement('p');
+			h.className = 'nl-head';
+			const code = document.createElement('code');
+			code.textContent = winner ? label(winner) : 'no location';
+			h.append(`${uri} → `, code);
+			const why = document.createElement('p');
+			why.className = 'nl-why';
+			why.textContent = winner
+				? (verdicts.find((x) => x.loc === winner)?.why ?? '')
+				: 'No location matches. nginx serves the request from the server block itself, usually a 404.';
+			win.append(h, why);
+			if (winner) {
+				const pre = document.createElement('pre');
+				pre.className = 'nl-body';
+				pre.textContent = winner.body
+					.replace(/^\n/, '')
+					.replace(/\s+$/, '')
+					.replace(/^ {4,8}/gm, '  ');
+				win.append(pre);
+			}
+
+			const svg = byId('nl-svg') as unknown as SVGSVGElement;
+			svg.querySelectorAll(':scope > g').forEach((g) => g.remove());
+			const W = 150;
+			const gap = 22;
+			const total = steps.length * W + (steps.length - 1) * gap + 8;
+			svg.setAttribute('viewBox', `0 0 ${total} 96`);
+			svg.setAttribute('width', String(total));
+			svg.setAttribute('height', '96');
+			steps.forEach((st, i) => {
+				const x = 4 + i * (W + gap);
+				const g = s('g', { class: `nl-step${st.hit ? ' hit' : ''}${st.reached ? '' : ' off'}` }, svg);
+				s('rect', { x, y: 8, width: W, height: 80, rx: 12 }, g);
+				s('text', { x: x + 12, y: 34, class: 'nl-st' }, g, st.title);
+				s('text', { x: x + 12, y: 58, class: 'nl-sd' }, g, cut(st.detail, 20));
+				if (st.hit) s('text', { x: x + 12, y: 78, class: 'nl-sw' }, g, 'match');
+				if (i < steps.length - 1) s('path', { d: `M${x + W + 4} 48 h${gap - 8}`, class: 'nl-arrow' }, g);
+			});
+			byId('nl-svg-title').textContent = `Matching flow: ${steps.map((st) => `${st.title} ${st.detail}`).join('; ')}`;
+
+			byId('nl-list').replaceChildren(
+				...verdicts.map((vd) => {
+					const li = document.createElement('li');
+					li.className = `nl-item ${vd.status}`;
+					li.dataset.status = vd.status;
+					const top = document.createElement('div');
+					top.className = 'nl-top';
+					const c = document.createElement('code');
+					c.textContent = label(vd.loc);
+					const tag = document.createElement('span');
+					tag.className = 'nl-tag';
+					tag.textContent = vd.status === 'win' ? 'Winner' : vd.status === 'match' ? 'Matches' : vd.status === 'skip' ? 'Skipped' : 'No match';
+					const kind = document.createElement('span');
+					kind.className = 'nl-kind';
+					kind.textContent = `${MOD_NAME[vd.loc.mod]} · line ${vd.loc.line}`;
+					top.append(tag, c, kind);
+					const p = document.createElement('p');
+					p.textContent = vd.why;
+					li.append(top, p);
+					return li;
+				}),
+			);
+			byId('nl-uris')
+				.querySelectorAll<HTMLButtonElement>('button')
+				.forEach((b) => b.setAttribute('aria-pressed', String(b.textContent === uriInput.value)));
+		};
+
+		byId('nl-uris').replaceChildren(
+			...uris.map((u) => {
+				const b = document.createElement('button');
+				b.textContent = u;
+				b.addEventListener('click', () => {
+					uriInput.value = u;
+					render();
+				});
+				return b;
+			}),
+		);
+		input.addEventListener('input', render);
+		uriInput.addEventListener('input', render);
+		copyButton(byId('nl-copy'), () => winnerText);
+		render();
+	});
+</script>
+
+<style>
+	.nl {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.nl-win {
+		padding: 12px 14px;
+	}
+	.nl-win :global(.nl-head) {
+		margin: 0;
+		font-family: var(--mono);
+		font-size: 15px;
+		word-break: break-all;
+	}
+	.nl-win :global(.nl-head code) {
+		color: var(--ok);
+		font-weight: 700;
+	}
+	.nl-win :global(.nl-why) {
+		margin: 6px 0 0;
+		font-size: 14px;
+		color: var(--ink-soft);
+	}
+	.nl-win :global(.nl-body) {
+		margin: 10px 0 0;
+		padding: 10px 12px;
+		background: var(--surface-2);
+		border-radius: 10px;
+		font-family: var(--mono);
+		font-size: 12.5px;
+		white-space: pre-wrap;
+		word-break: break-all;
+	}
+	.nl-scroll {
+		overflow-x: auto;
+		padding: 8px;
+	}
+	.nl-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	#nl-svg {
+		display: block;
+		font-family: var(--sans);
+	}
+	#nl-svg :global(.nl-step rect) {
+		fill: var(--surface-2);
+		stroke: var(--border);
+	}
+	#nl-svg :global(.nl-step.hit rect) {
+		fill: var(--ok-bg);
+		stroke: var(--ok);
+		stroke-width: 2;
+	}
+	#nl-svg :global(.nl-step.off rect) {
+		fill: var(--surface);
+		stroke-dasharray: 4 4;
+	}
+	#nl-svg :global(.nl-step.off text) {
+		fill: var(--ink-soft);
+	}
+	#nl-svg :global(.nl-st) {
+		fill: var(--ink);
+		font-size: 13px;
+		font-weight: 700;
+	}
+	#nl-svg :global(.nl-sd) {
+		fill: var(--ink);
+		font-family: var(--mono);
+		font-size: 11.5px;
+	}
+	#nl-svg :global(.nl-sw) {
+		fill: var(--ok);
+		font-size: 11px;
+		font-weight: 700;
+	}
+	#nl-svg :global(.nl-arrow) {
+		stroke: var(--accent-strong);
+		stroke-width: 2;
+	}
+	.nl-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.nl-list :global(.nl-item) {
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+		border-left: 4px solid transparent;
+	}
+	.nl-list :global(.nl-item.win) {
+		border-left-color: var(--ok);
+		background: var(--ok-bg);
+	}
+	.nl-list :global(.nl-item.match) {
+		border-left-color: var(--warn);
+	}
+	.nl-list :global(.nl-top) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+	}
+	.nl-list :global(code) {
+		font-family: var(--mono);
+		font-size: 13px;
+		word-break: break-all;
+	}
+	.nl-list :global(.nl-tag) {
+		font-size: 12px;
+		font-weight: 700;
+		padding: 2px 8px;
+		border-radius: 999px;
+		background: var(--surface-2);
+		color: var(--ink);
+	}
+	.nl-list :global(.nl-kind) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.nl-list :global(p) {
+		margin: 4px 0 0;
+		font-size: 13.5px;
+		color: var(--ink-soft);
+	}
+	.nl-list :global(.win p) {
+		color: var(--ink);
+	}
+</style>

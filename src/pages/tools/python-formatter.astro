@@ -1,0 +1,317 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `import os,sys
+from dataclasses import dataclass
+@dataclass
+class Order :
+  id : int
+  items : list
+  status : str='pending'
+  def total(self,tax=0.2)->float:
+      subtotal=sum(item['price']*item['qty'] for item in self.items)   #before tax
+      return round(subtotal*(1+tax),2)
+def load_orders(path,limit = 10):
+	"""Read orders from a JSON file.
+
+	Returns at most 'limit' orders."""
+	if not os.path.exists(path) :
+		print('missing file: %s'%path,file=sys.stderr)
+		return []
+	with open(path) as handle:
+		return [Order(**row) for row in json.load(handle)][:limit]
+
+
+
+if __name__=='__main__':
+    print(load_orders("orders.json" , limit=5))
+`;
+---
+
+<ToolShell
+	slug="python-formatter"
+	title="Python Formatter"
+	description="Tidy Python code in the browser: consistent indentation, PEP 8 spacing around operators and commas, normalized quotes and blank lines."
+>
+	<div class="toolbar" id="pyf-tool">
+		<div class="seg" id="pyf-indent" aria-label="Indent">
+			<button data-value="4" aria-pressed="true">
+				4 spaces
+			</button>
+			<button data-value="2" aria-pressed="false">
+				2 spaces
+			</button>
+		</div>
+		<div class="seg" id="pyf-quote" aria-label="Quotes">
+			<button data-value="double" aria-pressed="true">
+				Double quotes
+			</button>
+			<button data-value="single" aria-pressed="false">
+				Single quotes
+			</button>
+			<button data-value="keep" aria-pressed="false">
+				Keep
+			</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" id="pyf-blank" checked /> PEP 8 blank lines
+		</label>
+	</div>
+	<p class="pyf-note">
+		This is a whitespace and style normalizer, not a full Black or Ruff formatter: it re-indents blocks, fixes spacing and quotes, but does not reflow long
+		lines or rewrite expressions. Strings, docstrings and comments are left untouched.
+	</p>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="pyf-in" spellcheck="false" aria-label="Python input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="pyf-status">Output</span>
+				<button class="btn" id="pyf-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="pyf-out" tabindex="0"></pre>
+		</section>
+	</div>
+	<div class="stats">
+		<div class="stat">
+			<b id="pyf-lines">0</b>
+			<span>Lines</span>
+		</div>
+		<div class="stat">
+			<b id="pyf-changed">0</b>
+			<span>Lines changed</span>
+		</div>
+	</div>
+</ToolShell>
+
+<style>
+	.pyf-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+</style>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Options = { unit: string; quote: string; blank: boolean };
+	type Part = { kind: 'code' | 'str' | 'comment'; text: string; open?: string };
+
+	const OPS = /\*\*=|\/\/=|>>=|<<=|==|!=|<=|>=|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|->|:=|=/g;
+
+	const swapQuotes = (text: string, quote: string) => {
+		const m = /^([A-Za-z]{0,2})(['"])([\s\S]*)\2$/.exec(text);
+		if (!m || quote === 'keep') return text;
+		const [, prefix, q, body] = m;
+		const want = quote === 'single' ? "'" : '"';
+		if (q === want || body.includes(want) || body.includes(`\\${q}`)) return text;
+		return prefix + want + body + want;
+	};
+
+	const normalizeCode = (code: string, startDepth: number) => {
+		let s = code.replace(/[ \t]+/g, ' ');
+		s = s.replace(/\s*,\s*/g, ', ').replace(/, ([)\]}])/g, ',$1');
+		s = s.replace(/([([{]) +/g, '$1').replace(/ +([)\]}])/g, '$1');
+		s = s.replace(/ +([:;])/g, '$1');
+		let out = '';
+		let last = 0;
+		for (const m of s.matchAll(OPS)) {
+			const i = m.index ?? 0;
+			const before = s.slice(0, i);
+			const depth = startDepth + (before.match(/[([{]/g)?.length ?? 0) - (before.match(/[)\]}]/g)?.length ?? 0);
+			out += s.slice(last, i).replace(/ +$/, '');
+			out += m[0] === '=' && depth > 0 ? '=' : ` ${m[0]} `;
+			last = i + m[0].length;
+			while (s[last] === ' ') last++;
+		}
+		out += s.slice(last);
+		return out.replace(/ {2,}/g, ' ');
+	};
+
+	const format = (source: string, opt: Options) => {
+		const lines = source.replace(/\r\n?/g, '\n').split('\n');
+		const out: string[] = [];
+		const stack = [0];
+		let triple: string | null = null;
+		let depth = 0;
+		let continued = false;
+		let baseOrig = 0;
+		let baseNew = '';
+
+		for (const raw of lines) {
+			if (triple) {
+				const end = raw.indexOf(triple);
+				if (end < 0) {
+					const body = raw.replace(/\s+$/, '').replace(/^[ \t]+/, (w) => w.replace(/\t/g, '    '));
+					const width = body.length - body.trimStart().length;
+					out.push(body.trim() === '' ? '' : baseNew + ' '.repeat(Math.max(0, width - baseOrig)) + body.trimStart());
+					continue;
+				}
+			}
+			const expanded = raw.replace(/\s+$/, '').replace(/^[ \t]+/, (w) => w.replace(/\t/g, '    '));
+			if (!triple && expanded.trim() === '') {
+				out.push('');
+				continue;
+			}
+			const parts: Part[] = [];
+			let i: number;
+			let prefix: string;
+			if (triple) {
+				const end = expanded.indexOf(triple) + 3;
+				const width = expanded.length - expanded.trimStart().length;
+				prefix = baseNew + ' '.repeat(Math.max(0, width - baseOrig));
+				parts.push({ kind: 'str', text: expanded.slice(width, end) });
+				triple = null;
+				i = end;
+			} else {
+				const width = expanded.length - expanded.trimStart().length;
+				i = width;
+				if (depth > 0 || continued) {
+					prefix = baseNew + ' '.repeat(Math.max(0, width - baseOrig));
+				} else {
+					while (width < stack[stack.length - 1]) stack.pop();
+					if (width > stack[stack.length - 1]) stack.push(width);
+					baseOrig = width;
+					baseNew = opt.unit.repeat(stack.length - 1);
+					prefix = baseNew;
+				}
+			}
+			const lineStartDepth = depth;
+			let code = '';
+			const flush = () => {
+				if (code) parts.push({ kind: 'code', text: code });
+				code = '';
+			};
+			while (i < expanded.length) {
+				const ch = expanded[i];
+				const word = /^[A-Za-z_]\w*/.exec(expanded.slice(i));
+				if (word && !/\w/.test(expanded[i - 1] ?? '')) {
+					const w = word[0];
+					if (w.length <= 2 && /^[rRbBuUfF]+$/.test(w) && /['"]/.test(expanded[i + w.length] ?? '')) {
+						flush();
+						i = readString(expanded, i, w.length, parts);
+						triple = parts[parts.length - 1].open ?? null;
+						continue;
+					}
+					code += w;
+					i += w.length;
+					continue;
+				}
+				if (ch === '#') {
+					flush();
+					parts.push({ kind: 'comment', text: expanded.slice(i) });
+					break;
+				}
+				if (ch === '"' || ch === "'") {
+					flush();
+					i = readString(expanded, i, 0, parts);
+					triple = parts[parts.length - 1].open ?? null;
+					continue;
+				}
+				if ('([{'.includes(ch)) depth++;
+				if (')]}'.includes(ch)) depth = Math.max(0, depth - 1);
+				code += ch;
+				i++;
+			}
+			flush();
+			let d = lineStartDepth;
+			let text = '';
+			parts.forEach((p, idx) => {
+				if (p.kind === 'code') {
+					let c = normalizeCode(p.text, d);
+					if (idx === 0) c = c.replace(/^ /, '');
+					if (idx === parts.length - 1 || parts[idx + 1]?.kind === 'comment') c = c.replace(/ +$/, '');
+					text += c;
+					d += (p.text.match(/[([{]/g)?.length ?? 0) - (p.text.match(/[)\]}]/g)?.length ?? 0);
+				} else if (p.kind === 'str') {
+					text += /^[A-Za-z]{0,2}('''|""")/.test(p.text) ? p.text : swapQuotes(p.text, opt.quote);
+				} else {
+					const body = p.text.replace(/^#(?![!:])\s*/, '# ').replace(/^# $/, '#');
+					text = text === '' ? body : `${text.replace(/ +$/, '')}  ${body}`;
+				}
+			});
+			continued = !triple && /\\$/.test(expanded);
+			out.push((prefix + text).replace(/\s+$/, ''));
+		}
+		return tidyBlankLines(out, opt.blank);
+	};
+
+	function readString(line: string, start: number, prefixLen: number, parts: Part[]) {
+		const q = line[start + prefixLen];
+		const isTriple = line.slice(start + prefixLen, start + prefixLen + 3) === q.repeat(3);
+		const delim = isTriple ? q.repeat(3) : q;
+		let j = start + prefixLen + delim.length;
+		while (j < line.length) {
+			if (line[j] === '\\') {
+				j += 2;
+				continue;
+			}
+			if (line.startsWith(delim, j)) {
+				parts.push({ kind: 'str', text: line.slice(start, j + delim.length) });
+				return j + delim.length;
+			}
+			j++;
+		}
+		parts.push({ kind: 'str', text: line.slice(start), open: isTriple ? delim : undefined });
+		return line.length;
+	}
+
+	function tidyBlankLines(lines: string[], pep8: boolean) {
+		const result: string[] = [];
+		let blanks = 0;
+		lines.forEach((line) => {
+			if (line === '') {
+				blanks++;
+				return;
+			}
+			const top = !/^\s/.test(line);
+			const prev = [...result].reverse().find((l) => l !== '') ?? '';
+			const isDef = /^(async def|def|class)\b|^@/.test(line);
+			let want = Math.min(blanks, top ? 2 : 1);
+			if (pep8 && result.length && top && !prev.startsWith('@') && !prev.startsWith('#')) {
+				if (isDef || lastTopIsDef(result)) want = 2;
+			}
+			if (!result.length) want = 0;
+			for (let k = 0; k < want; k++) result.push('');
+			result.push(line);
+			blanks = 0;
+		});
+		return `${result.join('\n')}\n`;
+	}
+
+	function lastTopIsDef(lines: string[]) {
+		const top = [...lines].reverse().find((l) => l !== '' && !/^\s/.test(l)) ?? '';
+		return /^(async def|def|class)\b/.test(top);
+	}
+
+	onPage('pyf-tool', () => {
+		const input = byId<HTMLTextAreaElement>('pyf-in');
+		const output = byId('pyf-out');
+		const blank = byId<HTMLInputElement>('pyf-blank');
+		let unit = '    ';
+		let quote = 'double';
+
+		const render = () => {
+			const result = format(input.value, { unit, quote, blank: blank.checked });
+			output.textContent = result;
+			const before = input.value.replace(/\r\n?/g, '\n').split('\n');
+			const after = result.split('\n');
+			const changed = after.filter((l, i) => l !== before[i]).length;
+			byId('pyf-lines').textContent = String(after.length - 1);
+			byId('pyf-changed').textContent = String(changed);
+			byId('pyf-status').textContent = 'Formatted';
+		};
+
+		segmented(byId('pyf-indent'), (v) => ((unit = ' '.repeat(Number(v))), render()));
+		segmented(byId('pyf-quote'), (v) => ((quote = v), render()));
+		blank.addEventListener('change', render);
+		input.addEventListener('input', render);
+		copyButton(byId('pyf-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

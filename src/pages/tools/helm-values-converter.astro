@@ -1,0 +1,352 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `replicaCount: 3
+image:
+  repository: ghcr.io/acme/shop-api
+  tag: "2.4.0"
+  pullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+  port: 8080
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+  hosts:
+    - host: shop.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+env:
+  FEATURE_FLAGS: "search,checkout"
+  DEBUG: "false"
+`;
+---
+
+<ToolShell
+	slug="helm-values-converter"
+	title="Helm Values Converter"
+	description="Turn a values.yaml into helm --set flags, or a list of --set flags back into YAML, with dots, commas, arrays and string types escaped correctly."
+>
+	<div class="hv" id="hv-tool">
+		<div class="toolbar">
+			<div class="seg" id="hv-dir" role="group" aria-label="Direction">
+				<button data-value="yaml" aria-pressed="true">
+					values.yaml → --set
+				</button>
+				<button data-value="set">--set → values.yaml</button>
+			</div>
+			<label class="hv-field">
+				<span>Release</span>
+				<input class="num hv-name" id="hv-release" value="shop" spellcheck="false" />
+			</label>
+			<label class="hv-field">
+				<span>Chart</span>
+				<input class="num hv-name" id="hv-chart" value="acme/shop-api" spellcheck="false" />
+			</label>
+		</div>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">
+					<span id="hv-in-label">values.yaml</span>
+				</div>
+				<textarea id="hv-in" spellcheck="false" aria-labelledby="hv-in-label">{sample}</textarea>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span id="hv-out-label">helm command</span>
+					<button class="btn" id="hv-copy">
+						Copy
+					</button>
+				</div>
+				<pre class="out" id="hv-out" tabindex="0" aria-labelledby="hv-out-label"></pre>
+			</section>
+		</div>
+		<p class="error" id="hv-error" hidden></p>
+		<section class="panel">
+			<div class="panel-head">
+				<span>How each key maps</span>
+			</div>
+			<ul class="hv-map" id="hv-map"></ul>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { parse, stringify } from 'yaml';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Flag = { flag: string; path: string; value: string; note: string };
+
+	const escKey = (k: string) => k.replace(/\\/g, '\\\\').replace(/\./g, '\\.').replace(/,/g, '\\,').replace(/=/g, '\\=');
+	const escVal = (v: string) => v.replace(/\\/g, '\\\\').replace(/,/g, '\\,');
+	const quote = (s: string) => (/^[\w./:@=,-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
+	const coerces = (s: string) => /^(true|false|null|~|-?\d+(\.\d+)?([eE][+-]?\d+)?)$/i.test(s) || s === '';
+
+	const flatten = (value: unknown, path: string, out: Flag[]) => {
+		if (Array.isArray(value)) {
+			if (!value.length) out.push({ flag: '--set', path, value: '{}', note: 'Empty list' });
+			value.forEach((v, i) => flatten(v, `${path}[${i}]`, out));
+			return;
+		}
+		if (value && typeof value === 'object') {
+			const entries = Object.entries(value);
+			if (!entries.length) out.push({ flag: '--set-json', path, value: '{}', note: 'Empty map, only --set-json can express it' });
+			entries.forEach(([k, v]) => flatten(v, path ? `${path}.${escKey(k)}` : escKey(k), out));
+			return;
+		}
+		if (value === null) return out.push({ flag: '--set', path, value: 'null', note: 'null removes the key from the chart defaults' });
+		if (typeof value === 'string') {
+			const multi = value.includes('\n');
+			if (multi) return out.push({ flag: '--set-json', path, value: JSON.stringify(value), note: 'Multi-line string, passed as JSON' });
+			if (coerces(value))
+				return out.push({
+					flag: '--set-string',
+					path,
+					value: escVal(value),
+					note: `Kept as the string "${value}" instead of a ${value === '' ? 'null' : 'number or boolean'}`,
+				});
+			return out.push({ flag: '--set', path, value: escVal(value), note: value.includes(',') ? 'Commas escaped so helm does not split the value' : '' });
+		}
+		out.push({ flag: '--set', path, value: String(value), note: typeof value === 'number' ? 'Number' : 'Boolean' });
+	};
+
+	const splitUnescaped = (s: string, ch: string) => {
+		const parts: string[] = [];
+		let cur = '';
+		for (let i = 0; i < s.length; i++) {
+			if (s[i] === '\\' && i + 1 < s.length) {
+				cur += s[i] + s[i + 1];
+				i++;
+			} else if (s[i] === ch) {
+				parts.push(cur);
+				cur = '';
+			} else cur += s[i];
+		}
+		parts.push(cur);
+		return parts;
+	};
+	const unesc = (s: string) => s.replace(/\\(.)/g, '$1');
+
+	const tokenize = (text: string) => {
+		const tokens: string[] = [];
+		const re = /'((?:[^']|'\\'')*)'|"((?:[^"\\]|\\.)*)"|(\\\n)|(\S+)/g;
+		let buf = '';
+		let open = false;
+		let m: RegExpExecArray | null;
+		let last = 0;
+		while ((m = re.exec(text))) {
+			const gap = text.slice(last, m.index);
+			if (open && /\s/.test(gap)) {
+				tokens.push(buf);
+				buf = '';
+				open = false;
+			}
+			last = re.lastIndex;
+			if (m[3]) continue;
+			buf += m[1] !== undefined ? m[1].replace(/'\\''/g, "'") : m[2] !== undefined ? m[2].replace(/\\(["\\$`])/g, '$1') : m[4];
+			open = true;
+		}
+		if (open) tokens.push(buf);
+		return tokens;
+	};
+
+	const setPath = (root: Record<string, unknown>, path: string, value: unknown) => {
+		const segs: (string | number)[] = [];
+		splitUnescaped(path, '.').forEach((part) => {
+			const m = part.match(/^(.*?)((?:\[\d+\])+)$/);
+			if (m) {
+				if (m[1]) segs.push(unesc(m[1]));
+				m[2].match(/\d+/g)!.forEach((n) => segs.push(Number(n)));
+			} else segs.push(unesc(part));
+		});
+		let node: Record<string | number, unknown> = root;
+		segs.forEach((seg, i) => {
+			if (i === segs.length - 1) node[seg] = value;
+			else {
+				if (node[seg] === undefined || typeof node[seg] !== 'object' || node[seg] === null) node[seg] = typeof segs[i + 1] === 'number' ? [] : {};
+				node = node[seg] as Record<string | number, unknown>;
+			}
+		});
+	};
+
+	const typed = (v: string): unknown => {
+		if (v === 'true' || v === 'false') return v === 'true';
+		if (v === 'null') return null;
+		if (/^-?\d+$/.test(v) && Number.isSafeInteger(Number(v))) return Number(v);
+		if (v.startsWith('{') && v.endsWith('}')) return v.slice(1, -1).trim() ? splitUnescaped(v.slice(1, -1), ',').map((x) => typed(unesc(x.trim()))) : [];
+		return v;
+	};
+
+	onPage('hv-tool', () => {
+		const input = byId<HTMLTextAreaElement>('hv-in');
+		let dir = 'yaml';
+		let lastYaml = input.value;
+		let lastSet = '';
+
+		const renderMap = (rows: [string, string, string][]) =>
+			byId('hv-map').replaceChildren(
+				...rows.map(([a, b, note]) => {
+					const li = document.createElement('li');
+					const k = document.createElement('code');
+					k.textContent = a;
+					const v = document.createElement('code');
+					v.textContent = b;
+					const arrow = document.createElement('span');
+					arrow.className = 'hv-arrow';
+					arrow.textContent = '→';
+					arrow.setAttribute('aria-label', 'becomes');
+					li.append(k, arrow, v);
+					if (note) {
+						const n = document.createElement('span');
+						n.className = 'hv-note';
+						n.textContent = note;
+						li.append(n);
+					}
+					return li;
+				}),
+			);
+
+		const render = () => {
+			const err = byId('hv-error');
+			err.hidden = true;
+			const release = byId<HTMLInputElement>('hv-release').value.trim() || 'my-release';
+			const chart = byId<HTMLInputElement>('hv-chart').value.trim() || 'my-chart';
+			try {
+				if (dir === 'yaml') {
+					const data = parse(input.value) ?? {};
+					if (typeof data !== 'object' || Array.isArray(data)) throw new Error('values.yaml must be a map of keys at the top level.');
+					const flags: Flag[] = [];
+					flatten(data, '', flags);
+					const lines = flags.map((f) => `  ${f.flag} ${quote(`${f.path}=${f.value}`)}`);
+					byId('hv-out').textContent = [`helm upgrade --install ${release} ${chart}`, ...lines].join(' \\\n');
+					renderMap(flags.map((f) => [f.path.replace(/\\(.)/g, '$1'), `${f.flag} ${f.path}=${f.value}`, f.note]));
+				} else {
+					const tokens = tokenize(input.value);
+					const data: Record<string, unknown> = {};
+					const rows: [string, string, string][] = [];
+					for (let i = 0; i < tokens.length; i++) {
+						let t = tokens[i];
+						let flag = '';
+						let arg = '';
+						const eq = t.match(/^(--set(?:-string|-json|-file|-literal)?)=(.*)$/);
+						if (eq) [flag, arg] = [eq[1], eq[2]];
+						else if (/^--set(-string|-json|-file|-literal)?$/.test(t)) [flag, arg] = [t, tokens[++i] ?? ''];
+						else continue;
+						t = arg;
+						const pairs = flag === '--set-literal' || flag === '--set-json' ? [t] : splitUnescaped(t, ',');
+						pairs.forEach((pair) => {
+							const idx = splitUnescaped(pair, '=')[0].length;
+							const key = pair.slice(0, idx);
+							const raw = pair.slice(idx + 1);
+							if (!key) return;
+							let value: unknown;
+							let note: string;
+							if (flag === '--set-string' || flag === '--set-literal') {
+								value = flag === '--set-literal' ? raw : unesc(raw);
+								note = 'String';
+							} else if (flag === '--set-json') {
+								value = JSON.parse(raw);
+								note = 'Parsed as JSON';
+							} else if (flag === '--set-file') {
+								value = `<contents of ${raw}>`;
+								note = 'Helm reads this file at install time';
+							} else {
+								value = typed(unesc(raw));
+								note =
+									typeof value === 'string'
+										? 'String'
+										: Array.isArray(value)
+											? 'List'
+											: value === null
+												? 'null removes the key'
+												: typeof value === 'number'
+													? 'Number'
+													: 'Boolean';
+							}
+							setPath(data, key, value);
+							rows.push([`${flag} ${key}=${raw}`, unesc(key), note]);
+						});
+					}
+					if (!rows.length) throw new Error('No --set, --set-string, --set-json or --set-file flags found.');
+					byId('hv-out').textContent = stringify(data);
+					renderMap(rows);
+				}
+			} catch (e) {
+				err.textContent = e instanceof Error ? e.message.split('\n')[0] : String(e);
+				err.hidden = false;
+			}
+		};
+
+		segmented(byId('hv-dir'), (v) => {
+			if (v === dir) return;
+			if (dir === 'yaml') lastYaml = input.value;
+			else lastSet = input.value;
+			const out = byId('hv-out').textContent ?? '';
+			dir = v;
+			input.value = v === 'set' ? lastSet || out : lastYaml || out;
+			byId('hv-in-label').textContent = v === 'yaml' ? 'values.yaml' : 'helm --set flags';
+			byId('hv-out-label').textContent = v === 'yaml' ? 'helm command' : 'values.yaml';
+			render();
+		});
+		input.addEventListener('input', render);
+		byId('hv-release').addEventListener('input', render);
+		byId('hv-chart').addEventListener('input', render);
+		copyButton(byId('hv-copy'), () => byId('hv-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.hv {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.hv-field {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--ink-soft);
+	}
+	.hv-name {
+		width: 140px;
+		font-family: var(--mono);
+	}
+	.hv-map {
+		list-style: none;
+		margin: 0;
+		padding: 8px 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		font-size: 13px;
+	}
+	.hv-map :global(li) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 6px;
+		word-break: break-all;
+	}
+	.hv-map :global(code) {
+		font-family: var(--mono);
+		font-size: 12.5px;
+	}
+	.hv-map :global(.hv-arrow) {
+		color: var(--accent-strong);
+	}
+	.hv-map :global(.hv-note) {
+		color: var(--ink-soft);
+		font-size: 12px;
+		word-break: normal;
+	}
+</style>

@@ -1,0 +1,484 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const psSample = `USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.3 168524 12944 ?        Ss   Sep20   0:14 /sbin/init
+root         412  0.1  0.6  49732 24380 ?        S<s  Sep20   2:03 /lib/systemd/systemd-journald
+postgres     903  0.4  3.1 219004 125300 ?       Ss   Sep20  21:40 postgres: 16/main: checkpointer
+www-data    1204  2.3  1.2 412088 48212 ?        S    09:12   1:02 nginx: worker process
+app         2231 87.5 18.4 3912440 741220 ?      Rl   10:02  52:11 node /srv/shop/dist/server.js
+app         2290 12.1  9.8 2205100 395012 ?      Sl   10:02   7:05 node /srv/shop/dist/worker.js
+root        3102  0.0  0.0      0     0 ?        Z    10:40   0:00 [cron] <defunct>
+backup      3310  4.2  0.4  24880 16100 ?        D    11:00   0:31 rsync -a /var/lib/postgresql /mnt/backup
+alice       3544  0.0  0.1  11220  5460 pts/0    Ss+  11:04   0:00 -bash
+alice       3701  0.0  0.1  13384  4120 pts/0    R+   11:06   0:00 ps aux`;
+
+const topSample = `top - 11:06:42 up 5 days,  3:14,  2 users,  load average: 3.42, 2.81, 1.95
+Tasks: 214 total,   2 running, 211 sleeping,   0 stopped,   1 zombie
+%Cpu(s): 48.2 us,  6.1 sy,  0.0 ni, 41.9 id,  3.2 wa,  0.0 hi,  0.6 si,  0.0 st
+MiB Mem :   3913.4 total,    212.7 free,   2960.1 used,    740.6 buff/cache
+MiB Swap:   2048.0 total,   1620.3 free,    427.7 used.    700.2 avail Mem
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   2231 app       20   0 3912440 741220  38212 R  87.5  18.4  52:11.20 node
+   2290 app       20   0 2205100 395012  31040 S  12.1   9.8   7:05.43 node
+   3310 backup    20   0   24880  16100   3212 D   4.2   0.4   0:31.02 rsync
+   1204 www-data  20   0  412088  48212   9844 S   2.3   1.2   1:02.11 nginx
+    903 postgres  20   0  219004 125300 118004 S   0.4   3.1  21:40.90 postgres
+    412 root      19  -1   49732  24380  23100 S   0.1   0.6   2:03.00 systemd-journal
+   3102 root      20   0       0      0      0 Z   0.0   0.0   0:00.00 cron
+      1 root      20   0  168524  12944   8420 S   0.0   0.3   0:14.66 systemd`;
+---
+
+<ToolShell
+	slug="ps-top-explainer"
+	title="ps and top Explainer"
+	description="Paste ps aux or top output to get every column explained, a sortable process table with the heaviest CPU and memory users highlighted, and process state codes decoded."
+>
+	<div class="pt" id="pt-tool" data-samples={JSON.stringify({ ps: psSample, top: topSample })}>
+		<div class="chips" id="pt-examples" role="group" aria-label="Examples">
+			<button data-k="ps" aria-pressed="true">
+				ps aux
+			</button>
+			<button data-k="top" aria-pressed="false">
+				top
+			</button>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="pt-format">Output</span>
+				<button class="btn" id="pt-copy">
+					Copy as CSV
+				</button>
+			</div>
+			<textarea id="pt-in" spellcheck="false" aria-label="ps or top output">{psSample}</textarea>
+		</section>
+		<p class="error" id="pt-error" hidden></p>
+		<ul class="pt-summary" id="pt-summary"></ul>
+		<div class="stats" id="pt-stats"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Processes</span>
+				<span class="pt-hint">Select a column title to sort</span>
+			</div>
+			<div class="pt-scroll" tabindex="0" role="region" aria-label="Process table, scrollable">
+				<table class="pt-table" id="pt-table"></table>
+			</div>
+		</section>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">
+					<span>Columns</span>
+				</div>
+				<dl class="pt-dl" id="pt-cols"></dl>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span>States in this output</span>
+				</div>
+				<dl class="pt-dl" id="pt-states"></dl>
+			</section>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const COLS: Record<string, string> = {
+		USER: 'Owner of the process.',
+		PID: 'Process ID, used with kill, renice or /proc/<pid>.',
+		PPID: 'Parent process ID.',
+		'%CPU':
+			'Share of one CPU core used. Can exceed 100% for multi-threaded processes. In ps it is averaged over the whole lifetime, in top over the last refresh.',
+		'%MEM': 'Resident memory (RSS/RES) as a percentage of physical RAM.',
+		VSZ: 'Virtual memory size in KiB: everything mapped, including shared libraries and memory never touched. Usually much larger than what is really used.',
+		VIRT: 'Virtual memory in KiB: everything mapped, including memory never touched.',
+		RSS: 'Resident set size in KiB: physical RAM the process is using right now.',
+		RES: 'Resident memory in KiB: physical RAM in use right now.',
+		SHR: 'Shared memory in KiB, like shared libraries, also counted in RES.',
+		TTY: 'Terminal the process is attached to. ? means none, typical for daemons.',
+		TT: 'Terminal the process is attached to.',
+		STAT: 'Process state code, followed by modifier flags (see states).',
+		S: 'Process state code (see states).',
+		START: 'When the process started: a time today, otherwise a date.',
+		STARTED: 'When the process started.',
+		TIME: 'Total CPU time consumed since start (user + system).',
+		'TIME+': 'Total CPU time consumed, in minutes:seconds.hundredths.',
+		PR: 'Kernel scheduling priority. rt means real-time.',
+		NI: 'Nice value from -20 (highest priority) to 19 (lowest).',
+		COMMAND: 'Command line or program name. Names in [brackets] are kernel threads.',
+		CMD: 'Command line.',
+		'%WCPU': 'Weighted CPU share.',
+		NLWP: 'Number of threads.',
+		ELAPSED: 'Time since the process started.',
+	};
+	const STATES: Record<string, string> = {
+		R: 'Running or ready to run on a CPU.',
+		S: 'Sleeping, waiting for an event (interruptible). Most processes are here.',
+		D: 'Uninterruptible sleep, usually waiting for disk or network I/O. Cannot be killed until the I/O returns; many D processes mean storage trouble.',
+		Z: 'Zombie: finished, but its parent has not read its exit status yet. Uses no memory; fix or restart the parent.',
+		T: 'Stopped by a signal, like Ctrl+Z or SIGSTOP.',
+		t: 'Stopped by a debugger (traced).',
+		I: 'Idle kernel thread.',
+		X: 'Dead (should never be seen).',
+		W: 'Paging (obsolete).',
+	};
+	const FLAGS: Record<string, string> = {
+		'<': 'high priority (negative nice)',
+		N: 'low priority (positive nice)',
+		L: 'has pages locked in memory',
+		s: 'session leader',
+		l: 'multi-threaded',
+		'+': 'in the foreground process group of its terminal',
+	};
+
+	type Proc = Record<string, string>;
+
+	const parse = (text: string) => {
+		const lines = text.split('\n');
+		const hi = lines.findIndex((l) => /\bPID\b/.test(l) && /\b(COMMAND|CMD|ARGS)\b/.test(l));
+		if (hi < 0) return { header: [] as string[], rows: [] as Proc[], pre: lines };
+		const header = lines[hi].trim().split(/\s+/);
+		const rows: Proc[] = [];
+		lines.slice(hi + 1).forEach((l) => {
+			if (!l.trim()) return;
+			const parts = l.trim().split(/\s+/);
+			if (parts.length < header.length) return;
+			const row: Proc = {};
+			header.forEach((h, i) => (row[h] = i === header.length - 1 ? parts.slice(i).join(' ') : parts[i]));
+			rows.push(row);
+		});
+		return { header, rows, pre: lines.slice(0, hi) };
+	};
+
+	const num = (v: string) => {
+		if (v === undefined) return NaN;
+		const m = v.match(/^(-?[\d.]+)([kmgt])?$/i);
+		if (m) return Number(m[1]) * (m[2] ? 1024 ** ' kmgt'.indexOf(m[2].toLowerCase()) : 1);
+		const t = v.match(/^(?:(\d+)-)?(\d+):(\d+)(?::(\d+))?(?:\.(\d+))?$/);
+		if (t) {
+			const [, d, a, b, c] = t;
+			return (
+				(Number(d ?? 0) * 86400 + (c !== undefined ? Number(a) * 3600 + Number(b) * 60 + Number(c) : Number(a) * 60 + Number(b))) * 1 + Number(`0.${t[5] ?? 0}`)
+			);
+		}
+		return NaN;
+	};
+	const kib = (k: number) => (k >= 1048576 ? `${(k / 1048576).toFixed(1)} GiB` : k >= 1024 ? `${(k / 1024).toFixed(0)} MiB` : `${k} KiB`);
+
+	const summaryOf = (pre: string[]) => {
+		const out: string[] = [];
+		pre.forEach((l) => {
+			const load = l.match(/up (.+?),\s+(\d+) users?,\s+load average: ([\d.]+),\s*([\d.]+),\s*([\d.]+)/);
+			if (load)
+				out.push(
+					`Up ${load[1].replace(/,\s+/, ' ')}, ${load[2]} user${load[2] === '1' ? '' : 's'} logged in. Load average ${load[3]} (1 min), ${load[4]} (5 min), ${load[5]} (15 min): the number of processes running or waiting for CPU or disk. Compare it with your core count (nproc); ${Number(load[3]) > Number(load[5]) ? 'load is rising' : 'load is falling or steady'}.`,
+				);
+			const tasks = l.match(/Tasks:\s*(\d+) total,\s*(\d+) running,\s*(\d+) sleeping,\s*(\d+) stopped,\s*(\d+) zombie/);
+			if (tasks)
+				out.push(
+					`${tasks[1]} processes: ${tasks[2]} running, ${tasks[3]} sleeping, ${tasks[4]} stopped, ${tasks[5]} zombie${tasks[5] === '0' ? '' : ' (a parent is not reaping its children)'}.`,
+				);
+			const cpu = l.match(/%Cpu\(s\):\s*([\d.]+) us,\s*([\d.]+) sy,\s*([\d.]+) ni,\s*([\d.]+) id,\s*([\d.]+) wa,\s*([\d.]+) hi,\s*([\d.]+) si,\s*([\d.]+) st/);
+			if (cpu)
+				out.push(
+					`CPU: ${cpu[1]}% user code, ${cpu[2]}% kernel, ${cpu[4]}% idle, ${cpu[5]}% waiting for I/O${Number(cpu[5]) > 10 ? ' (high: disks are a bottleneck)' : ''}, ${cpu[8]}% stolen by the hypervisor${Number(cpu[8]) > 5 ? ' (noisy neighbours)' : ''}.`,
+				);
+			const mem = l.match(/(KiB|MiB|GiB) Mem\s*:\s*([\d.]+) total,\s*([\d.]+) free,\s*([\d.]+) used,\s*([\d.]+) buff\/cache/);
+			if (mem)
+				out.push(
+					`Memory: ${mem[4]} of ${mem[2]} ${mem[1]} used, ${mem[5]} ${mem[1]} is disk cache that the kernel frees when needed, so low "free" alone is not a problem.`,
+				);
+			const swap = l.match(/(KiB|MiB|GiB) Swap:\s*([\d.]+) total,\s*([\d.]+) free,\s*([\d.]+) used\.\s*([\d.]+) avail Mem/);
+			if (swap)
+				out.push(
+					`Swap: ${swap[4]} ${swap[1]} used. ${swap[5]} ${swap[1]} is really available for new programs${Number(swap[4]) > 0 ? '; swap in use means memory pressure happened at some point' : ''}.`,
+				);
+		});
+		return out;
+	};
+
+	const el = (tag: string, cls: string, text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	onPage('pt-tool', () => {
+		const root = byId('pt-tool');
+		const input = byId<HTMLTextAreaElement>('pt-in');
+		const samples = JSON.parse(root.dataset.samples ?? '{}') as Record<string, string>;
+		let sortKey = '%CPU';
+		let sortDir = -1;
+		let csv = '';
+
+		const render = () => {
+			const { header, rows, pre } = parse(input.value);
+			const err = byId('pt-error');
+			err.hidden = !!rows.length || !input.value.trim();
+			err.textContent = 'No process table found. It needs a header line with PID and COMMAND.';
+			const isTop = header.includes('RES') || header.includes('TIME+');
+			byId('pt-format').textContent = !header.length ? 'Output' : isTop ? 'top output' : 'ps output';
+			byId('pt-summary').replaceChildren(...summaryOf(pre).map((t) => el('li', '', t)));
+
+			const cpuKey = header.find((h) => h === '%CPU' || h === '%WCPU');
+			const memKey = header.find((h) => h === '%MEM');
+			const resKey = header.find((h) => h === 'RSS' || h === 'RES');
+			const stateKey = header.find((h) => h === 'STAT' || h === 'S');
+			const pidKey = header.find((h) => h === 'PID') ?? 'PID';
+			const cmdKey = header[header.length - 1];
+			if (!header.includes(sortKey)) sortKey = cpuKey ?? header[0] ?? '';
+			const topBy = (k: string | undefined) =>
+				k
+					? rows
+							.filter((r) => num(r[k]) > 0)
+							.sort((a, b) => num(b[k]) - num(a[k]))
+							.slice(0, 3)
+							.map((r) => r[pidKey])
+					: [];
+			const topCpu = topBy(cpuKey);
+			const topMem = topBy(memKey);
+			const sum = (k: string | undefined) => (k ? rows.reduce((n, r) => n + (num(r[k]) || 0), 0) : 0);
+			const stat = (b: string, label: string) => {
+				const d = el('div', 'stat');
+				d.append(el('b', '', b), el('span', '', label));
+				return d;
+			};
+			const zombies = stateKey ? rows.filter((r) => r[stateKey]?.startsWith('Z')).length : 0;
+			const dState = stateKey ? rows.filter((r) => r[stateKey]?.startsWith('D')).length : 0;
+			byId('pt-stats').replaceChildren(
+				stat(String(rows.length), 'Processes'),
+				...(cpuKey ? [stat(`${sum(cpuKey).toFixed(1)}%`, 'CPU total (100% = one core)')] : []),
+				...(resKey ? [stat(kib(sum(resKey)), `Resident memory (shared pages counted twice)`)] : []),
+				...(stateKey ? [stat(String(zombies), 'Zombies'), stat(String(dState), 'Waiting on I/O (D)')] : []),
+			);
+
+			const numeric = new Set(header.filter((h) => rows.length && rows.every((r) => !Number.isNaN(num(r[h])) || r[h] === undefined)));
+			const sorted = [...rows].sort((a, b) => {
+				const x = numeric.has(sortKey) ? num(a[sortKey]) - num(b[sortKey]) : (a[sortKey] ?? '').localeCompare(b[sortKey] ?? '');
+				return x * sortDir;
+			});
+			const table = byId('pt-table');
+			const thead = el('thead', '');
+			const tr = el('tr', '');
+			header.forEach((h) => {
+				const th = el('th', numeric.has(h) ? 'n' : '');
+				th.setAttribute('scope', 'col');
+				if (h === sortKey) th.setAttribute('aria-sort', sortDir < 0 ? 'descending' : 'ascending');
+				const b = el('button', 'pt-sort', `${h}${h === sortKey ? (sortDir < 0 ? ' ↓' : ' ↑') : ''}`);
+				b.addEventListener('click', () => {
+					if (sortKey === h) sortDir = -sortDir;
+					else {
+						sortKey = h;
+						sortDir = numeric.has(h) ? -1 : 1;
+					}
+					render();
+					table.querySelector<HTMLButtonElement>(`th[aria-sort] button`)?.focus();
+				});
+				th.append(b);
+				tr.append(th);
+			});
+			thead.append(tr);
+			const tbody = el('tbody', '');
+			const maxCpu = Math.max(100, ...rows.map((r) => (cpuKey ? num(r[cpuKey]) : 0)));
+			sorted.forEach((r) => {
+				const row = el('tr', '');
+				const pid = r[pidKey];
+				if (topCpu.includes(pid)) row.classList.add('hot-cpu');
+				if (topMem.includes(pid)) row.classList.add('hot-mem');
+				if (stateKey && /^[ZD]/.test(r[stateKey] ?? '')) row.classList.add(`st-${r[stateKey][0].toLowerCase()}`);
+				header.forEach((h) => {
+					const td = el('td', `${numeric.has(h) ? 'n' : ''}${h === cmdKey ? ' cmd' : ''}`.trim());
+					const v = r[h] ?? '';
+					if (h === cpuKey || h === memKey) {
+						const val = num(v);
+						const bar = el('span', `pt-bar ${h === cpuKey ? 'cpu' : 'mem'}`);
+						bar.style.width = `${Math.min(100, (val / (h === cpuKey ? maxCpu : 100)) * 100)}%`;
+						bar.setAttribute('aria-hidden', 'true');
+						td.append(el('span', 'pt-v', v), bar);
+					} else if (h === resKey || h === 'VSZ' || h === 'VIRT' || h === 'SHR') {
+						td.textContent = kib(num(v));
+						td.title = `${v} KiB`;
+					} else td.textContent = v;
+					if (h === cmdKey) td.title = v;
+					if (h === cpuKey && topCpu.includes(pid)) td.append(el('span', 'pt-tag cpu', `top ${topCpu.indexOf(pid) + 1} CPU`));
+					if (h === memKey && topMem.includes(pid)) td.append(el('span', 'pt-tag mem', `top ${topMem.indexOf(pid) + 1} mem`));
+					row.append(td);
+				});
+				tbody.append(row);
+			});
+			table.replaceChildren(thead, tbody);
+			csv = [
+				header.join(','),
+				...sorted.map((r) => header.map((h) => (/[",\s]/.test(r[h] ?? '') ? `"${(r[h] ?? '').replace(/"/g, '""')}"` : (r[h] ?? ''))).join(',')),
+			].join('\n');
+
+			byId('pt-cols').replaceChildren(
+				...header.flatMap((h) => {
+					const dt = el('dt', '', h);
+					const dd = el('dd', '', COLS[h] ?? 'Column reported by your ps or top format.');
+					return [dt, dd];
+				}),
+			);
+			const codes = new Map<string, number>();
+			const flags = new Map<string, number>();
+			if (stateKey)
+				rows.forEach((r) => {
+					const st = r[stateKey] ?? '';
+					codes.set(st[0], (codes.get(st[0]) ?? 0) + 1);
+					st.slice(1)
+						.split('')
+						.forEach((f) => FLAGS[f] && flags.set(f, (flags.get(f) ?? 0) + 1));
+				});
+			byId('pt-states').replaceChildren(
+				...[...codes.entries()].flatMap(([c, n]) => [
+					el('dt', `st-code st-${c.toLowerCase()}`, `${c} · ${n} process${n === 1 ? '' : 'es'}`),
+					el('dd', '', STATES[c] ?? 'Unknown state.'),
+				]),
+				...[...flags.entries()].flatMap(([f, n]) => [
+					el('dt', 'st-code', `${f} flag · ${n}`),
+					el('dd', '', `${FLAGS[f][0].toUpperCase()}${FLAGS[f].slice(1)}.`),
+				]),
+				...(stateKey ? [] : [el('dd', '', 'This output has no STAT or S column.')]),
+			);
+		};
+
+		const chips = Array.from(byId('pt-examples').querySelectorAll<HTMLButtonElement>('button'));
+		chips.forEach((b) =>
+			b.addEventListener('click', () => {
+				input.value = samples[b.dataset.k ?? 'ps'];
+				chips.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+				render();
+			}),
+		);
+		input.addEventListener('input', () => {
+			chips.forEach((x) => x.setAttribute('aria-pressed', String(samples[x.dataset.k ?? ''] === input.value)));
+			render();
+		});
+		copyButton(byId('pt-copy'), () => csv);
+		render();
+	});
+</script>
+
+<style>
+	.pt {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.pt-summary {
+		margin: 0;
+		padding-left: 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		font-size: 14px;
+	}
+	.pt-summary:empty {
+		display: none;
+	}
+	.pt-hint {
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 500;
+	}
+	.pt-scroll {
+		overflow-x: auto;
+	}
+	.pt-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	.pt-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 13px;
+		font-variant-numeric: tabular-nums;
+	}
+	.pt-table :global(th),
+	.pt-table :global(td) {
+		padding: 6px 10px;
+		border-bottom: 1px solid var(--border);
+		text-align: left;
+		white-space: nowrap;
+		vertical-align: top;
+	}
+	.pt-table :global(.n) {
+		text-align: right;
+	}
+	.pt-table :global(td.cmd) {
+		font-family: var(--mono);
+		font-size: 12px;
+		max-width: 320px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.pt-table :global(.pt-sort) {
+		border: 0;
+		background: none;
+		color: var(--ink-soft);
+		font: inherit;
+		font-size: 12px;
+		font-weight: 700;
+		cursor: pointer;
+		padding: 2px 4px;
+		border-radius: 6px;
+	}
+	.pt-table :global(th[aria-sort] .pt-sort) {
+		color: var(--ink);
+	}
+	.pt-table :global(.pt-sort:focus-visible) {
+		outline: 2px solid var(--accent-strong);
+	}
+	.pt-table :global(.pt-bar) {
+		display: block;
+		height: 4px;
+		margin: 3px 0 0 auto;
+		border-radius: 2px;
+		background: var(--accent-strong);
+		min-width: 1px;
+	}
+	.pt-table :global(.pt-bar.mem) {
+		background: var(--tint-3);
+	}
+	.pt-table :global(.pt-v) {
+		display: block;
+	}
+	.pt-table :global(.pt-tag) {
+		display: block;
+		font-size: 11px;
+		font-weight: 700;
+		color: var(--ink);
+	}
+	.pt-table :global(tr.hot-cpu),
+	.pt-table :global(tr.hot-mem) {
+		background: var(--accent);
+	}
+	.pt-table :global(tr.st-z td:first-child),
+	.pt-table :global(tr.st-d td:first-child) {
+		box-shadow: inset 4px 0 0 var(--warn);
+	}
+	.pt-dl {
+		margin: 0;
+		padding: 10px 14px;
+		font-size: 13.5px;
+	}
+	.pt-dl :global(dt) {
+		font-family: var(--mono);
+		font-weight: 700;
+		margin-top: 8px;
+	}
+	.pt-dl :global(dt:first-child) {
+		margin-top: 0;
+	}
+	.pt-dl :global(dd) {
+		margin: 2px 0 0;
+		color: var(--ink-soft);
+	}
+	.pt-dl :global(.st-z),
+	.pt-dl :global(.st-d) {
+		color: var(--warn);
+	}
+</style>

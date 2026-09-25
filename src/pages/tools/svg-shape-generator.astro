@@ -1,0 +1,190 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="svg-shape-generator"
+	title="SVG Wave & Blob Generator"
+	description="Generate organic SVG waves and blobs with sliders and a random seed, then copy the SVG markup or a ready CSS background."
+>
+	<div class="sg" id="sg-tool">
+		<div class="toolbar">
+			<div class="seg" id="sg-kind" role="group" aria-label="Shape">
+				<button data-value="wave" aria-pressed="true">
+					Wave
+				</button>
+				<button data-value="blob" aria-pressed="false">
+					Blob
+				</button>
+			</div>
+			<button class="btn" id="sg-random">
+				Randomize
+			</button>
+			<label class="check">
+				Color <input type="color" id="sg-color" value="#6d4fe0" />
+			</label>
+		</div>
+		<div class="sg-stage user-colors" id="sg-stage"></div>
+		<div class="sg-sliders">
+			<label class="check" data-for="wave blob">
+				Complexity <input type="range" id="sg-points" min="3" max="12" value="6" /> <b id="sg-points-v"></b>
+			</label>
+			<label class="check" data-for="wave blob">
+				Randomness <input type="range" id="sg-rand" min="0" max="100" value="45" /> <b id="sg-rand-v"></b>
+			</label>
+			<label class="check" data-for="wave">
+				Height <input type="range" id="sg-height" min="10" max="90" value="55" /> <b id="sg-height-v"></b>
+			</label>
+			<label class="check" data-for="wave">
+				Layers <input type="range" id="sg-layers" min="1" max="4" value="3" /> <b id="sg-layers-v"></b>
+			</label>
+			<label class="check">
+				Seed <input type="number" class="num" id="sg-seed" min="0" value="4217" />
+			</label>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>SVG</span>
+				<button class="btn" id="sg-copy-svg">
+					Copy
+				</button>
+			</div>
+			<pre class="out sg-out" id="sg-svg" tabindex="0" role="region" aria-label="SVG markup"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>CSS background</span>
+				<button class="btn" id="sg-copy-css">
+					Copy
+				</button>
+			</div>
+			<pre class="out sg-out" id="sg-css" tabindex="0" role="region" aria-label="CSS background"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const rng = (seed: number) => () => {
+		seed = (seed + 0x6d2b79f5) | 0;
+		let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+	const f = (n: number) => Math.round(n * 10) / 10;
+
+	const smooth = (pts: [number, number][], closed: boolean) => {
+		const at = (i: number) => pts[closed ? (i + pts.length) % pts.length : Math.max(0, Math.min(pts.length - 1, i))];
+		let d = `M${f(pts[0][0])},${f(pts[0][1])}`;
+		const n = closed ? pts.length : pts.length - 1;
+		for (let i = 0; i < n; i++) {
+			const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+			d += ` C${f(p1[0] + (p2[0] - p0[0]) / 6)},${f(p1[1] + (p2[1] - p0[1]) / 6)} ${f(p2[0] - (p3[0] - p1[0]) / 6)},${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])},${f(p2[1])}`;
+		}
+		return closed ? `${d}Z` : d;
+	};
+
+	onPage('sg-tool', () => {
+		let kind = 'wave';
+		const num = (id: string) => Number(byId<HTMLInputElement>(id).value);
+
+		const svg = () => {
+			const rand = rng(num('sg-seed'));
+			const n = num('sg-points');
+			const k = num('sg-rand') / 100;
+			const color = byId<HTMLInputElement>('sg-color').value;
+			if (kind === 'blob') {
+				const pts: [number, number][] = Array.from({ length: n }, (_, i) => {
+					const a = (i / n) * Math.PI * 2;
+					const r = 150 * (1 - k * 0.6 * rand());
+					return [200 + Math.cos(a) * r, 200 + Math.sin(a) * r];
+				});
+				return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><path fill="${color}" d="${smooth(pts, true)}"/></svg>`;
+			}
+			const layers = num('sg-layers');
+			const base = 320 * (1 - num('sg-height') / 100);
+			const paths = Array.from({ length: layers }, (_, l) => {
+				const y0 = base + l * (320 - base) * (0.8 / layers);
+				const pts: [number, number][] = Array.from({ length: n + 1 }, (_, i) => [(i / n) * 1440, y0 + (rand() - 0.5) * 2 * k * 80]);
+				const opacity = f((l + 1) / layers);
+				return `<path fill="${color}" fill-opacity="${opacity}" d="${smooth(pts, false)} L1440,320 L0,320Z"/>`;
+			});
+			return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320" preserveAspectRatio="none">${paths.join('')}</svg>`;
+		};
+
+		const paint = () => {
+			['points', 'rand', 'height', 'layers'].forEach((id) => (byId(`sg-${id}-v`).textContent = byId<HTMLInputElement>(`sg-${id}`).value));
+			document.querySelectorAll<HTMLElement>('.sg-sliders [data-for]').forEach((el) => (el.hidden = !el.dataset.for!.includes(kind)));
+			const markup = svg();
+			byId('sg-stage').innerHTML = markup;
+			byId('sg-stage').dataset.kind = kind;
+			byId('sg-svg').textContent = markup;
+			const uri = `url("data:image/svg+xml,${encodeURIComponent(markup).replace(/%20/g, ' ').replace(/%3D/g, '=').replace(/%3A/g, ':').replace(/%2F/g, '/')}")`;
+			byId('sg-css').textContent = kind === 'wave' ? `background: ${uri} bottom / 100% auto no-repeat;` : `background: ${uri} center / contain no-repeat;`;
+		};
+
+		segmented(byId('sg-kind'), (v) => {
+			kind = v;
+			paint();
+		});
+		byId('sg-tool').addEventListener('input', paint);
+		byId('sg-random').addEventListener('click', () => {
+			byId<HTMLInputElement>('sg-seed').value = String(Math.floor(Math.random() * 100000));
+			paint();
+		});
+		copyButton(byId('sg-copy-svg'), () => byId('sg-svg').textContent ?? '');
+		copyButton(byId('sg-copy-css'), () => byId('sg-css').textContent ?? '');
+		paint();
+	});
+</script>
+
+<style>
+	.sg {
+		display: grid;
+		gap: 16px;
+	}
+	.sg-stage {
+		display: grid;
+		place-items: end stretch;
+		height: 240px;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+		overflow: hidden;
+	}
+	.sg-stage[data-kind='blob'] {
+		place-items: center;
+	}
+	.sg-stage :global(svg) {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+	.sg-stage[data-kind='blob'] :global(svg) {
+		width: auto;
+		height: 90%;
+	}
+	.sg-sliders {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px 20px;
+	}
+	.sg-sliders input[type='range'] {
+		width: 140px;
+		accent-color: var(--accent-strong);
+	}
+	.sg-sliders b {
+		min-width: 3ch;
+		font-variant-numeric: tabular-nums;
+		color: var(--ink);
+	}
+	.sg-sliders .num {
+		width: 90px;
+	}
+	.sg-out {
+		min-height: auto !important;
+		max-height: 200px;
+		overflow: auto;
+	}
+</style>

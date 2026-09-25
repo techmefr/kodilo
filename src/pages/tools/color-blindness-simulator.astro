@@ -1,0 +1,316 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const visions = [
+	['normal', 'Normal'],
+	['protanopia', 'Protanopia'],
+	['protanomaly', 'Protanomaly'],
+	['deuteranopia', 'Deuteranopia'],
+	['deuteranomaly', 'Deuteranomaly'],
+	['tritanopia', 'Tritanopia'],
+	['tritanomaly', 'Tritanomaly'],
+	['achromatopsia', 'Achromatopsia'],
+	['achromatomaly', 'Achromatomaly'],
+];
+---
+
+<ToolShell
+	slug="color-blindness-simulator"
+	title="Color Blindness Simulator"
+	description="Paste HTML or drop an image and see it the way people with protanopia, deuteranopia, tritanopia or achromatopsia do, one vision type per tab or all side by side."
+>
+	<div class="cb" id="cb-tool">
+		<div class="toolbar">
+			<div class="seg" id="cb-source" role="group" aria-label="Source">
+				<button data-value="html" aria-pressed="true">
+					HTML
+				</button>
+				<button data-value="image" aria-pressed="false">
+					Image
+				</button>
+			</div>
+		</div>
+		<div class="cb-tabs" role="tablist" aria-label="Views" id="cb-tabs">
+			<button role="tab" id="cb-tab-edit" data-value="edit" aria-selected="true" aria-controls="cb-panel">
+				HTML
+			</button>
+			{visions.map(([value, label]) => (
+				<button role="tab" id={`cb-tab-${value}`} data-value={value} aria-selected="false" aria-controls="cb-panel" tabindex="-1">
+					{label}
+				</button>
+			))}
+			<button role="tab" id="cb-tab-all" data-value="all" aria-selected="false" aria-controls="cb-panel" tabindex="-1">
+				All
+			</button>
+		</div>
+		<div id="cb-panel" role="tabpanel" aria-labelledby="cb-tab-edit">
+			<section class="panel" id="cb-edit">
+				<div class="panel-head">
+					<span id="cb-edit-title">HTML</span>
+					<button class="btn" id="cb-reset">
+						Reset sample
+					</button>
+				</div>
+				<textarea id="cb-html" spellcheck="false" aria-labelledby="cb-edit-title"></textarea>
+				<label class="drop cb-drop" id="cb-drop" hidden>
+					<input type="file" accept="image/*" id="cb-file" class="sr-only" />
+					<span id="cb-drop-text">Drop an image here or click to choose one</span>
+				</label>
+			</section>
+			<div id="cb-view" hidden>
+				<p class="cb-info" id="cb-info" aria-live="polite"></p>
+				<div class="cb-frames" id="cb-frames"></div>
+			</div>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	const matrices: Record<string, [string, string, number[] | null]> = {
+		normal: ['Normal', 'Typical trichromatic vision.', null],
+		protanopia: ['Protanopia', 'No red cones. About 1% of men. Reds look dark and merge with greens.', [0.567, 0.433, 0, 0.558, 0.442, 0, 0, 0.242, 0.758]],
+		protanomaly: ['Protanomaly', 'Weak red cones. About 1% of men.', [0.817, 0.183, 0, 0.333, 0.667, 0, 0, 0.125, 0.875]],
+		deuteranopia: ['Deuteranopia', 'No green cones. About 1% of men. Red and green are hard to tell apart.', [0.625, 0.375, 0, 0.7, 0.3, 0, 0, 0.3, 0.7]],
+		deuteranomaly: ['Deuteranomaly', 'Weak green cones, the most common form. About 5% of men.', [0.8, 0.2, 0, 0.258, 0.742, 0, 0, 0.142, 0.858]],
+		tritanopia: [
+			'Tritanopia',
+			'No blue cones. Rare, under 0.01%. Blue and green, yellow and pink get confused.',
+			[0.95, 0.05, 0, 0, 0.433, 0.567, 0, 0.475, 0.525],
+		],
+		tritanomaly: ['Tritanomaly', 'Weak blue cones. Very rare.', [0.967, 0.033, 0, 0, 0.733, 0.267, 0, 0.183, 0.817]],
+		achromatopsia: ['Achromatopsia', 'No color vision at all. About 1 in 30,000 people.', [0.299, 0.587, 0.114, 0.299, 0.587, 0.114, 0.299, 0.587, 0.114]],
+		achromatomaly: ['Achromatomaly', 'Strongly reduced color vision.', [0.618, 0.32, 0.062, 0.163, 0.775, 0.062, 0.163, 0.32, 0.516]],
+	};
+
+	const sample = `<div class="card">
+  <h2>Deploy status</h2>
+  <p>
+    <span class="badge ok">Passed</span>
+    <span class="badge warn">Flaky</span>
+    <span class="badge bad">Failed</span>
+  </p>
+  <div class="bars">
+    <i style="height:70%;background:#e53935"></i>
+    <i style="height:45%;background:#43a047"></i>
+    <i style="height:85%;background:#fb8c00"></i>
+    <i style="height:60%;background:#1e88e5"></i>
+  </div>
+  <ul class="legend">
+    <li><b style="background:#e53935"></b>Errors</li>
+    <li><b style="background:#43a047"></b>Success</li>
+    <li><b style="background:#fb8c00"></b>Retries</li>
+    <li><b style="background:#1e88e5"></b>Queued</li>
+  </ul>
+  <p class="actions">
+    <button class="primary">Deploy</button>
+    <button class="danger">Roll back</button>
+  </p>
+  <p class="error">Required field missing</p>
+</div>
+<style>
+  body { font: 15px system-ui, sans-serif; margin: 16px; background: #f4f6fb; color: #1d2433; }
+  .card { background: #fff; border-radius: 14px; padding: 16px 20px; box-shadow: 0 2px 10px #0002; max-width: 420px; }
+  h2 { margin: 0 0 10px; font-size: 18px; }
+  .badge { padding: 3px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; }
+  .ok { background: #c8f7d0; color: #1b7a33; }
+  .warn { background: #ffe8b3; color: #9a5b00; }
+  .bad { background: #ffd0d0; color: #c62828; }
+  .bars { display: flex; align-items: end; gap: 10px; height: 90px; margin: 14px 0 8px; }
+  .bars i { flex: 1; border-radius: 6px 6px 0 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 0; list-style: none; font-size: 13px; }
+  .legend b { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  button { border: 0; border-radius: 8px; padding: 8px 14px; font: inherit; color: #fff; }
+  .primary { background: #2e7d32; }
+  .danger { background: #d32f2f; }
+  .error { color: #e53935; margin: 10px 0 0; font-size: 13px; }
+</style>
+`;
+
+	onPage('cb-tool', () => {
+		let source = 'html';
+		let image = '';
+		let tab = 'edit';
+		const html = byId<HTMLTextAreaElement>('cb-html');
+		html.value = sample;
+
+		const doc = (key: string) => {
+			const body =
+				source === 'image'
+					? image
+						? `<img src="${image}" alt="" style="max-width:100%;height:auto;display:block;margin:auto">`
+						: '<p style="font:15px system-ui;color:#555">Choose an image first.</p>'
+					: html.value;
+			const m = matrices[key][2];
+			if (!m) return body;
+			const values = [0, 1, 2].map((r) => `${m[r * 3]} ${m[r * 3 + 1]} ${m[r * 3 + 2]} 0 0`).join(' ') + ' 0 0 0 1 0';
+			return `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="cb-sim" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="${values}"/></filter></svg><style>html{filter:url(#cb-sim)}</style>${body}`;
+		};
+
+		const frame = (key: string) => {
+			const fig = document.createElement('figure');
+			const iframe = document.createElement('iframe');
+			iframe.setAttribute('sandbox', '');
+			iframe.title = `${matrices[key][0]} preview`;
+			iframe.srcdoc = doc(key);
+			const cap = document.createElement('figcaption');
+			cap.textContent = matrices[key][0];
+			fig.append(iframe, cap);
+			return fig;
+		};
+
+		const render = () => {
+			const editing = tab === 'edit';
+			byId('cb-edit').hidden = !editing;
+			byId('cb-view').hidden = editing;
+			html.hidden = source !== 'html';
+			byId('cb-drop').hidden = source !== 'image';
+			byId('cb-edit-title').textContent = source === 'html' ? 'HTML' : 'Image';
+			byId('cb-reset').hidden = source !== 'html';
+			byId('cb-tab-edit').textContent = source === 'html' ? 'HTML' : 'Image';
+			byId('cb-panel').setAttribute('aria-labelledby', `cb-tab-${tab}`);
+			if (editing) return;
+			const frames = byId('cb-frames');
+			frames.classList.toggle('all', tab === 'all');
+			if (tab === 'all') {
+				byId('cb-info').textContent = 'Every vision type side by side.';
+				frames.replaceChildren(...Object.keys(matrices).map(frame));
+			} else {
+				byId('cb-info').textContent = matrices[tab][1];
+				frames.replaceChildren(frame(tab));
+			}
+		};
+
+		const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('#cb-tabs [role="tab"]'));
+		const select = (b: HTMLButtonElement) => {
+			tabs.forEach((t) => {
+				t.setAttribute('aria-selected', String(t === b));
+				t.tabIndex = t === b ? 0 : -1;
+			});
+			tab = b.dataset.value!;
+			render();
+		};
+		tabs.forEach((t, i) => {
+			t.addEventListener('click', () => select(t));
+			t.addEventListener('keydown', (e) => {
+				const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+				if (!d) return;
+				e.preventDefault();
+				const next = tabs[(i + d + tabs.length) % tabs.length];
+				next.focus();
+				select(next);
+			});
+		});
+
+		let timer = 0;
+		html.addEventListener('input', () => {
+			clearTimeout(timer);
+			timer = window.setTimeout(render, 200);
+		});
+		byId('cb-reset').addEventListener('click', () => {
+			html.value = sample;
+			render();
+		});
+		segmented(byId('cb-source'), (v) => {
+			source = v;
+			render();
+		});
+		const load = (file?: File) => {
+			if (!file || !file.type.startsWith('image/')) return;
+			const reader = new FileReader();
+			reader.onload = () => {
+				image = String(reader.result);
+				byId('cb-drop-text').textContent = `${file.name} loaded. Pick a vision tab to compare.`;
+				render();
+			};
+			reader.readAsDataURL(file);
+		};
+		const drop = byId('cb-drop');
+		byId<HTMLInputElement>('cb-file').addEventListener('change', (e) => load((e.target as HTMLInputElement).files?.[0]));
+		drop.addEventListener('dragover', (e) => {
+			e.preventDefault();
+			drop.classList.add('over');
+		});
+		drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+		drop.addEventListener('drop', (e) => {
+			e.preventDefault();
+			drop.classList.remove('over');
+			load(e.dataTransfer?.files[0]);
+		});
+		render();
+	});
+</script>
+
+<style>
+	.cb {
+		display: grid;
+		gap: 16px;
+	}
+	.cb-tabs {
+		display: flex;
+		gap: 4px;
+		overflow-x: auto;
+		padding-bottom: 4px;
+		border-bottom: 1px solid var(--border);
+	}
+	.cb-tabs button {
+		flex: none;
+		border: 0;
+		background: transparent;
+		color: var(--ink-soft);
+		font: inherit;
+		font-size: 14px;
+		font-weight: 600;
+		padding: 8px 12px;
+		border-radius: 8px;
+		cursor: pointer;
+	}
+	.cb-tabs button[aria-selected='true'] {
+		background: var(--accent);
+		color: var(--ink);
+	}
+	.cb-tabs button:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 1px;
+	}
+	.cb-drop {
+		margin: 14px;
+	}
+	#cb-html {
+		min-height: 360px;
+		word-break: normal;
+	}
+	.cb-info {
+		margin: 0 0 12px;
+		font-size: 14px;
+		color: var(--ink-soft);
+	}
+	.cb-frames {
+		display: grid;
+		gap: 16px;
+	}
+	.cb-frames.all {
+		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	}
+	.cb-frames :global(figure) {
+		margin: 0;
+		display: grid;
+		gap: 6px;
+	}
+	.cb-frames :global(iframe) {
+		width: 100%;
+		height: 420px;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: #fff;
+	}
+	.cb-frames.all :global(iframe) {
+		height: 320px;
+	}
+	.cb-frames :global(figcaption) {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--ink-soft);
+	}
+</style>

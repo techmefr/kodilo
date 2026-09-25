@@ -1,0 +1,142 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `Service,Region,Latency (ms),Uptime
+api-gateway,eu-west-1,42,99.98%
+auth,us-east-1,118,99.95%
+search,ap-south-1,87,99.90%
+billing,eu-central-1,35,100%`;
+---
+
+<ToolShell
+	slug="ascii-table-generator"
+	title="ASCII Table Generator"
+	description="Paste CSV or TSV and get a plain-text table drawn with ASCII or Unicode box characters, ready for code comments, READMEs and terminals."
+>
+	<div class="toolbar" id="atg-tool">
+		<div class="seg" id="atg-style" aria-label="Style">
+			<button data-value="ascii" aria-pressed="true">
+				ASCII
+			</button>
+			<button data-value="single" aria-pressed="false">
+				Single line
+			</button>
+			<button data-value="rounded" aria-pressed="false">
+				Rounded
+			</button>
+			<button data-value="double" aria-pressed="false">
+				Double
+			</button>
+			<button data-value="heavy" aria-pressed="false">
+				Heavy
+			</button>
+			<button data-value="minimal" aria-pressed="false">
+				Minimal
+			</button>
+		</div>
+		<div class="seg" id="atg-align" aria-label="Alignment">
+			<button data-value="left" aria-pressed="true">
+				Left
+			</button>
+			<button data-value="center" aria-pressed="false">
+				Center
+			</button>
+			<button data-value="right" aria-pressed="false">
+				Right
+			</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" id="atg-header" checked /> Header row
+		</label>
+		<label class="check">
+			<input type="checkbox" id="atg-numbers" checked /> Right-align numbers
+		</label>
+		<label class="check">
+			<input type="checkbox" id="atg-rows" /> Row separators
+		</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">Data (CSV or TSV)</div>
+		<textarea id="atg-in" spellcheck="false" aria-label="CSV or TSV input">{sample}</textarea>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Table</span>
+			<button class="btn" id="atg-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out" id="atg-out" tabindex="0"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import Papa from 'papaparse';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Box = { h: string; v: string; tl: string; tm: string; tr: string; ml: string; mm: string; mr: string; bl: string; bm: string; br: string; hh?: string };
+
+	const STYLES: Record<string, Box> = {
+		ascii: { h: '-', v: '|', tl: '+', tm: '+', tr: '+', ml: '+', mm: '+', mr: '+', bl: '+', bm: '+', br: '+', hh: '=' },
+		single: { h: '─', v: '│', tl: '┌', tm: '┬', tr: '┐', ml: '├', mm: '┼', mr: '┤', bl: '└', bm: '┴', br: '┘' },
+		rounded: { h: '─', v: '│', tl: '╭', tm: '┬', tr: '╮', ml: '├', mm: '┼', mr: '┤', bl: '╰', bm: '┴', br: '╯' },
+		double: { h: '═', v: '║', tl: '╔', tm: '╦', tr: '╗', ml: '╠', mm: '╬', mr: '╣', bl: '╚', bm: '╩', br: '╝' },
+		heavy: { h: '━', v: '┃', tl: '┏', tm: '┳', tr: '┓', ml: '┣', mm: '╋', mr: '┫', bl: '┗', bm: '┻', br: '┛' },
+		minimal: { h: '─', v: ' ', tl: '', tm: '', tr: '', ml: ' ', mm: ' ', mr: ' ', bl: '', bm: '', br: '' },
+	};
+
+	const width = (s: string) => [...s].length;
+	const isNumber = (s: string) => /^[-+]?[$€£]?\d[\d,]*(\.\d+)?%?$/.test(s.trim());
+
+	const pad = (s: string, size: number, align: string) => {
+		const gap = size - width(s);
+		if (align === 'right') return ' '.repeat(gap) + s;
+		if (align === 'center') return ' '.repeat(Math.floor(gap / 2)) + s + ' '.repeat(Math.ceil(gap / 2));
+		return s + ' '.repeat(gap);
+	};
+
+	function draw(rows: string[][], style: string, align: string, header: boolean, numbers: boolean, separators: boolean) {
+		const b = STYLES[style];
+		const cols = Math.max(0, ...rows.map((r) => r.length));
+		const grid = rows.map((r) => Array.from({ length: cols }, (_, i) => (r[i] ?? '').trim()));
+		const sizes = Array.from({ length: cols }, (_, i) => Math.max(1, ...grid.map((r) => width(r[i]))));
+		const body = header ? grid.slice(1) : grid;
+		const numeric = sizes.map((_, i) => numbers && body.length > 0 && body.every((r) => r[i] === '' || isNumber(r[i])));
+		const line = (l: string, m: string, r: string, h = b.h) => (l || m || r ? l + sizes.map((s) => h.repeat(s + 2)).join(m) + r : '');
+		const row = (cells: string[], head: boolean) =>
+			b.v + cells.map((c, i) => ` ${pad(c, sizes[i], head ? align : numeric[i] ? 'right' : align)} `).join(b.v) + b.v;
+		const out: string[] = [];
+		const minimal = style === 'minimal';
+		if (!minimal) out.push(line(b.tl, b.tm, b.tr));
+		grid.forEach((cells, i) => {
+			const head = header && i === 0;
+			out.push(minimal ? row(cells, head).slice(1, -1).trimEnd() : row(cells, head));
+			if (head && grid.length > 1) out.push(minimal ? sizes.map((s) => b.h.repeat(s + 2)).join(' ') : line(b.ml, b.mm, b.mr, b.hh ?? b.h));
+			else if (separators && i < grid.length - 1 && !minimal) out.push(line(b.ml, b.mm, b.mr));
+		});
+		if (!minimal) out.push(line(b.bl, b.bm, b.br));
+		return out.join('\n');
+	}
+
+	onPage('atg-tool', () => {
+		const input = byId<HTMLTextAreaElement>('atg-in');
+		const output = byId('atg-out');
+		const header = byId<HTMLInputElement>('atg-header');
+		const numbers = byId<HTMLInputElement>('atg-numbers');
+		const separators = byId<HTMLInputElement>('atg-rows');
+		let style = 'ascii';
+		let align = 'left';
+
+		const render = () => {
+			const rows = Papa.parse<string[]>(input.value.trim(), { skipEmptyLines: true }).data;
+			output.textContent = rows.length ? draw(rows, style, align, header.checked, numbers.checked, separators.checked) : '';
+		};
+
+		segmented(byId('atg-style'), (v) => ((style = v), render()));
+		segmented(byId('atg-align'), (v) => ((align = v), render()));
+		[header, numbers, separators].forEach((el) => el.addEventListener('change', render));
+		input.addEventListener('input', render);
+		copyButton(byId('atg-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

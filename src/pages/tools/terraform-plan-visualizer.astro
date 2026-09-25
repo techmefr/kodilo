@@ -1,0 +1,451 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+  ~ update in-place
+  - destroy
+-/+ destroy and then create replacement
+
+Terraform will perform the following actions:
+
+  # aws_db_instance.main must be replaced
+-/+ resource "aws_db_instance" "main" {
+      ~ engine_version = "15.4" -> "16.2"
+      ~ identifier     = "shop-db" -> "shop-db-v2" # forces replacement
+        # (24 unchanged attributes hidden)
+    }
+
+  # aws_instance.web[0] will be updated in-place
+  ~ resource "aws_instance" "web" {
+        id            = "i-0a1b2c3d4e5f"
+      ~ instance_type = "t3.small" -> "t3.medium"
+      ~ tags          = {
+          ~ "Env" = "staging" -> "production"
+        }
+    }
+
+  # aws_s3_bucket.assets will be created
+  + resource "aws_s3_bucket" "assets" {
+      + bucket = "shop-assets-prod"
+      + id     = (known after apply)
+    }
+
+  # aws_s3_bucket.legacy_logs will be destroyed
+  - resource "aws_s3_bucket" "legacy_logs" {
+      - bucket = "shop-legacy-logs" -> null
+    }
+
+  # aws_security_group_rule.ssh will be created
+  + resource "aws_security_group_rule" "ssh" {
+      + cidr_blocks = [
+          + "0.0.0.0/0",
+        ]
+      + from_port   = 22
+      + to_port     = 22
+      + type        = "ingress"
+    }
+
+Plan: 2 to add, 1 to change, 1 to destroy.`;
+---
+
+<ToolShell
+	slug="terraform-plan-visualizer"
+	title="Terraform Plan Visualizer"
+	description="Paste terraform plan output or terraform show -json and see what will be created, updated, replaced and destroyed, grouped by resource with the risky changes highlighted."
+>
+	<div class="tp" id="tp-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span>Plan output or JSON</span>
+				<button class="btn" id="tp-copy">
+					Copy summary
+				</button>
+			</div>
+			<textarea id="tp-in" spellcheck="false" aria-label="Terraform plan output">{sample}</textarea>
+		</section>
+		<p class="error" id="tp-error" hidden></p>
+		<div class="stats" id="tp-stats"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Change mix</span>
+			</div>
+			<svg id="tp-bar" class="tp-bar" role="img" viewBox="0 0 600 44" preserveAspectRatio="none"></svg>
+		</section>
+		<ul class="tp-risks" id="tp-risks"></ul>
+		<div class="tp-groups" id="tp-groups"></div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Action = 'create' | 'update' | 'replace' | 'destroy' | 'read';
+	type Change = { attr: string; before: string; after: string; forces: boolean; sign: string };
+	type Res = { address: string; type: string; action: Action; changes: Change[]; raw: string };
+
+	const ORDER: Action[] = ['create', 'update', 'replace', 'destroy', 'read'];
+	const LABEL: Record<Action, string> = { create: 'Create', update: 'Update in place', replace: 'Replace', destroy: 'Destroy', read: 'Read' };
+	const SYMBOL: Record<Action, string> = { create: '+', update: '~', replace: '-/+', destroy: '-', read: '<=' };
+	const STATEFUL =
+		/(db_instance|rds_cluster|database|dynamodb_table|s3_bucket|efs_file_system|ebs_volume|disk|storage_account|sql_|bigtable|kms_key|secret|elasticache|redis|kafka|bucket)/;
+
+	const typeOf = (address: string) => {
+		const parts = address.replace(/\[[^\]]*\]/g, '').split('.');
+		const i = parts[0] === 'data' ? 1 : parts.findIndex((p, n) => p !== 'module' && parts[n - 1] !== 'module');
+		return parts[i] ?? address;
+	};
+
+	const parseText = (text: string): Res[] => {
+		const out: Res[] = [];
+		let cur: Res | null = null;
+		for (const raw of text.split('\n')) {
+			const line = raw.replace(/\x1b\[[0-9;]*m/g, '');
+			const head = line.match(/^\s*# (\S+) (?:will be|must be) (created|updated in-place|replaced|destroyed|read during apply)/);
+			const moved = line.match(/^\s*# (\S+) has moved/);
+			if (head) {
+				const verb = head[2];
+				const action: Action =
+					verb === 'created' ? 'create' : verb === 'replaced' ? 'replace' : verb === 'destroyed' ? 'destroy' : verb.startsWith('read') ? 'read' : 'update';
+				cur = { address: head[1], type: typeOf(head[1]), action, changes: [], raw: '' };
+				out.push(cur);
+				continue;
+			}
+			if (moved) {
+				cur = null;
+				continue;
+			}
+			if (!cur) continue;
+			cur.raw += `${line}\n`;
+			const m = line.match(/^\s*([+~-]|-\/\+|\+\/-)\s+("?[\w.-]+"?)\s*=\s*(.*)$/);
+			if (!m || /^resource|^data/.test(m[2])) continue;
+			let value = m[3];
+			const forces = /# forces replacement/.test(value);
+			value = value.replace(/\s*# forces replacement/, '').trim();
+			const [before, after] = value.includes(' -> ') ? value.split(' -> ') : m[1] === '-' ? [value, 'null'] : ['', value];
+			cur.changes.push({ attr: m[2].replace(/"/g, ''), before: before.trim(), after: after.trim(), forces, sign: m[1] });
+		}
+		return out;
+	};
+
+	const show = (v: unknown) => (v === undefined ? '' : v === null ? 'null' : typeof v === 'string' ? `"${v}"` : JSON.stringify(v));
+
+	const parseJson = (text: string): Res[] => {
+		const data = JSON.parse(text);
+		const list = data.resource_changes as
+			| {
+					address: string;
+					type: string;
+					change: {
+						actions: string[];
+						before: Record<string, unknown> | null;
+						after: Record<string, unknown> | null;
+						after_unknown?: Record<string, unknown>;
+						replace_paths?: string[][];
+					};
+			  }[]
+			| undefined;
+		if (!Array.isArray(list)) throw new Error('JSON has no resource_changes array. Use terraform show -json plan.out.');
+		return list
+			.filter((r) => !(r.change.actions.length === 1 && r.change.actions[0] === 'no-op'))
+			.map((r) => {
+				const a = r.change.actions;
+				const action: Action =
+					a.includes('create') && a.includes('delete')
+						? 'replace'
+						: a.includes('create')
+							? 'create'
+							: a.includes('delete')
+								? 'destroy'
+								: a.includes('read')
+									? 'read'
+									: 'update';
+				const before = r.change.before ?? {};
+				const after = r.change.after ?? {};
+				const unknown = r.change.after_unknown ?? {};
+				const forced = new Set((r.change.replace_paths ?? []).map((p) => String(p[0])));
+				const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(after), ...Object.keys(unknown)])).sort();
+				const changes = keys
+					.filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]) || unknown[k] === true)
+					.map((k) => ({
+						attr: k,
+						before: action === 'create' ? '' : show(before[k]),
+						after: unknown[k] === true ? '(known after apply)' : action === 'destroy' ? 'null' : show(after[k]),
+						forces: forced.has(k),
+						sign: action === 'create' ? '+' : action === 'destroy' ? '-' : '~',
+					}));
+				return { address: r.address, type: r.type, action, changes, raw: JSON.stringify(after) };
+			});
+	};
+
+	const el = (tag: string, cls: string, text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	onPage('tp-tool', () => {
+		const input = byId<HTMLTextAreaElement>('tp-in');
+		let summary = '';
+
+		const risksOf = (list: Res[]) => {
+			const risks: string[] = [];
+			list.forEach((r) => {
+				if ((r.action === 'destroy' || r.action === 'replace') && STATEFUL.test(r.type))
+					risks.push(
+						`${r.address} holds data and will be ${r.action === 'destroy' ? 'destroyed' : 'destroyed then recreated'}: back it up or add lifecycle { prevent_destroy = true }.`,
+					);
+				else if (r.action === 'replace') {
+					const forced = r.changes.filter((c) => c.forces).map((c) => c.attr);
+					risks.push(
+						`${r.address} will be replaced${forced.length ? ` because ${forced.join(', ')} forces replacement` : ''}: expect downtime unless create_before_destroy is set.`,
+					);
+				}
+				if (/0\.0\.0\.0\/0|::\/0/.test(r.raw) && r.action !== 'destroy') risks.push(`${r.address} opens access to the whole internet (0.0.0.0/0).`);
+			});
+			return risks;
+		};
+
+		const render = () => {
+			const text = input.value.trim();
+			const err = byId('tp-error');
+			let list: Res[] = [];
+			try {
+				list = text.startsWith('{') ? parseJson(text) : parseText(text);
+				err.hidden = true;
+			} catch (e) {
+				err.textContent = e instanceof Error ? e.message : String(e);
+				err.hidden = false;
+			}
+			if (!err.hidden) list = [];
+			else if (text && !list.length) {
+				err.textContent = /No changes/i.test(text)
+					? 'No changes: your infrastructure matches the configuration.'
+					: 'No resource changes found. Paste the "Terraform will perform the following actions" section or show -json output.';
+				err.hidden = false;
+			}
+			const count = (a: Action) => list.filter((r) => r.action === a).length;
+			byId('tp-stats').replaceChildren(
+				...ORDER.filter((a) => a !== 'read' || count('read')).map((a) => {
+					const d = el('div', `stat tp-${a}`);
+					d.append(el('b', '', String(count(a))), el('span', '', LABEL[a]));
+					return d;
+				}),
+			);
+			const bar = byId('tp-bar');
+			bar.replaceChildren();
+			const total = list.length || 1;
+			let x = 0;
+			ORDER.forEach((a) => {
+				const w = (count(a) / total) * 600;
+				if (!w) return;
+				const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+				Object.entries({ x, y: 8, width: w, height: 28, class: `tp-seg tp-${a}` }).forEach(([k, v]) => r.setAttribute(k, String(v)));
+				bar.append(r);
+				x += w;
+			});
+			bar.setAttribute('aria-label', ORDER.map((a) => `${count(a)} ${LABEL[a].toLowerCase()}`).join(', '));
+
+			const risks = risksOf(list);
+			byId('tp-risks').replaceChildren(...risks.map((t) => el('li', 'error', t)));
+
+			const groups = new Map<string, Res[]>();
+			list.forEach((r) => groups.set(r.type, [...(groups.get(r.type) ?? []), r]));
+			byId('tp-groups').replaceChildren(
+				...Array.from(groups.entries()).map(([type, items]) => {
+					const sec = el('section', 'panel');
+					const head = el('div', 'panel-head');
+					head.append(el('span', '', type), el('span', 'tp-n', `${items.length} resource${items.length > 1 ? 's' : ''}`));
+					const ul = el('ul', 'tp-list');
+					items
+						.sort((a, b) => ORDER.indexOf(b.action) - ORDER.indexOf(a.action))
+						.forEach((r) => {
+							const li = el('li', `tp-res tp-${r.action}`);
+							li.dataset.action = r.action;
+							const top = el('div', 'tp-top');
+							top.append(el('span', `tp-badge tp-${r.action}`, `${SYMBOL[r.action]} ${LABEL[r.action]}`), el('code', 'tp-addr', r.address));
+							li.append(top);
+							if (r.changes.length) {
+								const dl = el('ul', 'tp-changes');
+								r.changes.slice(0, 40).forEach((c) => {
+									const row = el('li', c.forces ? 'tp-force' : '');
+									row.append(el('code', 'tp-attr', c.attr));
+									if (c.before && c.after && r.action !== 'create')
+										row.append(el('span', 'tp-before', c.before), el('span', 'tp-arrow', ' → '), el('span', 'tp-after', c.after));
+									else row.append(el('span', 'tp-after', c.after || c.before));
+									if (c.forces) row.append(el('span', 'tp-flag', 'forces replacement'));
+									dl.append(row);
+								});
+								li.append(dl);
+							}
+							ul.append(li);
+						});
+					sec.append(head, ul);
+					return sec;
+				}),
+			);
+			summary = [
+				`Plan: ${count('create')} to add, ${count('update')} to change, ${count('replace')} to replace, ${count('destroy')} to destroy.`,
+				...list.map((r) => `${SYMBOL[r.action].padEnd(3)} ${r.address}`),
+				...risks.map((r) => `! ${r}`),
+			].join('\n');
+		};
+
+		input.addEventListener('input', render);
+		copyButton(byId('tp-copy'), () => summary);
+		render();
+	});
+</script>
+
+<style>
+	.tp {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.tp-bar {
+		display: block;
+		width: 100%;
+		height: 44px;
+	}
+	.tp :global(.tp-seg.tp-create) {
+		fill: var(--ok);
+	}
+	.tp :global(.tp-seg.tp-update) {
+		fill: var(--warn);
+	}
+	.tp :global(.tp-seg.tp-replace) {
+		fill: var(--tint-2);
+	}
+	.tp :global(.tp-seg.tp-destroy) {
+		fill: var(--bad);
+	}
+	.tp :global(.tp-seg.tp-read) {
+		fill: var(--tint-3);
+	}
+	.tp :global(.stat.tp-create b) {
+		color: var(--ok);
+	}
+	.tp :global(.stat.tp-update b) {
+		color: var(--warn);
+	}
+	.tp :global(.stat.tp-replace b) {
+		color: var(--tint-2);
+	}
+	.tp :global(.stat.tp-destroy b) {
+		color: var(--bad);
+	}
+	.tp-risks {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.tp-risks:empty {
+		display: none;
+	}
+	.tp-groups {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	.tp :global(.tp-n) {
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 600;
+	}
+	.tp :global(.tp-list) {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.tp :global(.tp-res) {
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+		border-left: 4px solid var(--border);
+	}
+	.tp :global(.tp-res.tp-create) {
+		border-left-color: var(--ok);
+	}
+	.tp :global(.tp-res.tp-update) {
+		border-left-color: var(--warn);
+	}
+	.tp :global(.tp-res.tp-replace) {
+		border-left-color: var(--tint-2);
+	}
+	.tp :global(.tp-res.tp-destroy) {
+		border-left-color: var(--bad);
+	}
+	.tp :global(.tp-top) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+	}
+	.tp :global(.tp-badge) {
+		font-size: 12px;
+		font-weight: 700;
+		padding: 2px 8px;
+		border-radius: 999px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+	}
+	.tp :global(.tp-badge.tp-create) {
+		color: var(--ok);
+	}
+	.tp :global(.tp-badge.tp-update) {
+		color: var(--warn);
+	}
+	.tp :global(.tp-badge.tp-replace) {
+		color: var(--tint-2);
+	}
+	.tp :global(.tp-badge.tp-destroy) {
+		color: var(--bad);
+	}
+	.tp :global(.tp-addr) {
+		font-family: var(--mono);
+		font-size: 13px;
+		word-break: break-all;
+	}
+	.tp :global(.tp-changes) {
+		list-style: none;
+		margin: 8px 0 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-family: var(--mono);
+		font-size: 12.5px;
+	}
+	.tp :global(.tp-changes li) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		word-break: break-all;
+	}
+	.tp :global(.tp-attr) {
+		color: var(--ink-soft);
+	}
+	.tp :global(.tp-before) {
+		color: var(--bad);
+		text-decoration: line-through;
+	}
+	.tp :global(.tp-after) {
+		color: var(--ok);
+	}
+	.tp :global(.tp-arrow) {
+		color: var(--ink-soft);
+	}
+	.tp :global(.tp-flag) {
+		font-family: var(--sans);
+		font-weight: 700;
+		color: var(--warn);
+		background: var(--warn-bg);
+		border-radius: 6px;
+		padding: 0 6px;
+	}
+</style>

@@ -1,0 +1,200 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `<?xml version="1.0" encoding="UTF-8"?>
+<catalog>
+  <book id="bk101" lang="en">
+    <author>Gambardella, Matthew</author>
+    <title>XML Developer's Guide</title>
+    <price currency="USD">44.95</price>
+    <tags>
+      <tag>xml</tag>
+      <tag>reference</tag>
+    </tags>
+  </book>
+  <book id="bk102">
+    <author>Ralls, Kim</author>
+    <title>Midnight Rain</title>
+    <price currency="EUR">5.95</price>
+  </book>
+</catalog>`;
+---
+
+<ToolShell
+	slug="xml-json-converter"
+	title="XML ⇄ JSON Converter"
+	description="Convert XML to JSON and JSON back to XML, with attributes and repeated elements preserved."
+>
+	<div class="toolbar" id="xj-tool">
+		<div class="seg" id="xj-dir" aria-label="Direction">
+			<button data-value="x2j" aria-pressed="true">
+				XML → JSON
+			</button>
+			<button data-value="j2x" aria-pressed="false">
+				JSON → XML
+			</button>
+		</div>
+		<label class="check">
+			<input type="checkbox" id="xj-typed" checked /> Typed values
+		</label>
+		<button class="btn" id="xj-swap">
+			Swap input and output
+		</button>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head" id="xj-in-label">
+				XML
+			</div>
+			<textarea id="xj-in" spellcheck="false" aria-labelledby="xj-in-label">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="xj-out-label">JSON</span>
+				<button class="btn" id="xj-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="xj-out" tabindex="0" aria-labelledby="xj-out-label"></pre>
+		</section>
+	</div>
+	<p class="error" id="xj-error" hidden></p>
+	<p class="xj-hint">
+		Attributes become <code>@name</code> keys, mixed text becomes <code>#text</code>, and repeated elements become arrays.
+	</p>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
+
+	const typed = (v: string, on: boolean): Json => {
+		if (!on) return v;
+		const t = v.trim();
+		if (t === 'true') return true;
+		if (t === 'false') return false;
+		if (/^-?(0|[1-9]\d*)(\.\d+)?$/.test(t) && t.length < 16) return Number(t);
+		return v;
+	};
+
+	const elementToJson = (el: Element, on: boolean): Json => {
+		const obj: Record<string, Json> = {};
+		for (const a of Array.from(el.attributes)) obj[`@${a.name}`] = typed(a.value, on);
+		const children = Array.from(el.children);
+		const text = Array.from(el.childNodes)
+			.filter((n) => n.nodeType === 3 || n.nodeType === 4)
+			.map((n) => n.textContent ?? '')
+			.join('')
+			.trim();
+		if (!children.length && !el.attributes.length) return text === '' ? null : typed(text, on);
+		for (const c of children) {
+			const value = elementToJson(c, on);
+			const existing = obj[c.tagName];
+			if (existing === undefined) obj[c.tagName] = value;
+			else if (Array.isArray(existing)) existing.push(value);
+			else obj[c.tagName] = [existing, value];
+		}
+		if (text) obj['#text'] = typed(text, on);
+		return obj;
+	};
+
+	const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	const escAttr = (s: string) => esc(s).replace(/"/g, '&quot;');
+	const validName = (n: string) => (/^[A-Za-z_][\w.:-]*$/.test(n) ? n : n.replace(/[^\w.:-]/g, '_').replace(/^([^A-Za-z_])/, '_$1'));
+
+	const toXml = (name: string, value: Json, pad: string): string => {
+		const tag = validName(name);
+		if (Array.isArray(value)) return value.map((v) => toXml(name, v, pad)).join('\n');
+		if (value === null) return `${pad}<${tag}/>`;
+		if (typeof value !== 'object') return `${pad}<${tag}>${esc(String(value))}</${tag}>`;
+		const attrs = Object.entries(value)
+			.filter(([k]) => k.startsWith('@'))
+			.map(([k, v]) => ` ${validName(k.slice(1))}="${escAttr(String(v))}"`)
+			.join('');
+		const text = value['#text'];
+		const kids = Object.entries(value).filter(([k]) => !k.startsWith('@') && k !== '#text');
+		if (!kids.length) return text === undefined || text === null ? `${pad}<${tag}${attrs}/>` : `${pad}<${tag}${attrs}>${esc(String(text))}</${tag}>`;
+		const inner = kids.map(([k, v]) => toXml(k, v, pad + '  '));
+		if (text !== undefined && text !== null) inner.unshift(`${pad}  ${esc(String(text))}`);
+		return `${pad}<${tag}${attrs}>\n${inner.join('\n')}\n${pad}</${tag}>`;
+	};
+
+	onPage('xj-tool', () => {
+		const input = byId<HTMLTextAreaElement>('xj-in');
+		const output = byId('xj-out');
+		const error = byId('xj-error');
+		const typedBox = byId<HTMLInputElement>('xj-typed');
+		const dirGroup = byId('xj-dir');
+		let dir = 'x2j';
+
+		const fail = (msg: string) => {
+			error.textContent = msg;
+			error.hidden = false;
+			output.textContent = '';
+		};
+
+		const render = () => {
+			byId('xj-in-label').textContent = dir === 'x2j' ? 'XML' : 'JSON';
+			byId('xj-out-label').textContent = dir === 'x2j' ? 'JSON' : 'XML';
+			if (!input.value.trim()) {
+				error.hidden = true;
+				output.textContent = '';
+				return;
+			}
+			if (dir === 'x2j') {
+				const doc = new DOMParser().parseFromString(input.value, 'application/xml');
+				const err = doc.getElementsByTagName('parsererror')[0];
+				if (err) return fail(`Invalid XML: ${(err.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 240)}`);
+				const root = doc.documentElement;
+				output.textContent = JSON.stringify({ [root.tagName]: elementToJson(root, typedBox.checked) }, null, 2);
+			} else {
+				let json: Json;
+				try {
+					json = JSON.parse(input.value);
+				} catch (e) {
+					return fail(`Invalid JSON: ${(e as Error).message}`);
+				}
+				const single = json && typeof json === 'object' && !Array.isArray(json) && Object.keys(json).length === 1 && !Array.isArray(Object.values(json)[0]);
+				const body = single ? toXml(Object.keys(json as object)[0], Object.values(json as object)[0] as Json, '') : toXml('root', { item: json } as Json, '');
+				output.textContent = `<?xml version="1.0" encoding="UTF-8"?>\n${body}`;
+			}
+			error.hidden = true;
+		};
+
+		const setDir = (value: string) => {
+			dir = value;
+			dirGroup.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === value)));
+		};
+
+		segmented(dirGroup, (v) => {
+			if (v !== dir && output.textContent) input.value = output.textContent;
+			dir = v;
+			render();
+		});
+		byId('xj-swap').addEventListener('click', () => {
+			if (output.textContent) input.value = output.textContent;
+			setDir(dir === 'x2j' ? 'j2x' : 'x2j');
+			render();
+		});
+		input.addEventListener('input', render);
+		typedBox.addEventListener('change', render);
+		copyButton(byId('xj-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.xj-hint {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.xj-hint code {
+		font-family: var(--mono);
+		background: var(--surface-2);
+		color: var(--ink);
+		padding: 1px 5px;
+		border-radius: 5px;
+	}
+</style>

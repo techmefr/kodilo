@@ -1,0 +1,657 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const listSample = `Chain INPUT (policy DROP 12 packets, 720 bytes)
+ pkts bytes target     prot opt in     out     source               destination
+ 8812  712K ACCEPT     all  --  lo     *       0.0.0.0/0            0.0.0.0/0
+ 190K  154M ACCEPT     all  --  *      *       0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+   44  2640 DROP       all  --  *      *       0.0.0.0/0            0.0.0.0/0            ctstate INVALID
+  312 18720 ACCEPT     tcp  --  *      *       203.0.113.0/24       0.0.0.0/0            tcp dpt:22 /* SSH from office */
+ 5230  301K ACCEPT     tcp  --  eth0   *       0.0.0.0/0            0.0.0.0/0            multiport dports 80,443
+    0     0 ACCEPT     icmp --  *      *       0.0.0.0/0            0.0.0.0/0            icmptype 8 limit: avg 1/sec burst 5
+   21  1260 f2b-sshd   tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:22
+    9   540 LOG        all  --  *      *       0.0.0.0/0            0.0.0.0/0            LOG flags 0 level 4 prefix "INPUT drop: "
+
+Chain FORWARD (policy DROP 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination
+
+Chain OUTPUT (policy ACCEPT 201K packets, 88M bytes)
+ pkts bytes target     prot opt in     out     source               destination
+
+Chain f2b-sshd (1 references)
+ pkts bytes target     prot opt in     out     source               destination
+    3   180 REJECT     all  --  *      *       198.51.100.23        0.0.0.0/0            reject-with icmp-port-unreachable
+   18  1080 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0`;
+
+const saveSample = `*nat
+:PREROUTING ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+-A PREROUTING -i eth0 -p tcp --dport 8080 -j DNAT --to-destination 10.0.0.5:80
+-A POSTROUTING -s 10.0.0.0/24 -o eth0 -j MASQUERADE
+COMMIT
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+-A INPUT -i lo -j ACCEPT
+-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 22 -m conntrack --ctstate NEW -m recent --set --name ssh
+-A INPUT -p tcp ! -s 10.0.0.0/8 --dport 3306 -j REJECT --reject-with tcp-reset
+-A INPUT -p tcp -m multiport --dports 80,443 -m comment --comment "web" -j ACCEPT
+-A FORWARD -i eth1 -o eth0 -j ACCEPT
+-A FORWARD -i eth0 -o eth1 -m state --state ESTABLISHED,RELATED -j ACCEPT
+COMMIT`;
+---
+
+<ToolShell
+	slug="iptables-explainer"
+	title="iptables Explainer"
+	description="Paste iptables -L -n -v output or an iptables-save file and read every rule in plain English, chain by chain, with default policies, counters and packet flow."
+>
+	<div class="it" id="it-tool" data-samples={JSON.stringify({ list: listSample, save: saveSample })}>
+		<div class="chips" id="it-examples" role="group" aria-label="Examples">
+			<button data-k="list" aria-pressed="true">
+				iptables -L -n -v
+			</button>
+			<button data-k="save" aria-pressed="false">
+				iptables-save with NAT
+			</button>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="it-format">Rules</span>
+				<button class="btn" id="it-copy">
+					Copy explanation
+				</button>
+			</div>
+			<textarea id="it-in" spellcheck="false" aria-label="iptables rules">{listSample}</textarea>
+		</section>
+		<p class="error" id="it-error" hidden></p>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Packet flow</span>
+			</div>
+			<div class="it-scroll" tabindex="0" role="region" aria-label="Packet flow diagram, scrollable">
+				<svg id="it-svg" viewBox="0 0 640 222" width="640" height="222" role="img" aria-labelledby="it-svg-title">
+					<title id="it-svg-title">Packet flow</title>
+				</svg>
+			</div>
+		</section>
+		<div class="it-chains" id="it-chains"></div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Rule = { table: string; chain: string; target: string; opts: Record<string, string>; neg: Set<string>; pkts?: string; bytes?: string; raw: string };
+	type Chain = { table: string; name: string; policy?: string; counters?: string; refs?: string; rules: Rule[] };
+
+	const BUILTIN = ['PREROUTING', 'INPUT', 'FORWARD', 'OUTPUT', 'POSTROUTING'];
+	const ANY = new Set(['0.0.0.0/0', '::/0', '*', 'all', '']);
+
+	const splitArgs = (line: string) => {
+		const out: string[] = [];
+		const re = /"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S+)/g;
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(line))) out.push(m[1] ?? m[2] ?? m[3]);
+		return out;
+	};
+
+	const LONG: Record<string, string> = {
+		'-p': 'proto',
+		'--protocol': 'proto',
+		'-s': 'src',
+		'--source': 'src',
+		'-d': 'dst',
+		'--destination': 'dst',
+		'-i': 'in',
+		'--in-interface': 'in',
+		'-o': 'out',
+		'--out-interface': 'out',
+		'-j': 'target',
+		'--jump': 'target',
+		'-g': 'goto',
+		'--goto': 'goto',
+		'-m': 'module',
+		'--match': 'module',
+	};
+
+	const parseSave = (text: string) => {
+		const chains: Chain[] = [];
+		let table = 'filter';
+		const get = (name: string) => {
+			let c = chains.find((x) => x.table === table && x.name === name);
+			if (!c) chains.push((c = { table, name, rules: [] }));
+			return c;
+		};
+		text.split('\n').forEach((raw) => {
+			const line = raw.trim().replace(/^(sudo\s+)?(iptables|ip6tables)\s+/, '');
+			if (!line || line.startsWith('#') || line === 'COMMIT') return;
+			if (line.startsWith('*')) return void (table = line.slice(1));
+			const pol = line.match(/^:(\S+)\s+(\S+)(?:\s+\[(\d+):(\d+)\])?/);
+			if (pol) {
+				const c = get(pol[1]);
+				if (pol[2] !== '-') c.policy = pol[2];
+				return;
+			}
+			const args = splitArgs(line);
+			let t = table;
+			const ti = args.indexOf('-t');
+			if (ti >= 0) {
+				t = args[ti + 1];
+				args.splice(ti, 2);
+			}
+			const ai = args.findIndex((a) => a === '-A' || a === '--append' || a === '-I' || a === '--insert');
+			if (ai < 0) return;
+			const prev = table;
+			table = t;
+			const chain = get(args[ai + 1]);
+			table = prev;
+			const rest = args.slice(ai + 2);
+			if ((args[ai] === '-I' || args[ai] === '--insert') && /^\d+$/.test(rest[0] ?? '')) rest.shift();
+			const opts: Record<string, string> = {};
+			const neg = new Set<string>();
+			let negNext = false;
+			const modules: string[] = [];
+			for (let i = 0; i < rest.length; i++) {
+				const a = rest[i];
+				if (a === '!') {
+					negNext = true;
+					continue;
+				}
+				if (!a.startsWith('-')) continue;
+				const key = LONG[a] ?? a.replace(/^-+/, '');
+				const vals: string[] = [];
+				while (i + 1 < rest.length && !(rest[i + 1].startsWith('-') && !/^-\d/.test(rest[i + 1])) && rest[i + 1] !== '!') vals.push(rest[++i]);
+				const v = vals.join(' ');
+				if (key === 'module') modules.push(v);
+				else opts[key] = key in opts && v ? `${opts[key]} ${v}` : v || 'yes';
+				if (negNext) neg.add(key);
+				negNext = false;
+			}
+			if (modules.length) opts.modules = modules.join(',');
+			chain.rules.push({ table: t, chain: chain.name, target: opts.target ?? opts.goto ?? '', opts, neg, raw: line });
+		});
+		return chains;
+	};
+
+	const parseList = (text: string) => {
+		const chains: Chain[] = [];
+		let cur: Chain | null = null;
+		let verbose = false;
+		text.split('\n').forEach((raw) => {
+			const line = raw.replace(/\s+$/, '');
+			const head = line.match(/^Chain (\S+) \((?:policy (\S+)(?: (\S+) packets, (\S+) bytes)?|(\d+) references?)\)/);
+			if (head) {
+				cur = {
+					table: 'filter',
+					name: head[1],
+					policy: head[2],
+					counters: head[3] ? `${head[3]} packets, ${head[4]} bytes` : undefined,
+					refs: head[5],
+					rules: [],
+				};
+				chains.push(cur);
+				return;
+			}
+			if (!cur || !line.trim()) return;
+			if (/^\s*(num\s+)?(pkts\s+bytes\s+)?target\s+prot/.test(line)) {
+				verbose = /pkts/.test(line);
+				return;
+			}
+			const cols = line.trim().split(/\s+/);
+			if (/^\d+$/.test(cols[0]) && !verbose && cols.length > 5 && /^\d+$/.test(cols[0]) && !/^[\d.]+[KMGT]?$/.test(cols[1] ?? '')) cols.shift();
+			let pkts: string | undefined;
+			let bytes: string | undefined;
+			if (verbose) {
+				if (/^\d+$/.test(cols[0]) && /^[\d.]+[KMGT]?$/.test(cols[1]) && /^[\d.]+[KMGT]?$/.test(cols[2])) cols.shift();
+				[pkts, bytes] = cols.splice(0, 2);
+			}
+			let target = cols[0];
+			if (/^(all|tcp|udp|icmp|ipv6-icmp|\d+|esp|ah|gre|sctp|udplite)$/.test(target)) {
+				target = '';
+			} else cols.shift();
+			const [proto, , ...more] = cols;
+			const opts: Record<string, string> = { proto };
+			const neg = new Set<string>();
+			let rest: string[];
+			if (verbose) {
+				const [iin, iout, src, dst, ...extra] = more;
+				Object.assign(opts, { in: iin, out: iout, src, dst });
+				rest = extra;
+			} else {
+				const [src, dst, ...extra] = more;
+				Object.assign(opts, { src, dst });
+				rest = extra;
+			}
+			['in', 'out', 'src', 'dst'].forEach((k) => {
+				if (opts[k]?.startsWith('!')) {
+					opts[k] = opts[k].slice(1);
+					neg.add(k);
+				}
+			});
+			const ex = rest.join(' ');
+			const take = (re: RegExp, key: string, fn = (m: RegExpMatchArray) => m[1]) => {
+				const m = ex.match(re);
+				if (m) opts[key] = fn(m);
+			};
+			take(/\/\* (.*?) \*\//, 'comment');
+			take(/(?:^|\s)(?:tcp|udp)?\s*dpt:(\S+)/, 'dport');
+			take(/(?:^|\s)(?:tcp|udp)?\s*spt:(\S+)/, 'sport');
+			take(/dpts:(\S+)/, 'dport');
+			take(/multiport dports (\S+)/, 'dports');
+			take(/multiport sports (\S+)/, 'sports');
+			take(/(?:ctstate|state) (\S+)/, 'ctstate');
+			take(/icmptype (\d+)/, 'icmp-type');
+			take(/limit: avg (\S+) burst (\d+)/, 'limit', (m) => `${m[1]} burst ${m[2]}`);
+			take(/reject-with (\S+)/, 'reject-with');
+			take(/prefix "([^"]*)"/, 'log-prefix');
+			take(/to:(\S+)/, 'to-destination');
+			take(/redir ports (\S+)/, 'to-ports');
+			take(/match-set (\S+) (\S+)/, 'match-set', (m) => `${m[1]} ${m[2]}`);
+			take(/MAC (\S+)/, 'mac-source');
+			take(/recent: (\S+)/, 'recent', (m) => m[1].toLowerCase());
+			if (/!\s*dpt:/.test(ex)) neg.add('dport');
+			cur.rules.push({ table: 'filter', chain: cur.name, target, opts, neg, pkts, bytes, raw: line.trim() });
+		});
+		return chains;
+	};
+
+	const ICMP: Record<string, string> = {
+		'0': 'echo reply',
+		'3': 'destination unreachable',
+		'8': 'ping (echo request)',
+		'11': 'time exceeded',
+		'echo-request': 'ping (echo request)',
+		'echo-reply': 'echo reply',
+	};
+	const PORTS: Record<string, string> = {
+		'22': 'SSH',
+		'80': 'HTTP',
+		'443': 'HTTPS',
+		'53': 'DNS',
+		'25': 'SMTP',
+		'3306': 'MySQL',
+		'5432': 'PostgreSQL',
+		'6379': 'Redis',
+		'51820': 'WireGuard',
+		'8080': 'HTTP alt',
+		'123': 'NTP',
+	};
+
+	const portText = (p: string) =>
+		p
+			.split(',')
+			.map((x) => (x.includes(':') ? `${x.replace(':', ' to ')}` : PORTS[x] ? `${x} (${PORTS[x]})` : x))
+			.join(', ');
+
+	const explainRule = (r: Rule, chains: Chain[]) => {
+		const o = r.opts;
+		const not = (k: string) => (r.neg.has(k) ? 'not ' : '');
+		const parts: string[] = [];
+		const proto = o.proto && !ANY.has(o.proto) ? o.proto.toUpperCase() : '';
+		if (o.in && !ANY.has(o.in)) parts.push(`arriving ${r.neg.has('in') ? 'on any interface except' : 'on'} ${o.in}`);
+		if (o.out && !ANY.has(o.out)) parts.push(`leaving ${r.neg.has('out') ? 'on any interface except' : 'through'} ${o.out}`);
+		if (o.src && !ANY.has(o.src)) parts.push(`from ${not('src')}${o.src}`);
+		if (o.dst && !ANY.has(o.dst)) parts.push(`to ${not('dst')}${o.dst}`);
+		if (o.dport) parts.push(`to port ${not('dport')}${portText(o.dport)}`);
+		if (o.dports) parts.push(`to ports ${portText(o.dports)}`);
+		if (o.sport) parts.push(`from port ${portText(o.sport)}`);
+		if (o.sports) parts.push(`from ports ${portText(o.sports)}`);
+		if (o['icmp-type']) parts.push(`of type ${ICMP[o['icmp-type']] ?? o['icmp-type']}`);
+		const state = o.ctstate ?? o.state;
+		if (state) {
+			const st = state
+				.split(',')
+				.map(
+					(s) =>
+						({
+							NEW: 'new connections',
+							ESTABLISHED: 'established connections',
+							RELATED: 'related connections (like FTP data or ICMP errors)',
+							INVALID: 'invalid packets that belong to no known connection',
+							UNTRACKED: 'untracked packets',
+							DNAT: 'destination-NATed connections',
+						})[s.toUpperCase()] ?? s,
+				)
+				.join(' and ');
+			parts.push(`that are ${st}`);
+		}
+		if (o['match-set']) parts.push(`whose ${o['match-set'].split(' ')[1]} address is in ipset ${o['match-set'].split(' ')[0]}`);
+		if (o['mac-source']) parts.push(`from MAC ${o['mac-source']}`);
+		if (o.limit) parts.push(`at most ${o.limit}`);
+		if (o['limit-burst'] && !o.limit?.includes('burst')) parts.push(`burst ${o['limit-burst']}`);
+		const custom = chains.some((c) => c.name === r.target && !BUILTIN.includes(c.name));
+		const what = `${proto ? `${proto} ` : ''}${!proto && !parts.length ? 'every packet' : 'packets'}`;
+		let verb: string;
+		switch (r.target) {
+			case 'ACCEPT':
+				verb = 'Accept';
+				break;
+			case 'DROP':
+				verb = 'Silently drop';
+				break;
+			case 'REJECT':
+				verb = `Reject with ${o['reject-with'] ?? 'icmp-port-unreachable'}`;
+				break;
+			case 'LOG':
+				verb = `Log to the kernel log${o['log-prefix'] ? ` with prefix "${o['log-prefix']}"` : ''}, then keep evaluating,`;
+				break;
+			case 'RETURN':
+				verb = 'Return to the calling chain for';
+				break;
+			case 'MASQUERADE':
+				verb = 'Rewrite the source address to the outgoing interface IP (masquerade) for';
+				break;
+			case 'SNAT':
+				verb = `Rewrite the source address to ${o['to-source'] ?? '?'} for`;
+				break;
+			case 'DNAT':
+				verb = `Forward to ${o['to-destination'] ?? '?'} (DNAT)`;
+				break;
+			case 'REDIRECT':
+				verb = `Redirect to local port ${o['to-ports'] ?? '?'} for`;
+				break;
+			case 'MARK':
+			case 'CONNMARK':
+				verb = `Set mark ${o['set-mark'] ?? o['set-xmark'] ?? ''} on`;
+				break;
+			case '':
+				verb = o.recent !== undefined || o.set ? `Record the source address in list ${o.name ?? 'DEFAULT'} for` : 'Count (no target, only updates counters)';
+				break;
+			default:
+				verb = custom ? `Jump to chain ${r.target} for` : `Send to ${r.target} for`;
+		}
+		const tail = parts.length ? ` ${parts.join(', ')}` : '';
+		return `${verb} ${what}${tail}.${o.comment ? ` Comment: "${o.comment}".` : ''}`;
+	};
+
+	const el = (tag: string, cls: string, text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	const NS = 'http://www.w3.org/2000/svg';
+	const s = (tag: string, attrs: Record<string, string | number>, parent: Element, text?: string) => {
+		const e = document.createElementNS(NS, tag);
+		Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, String(v)));
+		if (text !== undefined) e.textContent = text;
+		parent.appendChild(e);
+		return e;
+	};
+
+	onPage('it-tool', () => {
+		const root = byId('it-tool');
+		const input = byId<HTMLTextAreaElement>('it-in');
+		const samples = JSON.parse(root.dataset.samples ?? '{}') as Record<string, string>;
+		let text = '';
+
+		const drawFlow = (chains: Chain[]) => {
+			const svg = byId('it-svg');
+			svg.querySelectorAll(':scope > :not(title)').forEach((n) => n.remove());
+			const count = (name: string) => chains.filter((c) => c.name === name).reduce((n, c) => n + c.rules.length, 0);
+			const policy = (name: string) => chains.find((c) => c.name === name && c.policy)?.policy;
+			const box = (x: number, y: number, name: string) => {
+				const present = chains.some((c) => c.name === name);
+				const g = s('g', { class: `it-box${present ? ' on' : ''}` }, svg);
+				s('rect', { x, y, width: 116, height: 52, rx: 12 }, g);
+				s('text', { x: x + 58, y: y + 22, class: 'it-bn' }, g, name);
+				s(
+					'text',
+					{ x: x + 58, y: y + 40, class: 'it-bs' },
+					g,
+					present ? `${count(name)} rule${count(name) === 1 ? '' : 's'}${policy(name) ? `, ${policy(name)}` : ''}` : 'not shown',
+				);
+			};
+			const arrow = (d: string) => s('path', { d, class: 'it-arrow', 'marker-end': 'url(#it-head)' }, svg);
+			const defs = s('defs', {}, svg);
+			const mk = s('marker', { id: 'it-head', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, defs);
+			s('path', { d: 'M0 0 L10 5 L0 10 z', class: 'it-headfill' }, mk);
+			arrow('M2 176 H22');
+			box(24, 150, 'PREROUTING');
+			arrow('M140 176 H254');
+			s('text', { x: 197, y: 168, class: 'it-lbl mid' }, svg, 'forwarded');
+			box(256, 150, 'FORWARD');
+			arrow('M372 176 H498');
+			box(500, 150, 'POSTROUTING');
+			arrow('M616 176 H638');
+			arrow('M82 150 V96 H138');
+			s('text', { x: 88, y: 88, class: 'it-lbl' }, svg, 'to this host');
+			box(140, 70, 'INPUT');
+			s('rect', { x: 262, y: 8, width: 104, height: 36, rx: 10, class: 'it-proc' }, svg);
+			s('text', { x: 314, y: 31, class: 'it-bn' }, svg, 'local process');
+			arrow('M198 70 V26 H260');
+			arrow('M366 26 H442 V68');
+			box(384, 70, 'OUTPUT');
+			arrow('M442 122 V136 H558 V148');
+			s('text', { x: 4, y: 216, class: 'it-lbl' }, svg, 'packet in');
+			s('text', { x: 636, y: 216, class: 'it-lbl end' }, svg, 'packet out');
+			byId('it-svg-title').textContent = `Packet flow: ${BUILTIN.map((n) => `${n} ${count(n)} rules${policy(n) ? `, policy ${policy(n)}` : ''}`).join('; ')}`;
+		};
+
+		const render = () => {
+			const src = input.value;
+			const isSave = /^\s*(\*\w+|:\w+ \S+|-A |iptables )/m.test(src) && !/^Chain /m.test(src);
+			const chains = isSave ? parseSave(src) : parseList(src);
+			byId('it-format').textContent = isSave ? 'iptables-save format' : 'iptables -L format';
+			const err = byId('it-error');
+			err.hidden = !!chains.length || !src.trim();
+			err.textContent = 'No chains or rules found. Paste the output of iptables -L -n -v or iptables-save.';
+			drawFlow(chains);
+			const lines: string[] = [];
+			byId('it-chains').replaceChildren(
+				...chains.map((c) => {
+					const sec = el('section', 'panel it-chain');
+					sec.dataset.chain = c.name;
+					const head = el('div', 'panel-head');
+					const title = el('span', '', `${c.table !== 'filter' ? `${c.table} / ` : ''}${c.name}`);
+					const pol = el(
+						'span',
+						`it-pol ${c.policy === 'ACCEPT' ? 'accept' : c.policy ? 'drop' : ''}`,
+						c.policy
+							? `Default: ${c.policy}${c.counters ? ` (${c.counters})` : ''}`
+							: c.refs !== undefined
+								? `Custom chain, ${c.refs} reference${c.refs === '1' ? '' : 's'}`
+								: 'Custom chain',
+					);
+					head.append(title, pol);
+					const ol = el('ol', 'it-rules');
+					const policyText = c.policy
+						? `Packets that match no rule are ${c.policy === 'ACCEPT' ? 'accepted' : 'dropped'} by the default policy.`
+						: 'When no rule matches, packets return to the chain that jumped here.';
+					lines.push(`${c.table}/${c.name}${c.policy ? ` (policy ${c.policy})` : ''}`);
+					c.rules.forEach((r, i) => {
+						const li = el('li', `it-rule t-${(r.target || 'none').toLowerCase()}`);
+						const top = el('div', 'it-top');
+						top.append(el('span', 'it-n', String(i + 1)), el('span', 'it-target', r.target || 'no target'));
+						if (r.pkts !== undefined)
+							top.append(el('span', `it-count${r.pkts === '0' ? ' zero' : ''}`, r.pkts === '0' ? 'never matched' : `${r.pkts} packets, ${r.bytes} bytes`));
+						const exp = explainRule(r, chains);
+						li.append(top, el('p', 'it-text', exp), el('code', 'it-raw', r.raw));
+						ol.append(li);
+						lines.push(`  ${i + 1}. ${exp}`);
+					});
+					const foot = el('p', 'it-foot', policyText);
+					sec.append(head, ...(c.rules.length ? [ol] : [el('p', 'it-empty', 'No rules in this chain.')]), foot);
+					return sec;
+				}),
+			);
+			text = lines.join('\n');
+		};
+
+		const chips = Array.from(byId('it-examples').querySelectorAll<HTMLButtonElement>('button'));
+		chips.forEach((b) =>
+			b.addEventListener('click', () => {
+				input.value = samples[b.dataset.k ?? 'list'];
+				chips.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+				render();
+			}),
+		);
+		input.addEventListener('input', () => {
+			chips.forEach((x) => x.setAttribute('aria-pressed', String(samples[x.dataset.k ?? ''] === input.value)));
+			render();
+		});
+		copyButton(byId('it-copy'), () => text);
+		render();
+	});
+</script>
+
+<style>
+	.it {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.it-scroll {
+		overflow-x: auto;
+		padding: 8px;
+	}
+	.it-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	#it-svg {
+		display: block;
+		font-family: var(--sans);
+	}
+	#it-svg :global(.it-box rect) {
+		fill: var(--surface);
+		stroke: var(--border);
+		stroke-dasharray: 4 4;
+	}
+	#it-svg :global(.it-box.on rect) {
+		fill: var(--accent);
+		stroke: var(--accent-strong);
+		stroke-dasharray: none;
+		stroke-width: 1.5;
+	}
+	#it-svg :global(.it-bn) {
+		fill: var(--ink);
+		font-size: 12.5px;
+		font-weight: 700;
+		text-anchor: middle;
+	}
+	#it-svg :global(.it-bs) {
+		fill: var(--ink-soft);
+		font-size: 11px;
+		text-anchor: middle;
+	}
+	#it-svg :global(.it-box.on .it-bs) {
+		fill: var(--ink);
+	}
+	#it-svg :global(.it-proc) {
+		fill: var(--surface-2);
+		stroke: var(--border);
+	}
+	#it-svg :global(.it-arrow) {
+		fill: none;
+		stroke: var(--ink-soft);
+		stroke-width: 1.5;
+	}
+	#it-svg :global(.it-headfill) {
+		fill: var(--ink-soft);
+	}
+	#it-svg :global(.it-lbl) {
+		fill: var(--ink-soft);
+		font-size: 11px;
+	}
+	#it-svg :global(.it-lbl.mid) {
+		text-anchor: middle;
+	}
+	#it-svg :global(.it-lbl.end) {
+		text-anchor: end;
+	}
+	.it-chains {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	.it-chains :global(.it-pol) {
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 600;
+		text-align: right;
+	}
+	.it-chains :global(.it-pol.accept) {
+		color: var(--ok);
+	}
+	.it-chains :global(.it-pol.drop) {
+		color: var(--bad);
+	}
+	.it-chains :global(.it-rules) {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.it-chains :global(.it-rule) {
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+		border-left: 4px solid var(--border);
+	}
+	.it-chains :global(.it-rule.t-accept) {
+		border-left-color: var(--ok);
+	}
+	.it-chains :global(.it-rule.t-drop),
+	.it-chains :global(.it-rule.t-reject) {
+		border-left-color: var(--bad);
+	}
+	.it-chains :global(.it-rule.t-log) {
+		border-left-color: var(--warn);
+	}
+	.it-chains :global(.it-top) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+	}
+	.it-chains :global(.it-n) {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+	}
+	.it-chains :global(.it-target) {
+		font-family: var(--mono);
+		font-size: 12.5px;
+		font-weight: 700;
+		padding: 1px 8px;
+		border-radius: 999px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+	}
+	.it-chains :global(.t-accept .it-target) {
+		color: var(--ok);
+	}
+	.it-chains :global(.t-drop .it-target),
+	.it-chains :global(.t-reject .it-target) {
+		color: var(--bad);
+	}
+	.it-chains :global(.it-count) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.it-chains :global(.it-count.zero) {
+		color: var(--warn);
+		font-weight: 700;
+	}
+	.it-chains :global(.it-text) {
+		margin: 6px 0 4px;
+		font-size: 14px;
+	}
+	.it-chains :global(.it-raw) {
+		display: block;
+		font-family: var(--mono);
+		font-size: 12px;
+		color: var(--ink-soft);
+		word-break: break-all;
+	}
+	.it-chains :global(.it-foot),
+	.it-chains :global(.it-empty) {
+		margin: 0;
+		padding: 10px 14px;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+</style>
