@@ -1,0 +1,440 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const idToken = [
+	{ alg: 'RS256', kid: 'k1', typ: 'JWT' },
+	{ iss: 'https://auth.example.com', sub: 'user_8f2a91', aud: 'kodilo-web', nonce: 'n-0S6_WzA2Mj', iat: 1790000000, exp: 1790003600, email: 'ada@example.com' },
+]
+	.map((p) => Buffer.from(JSON.stringify(p)).toString('base64url'))
+	.concat('c2lnbmF0dXJlLW5vdC12ZXJpZmllZA')
+	.join('.');
+const tokenSample = JSON.stringify(
+	{
+		access_token: 'eyJhbGciOiJIUzI1NiJ9.eyJzY29wZSI6Im9wZW5pZCBwcm9maWxlIGVtYWlsIn0.c2ln',
+		token_type: 'Bearer',
+		expires_in: 3600,
+		scope: 'openid profile email',
+		id_token: idToken,
+	},
+	null,
+	2,
+);
+---
+
+<ToolShell
+	slug="oauth-helper"
+	title="OAuth & OIDC Helper"
+	description="Build an OAuth 2.0 or OpenID Connect authorization URL with PKCE, state and nonce, then decode the callback URL or token response. Everything is generated in your browser."
+>
+	<div class="oa" id="oa-tool" data-token={tokenSample}>
+		<h2>Authorization request</h2>
+		<div class="fields">
+			<div class="field wide">
+				<label for="oa-endpoint">Authorization endpoint</label>
+				<input id="oa-endpoint" spellcheck="false" value="https://auth.example.com/oauth2/authorize" />
+			</div>
+			<div class="field">
+				<label for="oa-client">client_id</label>
+				<input id="oa-client" spellcheck="false" value="kodilo-web" />
+			</div>
+			<div class="field">
+				<label for="oa-redirect">redirect_uri</label>
+				<input id="oa-redirect" spellcheck="false" value="https://app.example.com/callback" />
+			</div>
+			<div class="field">
+				<label for="oa-scope">scope</label>
+				<input id="oa-scope" spellcheck="false" value="openid profile email" />
+			</div>
+			<div class="field">
+				<label for="oa-type">response_type</label>
+				<select id="oa-type">
+					<option value="code" selected>
+						code
+					</option>
+					<option value="token">token (implicit, legacy)</option>
+					<option value="id_token">id_token</option>
+					<option value="code id_token">code id_token</option>
+				</select>
+			</div>
+			<div class="field wide">
+				<label for="oa-extra">Extra parameters</label>
+				<input id="oa-extra" spellcheck="false" placeholder="prompt=consent&amp;audience=api" />
+			</div>
+		</div>
+		<div class="toolbar">
+			<label class="check">
+				<input type="checkbox" id="oa-pkce" checked /> PKCE (S256)
+			</label>
+			<label class="check">
+				<input type="checkbox" id="oa-nonce-on" checked /> nonce
+			</label>
+			<button class="btn" id="oa-regen">
+				Regenerate secrets
+			</button>
+		</div>
+		<div class="fields oa-secrets">
+			<div class="field">
+				<label for="oa-verifier">code_verifier</label>
+				<input id="oa-verifier" spellcheck="false" readonly />
+				<span class="field-note">Keep it in the session; send it with the token request.</span>
+			</div>
+			<div class="field">
+				<label for="oa-challenge">code_challenge</label>
+				<input id="oa-challenge" spellcheck="false" readonly />
+				<span class="field-note">base64url(SHA-256(code_verifier))</span>
+			</div>
+			<div class="field">
+				<label for="oa-state">state</label>
+				<input id="oa-state" spellcheck="false" />
+			</div>
+			<div class="field">
+				<label for="oa-nonce">nonce</label>
+				<input id="oa-nonce" spellcheck="false" />
+			</div>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Authorization URL</span>
+				<span class="oa-actions">
+					<a class="btn" id="oa-open" href="#" target="_blank" rel="noopener noreferrer">
+						Open
+					</a>
+					<button class="btn" id="oa-copy-url">
+						Copy
+					</button>
+				</span>
+			</div>
+			<pre class="out oa-out" id="oa-url"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Token request</span>
+				<button class="btn" id="oa-copy-curl">
+					Copy
+				</button>
+			</div>
+			<div class="field oa-inline">
+				<label for="oa-token-endpoint">Token endpoint</label>
+				<input id="oa-token-endpoint" spellcheck="false" value="https://auth.example.com/oauth2/token" />
+			</div>
+			<pre class="out oa-out" id="oa-curl"></pre>
+		</section>
+		<p class="oa-note">Secrets are created with crypto.getRandomValues and never leave this page.</p>
+
+		<h2>Decode a callback or token response</h2>
+		<div class="toolbar">
+			<div class="chips" id="oa-samples">
+				<button data-k="callback" aria-pressed="true">
+					Callback URL
+				</button>
+				<button data-k="token" aria-pressed="false">
+					Token response
+				</button>
+			</div>
+		</div>
+		<section class="panel">
+			<div class="panel-head">Callback URL, fragment or token JSON</div>
+			<textarea id="oa-in" spellcheck="false" aria-label="Callback URL or token response"></textarea>
+		</section>
+		<ul class="oa-checks" id="oa-checks" aria-live="polite"></ul>
+		<section class="panel">
+			<div class="panel-head">Parameters</div>
+			<dl class="oa-dl" id="oa-params"></dl>
+		</section>
+		<div id="oa-jwts" class="oa-jwts"></div>
+	</div>
+</ToolShell>
+
+<script>
+	import { base64UrlDecode } from '../../scripts/crypto';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const b64url = (bytes: Uint8Array) =>
+		btoa(String.fromCharCode(...bytes))
+			.replace(/\+/g, '-')
+			.replace(/\//g, '_')
+			.replace(/=+$/, '');
+	const random = (n: number) => b64url(crypto.getRandomValues(new Uint8Array(n)));
+	const challengeOf = async (verifier: string) => b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+
+	const decodeJwt = (token: string) => {
+		const [h, p] = token.split('.');
+		const json = (s: string) => JSON.parse(new TextDecoder().decode(base64UrlDecode(s)));
+		return { header: json(h), payload: json(p) };
+	};
+
+	const el = (tag: string, cls = '', text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	const shellQuote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+
+	onPage('oa-tool', () => {
+		const v = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const pkce = byId<HTMLInputElement>('oa-pkce');
+		const nonceOn = byId<HTMLInputElement>('oa-nonce-on');
+		const input = byId<HTMLTextAreaElement>('oa-in');
+		let url = '';
+		let curl = '';
+		let run = 0;
+
+		const regen = () => {
+			byId<HTMLInputElement>('oa-verifier').value = random(32);
+			byId<HTMLInputElement>('oa-state').value = random(16);
+			byId<HTMLInputElement>('oa-nonce').value = random(16);
+		};
+
+		const build = async () => {
+			const t = ++run;
+			const verifier = v('oa-verifier');
+			const challenge = pkce.checked ? await challengeOf(verifier) : '';
+			if (t !== run) return;
+			byId<HTMLInputElement>('oa-challenge').value = challenge;
+			byId('oa-tool')
+				.querySelectorAll<HTMLElement>('#oa-verifier, #oa-challenge')
+				.forEach((e) => e.closest('.field')?.toggleAttribute('hidden', !pkce.checked));
+			byId('oa-nonce').closest('.field')?.toggleAttribute('hidden', !nonceOn.checked);
+			const params = new URLSearchParams();
+			params.set('response_type', byId<HTMLSelectElement>('oa-type').value);
+			params.set('client_id', v('oa-client'));
+			if (v('oa-redirect')) params.set('redirect_uri', v('oa-redirect'));
+			if (v('oa-scope')) params.set('scope', v('oa-scope'));
+			if (v('oa-state')) params.set('state', v('oa-state'));
+			if (nonceOn.checked && v('oa-nonce')) params.set('nonce', v('oa-nonce'));
+			if (pkce.checked) {
+				params.set('code_challenge', challenge);
+				params.set('code_challenge_method', 'S256');
+			}
+			new URLSearchParams(v('oa-extra')).forEach((val, key) => key && params.set(key, val));
+			const endpoint = v('oa-endpoint');
+			url = `${endpoint}${endpoint.includes('?') ? '&' : '?'}${params.toString().replace(/\+/g, '%20')}`;
+			byId('oa-url').textContent = url;
+			byId<HTMLAnchorElement>('oa-open').href = /^https?:\/\//.test(endpoint) ? url : '#';
+			const body = [
+				'grant_type=authorization_code',
+				'code=AUTHORIZATION_CODE',
+				`redirect_uri=${encodeURIComponent(v('oa-redirect'))}`,
+				`client_id=${encodeURIComponent(v('oa-client'))}`,
+				...(pkce.checked ? [`code_verifier=${verifier}`] : ['client_secret=CLIENT_SECRET']),
+			];
+			curl = `curl -X POST ${shellQuote(v('oa-token-endpoint'))} \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n${body.map((b) => `  -d ${shellQuote(b)}`).join(' \\\n')}`;
+			byId('oa-curl').textContent = curl;
+			decode();
+		};
+
+		const decode = () => {
+			const raw = input.value.trim();
+			const params = new Map<string, string>();
+			const checks: [string, string][] = [];
+			let kind = '';
+			try {
+				if (raw.startsWith('{')) {
+					kind = 'Token response';
+					Object.entries(JSON.parse(raw) as Record<string, unknown>).forEach(([k, val]) => params.set(k, typeof val === 'string' ? val : JSON.stringify(val)));
+				} else if (raw) {
+					kind = 'Callback';
+					const u = new URL(raw, 'https://callback.invalid/');
+					u.searchParams.forEach((val, k) => params.set(k, val));
+					new URLSearchParams(u.hash.slice(1)).forEach((val, k) => params.set(k, val));
+					if (u.origin !== 'https://callback.invalid' && v('oa-redirect') && `${u.origin}${u.pathname}` !== v('oa-redirect'))
+						checks.push(['warn', `Redirect ${u.origin}${u.pathname} differs from redirect_uri ${v('oa-redirect')}.`]);
+				}
+			} catch {
+				checks.push(['bad', 'Could not parse this as a URL or JSON.']);
+			}
+			if (params.has('error'))
+				checks.push(['bad', `Error ${params.get('error')}${params.has('error_description') ? `: ${params.get('error_description')}` : ''}`]);
+			if (params.has('state'))
+				checks.push(
+					params.get('state') === v('oa-state') ? ['ok', 'state matches the request.'] : ['bad', 'state does not match the request: possible CSRF, reject it.'],
+				);
+			else if (kind === 'Callback' && params.size) checks.push(['warn', 'No state in the callback.']);
+			if (params.has('code'))
+				checks.push(['ok', pkce.checked ? 'Authorization code received. Exchange it with the code_verifier above.' : 'Authorization code received.']);
+			if (params.has('expires_in')) {
+				const exp = Number(params.get('expires_in'));
+				checks.push(['ok', `Access token lifetime ${exp >= 3600 ? `${(exp / 3600).toFixed(exp % 3600 ? 1 : 0)} h` : `${Math.round(exp / 60)} min`}.`]);
+			}
+			const jwts: [string, ReturnType<typeof decodeJwt>][] = [];
+			params.forEach((val, k) => {
+				if (/^[\w-]+\.[\w-]+\.[\w-]*$/.test(val)) {
+					try {
+						jwts.push([k, decodeJwt(val)]);
+					} catch {
+						return;
+					}
+				}
+			});
+			const id = jwts.find(([k]) => k === 'id_token')?.[1].payload;
+			if (id) {
+				if (nonceOn.checked)
+					checks.push(id.nonce === v('oa-nonce') ? ['ok', 'id_token nonce matches the request.'] : ['bad', 'id_token nonce does not match the request.']);
+				if (id.aud && ![id.aud].flat().includes(v('oa-client'))) checks.push(['bad', `id_token audience ${id.aud} is not your client_id.`]);
+				if (typeof id.exp === 'number' && id.exp * 1000 < Date.now())
+					checks.push(['warn', `id_token expired on ${new Date(id.exp * 1000).toISOString().slice(0, 19).replace('T', ' ')} UTC.`]);
+			}
+			byId('oa-checks').replaceChildren(...checks.map(([k, m]) => el('li', k, m)));
+			byId('oa-params').replaceChildren(
+				...(params.size
+					? [...params].map(([k, val]) => {
+							const row = el('div', 'oa-row');
+							row.append(el('dt', '', k), el('dd', '', val));
+							return row;
+						})
+					: [el('p', 'oa-empty', 'Paste a redirect URL like https://app.example.com/callback?code=...&state=... or a token JSON.')]),
+			);
+			byId('oa-jwts').replaceChildren(
+				...jwts.map(([k, { header, payload }]) => {
+					const sec = el('section', 'panel');
+					const head = el('div', 'panel-head');
+					const btn = el('button', 'btn', 'Copy');
+					btn.setAttribute('aria-label', `Copy decoded ${k}`);
+					const text = `${JSON.stringify(header, null, 2)}\n${JSON.stringify(payload, null, 2)}`;
+					copyButton(btn, () => text);
+					head.append(el('span', '', `${k} · decoded, signature not verified`), btn);
+					const pre = el('pre', 'out oa-out', text);
+					pre.tabIndex = 0;
+					sec.append(head, pre);
+					return sec;
+				}),
+			);
+		};
+
+		const samples: Record<string, () => string> = {
+			callback: () => `${v('oa-redirect')}?code=SplxlOBeZQQYbYS6WxSbIA&state=${encodeURIComponent(v('oa-state'))}`,
+			token: () => byId('oa-tool').dataset.token ?? '',
+		};
+		const chips = Array.from(byId('oa-samples').querySelectorAll<HTMLButtonElement>('button'));
+		chips.forEach((b) =>
+			b.addEventListener('click', () => {
+				input.value = samples[b.dataset.k ?? 'callback']();
+				chips.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+				decode();
+			}),
+		);
+
+		regen();
+		input.value = samples.callback();
+		byId('oa-regen').addEventListener('click', () => {
+			regen();
+			build();
+		});
+		byId('oa-tool')
+			.querySelectorAll('input, select')
+			.forEach((e) => e.addEventListener('input', build));
+		input.addEventListener('input', () => {
+			chips.forEach((x) => x.setAttribute('aria-pressed', 'false'));
+			decode();
+		});
+		copyButton(byId('oa-copy-url'), () => url);
+		copyButton(byId('oa-copy-curl'), () => curl);
+		build();
+	});
+</script>
+
+<style>
+	.oa {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.oa h2 {
+		margin: 12px 0 0;
+		font-size: 18px;
+	}
+	.oa .field > input {
+		font-size: 15px;
+	}
+	.oa .field[hidden] {
+		display: none;
+	}
+	.oa-actions {
+		display: flex;
+		gap: 6px;
+	}
+	.oa-actions a {
+		text-decoration: none;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+	.panel .oa-out {
+		min-height: 0;
+	}
+	.oa-out:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	.oa-inline {
+		border: 0;
+		border-bottom: 1px solid var(--border);
+		border-radius: 0;
+	}
+	.oa textarea {
+		min-height: 120px;
+	}
+	.oa-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.oa-checks {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.oa-checks :global(li) {
+		padding: 8px 14px;
+		border-radius: 10px;
+		font-size: 14px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+	}
+	.oa-checks :global(li.bad) {
+		color: var(--warn);
+		background: var(--warn-bg);
+		border-color: transparent;
+		font-weight: 600;
+	}
+	.oa-checks :global(li.warn) {
+		color: var(--warn);
+	}
+	.oa-dl {
+		margin: 0;
+		padding: 10px 14px 14px;
+		display: grid;
+		gap: 8px;
+	}
+	.oa-dl :global(.oa-row) {
+		display: grid;
+		grid-template-columns: minmax(100px, 150px) 1fr;
+		gap: 10px;
+	}
+	.oa-dl :global(dt) {
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+	}
+	.oa-dl :global(dd) {
+		margin: 0;
+		min-width: 0;
+		font-family: var(--mono);
+		font-size: 13px;
+		overflow-wrap: anywhere;
+	}
+	.oa-dl :global(.oa-empty) {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.oa-jwts {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+</style>

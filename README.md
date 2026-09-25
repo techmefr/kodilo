@@ -6,7 +6,7 @@ Live at **https://techmefr.github.io/kodilo/**
 
 ## What's in here
 
-**203 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
+**216 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
 
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
@@ -14,7 +14,7 @@ Live at **https://techmefr.github.io/kodilo/**
 
 - [Inbox Tester](https://techmefr.github.io/kodilo/tools/inbox-tester/) — Paste an HTML email, pick a client tab, see the render and which CSS features it supports.
 
-### JSON (10)
+### JSON (11)
 
 - [JSON Formatter & Validator](https://techmefr.github.io/kodilo/tools/json-formatter/) — Format, validate and minify JSON data.
 - [JSON to YAML](https://techmefr.github.io/kodilo/tools/json-to-yaml/) — Convert JSON to YAML.
@@ -26,8 +26,9 @@ Live at **https://techmefr.github.io/kodilo/**
 - [JSONPath Tester](https://techmefr.github.io/kodilo/tools/jsonpath-tester/) — Run JSONPath expressions against a JSON document and see every match with its exact path, live as you type.
 - [JSON to Zod](https://techmefr.github.io/kodilo/tools/json-to-zod/) — Generate a Zod schema from a JSON sample, with nested objects, arrays and optional keys.
 - [JSON to Go](https://techmefr.github.io/kodilo/tools/json-to-go/) — Generate Go structs with json tags from a JSON sample.
+- [JSON to OpenAPI Schema](https://techmefr.github.io/kodilo/tools/json-to-openapi-schema/) — Infer an OpenAPI 3.1 component or JSON Schema from JSON samples, with formats.
 
-### HTML / CSS (11)
+### HTML / CSS (12)
 
 - [HTML Formatter](https://techmefr.github.io/kodilo/tools/html-formatter/) — Beautify and format HTML code.
 - [CSS Formatter & Minifier](https://techmefr.github.io/kodilo/tools/css-formatter/) — Format and minify CSS stylesheets.
@@ -40,6 +41,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [Code Minifier](https://techmefr.github.io/kodilo/tools/code-minifier/) — Minify JavaScript, CSS or HTML and see how many bytes you saved.
 - [CSS clip-path Editor](https://techmefr.github.io/kodilo/tools/clip-path-editor/) — Drag handles to shape a polygon, circle, ellipse or inset clip-path and copy the CSS.
 - [CSS Keyframes Generator](https://techmefr.github.io/kodilo/tools/css-keyframes-generator/) — Build @keyframes animations step by step with timing, iteration and a live preview.
+- [Media Query Tester](https://techmefr.github.io/kodilo/tools/media-query-tester/) — See which media queries match at any width, orientation, color scheme or pointer, with a live resizable preview.
 
 ### Markdown (7)
 
@@ -51,12 +53,13 @@ Live at **https://techmefr.github.io/kodilo/**
 - [README Badge Generator](https://techmefr.github.io/kodilo/tools/readme-badge-generator/) — Build shields.io badges for your README, with GitHub and GitLab presets, a live preview and Markdown, HTML or reStructuredText output.
 - [Issue & PR Template Generator](https://techmefr.github.io/kodilo/tools/issue-pr-template-generator/) — Create GitHub issue forms and pull request templates, and GitLab issue and merge request templates with quick actions, ready to drop in your repo.
 
-### SEO (4)
+### SEO (5)
 
 - [Meta Tag Generator](https://techmefr.github.io/kodilo/tools/meta-tag-generator/) — Generate HTML meta tags.
 - [Open Graph Generator](https://techmefr.github.io/kodilo/tools/open-graph-generator/) — Generate Open Graph tags for link previews.
 - [robots.txt Generator](https://techmefr.github.io/kodilo/tools/robots-txt-generator/) — Write robots.txt rules per crawler, block AI bots and test a path.
 - [Sitemap Generator](https://techmefr.github.io/kodilo/tools/sitemap-generator/) — Turn a list of pages into a valid sitemap.xml.
+- [HTML Meta Audit](https://techmefr.github.io/kodilo/tools/html-meta-audit/) — Audit a page's title, description, social cards, icons, headings, alt text and JSON-LD with a score.
 
 ### Text (14)
 
@@ -75,7 +78,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [ASCII Table Generator](https://techmefr.github.io/kodilo/tools/ascii-table-generator/) — Draw CSV or TSV data as ASCII or Unicode box tables in several styles.
 - [ASCII Art Generator](https://techmefr.github.io/kodilo/tools/ascii-art-generator/) — Turn text into ASCII banners with classic FIGlet fonts.
 
-### Encoding & Security (23)
+### Encoding & Security (28)
 
 - [Base64 Encoder & Decoder](https://techmefr.github.io/kodilo/tools/base64/) — Encode and decode Base64 strings.
 - [JWT Decoder](https://techmefr.github.io/kodilo/tools/jwt-decoder/) — Decode and inspect JWT tokens.
@@ -100,6 +103,11 @@ Live at **https://techmefr.github.io/kodilo/**
 - [RBAC Matrix Builder](https://techmefr.github.io/kodilo/tools/rbac-matrix-builder/) — Build a roles × resources × actions grid with scopes and inheritance, then export JSON, YAML, a Spatie seeder, CASL or SQL.
 - [Permission Tester](https://techmefr.github.io/kodilo/tools/permission-tester/) — Check whether a role may perform an action on a record, with the deciding rule and the inheritance chain.
 - [Policy Diff](https://techmefr.github.io/kodilo/tools/policy-diff/) — Compare two role matrices: granted, revoked, widened and narrowed permissions per role, with risky escalations flagged.
+- [Password Strength Checker](https://techmefr.github.io/kodilo/tools/password-strength-checker/) — Estimate entropy and crack time per attack scenario, spot weak patterns and get advice. Never stored.
+- [SAML Decoder](https://techmefr.github.io/kodilo/tools/saml-decoder/) — Decode SAMLRequest and SAMLResponse messages: issuer, NameID, validity, audience, attributes and signature.
+- [OAuth & OIDC Helper](https://techmefr.github.io/kodilo/tools/oauth-helper/) — Build an OAuth 2.0 or OIDC authorization URL with PKCE, state and nonce, and decode callbacks and tokens.
+- [SSH Key Generator](https://techmefr.github.io/kodilo/tools/ssh-key-generator/) — Generate Ed25519 or RSA SSH key pairs in OpenSSH format with a comment and SHA256 fingerprint.
+- [Webhook Signature Verifier](https://techmefr.github.io/kodilo/tools/webhook-signature-verifier/) — Verify GitHub, Stripe, Slack, Shopify and HMAC webhook signatures.
 
 ### Generators (8)
 
@@ -147,7 +155,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [Credit Card Validator](https://techmefr.github.io/kodilo/tools/credit-card-validator/) — Validate a credit card number with the Luhn check.
 - [IBAN Validator & Parser](https://techmefr.github.io/kodilo/tools/iban-validator/) — Validate an IBAN and break it down by country/bank/account.
 
-### Images (10)
+### Images (11)
 
 - [Image Resizer](https://techmefr.github.io/kodilo/tools/image-resizer/) — Resize images entirely in the browser.
 - [Image Compressor](https://techmefr.github.io/kodilo/tools/image-compressor/) — Compress images without uploading them anywhere.
@@ -159,6 +167,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [QR Code Reader](https://techmefr.github.io/kodilo/tools/qr-code-reader/) — Read a QR code from an image, a pasted screenshot or the camera.
 - [Code Screenshot](https://techmefr.github.io/kodilo/tools/code-screenshot/) — Turn a code snippet into a clean image with syntax highlighting, window chrome and a gradient background, exported as a 2x PNG.
 - [Placeholder Image Generator](https://techmefr.github.io/kodilo/tools/placeholder-image-generator/) — Make placeholder images of any size with your colors and label, as PNG, JPG, WebP or SVG, plus a data URI and an SVG snippet.
+- [srcset & sizes Generator](https://techmefr.github.io/kodilo/tools/srcset-generator/) — Responsive img srcset and sizes or picture with AVIF and WebP, and which file the browser picks.
 
 ### PDF (5)
 
@@ -168,7 +177,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [PDF to JPG](https://techmefr.github.io/kodilo/tools/pdf-to-jpg/) — Convert PDF pages to JPG images.
 - [JPG to PDF](https://techmefr.github.io/kodilo/tools/jpg-to-pdf/) — Convert JPG images to a PDF.
 
-### Dev Utilities (24)
+### Dev Utilities (27)
 
 - [SQL Prettify](https://techmefr.github.io/kodilo/tools/sql-prettify/) — Format SQL queries.
 - [Math Evaluator](https://techmefr.github.io/kodilo/tools/math-evaluator/) — Evaluate a math expression on the fly.
@@ -194,8 +203,11 @@ Live at **https://techmefr.github.io/kodilo/**
 - [Git Log Graph Explainer](https://techmefr.github.io/kodilo/tools/git-log-graph-explainer/) — Paste git log --graph output and get a clean commit graph with branches, merges and tags explained.
 - [Git Rebase vs Merge Visualizer](https://techmefr.github.io/kodilo/tools/git-rebase-visualizer/) — Before and after diagrams of merge, rebase, squash and cherry-pick on the same history, with the commands.
 - [.gitattributes Generator](https://techmefr.github.io/kodilo/tools/gitattributes-generator/) — Build a .gitattributes file with line endings, binary files, Git LFS, linguist overrides and diff drivers.
+- [SQL EXPLAIN Explainer](https://techmefr.github.io/kodilo/tools/sql-explain-explainer/) — Read Postgres and MySQL EXPLAIN plans as a tree with cost bars and plain-English advice.
+- [SQL to ER Diagram](https://techmefr.github.io/kodilo/tools/sql-er-diagram/) — Draw an ER diagram from CREATE TABLE statements, export Mermaid or SVG.
+- [OpenAPI Viewer & Validator](https://techmefr.github.io/kodilo/tools/openapi-viewer/) — Validate an OpenAPI 3.x or Swagger 2.0 spec and browse its endpoints by tag.
 
-### DevOps & Sysadmin (46)
+### DevOps & Sysadmin (47)
 
 - [Uptime / SLA Calculator](https://techmefr.github.io/kodilo/tools/uptime-sla-calculator/) — Turn 99.9% into allowed downtime per day, month and year, and back.
 - [Byte Size Converter](https://techmefr.github.io/kodilo/tools/byte-size-converter/) — B, KB, KiB, MB, MiB, GB, GiB, TB, TiB: decimal and binary units side by side.
@@ -243,6 +255,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [PromQL Explainer](https://techmefr.github.io/kodilo/tools/promql-explainer/) — Break a PromQL query down step by step: selectors, ranges, functions, aggregations and vector matching
 - [iptables Explainer](https://techmefr.github.io/kodilo/tools/iptables-explainer/) — Read iptables -L -n -v or iptables-save rules in plain English, chain by chain, with packet flow
 - [ps and top Explainer](https://techmefr.github.io/kodilo/tools/ps-top-explainer/) — Explain ps aux and top output: columns, process states and a sortable table of the heaviest processes
+- [Access Log Analyzer](https://techmefr.github.io/kodilo/tools/access-log-analyzer/) — Analyze nginx and Apache access logs: status codes, top IPs and URLs, traffic chart, errors and bots.
 
 ### Calculators (5)
 

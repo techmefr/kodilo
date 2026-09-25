@@ -1,0 +1,522 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `CREATE TABLE customers (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  full_name TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE customer_profiles (
+  customer_id INTEGER PRIMARY KEY REFERENCES customers(id),
+  avatar_url TEXT,
+  bio TEXT
+);
+
+CREATE TABLE products (
+  id SERIAL PRIMARY KEY,
+  sku VARCHAR(40) NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  price NUMERIC(10, 2) NOT NULL
+);
+
+CREATE TABLE orders (
+  id BIGSERIAL PRIMARY KEY,
+  customer_id INTEGER NOT NULL REFERENCES customers(id),
+  coupon_code VARCHAR(20),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  placed_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE order_items (
+  order_id BIGINT NOT NULL,
+  product_id INTEGER NOT NULL,
+  quantity INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (order_id, product_id),
+  CONSTRAINT fk_items_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_items_product FOREIGN KEY (product_id) REFERENCES products(id)
+);`;
+---
+
+<ToolShell
+	slug="sql-er-diagram"
+	title="SQL to ER Diagram"
+	description="Paste MySQL or Postgres CREATE TABLE statements and get an entity-relationship diagram with keys, foreign keys and cardinality, exportable as Mermaid or SVG."
+>
+	<div class="er" id="er-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span id="er-in-label">SQL</span>
+			</div>
+			<textarea id="er-in" spellcheck="false" aria-labelledby="er-in-label">{sample}</textarea>
+		</section>
+		<p class="error" id="er-error" hidden></p>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="er-svg-label">Diagram</span>
+				<span class="er-actions">
+					<button class="btn" id="er-copy-svg">
+						Copy SVG
+					</button>
+					<button class="btn" id="er-download">
+						Download SVG
+					</button>
+				</span>
+			</div>
+			<div class="er-scroll" tabindex="0" role="region" aria-labelledby="er-svg-label">
+				<svg id="er-svg" role="img" aria-label="Entity-relationship diagram"></svg>
+			</div>
+		</section>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">
+					<span id="er-rel-label">Relations</span>
+				</div>
+				<ul class="er-rels" id="er-rels" aria-labelledby="er-rel-label"></ul>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span id="er-mm-label">Mermaid erDiagram</span>
+					<button class="btn" id="er-copy-mm">
+						Copy
+					</button>
+				</div>
+				<pre class="out" id="er-mm" tabindex="0" aria-labelledby="er-mm-label"></pre>
+			</section>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Column = { name: string; type: string; nullable: boolean; pk: boolean; unique: boolean; fk?: { table: string; column: string } };
+	type Table = { name: string; columns: Column[]; pk: string[] };
+	type Rel = { from: string; column: string; to: string; toColumn: string; one: boolean; optional: boolean };
+
+	const unquote = (s: string) => s.trim().replace(/^[`"[]|[`"\]]$/g, '');
+	const lastPart = (s: string) => unquote(s.split('.').pop() ?? s);
+	const names = (list: string) => list.split(',').map(lastPart);
+
+	const splitTop = (s: string) => {
+		const out: string[] = [];
+		let depth = 0;
+		let quote = '';
+		let cur = '';
+		for (const c of s) {
+			if (quote) {
+				if (c === quote) quote = '';
+			} else if (c === "'" || c === '"' || c === '`') quote = c;
+			else if (c === '(') depth++;
+			else if (c === ')') depth--;
+			else if (c === ',' && depth === 0) {
+				out.push(cur.trim());
+				cur = '';
+				continue;
+			}
+			cur += c;
+		}
+		if (cur.trim()) out.push(cur.trim());
+		return out;
+	};
+
+	const applyConstraint = (table: Table, c: string) => {
+		const find = (n: string) => table.columns.find((col) => col.name.toLowerCase() === n.toLowerCase());
+		const pk = /primary\s+key\s*\(([^)]+)\)/i.exec(c);
+		if (pk) {
+			table.pk = names(pk[1]);
+			table.pk.forEach((n) => {
+				const col = find(n);
+				if (col) {
+					col.pk = true;
+					col.nullable = false;
+				}
+			});
+		}
+		const fk = /foreign\s+key\s*\(([^)]+)\)\s*references\s+([`"[\]\w.]+)\s*(?:\(([^)]+)\))?/i.exec(c);
+		if (fk) {
+			const target = names(fk[3] ?? 'id');
+			names(fk[1]).forEach((n, i) => {
+				const col = find(n);
+				if (col) col.fk = { table: lastPart(fk[2]), column: target[i] ?? target[0] };
+			});
+		}
+		const uq = /^(?:constraint\s+\S+\s+)?unique(?:\s+(?:key|index))?(?:\s+[`"\w]+)?\s*\(([^)]+)\)/i.exec(c);
+		if (uq && names(uq[1]).length === 1) {
+			const col = find(names(uq[1])[0]);
+			if (col) col.unique = true;
+		}
+	};
+
+	const parseSql = (sql: string): Table[] => {
+		const clean = sql
+			.replace(/--[^\n]*/g, '')
+			.replace(/#[^\n]*/g, '')
+			.replace(/\/\*[\s\S]*?\*\//g, '');
+		const tables: Table[] = [];
+		const re = /create\s+(?:temporary\s+|temp\s+|unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?([`"[\]\w.]+)\s*\(/gi;
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(clean))) {
+			let depth = 1;
+			let i = re.lastIndex;
+			for (; i < clean.length && depth; i++) {
+				if (clean[i] === '(') depth++;
+				else if (clean[i] === ')') depth--;
+			}
+			if (depth) throw new Error(`Unclosed parenthesis in table ${lastPart(m[1])}`);
+			const table: Table = { name: lastPart(m[1]), columns: [], pk: [] };
+			const constraints: string[] = [];
+			for (const def of splitTop(clean.slice(re.lastIndex, i - 1))) {
+				if (/^(constraint|primary\s+key|foreign\s+key|unique|key|index|check|fulltext|exclude)\b/i.test(def)) {
+					constraints.push(def);
+					continue;
+				}
+				const cm = /^([`"[]?[\w$ ]+?[`"\]]?)\s+([a-z][\w]*(?:\s+(?:varying|precision|without time zone|with time zone))?)(\s*\([^)]*\))?(.*)$/is.exec(def);
+				if (!cm) continue;
+				const rest = cm[4] ?? '';
+				const col: Column = {
+					name: unquote(cm[1]),
+					type: (cm[2] + (cm[3] ?? '')).replace(/\s+/g, ' ').toLowerCase(),
+					nullable: !/\bnot\s+null\b/i.test(rest),
+					pk: /\bprimary\s+key\b/i.test(rest),
+					unique: /\bunique\b/i.test(rest),
+				};
+				const rm = /\breferences\s+([`"[\]\w.]+)\s*(?:\(\s*([`"[\]\w]+)\s*\))?/i.exec(rest);
+				if (rm) col.fk = { table: lastPart(rm[1]), column: rm[2] ? unquote(rm[2]) : 'id' };
+				if (col.pk) {
+					col.nullable = false;
+					table.pk = [col.name];
+				}
+				table.columns.push(col);
+			}
+			constraints.forEach((c) => applyConstraint(table, c));
+			tables.push(table);
+			re.lastIndex = i;
+		}
+		const alter = /alter\s+table\s+(?:only\s+)?(?:if\s+exists\s+)?([`"[\]\w.]+)\s+([\s\S]*?);/gi;
+		while ((m = alter.exec(clean))) {
+			const t = tables.find((x) => x.name.toLowerCase() === lastPart(m![1]).toLowerCase());
+			if (!t) continue;
+			splitTop(m[2]).forEach((part) => applyConstraint(t, part.replace(/^add\s+/i, '')));
+		}
+		return tables;
+	};
+
+	const relations = (tables: Table[]): Rel[] => {
+		const out: Rel[] = [];
+		const known = new Map(tables.map((t) => [t.name.toLowerCase(), t.name]));
+		for (const t of tables)
+			for (const c of t.columns) {
+				if (!c.fk) continue;
+				const to = known.get(c.fk.table.toLowerCase());
+				if (!to) continue;
+				const one = c.unique || (c.pk && t.pk.length === 1);
+				out.push({ from: t.name, column: c.name, to, toColumn: c.fk.column, one, optional: c.nullable });
+			}
+		return out;
+	};
+
+	const word = (s: string) => s.replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '') || 'x';
+
+	const mermaid = (tables: Table[], rels: Rel[]) => {
+		const lines = ['erDiagram'];
+		for (const t of tables) {
+			lines.push(`    ${word(t.name)} {`);
+			for (const c of t.columns) {
+				const keys = [c.pk ? 'PK' : '', c.fk ? 'FK' : '', c.unique && !c.pk ? 'UK' : ''].filter(Boolean).join(', ');
+				lines.push(`        ${word(c.type)} ${word(c.name)}${keys ? ` ${keys}` : ''}`);
+			}
+			lines.push('    }');
+		}
+		for (const r of rels) lines.push(`    ${word(r.to)} ${r.optional ? '|o' : '||'}--${r.one ? 'o|' : 'o{'} ${word(r.from)} : "${r.column}"`);
+		return lines.join('\n') + '\n';
+	};
+
+	const NS = 'http://www.w3.org/2000/svg';
+	const svgEl = (tag: string, attrs: Record<string, string | number>, text?: string) => {
+		const e = document.createElementNS(NS, tag);
+		Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, String(v)));
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	const ROW = 22;
+	const HEAD = 30;
+	const CHAR = 7.4;
+
+	const draw = (svg: SVGSVGElement, tables: Table[], rels: Rel[]) => {
+		svg.replaceChildren();
+		const level = new Map<string, number>();
+		const parents = (name: string) => rels.filter((r) => r.from === name && r.to !== name).map((r) => r.to);
+		const depth = (name: string, seen: Set<string>): number => {
+			if (level.has(name)) return level.get(name)!;
+			if (seen.has(name)) return 0;
+			seen.add(name);
+			const d = Math.max(-1, ...parents(name).map((p) => depth(p, seen))) + 1;
+			level.set(name, d);
+			return d;
+		};
+		tables.forEach((t) => depth(t.name, new Set()));
+		const widthOf = (t: Table) => Math.max(t.name.length * 8.2 + 24, ...t.columns.map((c) => (c.name.length + c.type.length + 4) * CHAR + 48), 160);
+		const cols: Table[][] = [];
+		tables.forEach((t) => (cols[level.get(t.name) ?? 0] ??= []).push(t));
+		const pos = new Map<string, { x: number; y: number; w: number; h: number }>();
+		let x = 20;
+		const GAP_X = 90;
+		let height = 0;
+		cols.forEach((list) => {
+			if (!list) return;
+			const w = Math.max(...list.map(widthOf));
+			let y = 20;
+			list.forEach((t) => {
+				const h = HEAD + t.columns.length * ROW + 6;
+				pos.set(t.name, { x, y, w, h });
+				y += h + 30;
+			});
+			height = Math.max(height, y);
+			x += w + GAP_X;
+		});
+		const width = x - GAP_X + 60;
+		svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+		svg.setAttribute('width', String(width));
+		svg.setAttribute('height', String(height));
+
+		const rowY = (t: string, col: string) => {
+			const p = pos.get(t)!;
+			const idx = tables.find((x) => x.name === t)!.columns.findIndex((c) => c.name.toLowerCase() === col.toLowerCase());
+			return p.y + HEAD + (idx < 0 ? 0 : idx) * ROW + ROW / 2 + 3;
+		};
+
+		const edges = svgEl('g', { class: 'er-edges' });
+		const mark = (x0: number, y0: number, dir: number, many: boolean, optional: boolean) => {
+			const g = svgEl('g', { class: 'er-mark' });
+			if (many) {
+				g.append(svgEl('path', { d: `M${x0 + dir * 12} ${y0} L${x0} ${y0 - 7} M${x0 + dir * 12} ${y0} L${x0} ${y0 + 7}` }));
+			} else g.append(svgEl('path', { d: `M${x0 + dir * 8} ${y0 - 7} V${y0 + 7}` }));
+			if (optional) g.append(svgEl('circle', { cx: x0 + dir * 19, cy: y0, r: 4, class: 'er-ring' }));
+			else g.append(svgEl('path', { d: `M${x0 + dir * 16} ${y0 - 7} V${y0 + 7}` }));
+			return g;
+		};
+		rels.forEach((r) => {
+			const a = pos.get(r.to)!;
+			const b = pos.get(r.from)!;
+			const y1 = rowY(r.to, r.toColumn);
+			const y2 = rowY(r.from, r.column);
+			let d: string;
+			let p1: [number, number, number];
+			let p2: [number, number, number];
+			if (a.x + a.w < b.x) {
+				const x1 = a.x + a.w;
+				const x2 = b.x;
+				const mid = (x1 + x2) / 2;
+				d = `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`;
+				p1 = [x1, y1, 1];
+				p2 = [x2, y2, -1];
+			} else {
+				const x1 = a.x + a.w;
+				const x2 = b.x + b.w;
+				const out = Math.max(x1, x2) + 36;
+				d = `M${x1} ${y1} C${out} ${y1} ${out} ${y2} ${x2} ${y2}`;
+				p1 = [x1, y1, 1];
+				p2 = [x2, y2, 1];
+			}
+			const g = svgEl('g', { class: 'er-edge' });
+			g.append(svgEl('title', {}, `${r.from}.${r.column} references ${r.to}.${r.toColumn}`));
+			g.append(svgEl('path', { d, class: 'er-line' }));
+			g.append(mark(p1[0], p1[1], p1[2], false, r.optional));
+			g.append(mark(p2[0], p2[1], p2[2], !r.one, true));
+			edges.append(g);
+		});
+
+		const boxes = svgEl('g', { class: 'er-boxes' });
+		tables.forEach((t) => {
+			const p = pos.get(t.name)!;
+			const g = svgEl('g', { class: 'er-table' });
+			g.append(svgEl('rect', { x: p.x, y: p.y, width: p.w, height: p.h, rx: 10, class: 'er-box' }));
+			g.append(svgEl('path', { d: `M${p.x} ${p.y + HEAD} H${p.x + p.w}`, class: 'er-sep' }));
+			g.append(svgEl('text', { x: p.x + 12, y: p.y + 20, class: 'er-name' }, t.name));
+			t.columns.forEach((c, i) => {
+				const y = p.y + HEAD + i * ROW + ROW / 2 + 7;
+				const key = c.pk ? 'PK' : c.fk ? 'FK' : c.unique ? 'UK' : '';
+				if (key) g.append(svgEl('text', { x: p.x + 12, y, class: `er-key er-${key.toLowerCase()}` }, key));
+				g.append(svgEl('text', { x: p.x + 40, y, class: `er-col${c.pk ? ' er-pkcol' : ''}` }, c.name));
+				g.append(svgEl('text', { x: p.x + p.w - 12, y, class: 'er-type', 'text-anchor': 'end' }, `${c.type}${c.nullable && !c.pk ? '?' : ''}`));
+			});
+			boxes.append(g);
+		});
+		svg.append(edges, boxes);
+		svg.setAttribute(
+			'aria-label',
+			`Entity-relationship diagram with ${tables.length} tables and ${rels.length} relations: ${tables.map((t) => t.name).join(', ')}`,
+		);
+	};
+
+	const exportSvg = (svg: SVGSVGElement) => {
+		const s = getComputedStyle(svg);
+		const v = (name: string) => s.getPropertyValue(name).trim();
+		const clone = svg.cloneNode(true) as SVGSVGElement;
+		clone.setAttribute('xmlns', NS);
+		clone.removeAttribute('role');
+		const style = document.createElementNS(NS, 'style');
+		style.textContent = `svg{background:${v('--surface')}}text{font-family:ui-monospace,monospace;font-size:12px;fill:${v('--ink')}}.er-name{font-weight:700;font-size:13px}.er-type{fill:${v('--ink-soft')}}.er-key{font-size:10px;font-weight:700;fill:${v('--accent-strong')}}.er-fk{fill:${v('--tint-3')}}.er-uk{fill:${v('--tint-1')}}.er-box{fill:${v('--surface')};stroke:${v('--border')};stroke-width:1.5}.er-sep{stroke:${v('--border')}}.er-line,.er-mark path{fill:none;stroke:${v('--ink-soft')};stroke-width:1.5}.er-ring{fill:${v('--surface')};stroke:${v('--ink-soft')};stroke-width:1.5}`;
+		clone.insertBefore(style, clone.firstChild);
+		return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(clone)}\n`;
+	};
+
+	const el = (tag: string, cls: string, text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	onPage('er-tool', () => {
+		const input = byId<HTMLTextAreaElement>('er-in');
+		const svg = document.getElementById('er-svg') as unknown as SVGSVGElement;
+		const error = byId('er-error');
+
+		const render = () => {
+			try {
+				const tables = parseSql(input.value);
+				if (!tables.length) throw new Error('No CREATE TABLE statement found');
+				const rels = relations(tables);
+				draw(svg, tables, rels);
+				byId('er-mm').textContent = mermaid(tables, rels);
+				byId('er-in-label').textContent =
+					`SQL · ${tables.length} ${tables.length === 1 ? 'table' : 'tables'}, ${rels.length} ${rels.length === 1 ? 'relation' : 'relations'}`;
+				const missing = tables.flatMap((t) =>
+					t.columns
+						.filter((c) => c.fk && !tables.some((x) => x.name.toLowerCase() === c.fk!.table.toLowerCase()))
+						.map((c) => `${t.name}.${c.name} → ${c.fk!.table}`),
+				);
+				byId('er-rels').replaceChildren(
+					...rels.map((r) => {
+						const li = el('li', '');
+						li.append(
+							el('code', '', `${r.from}.${r.column} → ${r.to}.${r.toColumn}`),
+							el(
+								'span',
+								'er-card',
+								`${r.one ? 'one-to-one' : 'many-to-one'}, ${r.optional ? 'optional' : 'required'}: each ${r.from} row has ${r.optional ? 'zero or one' : 'exactly one'} ${r.to}, each ${r.to} has ${r.one ? 'at most one' : 'any number of'} ${r.from}`,
+							),
+						);
+						return li;
+					}),
+					...missing.map((m) => el('li', 'er-missing', `${m}: referenced table not in the input`)),
+					...(rels.length || missing.length ? [] : [el('li', 'er-card', 'No foreign keys found.')]),
+				);
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = (e as Error).message;
+				error.hidden = false;
+			}
+		};
+
+		input.addEventListener('input', render);
+		copyButton(byId('er-copy-mm'), () => byId('er-mm').textContent ?? '');
+		copyButton(byId('er-copy-svg'), () => exportSvg(svg));
+		byId('er-download').addEventListener('click', () => {
+			const url = URL.createObjectURL(new Blob([exportSvg(svg)], { type: 'image/svg+xml' }));
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = 'er-diagram.svg';
+			a.click();
+			setTimeout(() => URL.revokeObjectURL(url), 1000);
+		});
+		render();
+	});
+</script>
+
+<style>
+	.er {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	#er-in {
+		min-height: 260px;
+	}
+	.er-actions {
+		display: inline-flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.er-scroll {
+		overflow: auto;
+		max-height: 640px;
+		padding: 8px;
+	}
+	.er-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	#er-svg {
+		display: block;
+	}
+	.er :global(text) {
+		font-family: var(--mono);
+		font-size: 12px;
+		fill: var(--ink);
+	}
+	.er :global(.er-name) {
+		font-weight: 700;
+		font-size: 13px;
+	}
+	.er :global(.er-type) {
+		fill: var(--ink-soft);
+	}
+	.er :global(.er-key) {
+		font-size: 10px;
+		font-weight: 700;
+		fill: var(--accent-strong);
+	}
+	.er :global(.er-fk) {
+		fill: var(--tint-3);
+	}
+	.er :global(.er-uk) {
+		fill: var(--tint-1);
+	}
+	.er :global(.er-box) {
+		fill: var(--surface);
+		stroke: var(--border);
+		stroke-width: 1.5;
+	}
+	.er :global(.er-sep) {
+		stroke: var(--border);
+	}
+	.er :global(.er-line),
+	.er :global(.er-mark path) {
+		fill: none;
+		stroke: var(--ink-soft);
+		stroke-width: 1.5;
+	}
+	.er :global(.er-ring) {
+		fill: var(--surface);
+		stroke: var(--ink-soft);
+		stroke-width: 1.5;
+	}
+	.er-rels {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.er :global(.er-rels li) {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+		font-size: 13px;
+	}
+	.er :global(.er-rels code) {
+		font-family: var(--mono);
+		word-break: break-all;
+	}
+	.er :global(.er-card) {
+		color: var(--ink-soft);
+	}
+	.er :global(.er-missing) {
+		color: var(--warn);
+	}
+</style>

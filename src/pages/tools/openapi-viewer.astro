@@ -1,0 +1,767 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `openapi: 3.0.3
+info:
+  title: Bookstore API
+  version: 1.4.0
+  description: Browse the catalogue and place orders.
+servers:
+  - url: https://api.bookstore.example/v1
+tags:
+  - name: books
+    description: Catalogue
+  - name: orders
+    description: Checkout and order history
+paths:
+  /books:
+    get:
+      tags: [books]
+      operationId: listBooks
+      summary: List books
+      parameters:
+        - name: q
+          in: query
+          description: Full-text search on title and author
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: A page of books
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, total]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Book'
+                  total:
+                    type: integer
+  /books/{bookId}:
+    get:
+      tags: [books]
+      operationId: getBook
+      summary: Get a book
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The book
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '404':
+          description: No book with this id
+  /orders:
+    post:
+      tags: [orders]
+      operationId: createOrder
+      summary: Place an order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [bookId, quantity]
+                    properties:
+                      bookId:
+                        type: string
+                        format: uuid
+                      quantity:
+                        type: integer
+                        minimum: 1
+                coupon:
+                  type: string
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '422':
+          description: Validation failed
+components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Book:
+      type: object
+      required: [id, title, price]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        author:
+          type: string
+          nullable: true
+        price:
+          type: number
+          format: double
+    Order:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, paid, shipped]
+        books:
+          type: array
+          items:
+            $ref: '#/components/schemas/Book'
+`;
+---
+
+<ToolShell
+	slug="openapi-viewer"
+	title="OpenAPI Viewer & Validator"
+	description="Paste an OpenAPI 3.x or Swagger 2.0 document in JSON or YAML to check its structure and browse every endpoint by tag with parameters, request bodies and response schemas."
+>
+	<div class="oa" id="oa-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span id="oa-in-label">Spec, JSON or YAML</span>
+				<button class="btn" id="oa-copy">
+					Copy endpoint list
+				</button>
+			</div>
+			<textarea id="oa-in" spellcheck="false" aria-labelledby="oa-in-label">{sample}</textarea>
+		</section>
+		<p class="error" id="oa-error" hidden></p>
+		<div class="stats" id="oa-stats"></div>
+		<section class="panel" id="oa-issues-panel">
+			<div class="panel-head">
+				<span id="oa-issues-label">Validation</span>
+			</div>
+			<ul class="oa-issues" id="oa-issues" aria-labelledby="oa-issues-label"></ul>
+		</section>
+		<div class="oa-search">
+			<label for="oa-filter">Filter endpoints</label>
+			<input id="oa-filter" type="search" placeholder="Path, method, summary or tag" autocomplete="off" />
+		</div>
+		<div class="oa-groups" id="oa-groups"></div>
+	</div>
+</ToolShell>
+
+<script>
+	import { parse as parseYaml } from 'yaml';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Obj = Record<string, unknown>;
+	type Issue = { level: 'error' | 'warning'; path: string; message: string };
+	type Op = { method: string; path: string; op: Obj; params: Obj[]; tags: string[] };
+
+	const METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'];
+	const LOCATIONS3 = ['query', 'header', 'path', 'cookie'];
+	const LOCATIONS2 = ['query', 'header', 'path', 'formData', 'body'];
+	const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+	const pointer = (doc: Obj, ref: string): unknown => {
+		if (!ref.startsWith('#/')) return undefined;
+		return ref
+			.slice(2)
+			.split('/')
+			.map((p) => decodeURIComponent(p.replace(/~1/g, '/').replace(/~0/g, '~')))
+			.reduce<unknown>((cur, key) => (isObj(cur) || Array.isArray(cur) ? (cur as Obj)[key] : undefined), doc);
+	};
+
+	const deref = (doc: Obj, v: unknown): Obj => {
+		let cur = v;
+		for (let i = 0; i < 20 && isObj(cur) && typeof cur['$ref'] === 'string'; i++) cur = pointer(doc, cur['$ref'] as string);
+		return isObj(cur) ? cur : {};
+	};
+
+	const validate = (doc: Obj) => {
+		const issues: Issue[] = [];
+		const err = (path: string, message: string) => issues.push({ level: 'error', path, message });
+		const warn = (path: string, message: string) => issues.push({ level: 'warning', path, message });
+		const v3 = typeof doc['openapi'] === 'string';
+		const v2 = doc['swagger'] !== undefined;
+		if (v3 && !/^3\.[01]\.\d+$/.test(doc['openapi'] as string)) err('openapi', `Unsupported version "${doc['openapi']}", expected 3.0.x or 3.1.x`);
+		if (v2 && String(doc['swagger']) !== '2.0') err('swagger', `Swagger version must be "2.0", got "${doc['swagger']}"`);
+		if (!v2 && !v3) err('', 'Missing the openapi (3.x) or swagger (2.0) field');
+		const info = doc['info'];
+		if (!isObj(info)) err('info', 'Missing required info object');
+		else {
+			if (typeof info['title'] !== 'string' || !info['title']) err('info.title', 'Missing required title');
+			if (info['version'] === undefined) err('info.version', 'Missing required version');
+		}
+		const paths = doc['paths'];
+		if (!isObj(paths)) {
+			if (!(v3 && /^3\.1/.test(String(doc['openapi'])) && (doc['webhooks'] || doc['components']))) err('paths', 'Missing required paths object');
+		}
+		const ids = new Map<string, string>();
+		const ops: Op[] = [];
+		const seenRefs = new Set<string>();
+		const checkRefs = (v: unknown, path: string) => {
+			if (Array.isArray(v)) v.forEach((x, i) => checkRefs(x, `${path}[${i}]`));
+			else if (isObj(v)) {
+				if (typeof v['$ref'] === 'string') {
+					const ref = v['$ref'] as string;
+					if (ref.startsWith('#') && pointer(doc, ref) === undefined && !seenRefs.has(ref)) {
+						seenRefs.add(ref);
+						err(path, `Unresolved reference ${ref}`);
+					}
+				}
+				Object.entries(v).forEach(([k, x]) => checkRefs(x, path ? `${path}.${k}` : k));
+			}
+		};
+		checkRefs(doc, '');
+		if (isObj(paths))
+			for (const [p, item] of Object.entries(paths)) {
+				const base = `paths.${p}`;
+				if (!p.startsWith('/')) err(base, 'Path must start with /');
+				if (!isObj(item)) {
+					err(base, 'Path item must be an object');
+					continue;
+				}
+				const shared = Array.isArray(item['parameters']) ? (item['parameters'] as unknown[]) : [];
+				for (const [m, raw] of Object.entries(item)) {
+					if (['parameters', 'summary', 'description', 'servers', '$ref'].includes(m) || m.startsWith('x-')) continue;
+					const at = `${base}.${m}`;
+					if (!METHODS.includes(m)) {
+						err(at, `Unknown key "${m}", expected an HTTP method`);
+						continue;
+					}
+					if (!isObj(raw)) {
+						err(at, 'Operation must be an object');
+						continue;
+					}
+					const own = Array.isArray(raw['parameters']) ? (raw['parameters'] as unknown[]) : [];
+					const merged = new Map<string, Obj>();
+					[...shared, ...own].forEach((x) => {
+						const d = deref(doc, x);
+						merged.set(`${d['in']}:${d['name']}`, d);
+					});
+					const params = Array.from(merged.values());
+					own.forEach((x, i) => {
+						const d = deref(doc, x);
+						const pat = `${at}.parameters[${i}]`;
+						if (typeof d['name'] !== 'string') err(pat, 'Parameter is missing name');
+						const locs = v2 ? LOCATIONS2 : LOCATIONS3;
+						if (!locs.includes(String(d['in']))) err(pat, `Parameter "in" must be one of ${locs.join(', ')}`);
+						if (d['in'] === 'path' && d['required'] !== true) err(pat, `Path parameter ${d['name']} must have required: true`);
+						if (v3 && !d['schema'] && !d['content']) warn(pat, `Parameter ${d['name']} has no schema`);
+					});
+					for (const tpl of p.match(/\{[^}]+\}/g) ?? []) {
+						const name = tpl.slice(1, -1);
+						if (!params.some((x) => x['in'] === 'path' && x['name'] === name)) err(at, `Path template {${name}} has no matching path parameter`);
+					}
+					params
+						.filter((x) => x['in'] === 'path' && !p.includes(`{${x['name']}}`))
+						.forEach((x) => err(at, `Path parameter ${x['name']} does not appear in the path`));
+					const responses = raw['responses'];
+					if (!isObj(responses) || !Object.keys(responses).length) err(`${at}.responses`, 'Operation must declare at least one response');
+					else
+						Object.entries(responses).forEach(([code, r]) => {
+							if (!/^([1-5]\d\d|[1-5]XX|default)$/.test(code)) err(`${at}.responses.${code}`, 'Response key must be an HTTP status code or default');
+							if (!deref(doc, r)['description'] && deref(doc, r)['description'] !== '') err(`${at}.responses.${code}`, 'Response is missing description');
+						});
+					if (v3 && raw['requestBody'] && !isObj(deref(doc, raw['requestBody'])['content'])) err(`${at}.requestBody`, 'requestBody must have content');
+					if (v3 && ['get', 'head', 'delete'].includes(m) && raw['requestBody'])
+						warn(`${at}.requestBody`, `A request body on ${m.toUpperCase()} is ignored by many clients`);
+					const id = raw['operationId'];
+					if (typeof id === 'string') {
+						if (ids.has(id)) err(`${at}.operationId`, `Duplicate operationId "${id}", also used by ${ids.get(id)}`);
+						else ids.set(id, `${m.toUpperCase()} ${p}`);
+					} else warn(at, 'No operationId: generated clients will invent a method name');
+					const tags = Array.isArray(raw['tags']) && raw['tags'].length ? (raw['tags'] as string[]).map(String) : ['default'];
+					ops.push({ method: m, path: p, op: raw, params, tags });
+				}
+			}
+		return { issues, ops, version: v3 ? `OpenAPI ${doc['openapi']}` : v2 ? `Swagger ${doc['swagger']}` : 'Unknown' };
+	};
+
+	const schemaLines = (doc: Obj, schema: unknown, indent: string, seen: Set<string>): string[] => {
+		if (!isObj(schema)) return [`${indent}any`];
+		const ref = typeof schema['$ref'] === 'string' ? (schema['$ref'] as string) : '';
+		if (ref) {
+			const name = ref.split('/').pop() ?? ref;
+			if (seen.has(ref)) return [`${indent}${name} (circular)`];
+			const target = pointer(doc, ref);
+			if (!isObj(target)) return [`${indent}${name} (unresolved)`];
+			const inner = schemaLines(doc, target, indent, new Set([...seen, ref]));
+			inner[0] = `${indent}${name} ${inner[0].trimStart()}`;
+			return inner;
+		}
+		for (const k of ['oneOf', 'anyOf', 'allOf']) {
+			if (Array.isArray(schema[k])) {
+				const out = [`${indent}${k}:`];
+				(schema[k] as unknown[]).forEach((s) =>
+					out.push(...schemaLines(doc, s, `${indent}  `, seen).map((l, i) => (i === 0 ? l.replace(/^(\s*)/, '$1- ') : `  ${l}`))),
+				);
+				return out;
+			}
+		}
+		const types = Array.isArray(schema['type'])
+			? (schema['type'] as string[])
+			: schema['type']
+				? [String(schema['type'])]
+				: schema['properties']
+					? ['object']
+					: [];
+		const nullable = schema['nullable'] === true || types.includes('null');
+		const main = types.filter((t) => t !== 'null');
+		const extras = [
+			schema['format'] ? `(${schema['format']})` : '',
+			Array.isArray(schema['enum']) ? `enum: ${(schema['enum'] as unknown[]).map((e) => JSON.stringify(e)).join(' | ')}` : '',
+			schema['default'] !== undefined ? `default ${JSON.stringify(schema['default'])}` : '',
+			schema['minimum'] !== undefined ? `min ${schema['minimum']}` : '',
+			schema['maximum'] !== undefined ? `max ${schema['maximum']}` : '',
+			nullable ? 'nullable' : '',
+		]
+			.filter(Boolean)
+			.join(', ');
+		if (main.includes('array')) {
+			const items = schemaLines(doc, schema['items'], indent, seen);
+			items[0] = `${indent}array of ${items[0].trimStart()}${extras ? `  ${extras}` : ''}`;
+			return items;
+		}
+		if (main.includes('object') && isObj(schema['properties'])) {
+			const req = new Set(Array.isArray(schema['required']) ? (schema['required'] as string[]) : []);
+			const out = [`${indent}object {${extras ? `  ${extras}` : ''}`];
+			Object.entries(schema['properties'] as Obj).forEach(([k, v]) => {
+				const inner = schemaLines(doc, v, `${indent}  `, seen);
+				inner[0] = `${indent}  ${k}${req.has(k) ? '' : '?'}: ${inner[0].trimStart()}`;
+				out.push(...inner);
+			});
+			out.push(`${indent}}`);
+			return out;
+		}
+		return [`${indent}${main.join(' | ') || 'any'}${extras ? `  ${extras}` : ''}`];
+	};
+
+	const el = (tag: string, cls: string, text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	const schemaBlock = (doc: Obj, schema: unknown, label: string) => {
+		const pre = el('pre', 'oa-schema', schemaLines(doc, schema, '', new Set()).join('\n'));
+		pre.tabIndex = 0;
+		pre.setAttribute('aria-label', label);
+		return pre;
+	};
+
+	onPage('oa-tool', () => {
+		const input = byId<HTMLTextAreaElement>('oa-in');
+		const filter = byId<HTMLInputElement>('oa-filter');
+		let list = '';
+		let timer = 0;
+
+		const render = () => {
+			const error = byId('oa-error');
+			let doc: Obj;
+			try {
+				const parsed = input.value.trim().startsWith('{') ? JSON.parse(input.value) : parseYaml(input.value);
+				if (!isObj(parsed)) throw new Error('The document must be an object with openapi or swagger at the top.');
+				doc = parsed;
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = `Could not parse: ${(e as Error).message}`;
+				error.hidden = false;
+				['oa-stats', 'oa-issues', 'oa-groups'].forEach((id) => byId(id).replaceChildren());
+				return;
+			}
+			const { issues, ops, version } = validate(doc);
+			const v2 = doc['swagger'] !== undefined;
+			const info = isObj(doc['info']) ? doc['info'] : {};
+			const schemas = v2 ? doc['definitions'] : isObj(doc['components']) ? (doc['components'] as Obj)['schemas'] : undefined;
+			const tags = Array.from(new Set(ops.flatMap((o) => o.tags)));
+			const errors = issues.filter((i) => i.level === 'error').length;
+			const stat = (value: string, label: string, cls = '') => {
+				const d = el('div', `stat ${cls}`);
+				d.append(el('b', '', value), el('span', '', label));
+				return d;
+			};
+			byId('oa-stats').replaceChildren(
+				stat(errors ? `${errors} error${errors > 1 ? 's' : ''}` : 'Valid', version, errors ? 'oa-bad' : 'oa-good'),
+				stat(String(ops.length), 'Endpoints'),
+				stat(String(tags.length), tags.length === 1 ? 'Tag' : 'Tags'),
+				stat(String(isObj(schemas) ? Object.keys(schemas).length : 0), 'Schemas'),
+			);
+			byId('oa-in-label').textContent = `${info['title'] ?? 'Spec'}${info['version'] ? ` · v${info['version']}` : ''}`;
+			byId('oa-issues').replaceChildren(
+				...(issues.length
+					? issues.map((i) => {
+							const li = el('li', `oa-issue oa-${i.level}`);
+							li.append(el('span', 'oa-level', i.level === 'error' ? 'Error' : 'Warning'), el('code', '', i.path || '(root)'), el('span', '', i.message));
+							return li;
+						})
+					: [el('li', 'oa-issue oa-clean', `No structural problems found in this ${version} document.`)]),
+			);
+
+			const q = filter.value.trim().toLowerCase();
+			const shown = ops.filter(
+				(o) => !q || `${o.method} ${o.path} ${o.op['summary'] ?? ''} ${o.tags.join(' ')} ${o.op['operationId'] ?? ''}`.toLowerCase().includes(q),
+			);
+			const tagInfo = new Map(((doc['tags'] as Obj[]) ?? []).filter(isObj).map((t) => [String(t['name']), String(t['description'] ?? '')]));
+			byId('oa-groups').replaceChildren(
+				...tags
+					.filter((t) => shown.some((o) => o.tags.includes(t)))
+					.map((tag) => {
+						const sec = el('section', 'panel');
+						const head = el('div', 'panel-head');
+						const title = el('h2', 'oa-tag', tag);
+						head.append(title, el('span', 'oa-n', tagInfo.get(tag) || `${shown.filter((o) => o.tags.includes(tag)).length} endpoints`));
+						sec.append(head);
+						shown
+							.filter((o) => o.tags.includes(tag))
+							.forEach((o) => {
+								const det = el('details', 'oa-op') as HTMLDetailsElement;
+								const sum = el('summary', '');
+								sum.append(el('span', `oa-method oa-${o.method}`, o.method.toUpperCase()), el('code', 'oa-path', o.path));
+								if (o.op['summary']) sum.append(el('span', 'oa-summary', String(o.op['summary'])));
+								if (o.op['deprecated']) sum.append(el('span', 'oa-dep', 'Deprecated'));
+								det.append(sum);
+								const body = el('div', 'oa-body');
+								if (o.op['description']) body.append(el('p', 'oa-desc', String(o.op['description'])));
+								const meta = [
+									o.op['operationId'] ? `operationId ${o.op['operationId']}` : '',
+									o.op['security'] || doc['security'] ? 'requires auth' : '',
+								].filter(Boolean);
+								if (meta.length) body.append(el('p', 'oa-meta', meta.join(' · ')));
+								const params = o.params.filter((p) => p['in'] !== 'body');
+								if (params.length) {
+									body.append(el('h3', '', 'Parameters'));
+									const wrap = el('div', 'oa-table');
+									const table = el('table', '');
+									const thead = el('thead', '');
+									const hr = el('tr', '');
+									['Name', 'In', 'Type', 'Description'].forEach((h) => hr.append(el('th', '', h)));
+									thead.append(hr);
+									const tbody = el('tbody', '');
+									params.forEach((p) => {
+										const tr = el('tr', '');
+										const name = el('td', '');
+										name.append(el('code', '', String(p['name'])));
+										if (p['required']) name.append(el('span', 'oa-req', ' required'));
+										const schema = isObj(p['schema']) ? p['schema'] : p;
+										tr.append(
+											name,
+											el('td', '', String(p['in'])),
+											el('td', 'oa-type', schemaLines(doc, schema, '', new Set())[0]),
+											el('td', '', String(p['description'] ?? '')),
+										);
+										tbody.append(tr);
+									});
+									table.append(thead, tbody);
+									wrap.append(table);
+									body.append(wrap);
+								}
+								const rb = v2 ? o.params.find((p) => p['in'] === 'body') : o.op['requestBody'] ? deref(doc, o.op['requestBody']) : undefined;
+								if (rb) {
+									const h = el('h3', '', `Request body${rb['required'] ? ' (required)' : ''}`);
+									body.append(h);
+									if (v2) body.append(schemaBlock(doc, rb['schema'], `${o.method} ${o.path} request body schema`));
+									else
+										Object.entries(isObj(rb['content']) ? rb['content'] : {}).forEach(([type, media]) => {
+											body.append(el('p', 'oa-media', type), schemaBlock(doc, deref(doc, media)['schema'], `${o.method} ${o.path} request body ${type}`));
+										});
+								}
+								const responses = isObj(o.op['responses']) ? o.op['responses'] : {};
+								if (Object.keys(responses).length) body.append(el('h3', '', 'Responses'));
+								Object.entries(responses).forEach(([code, raw]) => {
+									const r = deref(doc, raw);
+									const row = el('div', 'oa-resp');
+									const top = el('p', '');
+									top.append(el('span', `oa-code oa-c${code[0]}`, code), el('span', '', ` ${r['description'] ?? ''}`));
+									row.append(top);
+									if (v2 && r['schema']) row.append(schemaBlock(doc, r['schema'], `${o.method} ${o.path} ${code} response schema`));
+									Object.entries(isObj(r['content']) ? r['content'] : {}).forEach(([type, media]) => {
+										const s = deref(doc, media)['schema'];
+										row.append(el('p', 'oa-media', type));
+										if (s) row.append(schemaBlock(doc, s, `${o.method} ${o.path} ${code} response ${type}`));
+									});
+									body.append(row);
+								});
+								det.append(body);
+								sec.append(det);
+							});
+						return sec;
+					}),
+			);
+			if (!shown.length && ops.length) byId('oa-groups').append(el('p', 'oa-none', `No endpoint matches "${filter.value}".`));
+			list = ops.map((o) => `${o.method.toUpperCase().padEnd(7)} ${o.path}${o.op['summary'] ? `  ${o.op['summary']}` : ''}`).join('\n');
+		};
+
+		input.addEventListener('input', () => {
+			clearTimeout(timer);
+			timer = window.setTimeout(render, 150);
+		});
+		filter.addEventListener('input', render);
+		copyButton(byId('oa-copy'), () => list);
+		render();
+	});
+</script>
+
+<style>
+	.oa {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	#oa-in {
+		min-height: 280px;
+	}
+	.oa :global(.oa-good b) {
+		color: var(--ok);
+	}
+	.oa :global(.oa-bad b) {
+		color: var(--bad);
+	}
+	.oa-issues {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		max-height: 260px;
+		overflow-y: auto;
+	}
+	.oa :global(.oa-issue) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 10px;
+		align-items: baseline;
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+		font-size: 13px;
+	}
+	.oa :global(.oa-issue code) {
+		font-family: var(--mono);
+		font-size: 12px;
+		word-break: break-all;
+	}
+	.oa :global(.oa-level) {
+		font-weight: 700;
+		font-size: 12px;
+		border-radius: 6px;
+		padding: 0 6px;
+	}
+	.oa :global(.oa-error .oa-level) {
+		color: var(--bad);
+		background: var(--surface-2);
+	}
+	.oa :global(.oa-warning .oa-level) {
+		color: var(--warn);
+		background: var(--warn-bg);
+	}
+	.oa :global(.oa-clean) {
+		color: var(--ok);
+	}
+	.oa-search {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.oa-search label {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.oa-search input {
+		font: inherit;
+		font-size: 14px;
+		padding: 10px 12px;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		background: var(--surface);
+		color: var(--ink);
+	}
+	.oa-search input:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 1px;
+	}
+	.oa-groups {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	.oa :global(.oa-tag) {
+		margin: 0;
+		font-size: inherit;
+	}
+	.oa :global(.oa-n) {
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 600;
+		text-align: right;
+	}
+	.oa :global(.oa-op) {
+		border-bottom: 1px solid var(--border);
+	}
+	.oa :global(.oa-op summary) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px 10px;
+		padding: 10px 14px;
+		cursor: pointer;
+	}
+	.oa :global(.oa-op summary:focus-visible) {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	.oa :global(.oa-method) {
+		font-family: var(--mono);
+		font-size: 12px;
+		font-weight: 700;
+		min-width: 58px;
+		text-align: center;
+		padding: 2px 6px;
+		border-radius: 6px;
+		border: 1px solid currentColor;
+	}
+	.oa :global(.oa-get) {
+		color: var(--tint-3);
+	}
+	.oa :global(.oa-post) {
+		color: var(--ok);
+	}
+	.oa :global(.oa-put),
+	.oa :global(.oa-patch) {
+		color: var(--warn);
+	}
+	.oa :global(.oa-delete) {
+		color: var(--bad);
+	}
+	.oa :global(.oa-head),
+	.oa :global(.oa-options),
+	.oa :global(.oa-trace) {
+		color: var(--tint-2);
+	}
+	.oa :global(.oa-path) {
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 600;
+		word-break: break-all;
+	}
+	.oa :global(.oa-summary),
+	.oa :global(.oa-meta),
+	.oa :global(.oa-media) {
+		color: var(--ink-soft);
+		font-size: 13px;
+	}
+	.oa :global(.oa-dep) {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--warn);
+		background: var(--warn-bg);
+		border-radius: 6px;
+		padding: 0 6px;
+	}
+	.oa :global(.oa-body) {
+		padding: 0 14px 14px;
+		min-width: 0;
+	}
+	.oa :global(.oa-body h3) {
+		margin: 14px 0 6px;
+		font-size: 12px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--ink-soft);
+	}
+	.oa :global(.oa-body p) {
+		margin: 4px 0;
+	}
+	.oa :global(.oa-media) {
+		font-family: var(--mono);
+		font-size: 12px;
+	}
+	.oa :global(.oa-table) {
+		overflow-x: auto;
+	}
+	.oa :global(.oa-table table) {
+		border-collapse: collapse;
+		width: 100%;
+		font-size: 13px;
+	}
+	.oa :global(.oa-table th),
+	.oa :global(.oa-table td) {
+		text-align: left;
+		padding: 6px 8px;
+		border-bottom: 1px solid var(--border);
+		vertical-align: top;
+	}
+	.oa :global(.oa-table th) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.oa :global(.oa-type) {
+		font-family: var(--mono);
+		font-size: 12px;
+		white-space: nowrap;
+	}
+	.oa :global(.oa-req) {
+		color: var(--bad);
+		font-size: 12px;
+	}
+	.oa :global(.oa-schema) {
+		margin: 4px 0 8px;
+		padding: 10px 12px;
+		background: var(--surface-2);
+		border-radius: 8px;
+		font-family: var(--mono);
+		font-size: 12.5px;
+		line-height: 1.55;
+		overflow-x: auto;
+		white-space: pre;
+	}
+	.oa :global(.oa-schema:focus-visible) {
+		outline: 2px solid var(--accent-strong);
+	}
+	.oa :global(.oa-code) {
+		font-family: var(--mono);
+		font-weight: 700;
+	}
+	.oa :global(.oa-c2) {
+		color: var(--ok);
+	}
+	.oa :global(.oa-c4),
+	.oa :global(.oa-c5) {
+		color: var(--bad);
+	}
+	.oa :global(.oa-c3) {
+		color: var(--tint-3);
+	}
+	.oa :global(.oa-none) {
+		color: var(--ink-soft);
+		margin: 0;
+	}
+</style>

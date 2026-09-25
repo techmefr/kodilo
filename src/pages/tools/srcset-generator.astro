@@ -1,0 +1,315 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="srcset-generator"
+	title="srcset & sizes Generator"
+	description="Build responsive img srcset and sizes or a picture element with AVIF and WebP sources, see which file a browser picks at any viewport and pixel density, and resize your own image into every width."
+>
+	<div class="sr" id="sr-tool">
+		<div class="fields">
+			<div class="field wide">
+				<label for="sr-pattern">File pattern</label>
+				<input id="sr-pattern" spellcheck="false" value="/images/hero-{w}.{ext}" />
+				<span class="field-note">
+					Use {'{w}'} for the width and {'{ext}'} for the format.
+				</span>
+			</div>
+			<div class="field">
+				<label for="sr-widths">Widths</label>
+				<input id="sr-widths" spellcheck="false" value="480, 800, 1200, 1600, 2400" />
+			</div>
+			<div class="field">
+				<label for="sr-alt">Alt text</label>
+				<input id="sr-alt" value="Team working around a table" />
+			</div>
+			<div class="field">
+				<label for="sr-ratio">Aspect ratio</label>
+				<input id="sr-ratio" spellcheck="false" value="3:2" />
+			</div>
+			<div class="field wide">
+				<label for="sr-sizes">Layout sizes, one per line, last one is the default</label>
+				<textarea id="sr-sizes" rows="3" spellcheck="false">(min-width: 1024px) 50vw
+(min-width: 640px) 80vw
+100vw</textarea>
+			</div>
+		</div>
+		<div class="toolbar">
+			<fieldset class="sr-formats">
+				<legend class="sr-only">Formats</legend>
+				<label class="check">
+					<input type="checkbox" value="avif" checked /> AVIF
+				</label>
+				<label class="check">
+					<input type="checkbox" value="webp" checked /> WebP
+				</label>
+				<label class="check">
+					<input type="checkbox" value="jpg" checked /> JPG
+				</label>
+			</fieldset>
+			<label class="check">
+				<input type="checkbox" id="sr-lazy" checked /> Lazy loading
+			</label>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>img</span>
+				<button class="btn" id="sr-copy-img">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="sr-img" tabindex="0"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>picture</span>
+				<button class="btn" id="sr-copy-picture">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="sr-picture" tabindex="0"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Which file does the browser pick?</span>
+			</div>
+			<div class="sr-pick">
+				<div class="toolbar">
+					<label class="check" for="sr-vw">
+						Viewport <input type="number" class="num" id="sr-vw" min="200" max="4000" value="390" /> px
+					</label>
+					<div class="seg" id="sr-dpr" role="group" aria-label="Device pixel ratio">
+						<button data-value="1" aria-pressed="false">
+							1x
+						</button>
+						<button data-value="2" aria-pressed="false">
+							2x
+						</button>
+						<button data-value="3" aria-pressed="true">
+							3x
+						</button>
+					</div>
+				</div>
+				<p id="sr-explain" aria-live="polite"></p>
+			</div>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Resize an image into these widths</span>
+			</div>
+			<div class="sr-files">
+				<label class="drop" id="sr-drop">
+					<input type="file" accept="image/*" id="sr-file" class="sr-only" />
+					<span id="sr-drop-text">Drop an image here or click to choose one</span>
+				</label>
+				<ul class="sr-downloads" id="sr-downloads"></ul>
+			</div>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { humanSize, loadImage, render } from '../../scripts/image';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+	const mime: Record<string, string> = { avif: 'image/avif', webp: 'image/webp', jpg: 'image/jpeg' };
+
+	onPage('sr-tool', () => {
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		let dpr = 3;
+		let urls: string[] = [];
+
+		const widths = () =>
+			[
+				...new Set(
+					val('sr-widths')
+						.split(/[\s,]+/)
+						.map(Number)
+						.filter((n) => n > 0),
+				),
+			].sort((a, b) => a - b);
+		const formats = () => [...document.querySelectorAll<HTMLInputElement>('.sr-formats input:checked')].map((i) => i.value);
+		const file = (w: number, ext: string) => val('sr-pattern').replaceAll('{w}', String(w)).replaceAll('{ext}', ext);
+		const sizes = () =>
+			byId<HTMLTextAreaElement>('sr-sizes')
+				.value.split('\n')
+				.map((s) => s.trim())
+				.filter(Boolean);
+		const ratio = () => {
+			const [a, b] = val('sr-ratio').split(/[:/x]/).map(Number);
+			return a > 0 && b > 0 ? b / a : 0;
+		};
+
+		const slot = (vw: number) => {
+			for (const entry of sizes()) {
+				const m = entry.match(/^(\(.*\))\s+(.+)$/);
+				const cond = m ? m[1] : '';
+				const length = m ? m[2] : entry;
+				const ok = !cond || [...cond.matchAll(/\((min|max)-width:\s*([\d.]+)px\)/g)].every(([, k, v]) => (k === 'min' ? vw >= Number(v) : vw <= Number(v)));
+				if (!ok) continue;
+				const l = length.match(/^([\d.]+)(vw|px)$/);
+				return { entry, px: l ? (l[2] === 'vw' ? (Number(l[1]) * vw) / 100 : Number(l[1])) : vw };
+			}
+			return { entry: '100vw', px: vw };
+		};
+
+		const update = () => {
+			const ws = widths();
+			const fs = formats();
+			const fallback = fs.includes('jpg') ? 'jpg' : (fs[fs.length - 1] ?? 'jpg');
+			const set = (ext: string) => ws.map((w) => `${file(w, ext)} ${w}w`).join(',\n       ');
+			const sz = sizes().join(',\n       ');
+			const largest = ws[ws.length - 1] ?? 0;
+			const r = ratio();
+			const dims = largest && r ? ` width="${largest}" height="${Math.round(largest * r)}"` : '';
+			const lazy = byId<HTMLInputElement>('sr-lazy').checked ? ' loading="lazy" decoding="async"' : '';
+			const img = (indent: string, ext: string) =>
+				`${indent}<img src="${esc(file(ws[Math.floor(ws.length / 2)] ?? largest, ext))}"\n${indent}     srcset="${esc(set(ext)).replaceAll('\n', `\n${indent}`)}"\n${indent}     sizes="${esc(sz).replaceAll('\n', `\n${indent}`)}"\n${indent}     alt="${esc(val('sr-alt'))}"${dims}${lazy} />`;
+			byId('sr-img').textContent = img('', fallback);
+			const sources = fs
+				.filter((f) => f !== fallback)
+				.map(
+					(f) =>
+						`  <source type="${mime[f]}"\n          srcset="${esc(set(f)).replaceAll('\n', '\n   ')}"\n          sizes="${esc(sz).replaceAll('\n', '\n   ')}" />`,
+				);
+			byId('sr-picture').textContent = `<picture>\n${[...sources, img('  ', fallback)].join('\n')}\n</picture>`;
+
+			const vw = Math.max(1, Number(byId<HTMLInputElement>('sr-vw').value) || 390);
+			const s = slot(vw);
+			const need = Math.round(s.px * dpr);
+			const pick = ws.find((w) => w >= need) ?? largest;
+			const first = fs[0] ?? fallback;
+			byId('sr-explain').textContent = ws.length
+				? `At ${vw}px wide the slot is ${Math.round(s.px)}px (${s.entry}). At ${dpr}x the browser wants ${need} pixels, so it picks ${file(pick, first)}${pick < need ? ', the largest file available, which is smaller than needed' : ''}. Browsers that support ${first.toUpperCase()} take that source first${fs.length > 1 ? `, others fall back through ${fs.slice(1).join(', ').toUpperCase()}` : ''}.`
+				: 'Add at least one width.';
+		};
+
+		const resize = async (blob: Blob, name: string) => {
+			try {
+				const image = await loadImage(blob);
+				urls.forEach((u) => URL.revokeObjectURL(u));
+				urls = [];
+				const base = (val('sr-pattern').split('/').pop() || name).replace(/\.\{ext\}$/, '');
+				const items: HTMLLIElement[] = [];
+				const skipped: string[] = [];
+				for (const ext of formats()) {
+					for (const w of widths()) {
+						const h = Math.round((w * image.naturalHeight) / image.naturalWidth);
+						const out = await render(image, w, h, mime[ext], 0.82, ext === 'jpg' ? '#ffffff' : undefined);
+						if (out.type !== mime[ext]) {
+							if (!skipped.includes(ext)) skipped.push(ext);
+							continue;
+						}
+						const url = URL.createObjectURL(out);
+						urls.push(url);
+						const li = document.createElement('li');
+						const a = document.createElement('a');
+						a.className = 'btn';
+						a.href = url;
+						a.download = `${base.replaceAll('{w}', String(w))}.${ext}`;
+						a.textContent = `Download ${a.download}`;
+						const info = document.createElement('span');
+						info.textContent = `${w} × ${h} · ${humanSize(out.size)}`;
+						li.append(a, info);
+						items.push(li);
+					}
+				}
+				byId('sr-downloads').replaceChildren(...items);
+				byId('sr-drop-text').textContent =
+					`${name}, ${image.naturalWidth} × ${image.naturalHeight}.${skipped.length ? ` This browser cannot encode ${skipped.join(', ').toUpperCase()}.` : ''} Drop another image to replace it.`;
+			} catch (e) {
+				byId('sr-drop-text').textContent = (e as Error).message;
+			}
+		};
+
+		segmented(byId('sr-dpr'), (v) => ((dpr = Number(v)), update()));
+		document.querySelectorAll('#sr-tool input:not([type=file]), #sr-sizes').forEach((el) => el.addEventListener('input', update));
+		copyButton(byId('sr-copy-img'), () => byId('sr-img').textContent ?? '');
+		copyButton(byId('sr-copy-picture'), () => byId('sr-picture').textContent ?? '');
+		const drop = byId('sr-drop');
+		byId<HTMLInputElement>('sr-file').addEventListener('change', (e) => {
+			const f = (e.target as HTMLInputElement).files?.[0];
+			if (f) resize(f, f.name);
+		});
+		drop.addEventListener('dragover', (e) => {
+			e.preventDefault();
+			drop.classList.add('over');
+		});
+		drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+		drop.addEventListener('drop', (e) => {
+			e.preventDefault();
+			drop.classList.remove('over');
+			const f = e.dataTransfer?.files[0];
+			if (f) resize(f, f.name);
+		});
+		update();
+	});
+</script>
+
+<style>
+	.sr {
+		display: grid;
+		gap: 16px;
+	}
+	.sr-formats {
+		display: inline-flex;
+		gap: 12px;
+		border: 0;
+		margin: 0;
+		padding: 0;
+		position: relative;
+	}
+	#sr-sizes {
+		font-family: var(--mono);
+		font-size: 14px;
+		resize: vertical;
+	}
+	#sr-img,
+	#sr-picture {
+		min-height: 0;
+		word-break: normal;
+		white-space: pre;
+		overflow-x: auto;
+	}
+	.sr-pick {
+		padding: 14px;
+		display: grid;
+		gap: 10px;
+	}
+	.sr-pick p {
+		margin: 0;
+		font-size: 14px;
+		line-height: 1.5;
+		overflow-wrap: anywhere;
+	}
+	.sr-files {
+		padding: 14px;
+		display: grid;
+		gap: 12px;
+		position: relative;
+	}
+	.sr-downloads {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 8px;
+	}
+	.sr-downloads:empty {
+		display: none;
+	}
+	.sr-downloads li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.sr-downloads a {
+		text-decoration: none;
+		overflow-wrap: anywhere;
+	}
+</style>

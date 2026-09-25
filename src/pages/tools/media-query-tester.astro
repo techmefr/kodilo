@@ -1,0 +1,444 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const presets = [
+	['375x667', 'iPhone SE'],
+	['393x852', 'iPhone 15'],
+	['820x1180', 'iPad Air'],
+	['1180x820', 'iPad landscape'],
+	['1280x800', 'Laptop'],
+	['1440x900', 'Desktop'],
+];
+---
+
+<ToolShell
+	slug="media-query-tester"
+	title="Media Query Tester"
+	description="Paste CSS and HTML, resize the preview with device presets or a slider, and see which media queries match for width, orientation, color scheme, hover and reduced motion."
+>
+	<div class="mq" id="mq-tool">
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">
+					<span id="mq-css-label">CSS</span>
+					<button class="btn" id="mq-reset">
+						Reset sample
+					</button>
+				</div>
+				<textarea id="mq-css" spellcheck="false" aria-labelledby="mq-css-label"></textarea>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span id="mq-html-label">HTML</span>
+				</div>
+				<textarea id="mq-html" spellcheck="false" aria-labelledby="mq-html-label"></textarea>
+			</section>
+		</div>
+		<div class="chips" id="mq-presets" role="group" aria-label="Device presets">
+			{presets.map(([size, label]) => (
+				<button data-size={size} aria-pressed="false">
+					{label}
+				</button>
+			))}
+		</div>
+		<div class="toolbar">
+			<label class="check" for="mq-width">
+				Width <input type="range" id="mq-width" min="240" max="1920" step="1" value="393" /> <b id="mq-width-value">393px</b>
+			</label>
+			<label class="check" for="mq-height">
+				Height <input type="number" class="num" id="mq-height" min="200" max="2000" value="852" />
+			</label>
+		</div>
+		<div class="toolbar">
+			<div class="seg" id="mq-scheme" role="group" aria-label="Color scheme">
+				<button data-value="light" aria-pressed="true">
+					Light
+				</button>
+				<button data-value="dark" aria-pressed="false">
+					Dark
+				</button>
+			</div>
+			<div class="seg" id="mq-hover" role="group" aria-label="Pointer">
+				<button data-value="none" aria-pressed="true">
+					Touch
+				</button>
+				<button data-value="hover" aria-pressed="false">
+					Mouse
+				</button>
+			</div>
+			<label class="check">
+				<input type="checkbox" id="mq-motion" /> Reduced motion
+			</label>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Breakpoints</span>
+				<span id="mq-orientation"></span>
+			</div>
+			<div class="mq-ruler-wrap">
+				<div class="mq-ruler" id="mq-ruler"></div>
+			</div>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Media queries</span>
+				<span id="mq-count" aria-live="polite"></span>
+			</div>
+			<ul class="mq-list" id="mq-list"></ul>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Preview</span>
+			</div>
+			<div class="mq-stage" tabindex="0" role="region" aria-label="Preview frame">
+				<iframe id="mq-frame" sandbox="" title="Media query preview"></iframe>
+			</div>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	const sampleCss = `body { font: 15px system-ui, sans-serif; margin: 0; background: #f4f6fb; color: #1d2433; }
+.page { display: grid; gap: 16px; padding: 16px; }
+.nav { display: flex; gap: 12px; flex-direction: column; }
+.card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px #0002; transition: transform .2s; }
+.card:hover { transform: translateY(-2px); }
+.hint::after { content: "Phone layout"; }
+
+@media (min-width: 640px) {
+  .nav { flex-direction: row; }
+  .hint::after { content: "Tablet layout"; }
+}
+
+@media (min-width: 1024px) {
+  .page { grid-template-columns: 220px 1fr 1fr; }
+  .hint::after { content: "Desktop layout"; }
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  .card { padding: 12px; }
+}
+
+@media (orientation: landscape) {
+  .page { padding: 24px; }
+}
+
+@media (prefers-color-scheme: dark) {
+  body { background: #14161f; color: #e6e8ef; }
+  .card { background: #22263a; box-shadow: none; }
+}
+
+@media (hover: none) {
+  .card:hover { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+}
+
+@media screen and (width >= 1440px) {
+  .page { max-width: 1280px; margin: 0 auto; }
+}`;
+
+	const sampleHtml = `<div class="page">
+  <nav class="nav card">
+    <strong>Acme</strong>
+    <span>Products</span>
+    <span>Pricing</span>
+    <span>Docs</span>
+  </nav>
+  <main class="card">
+    <h1>Ship faster</h1>
+    <p class="hint"></p>
+  </main>
+  <aside class="card">
+    <h2>Changelog</h2>
+    <p>Dark mode, faster builds and a new CLI.</p>
+  </aside>
+</div>`;
+
+	type Env = { width: number; height: number; scheme: string; hover: boolean; motion: boolean };
+
+	const px = (v: string) => {
+		const m = v.trim().match(/^(-?[\d.]+)(px|em|rem)?$/);
+		if (!m) return NaN;
+		return Number(m[1]) * (m[2] === 'em' || m[2] === 'rem' ? 16 : 1);
+	};
+
+	const compare = (a: number, op: string, b: number) => (op === '<' ? a < b : op === '<=' ? a <= b : op === '>' ? a > b : op === '>=' ? a >= b : a === b);
+	const flip: Record<string, string> = { '<': '>', '<=': '>=', '>': '<', '>=': '<=', '=': '=' };
+
+	const feature = (raw: string, env: Env): boolean => {
+		const f = raw.trim().toLowerCase();
+		const dims: Record<string, number> = { width: env.width, height: env.height, 'aspect-ratio': env.width / env.height };
+		const range = f.match(/^([^<>=]+?)\s*(<=|>=|<|>|=)\s*([^<>=]+?)(?:\s*(<=|>=|<|>|=)\s*([^<>=]+))?$/);
+		if (range) {
+			const [, a, op1, b, op2, c] = range;
+			if (c !== undefined) return compare(px(a), op1, dims[b.trim()]) && compare(dims[b.trim()], op2, px(c));
+			if (a.trim() in dims) return compare(dims[a.trim()], op1, px(b));
+			return compare(dims[b.trim()], flip[op1], px(a));
+		}
+		const [name, value = ''] = f.split(':').map((s) => s.trim());
+		const orientation = env.width >= env.height ? 'landscape' : 'portrait';
+		switch (name) {
+			case 'min-width':
+				return env.width >= px(value);
+			case 'max-width':
+				return env.width <= px(value);
+			case 'width':
+				return env.width === px(value);
+			case 'min-height':
+				return env.height >= px(value);
+			case 'max-height':
+				return env.height <= px(value);
+			case 'height':
+				return env.height === px(value);
+			case 'orientation':
+				return value === orientation;
+			case 'prefers-color-scheme':
+				return value === env.scheme;
+			case 'prefers-reduced-motion':
+				return value ? (value === 'reduce') === env.motion : env.motion;
+			case 'hover':
+			case 'any-hover':
+				return value ? (value === 'hover') === env.hover : env.hover;
+			case 'pointer':
+			case 'any-pointer':
+				return value ? value === (env.hover ? 'fine' : 'coarse') : true;
+			case 'color':
+				return true;
+			default:
+				return false;
+		}
+	};
+
+	const single = (q: string, env: Env) => {
+		let s = q.trim().toLowerCase();
+		let negate = false;
+		if (s.startsWith('not ')) {
+			negate = true;
+			s = s.slice(4);
+		}
+		s = s.replace(/^only\s+/, '');
+		const parts = s.split(/\s+and\s+/);
+		let ok = true;
+		for (const p of parts) {
+			const t = p.trim();
+			if (t.startsWith('(')) ok = ok && feature(t.replace(/^\(|\)$/g, ''), env);
+			else ok = ok && (t === 'all' || t === 'screen');
+		}
+		return negate ? !ok : ok;
+	};
+
+	const matches = (query: string, env: Env) => query.split(',').some((q) => single(q, env));
+
+	const queries = (css: string) => {
+		const found: string[] = [];
+		for (const m of css.matchAll(/@media\s+([^{]+)\{/g)) found.push(m[1].trim());
+		return found;
+	};
+
+	const breakpoints = (list: string[]) => {
+		const values = new Set<number>();
+		for (const q of list) {
+			for (const m of q.matchAll(/(?:min-width|max-width)\s*:\s*([\d.]+(?:px|em|rem)?)/g)) values.add(px(m[1]));
+			for (const m of q.matchAll(/width\s*(?:<=|>=|<|>)\s*([\d.]+(?:px|em|rem)?)/g)) values.add(px(m[1]));
+			for (const m of q.matchAll(/([\d.]+(?:px|em|rem)?)\s*(?:<=|>=|<|>)\s*width/g)) values.add(px(m[1]));
+		}
+		return [...values].filter((v) => !isNaN(v)).sort((a, b) => a - b);
+	};
+
+	onPage('mq-tool', () => {
+		const css = byId<HTMLTextAreaElement>('mq-css');
+		const html = byId<HTMLTextAreaElement>('mq-html');
+		const width = byId<HTMLInputElement>('mq-width');
+		const height = byId<HTMLInputElement>('mq-height');
+		css.value = sampleCss;
+		html.value = sampleHtml;
+		const env: Env = { width: 393, height: 852, scheme: 'light', hover: false, motion: false };
+		let frameTimer = 0;
+
+		const render = () => {
+			env.width = Number(width.value);
+			env.height = Math.max(200, Number(height.value) || 800);
+			byId('mq-width-value').textContent = `${env.width}px`;
+			byId('mq-orientation').textContent = `${env.width} × ${env.height} · ${env.width >= env.height ? 'landscape' : 'portrait'}`;
+			document.querySelectorAll<HTMLButtonElement>('#mq-presets button').forEach((b) => {
+				b.setAttribute('aria-pressed', String(b.dataset.size === `${env.width}x${env.height}`));
+			});
+			const list = queries(css.value);
+			const items = list.map((q) => {
+				const li = document.createElement('li');
+				const ok = matches(q, env);
+				li.dataset.match = String(ok);
+				const code = document.createElement('code');
+				code.textContent = `@media ${q}`;
+				const badge = document.createElement('span');
+				badge.className = 'mq-badge';
+				badge.textContent = ok ? 'Matches' : 'No match';
+				li.append(code, badge);
+				return li;
+			});
+			const list_ = byId('mq-list');
+			if (items.length) list_.replaceChildren(...items);
+			else {
+				const li = document.createElement('li');
+				li.textContent = 'No @media rules found in the CSS.';
+				list_.replaceChildren(li);
+			}
+			byId('mq-count').textContent = `${items.filter((i) => i.dataset.match === 'true').length} of ${items.length} match`;
+
+			const points = breakpoints(list);
+			const max = Math.max(1920, ...points.map((p) => p + 80));
+			const ruler = byId('mq-ruler');
+			const ticks = points.map((p) => {
+				const b = document.createElement('button');
+				b.className = 'mq-tick';
+				b.style.left = `${(p / max) * 100}%`;
+				b.textContent = `${p}`;
+				b.setAttribute('aria-label', `Set width to ${p}px`);
+				b.addEventListener('click', () => {
+					width.value = String(p);
+					render();
+				});
+				return b;
+			});
+			const marker = document.createElement('span');
+			marker.className = 'mq-marker';
+			marker.style.left = `${(env.width / max) * 100}%`;
+			marker.setAttribute('aria-hidden', 'true');
+			ruler.replaceChildren(...ticks, marker);
+
+			clearTimeout(frameTimer);
+			frameTimer = window.setTimeout(() => {
+				const rewritten = css.value.replace(/@media\s+([^{]+)\{/g, (_, q: string) => (matches(q, env) ? '@media all {' : '@media not all {'));
+				const frame = byId<HTMLIFrameElement>('mq-frame');
+				frame.style.width = `${env.width}px`;
+				frame.style.height = `${Math.min(env.height, 720)}px`;
+				frame.srcdoc = `<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>${rewritten}</style></head><body>${html.value}</body></html>`;
+			}, 150);
+		};
+
+		document.querySelectorAll<HTMLButtonElement>('#mq-presets button').forEach((b) =>
+			b.addEventListener('click', () => {
+				const [w, h] = b.dataset.size!.split('x');
+				width.value = w;
+				height.value = h;
+				const touch = Number(w) < 1024;
+				env.hover = !touch;
+				document
+					.querySelectorAll<HTMLButtonElement>('#mq-hover button')
+					.forEach((x) => x.setAttribute('aria-pressed', String((x.dataset.value === 'hover') === !touch)));
+				render();
+			}),
+		);
+		segmented(byId('mq-scheme'), (v) => ((env.scheme = v), render()));
+		segmented(byId('mq-hover'), (v) => ((env.hover = v === 'hover'), render()));
+		byId<HTMLInputElement>('mq-motion').addEventListener('change', (e) => ((env.motion = (e.target as HTMLInputElement).checked), render()));
+		[css, html, width, height].forEach((el) => el.addEventListener('input', render));
+		byId('mq-reset').addEventListener('click', () => {
+			css.value = sampleCss;
+			html.value = sampleHtml;
+			render();
+		});
+		render();
+	});
+</script>
+
+<style>
+	.mq {
+		display: grid;
+		gap: 16px;
+	}
+	#mq-css,
+	#mq-html {
+		min-height: 280px;
+		word-break: normal;
+	}
+	.mq-ruler-wrap {
+		overflow-x: auto;
+		padding: 14px;
+	}
+	.mq-ruler {
+		position: relative;
+		min-width: 520px;
+		height: 44px;
+		border-bottom: 2px solid var(--border);
+	}
+	.mq-tick {
+		position: absolute;
+		bottom: -2px;
+		transform: translateX(-50%);
+		border: 1px solid var(--border);
+		border-bottom: 3px solid var(--accent-strong);
+		background: var(--surface);
+		color: var(--ink);
+		font: 600 12px var(--mono);
+		padding: 2px 6px;
+		border-radius: 6px 6px 0 0;
+		cursor: pointer;
+	}
+	.mq-tick:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 2px;
+	}
+	.mq-marker {
+		position: absolute;
+		top: 0;
+		bottom: -6px;
+		width: 2px;
+		background: var(--bad);
+		pointer-events: none;
+	}
+	.mq-list {
+		list-style: none;
+		margin: 0;
+		padding: 6px 14px;
+		display: grid;
+	}
+	.mq-list li {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 12px;
+		padding: 8px 0;
+		border-bottom: 1px solid var(--border);
+		font-size: 13px;
+		min-width: 0;
+	}
+	.mq-list li:last-child {
+		border-bottom: 0;
+	}
+	.mq-list code {
+		font-family: var(--mono);
+		overflow-wrap: anywhere;
+		min-width: 0;
+	}
+	.mq-badge {
+		flex: none;
+		font-weight: 700;
+		font-size: 12px;
+		padding: 2px 10px;
+		border-radius: 99px;
+		background: var(--surface-2);
+		color: var(--ink-soft);
+	}
+	.mq-list li[data-match='true'] .mq-badge {
+		background: var(--ok-bg);
+		color: var(--ok);
+	}
+	.mq-stage {
+		overflow: auto;
+		padding: 14px;
+		background: var(--surface-2);
+	}
+	#mq-frame {
+		display: block;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: #fff;
+		margin: 0 auto;
+	}
+</style>

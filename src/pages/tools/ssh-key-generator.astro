@@ -1,0 +1,279 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="ssh-key-generator"
+	title="SSH Key Generator"
+	description="Generate an Ed25519 or RSA SSH key pair in OpenSSH format, with a comment and its SHA256 fingerprint. Keys are created in your browser and never leave it."
+>
+	<div class="sg" id="sg-tool">
+		<p class="sg-warn">
+			For production servers, prefer <code>ssh-keygen -t ed25519</code> on your own machine: it can protect the private key with a passphrase, which this page
+			does not.
+		</p>
+		<div class="toolbar">
+			<div class="seg" id="sg-type" role="group" aria-label="Key type">
+				<button data-value="ed25519" aria-pressed="true">
+					Ed25519
+				</button>
+				<button data-value="2048" aria-pressed="false">
+					RSA 2048
+				</button>
+				<button data-value="3072" aria-pressed="false">
+					RSA 3072
+				</button>
+				<button data-value="4096" aria-pressed="false">
+					RSA 4096
+				</button>
+			</div>
+			<button class="btn primary" id="sg-new">
+				Generate
+			</button>
+		</div>
+		<div class="field">
+			<label for="sg-comment">Comment</label>
+			<input id="sg-comment" spellcheck="false" value="ada@laptop" />
+		</div>
+		<p class="sg-status" id="sg-status" aria-live="polite"></p>
+		<section class="panel">
+			<div class="panel-head">
+				<span>
+					Public key · id_<span id="sg-name">ed25519</span>.pub
+				</span>
+				<button class="btn" id="sg-copy-pub">
+					Copy
+				</button>
+			</div>
+			<pre class="out sg-out" id="sg-pub" tabindex="0"></pre>
+		</section>
+		<dl class="sg-fp">
+			<dt>Fingerprint</dt>
+			<dd>
+				<code id="sg-fp"></code>
+				<button class="btn" id="sg-copy-fp" aria-label="Copy fingerprint">
+					Copy
+				</button>
+			</dd>
+		</dl>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Private key · unencrypted</span>
+				<span class="sg-actions">
+					<button class="btn" id="sg-save">
+						Download
+					</button>
+					<button class="btn" id="sg-copy-priv">
+						Copy
+					</button>
+				</span>
+			</div>
+			<pre class="out sg-out" id="sg-priv" tabindex="0"></pre>
+		</section>
+		<p class="sg-note">
+			Save the private key as ~/.ssh/id_<span id="sg-name-2">ed25519</span>, then run chmod 600 on it. Keys are generated with the Web Crypto API and never
+			leave your browser.
+		</p>
+	</div>
+</ToolShell>
+
+<script>
+	import { base64UrlDecode } from '../../scripts/crypto';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const enc = new TextEncoder();
+
+	const concat = (parts: Uint8Array[]) => {
+		const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+		let o = 0;
+		parts.forEach((p) => {
+			out.set(p, o);
+			o += p.length;
+		});
+		return out;
+	};
+
+	const u32 = (n: number) => {
+		const b = new Uint8Array(4);
+		new DataView(b.buffer).setUint32(0, n);
+		return b;
+	};
+
+	const str = (v: string | Uint8Array) => {
+		const b = typeof v === 'string' ? enc.encode(v) : v;
+		return concat([u32(b.length), b]);
+	};
+
+	const mpint = (b: Uint8Array) => {
+		let i = 0;
+		while (i < b.length - 1 && b[i] === 0) i++;
+		const v = b.subarray(i);
+		return str(v[0] & 0x80 ? concat([new Uint8Array([0]), v]) : v);
+	};
+
+	const b64 = (b: Uint8Array) => {
+		let s = '';
+		b.forEach((c) => (s += String.fromCharCode(c)));
+		return btoa(s);
+	};
+
+	const armor = (b: Uint8Array) =>
+		`-----BEGIN OPENSSH PRIVATE KEY-----\n${b64(b)
+			.match(/.{1,70}/g)!
+			.join('\n')}\n-----END OPENSSH PRIVATE KEY-----\n`;
+
+	const privateFile = (type: string, pub: Uint8Array, fields: Uint8Array[], comment: string) => {
+		const check = crypto.getRandomValues(new Uint8Array(4));
+		let body = concat([check, check, str(type), ...fields, str(comment)]);
+		const padLen = (8 - (body.length % 8)) % 8;
+		body = concat([body, Uint8Array.from({ length: padLen }, (_, i) => i + 1)]);
+		return armor(concat([enc.encode('openssh-key-v1\0'), str('none'), str('none'), str(''), u32(1), str(pub), str(body)]));
+	};
+
+	const ed25519 = async (comment: string) => {
+		const pair = (await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify'])) as CryptoKeyPair;
+		const raw = new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey));
+		const seed = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey)).slice(-32);
+		const pub = concat([str('ssh-ed25519'), str(raw)]);
+		return { type: 'ssh-ed25519', pub, priv: privateFile('ssh-ed25519', pub, [str(raw), str(concat([seed, raw]))], comment) };
+	};
+
+	const rsa = async (bits: number, comment: string) => {
+		const pair = (await crypto.subtle.generateKey(
+			{ name: 'RSASSA-PKCS1-v1_5', modulusLength: bits, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+			true,
+			['sign', 'verify'],
+		)) as CryptoKeyPair;
+		const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
+		const [n, e, d, p, q, qi] = [jwk.n, jwk.e, jwk.d, jwk.p, jwk.q, jwk.qi].map((x) => base64UrlDecode(x ?? ''));
+		const pub = concat([str('ssh-rsa'), mpint(e), mpint(n)]);
+		return { type: 'ssh-rsa', pub, priv: privateFile('ssh-rsa', pub, [mpint(n), mpint(e), mpint(d), mpint(qi), mpint(p), mpint(q)], comment) };
+	};
+
+	onPage('sg-tool', () => {
+		const comment = byId<HTMLInputElement>('sg-comment');
+		let kind = 'ed25519';
+		let key: { type: string; pub: Uint8Array; priv: string } | null = null;
+		let fp = '';
+		let run = 0;
+
+		const publicLine = () => (key ? `${key.type} ${b64(key.pub)}${comment.value.trim() ? ` ${comment.value.trim()}` : ''}` : '');
+
+		const show = async () => {
+			if (!key) return;
+			byId('sg-pub').textContent = publicLine();
+			const sha = new Uint8Array(await crypto.subtle.digest('SHA-256', key.pub as BufferSource));
+			fp = `SHA256:${b64(sha).replace(/=+$/, '')}`;
+			byId('sg-fp').textContent = fp;
+			byId('sg-priv').textContent = key.priv;
+		};
+
+		const generate = async () => {
+			const t = ++run;
+			const status = byId('sg-status');
+			const name = kind === 'ed25519' ? 'ed25519' : 'rsa';
+			byId('sg-name').textContent = name;
+			byId('sg-name-2').textContent = name;
+			status.textContent = kind === 'ed25519' ? 'Generating Ed25519 key…' : `Generating RSA ${kind} key, this can take a few seconds…`;
+			try {
+				const k = kind === 'ed25519' ? await ed25519(comment.value.trim()) : await rsa(Number(kind), comment.value.trim());
+				if (t !== run) return;
+				key = k;
+				await show();
+				status.textContent = kind === 'ed25519' ? 'Ed25519 key ready. Recommended for new keys.' : `RSA ${kind} key ready.`;
+			} catch {
+				if (t !== run) return;
+				status.textContent =
+					kind === 'ed25519' ? 'This browser does not support Ed25519 in Web Crypto. Pick RSA or update your browser.' : 'Key generation failed.';
+			}
+		};
+
+		let timer = 0;
+		comment.addEventListener('input', () => {
+			byId('sg-pub').textContent = publicLine();
+			clearTimeout(timer);
+			timer = window.setTimeout(generate, 400);
+		});
+		segmented(byId('sg-type'), (v) => {
+			kind = v;
+			generate();
+		});
+		byId('sg-new').addEventListener('click', generate);
+		copyButton(byId('sg-copy-pub'), publicLine);
+		copyButton(byId('sg-copy-priv'), () => key?.priv ?? '');
+		copyButton(byId('sg-copy-fp'), () => fp);
+		byId('sg-save').addEventListener('click', () => {
+			if (!key) return;
+			const a = document.createElement('a');
+			a.href = URL.createObjectURL(new Blob([key.priv], { type: 'text/plain' }));
+			a.download = kind === 'ed25519' ? 'id_ed25519' : 'id_rsa';
+			a.click();
+			setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+		});
+		generate();
+	});
+</script>
+
+<style>
+	.sg {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.sg-warn {
+		margin: 0;
+		padding: 10px 14px;
+		border-radius: 10px;
+		background: var(--warn-bg);
+		color: var(--warn);
+		font-size: 14px;
+	}
+	.sg-warn code {
+		font-family: var(--mono);
+		font-weight: 700;
+	}
+	.sg .field > input {
+		font-size: 16px;
+	}
+	.sg-status,
+	.sg-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+		min-height: 1.2em;
+	}
+	.panel .sg-out {
+		min-height: 0;
+	}
+	.sg-out:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	.sg-actions {
+		display: flex;
+		gap: 6px;
+	}
+	.sg-fp {
+		margin: 0;
+	}
+	.sg-fp dt {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.sg-fp dd {
+		margin: 4px 0 0;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.sg-fp code {
+		flex: 1;
+		min-width: 0;
+		font-family: var(--mono);
+		font-size: 13px;
+		word-break: break-all;
+	}
+</style>

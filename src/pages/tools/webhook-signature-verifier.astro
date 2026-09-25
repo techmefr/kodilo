@@ -1,0 +1,419 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="webhook-signature-verifier"
+	title="Webhook Signature Verifier"
+	description="Compute and check webhook signatures for GitHub, Stripe, Slack, Shopify or any HMAC scheme: paste the raw body, the secret and the header to compare expected against received."
+>
+	<div class="wh" id="wh-tool">
+		<div class="toolbar">
+			<div class="seg" id="wh-provider" aria-label="Provider">
+				<button data-value="github" aria-pressed="true">
+					GitHub
+				</button>
+				<button data-value="stripe" aria-pressed="false">
+					Stripe
+				</button>
+				<button data-value="slack" aria-pressed="false">
+					Slack
+				</button>
+				<button data-value="shopify" aria-pressed="false">
+					Shopify
+				</button>
+				<button data-value="generic" aria-pressed="false">
+					Generic HMAC
+				</button>
+			</div>
+			<button class="btn" id="wh-sample">
+				Load sample
+			</button>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="wh-body-label">Raw request body</span>
+			</div>
+			<textarea id="wh-body" spellcheck="false" aria-labelledby="wh-body-label"></textarea>
+		</section>
+		<div class="fields">
+			<div class="field">
+				<label for="wh-secret">Signing secret</label>
+				<input id="wh-secret" spellcheck="false" autocomplete="off" />
+			</div>
+			<div class="field wide">
+				<label for="wh-header" id="wh-header-label">
+					X-Hub-Signature-256
+				</label>
+				<input id="wh-header" spellcheck="false" autocomplete="off" />
+			</div>
+			<div class="field" data-for="slack">
+				<label for="wh-ts">X-Slack-Request-Timestamp</label>
+				<input id="wh-ts" inputmode="numeric" spellcheck="false" autocomplete="off" />
+			</div>
+			<div class="field" data-for="stripe slack">
+				<label for="wh-tol">Tolerance, seconds</label>
+				<input id="wh-tol" type="number" min="0" value="300" />
+			</div>
+			<div class="field" data-for="generic">
+				<label for="wh-algo">Hash</label>
+				<select id="wh-algo">
+					<option value="SHA-256">SHA-256</option>
+					<option value="SHA-1">SHA-1</option>
+					<option value="SHA-384">SHA-384</option>
+					<option value="SHA-512">SHA-512</option>
+				</select>
+			</div>
+			<div class="field" data-for="generic">
+				<label for="wh-enc">Encoding</label>
+				<select id="wh-enc">
+					<option value="hex">Hex</option>
+					<option value="base64">Base64</option>
+				</select>
+			</div>
+			<div class="field" data-for="generic">
+				<label for="wh-prefix">Header prefix</label>
+				<input id="wh-prefix" value="sha256=" spellcheck="false" autocomplete="off" />
+			</div>
+		</div>
+		<div class="wh-verdict" id="wh-verdict" role="status" aria-live="polite"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Details</span>
+				<span class="wh-actions">
+					<button class="btn" id="wh-use">
+						Use expected
+					</button>
+					<button class="btn" id="wh-copy">
+						Copy expected
+					</button>
+				</span>
+			</div>
+			<dl class="wh-dl">
+				<dt>Expected</dt>
+				<dd>
+					<code id="wh-expected"></code>
+				</dd>
+				<dt>Received</dt>
+				<dd>
+					<code id="wh-received"></code>
+				</dd>
+				<dt>Signed string</dt>
+				<dd>
+					<code id="wh-signed"></code>
+				</dd>
+				<dt>Timestamp</dt>
+				<dd id="wh-age"></dd>
+				<dt>Computed in</dt>
+				<dd id="wh-time"></dd>
+			</dl>
+		</section>
+		<ul class="wh-tips" id="wh-tips"></ul>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Provider = 'github' | 'stripe' | 'slack' | 'shopify' | 'generic';
+
+	const HEADERS: Record<Provider, string> = {
+		github: 'X-Hub-Signature-256',
+		stripe: 'Stripe-Signature',
+		slack: 'X-Slack-Signature',
+		shopify: 'X-Shopify-Hmac-Sha256',
+		generic: 'Signature header',
+	};
+
+	const SAMPLES: Record<Provider, { body: string; secret: string }> = {
+		github: {
+			body: '{"action":"opened","number":42,"pull_request":{"title":"Add webhook retries","user":{"login":"octocat"}},"repository":{"full_name":"acme/api"}}',
+			secret: 'gh_webhook_s3cret',
+		},
+		stripe: {
+			body: '{"id":"evt_1PqXk2","object":"event","type":"checkout.session.completed","data":{"object":{"id":"cs_test_a1b2","amount_total":4900,"currency":"eur"}}}',
+			secret: 'whsec_4f9d2c7a1e8b',
+		},
+		slack: {
+			body: 'token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=acme&channel_id=C2147483705&user_name=ada&command=%2Fdeploy&text=api+production',
+			secret: '8f742231b10e8888abcd99yyyzzz85a5',
+		},
+		shopify: {
+			body: '{"id":820982911946154508,"email":"jon@example.com","total_price":"199.00","currency":"USD","financial_status":"paid"}',
+			secret: 'shpss_1a2b3c4d5e6f',
+		},
+		generic: {
+			body: '{"event":"invoice.paid","invoice_id":"inv_2093","amount":12000}',
+			secret: 'my-shared-secret',
+		},
+	};
+
+	const enc = new TextEncoder();
+	const toHex = (b: ArrayBuffer) => Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, '0')).join('');
+	const toB64 = (b: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(b)));
+
+	const hmac = async (algo: string, secret: string, data: string) => {
+		const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: algo }, false, ['sign']);
+		return crypto.subtle.sign('HMAC', key, enc.encode(data));
+	};
+
+	const safeEqual = (a: string, b: string) => {
+		if (a.length !== b.length) return false;
+		let diff = 0;
+		for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+		return diff === 0;
+	};
+
+	const now = () => Math.floor(Date.now() / 1000);
+
+	type Result = { expected: string; header: string; received: string; signed: string; match: boolean; ts?: number };
+
+	const compute = async (
+		p: Provider,
+		body: string,
+		secret: string,
+		header: string,
+		opts: { ts: string; algo: string; enc: string; prefix: string },
+	): Promise<Result> => {
+		const h = header.trim();
+		if (p === 'github') {
+			const sha1 = /^sha1=/i.test(h);
+			const hex = toHex(await hmac(sha1 ? 'SHA-1' : 'SHA-256', secret, body));
+			const expected = `${sha1 ? 'sha1' : 'sha256'}=${hex}`;
+			return { expected, header: expected, received: h, signed: body, match: safeEqual(expected, h.toLowerCase()) };
+		}
+		if (p === 'stripe') {
+			const parts = h.split(',').map((x) => x.trim().split('='));
+			const tRaw = parts.find(([k]) => k === 't')?.[1];
+			const t = tRaw && /^\d+$/.test(tRaw) ? Number(tRaw) : now();
+			const sigs = parts.filter(([k]) => k === 'v1').map(([, v]) => (v ?? '').toLowerCase());
+			const signed = `${t}.${body}`;
+			const hex = toHex(await hmac('SHA-256', secret, signed));
+			return {
+				expected: hex,
+				header: `t=${t},v1=${hex}`,
+				received: sigs.join(', ') || '(no v1 signature)',
+				signed,
+				match: sigs.some((s) => safeEqual(s, hex)),
+				ts: tRaw ? t : undefined,
+			};
+		}
+		if (p === 'slack') {
+			const t = /^\d+$/.test(opts.ts.trim()) ? Number(opts.ts.trim()) : undefined;
+			const signed = `v0:${opts.ts.trim()}:${body}`;
+			const expected = `v0=${toHex(await hmac('SHA-256', secret, signed))}`;
+			return { expected, header: expected, received: h, signed, match: safeEqual(expected, h.toLowerCase()), ts: t };
+		}
+		if (p === 'shopify') {
+			const expected = toB64(await hmac('SHA-256', secret, body));
+			return { expected, header: expected, received: h, signed: body, match: safeEqual(expected, h) };
+		}
+		const raw = await hmac(opts.algo, secret, body);
+		const digest = opts.enc === 'base64' ? toB64(raw) : toHex(raw);
+		const expected = `${opts.prefix}${digest}`;
+		const cmp = opts.enc === 'hex' ? h.toLowerCase() : h;
+		return { expected, header: expected, received: h, signed: body, match: safeEqual(opts.enc === 'hex' ? expected.toLowerCase() : expected, cmp) };
+	};
+
+	onPage('wh-tool', () => {
+		const body = byId<HTMLTextAreaElement>('wh-body');
+		const secret = byId<HTMLInputElement>('wh-secret');
+		const header = byId<HTMLInputElement>('wh-header');
+		const ts = byId<HTMLInputElement>('wh-ts');
+		const tol = byId<HTMLInputElement>('wh-tol');
+		const algo = byId<HTMLSelectElement>('wh-algo');
+		const encSel = byId<HTMLSelectElement>('wh-enc');
+		const prefix = byId<HTMLInputElement>('wh-prefix');
+		const group = byId('wh-provider');
+		let provider: Provider = 'github';
+		let last: Result | undefined;
+		let run = 0;
+
+		const opts = () => ({ ts: ts.value, algo: algo.value, enc: encSel.value, prefix: prefix.value });
+
+		const render = async () => {
+			const id = ++run;
+			const start = performance.now();
+			const r = await compute(provider, body.value, secret.value, header.value, opts());
+			const ms = performance.now() - start;
+			if (id !== run) return;
+			last = r;
+			const tips: string[] = [];
+			let fresh = true;
+			let ageText = 'Not part of this scheme';
+			if (provider === 'stripe' || provider === 'slack') {
+				if (r.ts === undefined) {
+					ageText = provider === 'stripe' ? 'No t= value in the header' : 'Missing timestamp';
+					fresh = false;
+				} else {
+					const age = now() - r.ts;
+					const limit = Number(tol.value) || 0;
+					fresh = !limit || Math.abs(age) <= limit;
+					const when = new Date(r.ts * 1000).toISOString().replace('.000Z', 'Z');
+					ageText = `${when}, ${Math.abs(age)} s ${age >= 0 ? 'ago' : 'in the future'}${limit ? ` (tolerance ${limit} s)` : ''}`;
+					if (!fresh)
+						tips.push(
+							`The timestamp is outside the ${limit} s tolerance, so the provider's SDK would reject it as a possible replay even though the signature ${r.match ? 'matches' : 'is checked'}.`,
+						);
+				}
+			}
+			const verdict = byId('wh-verdict');
+			const empty = !header.value.trim();
+			verdict.className = `wh-verdict ${empty ? '' : r.match && fresh ? 'wh-ok' : r.match ? 'wh-warn' : 'wh-bad'}`;
+			verdict.textContent = empty
+				? 'Paste the signature header to verify it, or use the expected value.'
+				: r.match && fresh
+					? 'Valid signature'
+					: r.match
+						? 'Signature matches, but the timestamp is too old'
+						: 'Signature mismatch';
+			byId('wh-expected').textContent = r.header;
+			byId('wh-received').textContent = r.received || '(empty)';
+			byId('wh-signed').textContent = r.signed.length > 400 ? `${r.signed.slice(0, 400)}…` : r.signed;
+			byId('wh-age').textContent = ageText;
+			byId('wh-time').textContent = `${ms.toFixed(2)} ms with Web Crypto HMAC`;
+			if (!r.match && !empty) {
+				if (/\r?\n$/.test(body.value)) {
+					const trimmed = await compute(provider, body.value.replace(/\r?\n$/, ''), secret.value, header.value, opts());
+					if (id !== run) return;
+					if (trimmed.match) tips.push('It matches once the trailing newline is removed: your body has an extra line break the sender did not sign.');
+				}
+				if (secret.value !== secret.value.trim()) tips.push('The secret has leading or trailing spaces.');
+				tips.push('Sign the raw body exactly as received. Parsing and re-serialising JSON changes spacing and key order and breaks the signature.');
+				if (provider === 'stripe' && !secret.value.startsWith('whsec_'))
+					tips.push('Stripe endpoint secrets start with whsec_. The API key is not the signing secret.');
+				if (provider === 'shopify') tips.push('Shopify sends the HMAC in base64, not hex.');
+			}
+			byId('wh-tips').replaceChildren(
+				...tips.map((t) => {
+					const li = document.createElement('li');
+					li.textContent = t;
+					return li;
+				}),
+			);
+		};
+
+		const loadSample = async () => {
+			const s = SAMPLES[provider];
+			body.value = s.body;
+			secret.value = s.secret;
+			ts.value = String(now() - 12);
+			header.value = '';
+			const r = await compute(provider, s.body, s.secret, provider === 'stripe' ? `t=${now() - 12}` : '', opts());
+			header.value = r.header;
+			render();
+		};
+
+		const setProvider = (p: Provider) => {
+			provider = p;
+			byId('wh-header-label').textContent = HEADERS[p];
+			document.querySelectorAll<HTMLElement>('#wh-tool [data-for]').forEach((f) => (f.hidden = !(f.dataset.for ?? '').split(' ').includes(p)));
+		};
+
+		group.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
+			b.addEventListener('click', () => {
+				group.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+				setProvider(b.dataset.value as Provider);
+				loadSample();
+			}),
+		);
+		[body, secret, header, ts, tol, prefix].forEach((i) => i.addEventListener('input', render));
+		[algo, encSel].forEach((s) => s.addEventListener('change', render));
+		byId('wh-sample').addEventListener('click', loadSample);
+		byId('wh-use').addEventListener('click', () => {
+			if (!last) return;
+			header.value = last.header;
+			render();
+		});
+		copyButton(byId('wh-copy'), () => last?.header ?? '');
+		setProvider('github');
+		loadSample();
+	});
+</script>
+
+<style>
+	.wh {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	#wh-body {
+		min-height: 160px;
+	}
+	.wh .field > input {
+		font-size: 14px;
+	}
+	.wh .field[hidden] {
+		display: none;
+	}
+	.wh-verdict {
+		border-radius: 14px;
+		padding: 14px 16px;
+		font-weight: 700;
+		font-size: 16px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--ink-soft);
+	}
+	.wh-verdict.wh-ok {
+		color: var(--ok);
+		background: var(--ok-bg);
+		border-color: transparent;
+	}
+	.wh-verdict.wh-warn {
+		color: var(--warn);
+		background: var(--warn-bg);
+		border-color: transparent;
+	}
+	.wh-verdict.wh-bad {
+		color: var(--bad);
+		border-color: var(--bad);
+	}
+	.wh-actions {
+		display: inline-flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.wh-dl {
+		display: grid;
+		grid-template-columns: max-content minmax(0, 1fr);
+		gap: 8px 14px;
+		margin: 0;
+		padding: 12px 14px;
+		font-size: 13px;
+	}
+	.wh-dl dt {
+		font-weight: 700;
+		color: var(--ink-soft);
+	}
+	.wh-dl dd {
+		margin: 0;
+		min-width: 0;
+	}
+	.wh-dl code {
+		font-family: var(--mono);
+		font-size: 12.5px;
+		word-break: break-all;
+	}
+	@media (max-width: 480px) {
+		.wh-dl {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 2px;
+		}
+		.wh-dl dd {
+			margin-bottom: 8px;
+		}
+	}
+	.wh-tips {
+		margin: 0;
+		padding-left: 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.wh-tips:empty {
+		display: none;
+	}
+</style>

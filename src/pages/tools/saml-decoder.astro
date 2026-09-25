@@ -1,0 +1,363 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const xml = `<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_8e8dc5f69a98cc4c1ff3427e5ce34606fd672f91e6" Version="2.0" IssueInstant="2026-09-24T09:14:02Z" Destination="https://app.example.com/saml/acs" InResponseTo="_4fee3b046395c4e751011e97f8900b5273d56685"><saml:Issuer>https://idp.example.org/metadata</saml:Issuer><samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></samlp:Status><saml:Assertion ID="_d71a3a8e9fcc45c9e9d248ef7049393fc8f04e5f75" Version="2.0" IssueInstant="2026-09-24T09:14:02Z"><saml:Issuer>https://idp.example.org/metadata</saml:Issuer><ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/><ds:Reference URI="#_d71a3a8e9fcc45c9e9d248ef7049393fc8f04e5f75"><ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><ds:DigestValue>q8aKkGQ3r0VbYxLJqFd2Yh1Xk9pC6s2Zp4Rm0cT1wEo=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>TmV2ZXIgdHJ1c3QgYSBzaWduYXR1cmUgeW91IGRpZCBub3QgdmVyaWZ5IHlvdXJzZWxmLg==</ds:SignatureValue></ds:Signature><saml:Subject><saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">ada.lovelace@example.com</saml:NameID><saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData NotOnOrAfter="2026-09-24T09:19:02Z" Recipient="https://app.example.com/saml/acs" InResponseTo="_4fee3b046395c4e751011e97f8900b5273d56685"/></saml:SubjectConfirmation></saml:Subject><saml:Conditions NotBefore="2026-09-24T09:13:32Z" NotOnOrAfter="2026-09-24T09:19:02Z"><saml:AudienceRestriction><saml:Audience>https://app.example.com/saml/metadata</saml:Audience></saml:AudienceRestriction></saml:Conditions><saml:AuthnStatement AuthnInstant="2026-09-24T09:14:01Z" SessionIndex="_be9967abd904ddcae3c0eb4189adbe3f71e327cf93"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement><saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue>ada.lovelace@example.com</saml:AttributeValue></saml:Attribute><saml:Attribute Name="displayName"><saml:AttributeValue>Ada Lovelace</saml:AttributeValue></saml:Attribute><saml:Attribute Name="groups"><saml:AttributeValue>engineering</saml:AttributeValue><saml:AttributeValue>admins</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response>`;
+const sample = Buffer.from(xml).toString('base64');
+---
+
+<ToolShell
+	slug="saml-decoder"
+	title="SAML Decoder"
+	description="Paste a SAMLRequest or SAMLResponse, base64, deflated, URL-encoded or raw XML, to read the issuer, subject, validity window, audience, attributes and signature. Decoded in your browser."
+>
+	<div class="sm" id="sm-tool">
+		<section class="panel">
+			<div class="panel-head">
+				<span>SAML message</span>
+				<span class="sm-kind" id="sm-steps"></span>
+			</div>
+			<textarea id="sm-in" spellcheck="false" aria-label="SAML message">{sample}</textarea>
+		</section>
+		<p class="sm-note">Assertions carry identities. They are decoded locally and never leave your browser. The signature is detected, not verified.</p>
+		<div class="error" id="sm-error" hidden></div>
+		<ul class="sm-warn" id="sm-warn" aria-live="polite"></ul>
+		<div class="sm-out" id="sm-out">
+			<section class="panel">
+				<div class="panel-head">Summary</div>
+				<dl class="sm-dl" id="sm-summary"></dl>
+			</section>
+			<section class="panel">
+				<div class="panel-head">Attributes</div>
+				<div class="sm-scroll" tabindex="0" role="region" aria-label="Attributes, scrollable">
+					<table class="sm-table">
+						<thead>
+							<tr>
+								<th>Name</th>
+								<th>Value</th>
+							</tr>
+						</thead>
+						<tbody id="sm-attrs"></tbody>
+					</table>
+				</div>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span>XML</span>
+					<button class="btn" id="sm-copy">
+						Copy
+					</button>
+				</div>
+				<pre class="out sm-xml" id="sm-xml" tabindex="0"></pre>
+			</section>
+		</div>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const inflate = async (bytes: Uint8Array) => {
+		const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+		return new Uint8Array(await new Response(stream).arrayBuffer());
+	};
+
+	const decode = async (input: string) => {
+		const steps: string[] = [];
+		let s = input.trim();
+		const param = s.match(/(?:^|[?&])(SAMLRequest|SAMLResponse)=([^&#\s]+)/);
+		if (param) {
+			steps.push(`${param[1]} parameter`);
+			s = param[2];
+		}
+		if (s.startsWith('<')) return { xml: s, steps: [...steps, 'XML'] };
+		if (/%[0-9a-f]{2}/i.test(s)) {
+			s = decodeURIComponent(s.replace(/\+/g, ' '));
+			steps.push('URL-decoded');
+		}
+		const clean = s.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+		let bytes: Uint8Array;
+		try {
+			bytes = Uint8Array.from(atob(clean), (c) => c.charCodeAt(0));
+		} catch {
+			throw new Error('This is neither XML nor valid base64.');
+		}
+		steps.push('base64');
+		let text = new TextDecoder().decode(bytes);
+		if (!text.trimStart().startsWith('<')) {
+			try {
+				text = new TextDecoder().decode(await inflate(bytes));
+				steps.push('inflated');
+			} catch {
+				throw new Error('Decoded bytes are not XML and do not inflate as deflate-raw.');
+			}
+		}
+		return { xml: text, steps: [...steps, 'XML'] };
+	};
+
+	const pretty = (node: Node, depth = 0): string => {
+		const pad = '  '.repeat(depth);
+		if (node.nodeType === Node.TEXT_NODE) {
+			const t = node.textContent?.trim();
+			return t ? `${pad}${t}\n` : '';
+		}
+		if (node.nodeType === Node.COMMENT_NODE) return `${pad}<!--${node.textContent}-->\n`;
+		if (node.nodeType !== Node.ELEMENT_NODE) return '';
+		const e = node as Element;
+		const attrs = [...e.attributes].map((a) => ` ${a.name}="${a.value.replace(/"/g, '&quot;')}"`).join('');
+		const kids = [...e.childNodes].filter((c) => c.nodeType !== Node.TEXT_NODE || c.textContent?.trim());
+		if (!kids.length) return `${pad}<${e.tagName}${attrs}/>\n`;
+		if (kids.length === 1 && kids[0].nodeType === Node.TEXT_NODE) return `${pad}<${e.tagName}${attrs}>${kids[0].textContent?.trim()}</${e.tagName}>\n`;
+		return `${pad}<${e.tagName}${attrs}>\n${kids.map((k) => pretty(k, depth + 1)).join('')}${pad}</${e.tagName}>\n`;
+	};
+
+	const all = (root: Element | Document, name: string) => [...root.getElementsByTagNameNS('*', name)];
+	const first = (root: Element | Document, name: string) => all(root, name)[0];
+	const short = (urn: string | null | undefined) => (urn ?? '').replace(/^urn:oasis:names:tc:SAML:\d\.\d:[\w-]+:/, '');
+
+	const fmt = (iso: string | null) => {
+		if (!iso) return '';
+		const d = new Date(iso);
+		return Number.isNaN(d.getTime()) ? iso : `${d.toISOString().replace('T', ' ').replace('.000Z', ' UTC')}`;
+	};
+
+	const el = (tag: string, cls = '', text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	onPage('sm-tool', () => {
+		const input = byId<HTMLTextAreaElement>('sm-in');
+		let xmlText = '';
+		let token = 0;
+
+		const render = async () => {
+			const t = ++token;
+			const err = byId('sm-error');
+			const out = byId('sm-out');
+			const warn = byId('sm-warn');
+			try {
+				if (!input.value.trim()) throw new Error('Paste a SAMLRequest, SAMLResponse or its XML.');
+				const { xml, steps } = await decode(input.value);
+				if (t !== token) return;
+				const doc = new DOMParser().parseFromString(xml, 'application/xml');
+				if (doc.getElementsByTagName('parsererror').length) throw new Error('The decoded text is not well-formed XML.');
+				const root = doc.documentElement;
+				err.hidden = true;
+				out.hidden = false;
+				byId('sm-steps').textContent = steps.join(' → ');
+				xmlText = pretty(root).trimEnd();
+				byId('sm-xml').textContent = xmlText;
+				const warnings: [string, string][] = [];
+				const conditions = first(doc, 'Conditions');
+				const notBefore = conditions?.getAttribute('NotBefore') ?? null;
+				const notAfter = conditions?.getAttribute('NotOnOrAfter') ?? first(doc, 'SubjectConfirmationData')?.getAttribute('NotOnOrAfter') ?? null;
+				const now = Date.now();
+				const statusCode = first(doc, 'StatusCode')?.getAttribute('Value');
+				const isResponse = root.localName === 'Response';
+				const assertions = all(doc, 'Assertion');
+				const encrypted = all(doc, 'EncryptedAssertion').length > 0;
+				const sigs = all(doc, 'Signature');
+				const sigOnAssertion = sigs.some((s) => s.parentElement?.localName === 'Assertion');
+				const sigOnRoot = sigs.some((s) => s.parentElement === root);
+				if (notAfter && new Date(notAfter).getTime() <= now) warnings.push(['bad', `Expired: not valid on or after ${fmt(notAfter)}.`]);
+				if (notBefore && new Date(notBefore).getTime() > now) warnings.push(['bad', `Not yet valid: starts at ${fmt(notBefore)}. Check clock skew.`]);
+				if (isResponse && !sigs.length && !encrypted) warnings.push(['bad', 'No signature: a service provider must reject an unsigned response.']);
+				if (isResponse && sigs.length && !sigOnAssertion && assertions.length)
+					warnings.push(['warn', 'Only the response is signed, not the assertion. Make sure your SP validates the response signature.']);
+				if (statusCode && !statusCode.endsWith(':Success')) warnings.push(['bad', `Status is ${short(statusCode)}.`]);
+				if (encrypted) warnings.push(['ok', 'The assertion is encrypted. Its content needs the SP private key.']);
+				if (isResponse && assertions.length && !first(doc, 'Audience')) warnings.push(['warn', 'No audience restriction.']);
+				warn.replaceChildren(...warnings.map(([k, m]) => el('li', k, m)));
+				if (!warnings.length) warn.append(el('li', 'ok', 'No problem found. Remember the signature itself is not verified here.'));
+				const nameId = first(doc, 'NameID');
+				const assertionIssuer = assertions[0] ? first(assertions[0], 'Issuer')?.textContent : null;
+				const rows: [string, string][] = [
+					['Type', `${root.localName}${root.getAttribute('ID') ? ` · ${root.getAttribute('ID')}` : ''}`],
+					['Issuer', first(doc, 'Issuer')?.textContent?.trim() ?? assertionIssuer ?? ''],
+					['Issued', fmt(root.getAttribute('IssueInstant'))],
+					['Destination', root.getAttribute('Destination') ?? root.getAttribute('AssertionConsumerServiceURL') ?? ''],
+					['In response to', root.getAttribute('InResponseTo') ?? ''],
+					['Status', short(statusCode)],
+					['NameID', nameId?.textContent?.trim() ?? ''],
+					['NameID format', short(nameId?.getAttribute('Format') ?? first(doc, 'NameIDPolicy')?.getAttribute('Format'))],
+					['Valid from', fmt(notBefore)],
+					['Valid until', fmt(notAfter)],
+					[
+						'Audience',
+						all(doc, 'Audience')
+							.map((a) => a.textContent?.trim())
+							.join(', '),
+					],
+					['Authn context', short(first(doc, 'AuthnContextClassRef')?.textContent?.trim())],
+					['Session index', first(doc, 'AuthnStatement')?.getAttribute('SessionIndex') ?? ''],
+					[
+						'Signature',
+						sigs.length
+							? `Present on ${[sigOnRoot && root.localName, sigOnAssertion && 'Assertion'].filter(Boolean).join(' and ') || 'an element'} · ${short(first(doc, 'SignatureMethod')?.getAttribute('Algorithm')).replace(/^.*#/, '')}`
+							: 'Missing',
+					],
+				];
+				byId('sm-summary').replaceChildren(
+					...rows
+						.filter(([, v]) => v)
+						.map(([k, v]) => {
+							const row = el('div', 'sm-row');
+							row.append(el('dt', '', k), el('dd', k === 'Signature' && v === 'Missing' ? 'bad' : '', v));
+							return row;
+						}),
+				);
+				const attrs = all(doc, 'Attribute');
+				byId('sm-attrs').replaceChildren(
+					...(attrs.length
+						? attrs.map((a) => {
+								const tr = el('tr');
+								tr.append(
+									el('td', 'sm-name', a.getAttribute('FriendlyName') ?? a.getAttribute('Name') ?? ''),
+									el(
+										'td',
+										'',
+										all(a, 'AttributeValue')
+											.map((v) => v.textContent?.trim())
+											.join(', '),
+									),
+								);
+								return tr;
+							})
+						: [
+								(() => {
+									const tr = el('tr');
+									const td = el('td', 'sm-empty', 'No attributes in this message.');
+									td.setAttribute('colspan', '2');
+									tr.append(td);
+									return tr;
+								})(),
+							]),
+				);
+			} catch (e) {
+				if (t !== token) return;
+				err.hidden = false;
+				err.textContent = e instanceof Error ? e.message : 'Could not decode this message.';
+				out.hidden = true;
+				warn.replaceChildren();
+				byId('sm-steps').textContent = '';
+			}
+		};
+
+		input.addEventListener('input', render);
+		copyButton(byId('sm-copy'), () => xmlText);
+		render();
+	});
+</script>
+
+<style>
+	.sm,
+	.sm-out {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.sm-out[hidden] {
+		display: none;
+	}
+	.sm-kind {
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 600;
+	}
+	.sm-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.sm-warn {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.sm-warn :global(li) {
+		padding: 10px 14px;
+		border-radius: 10px;
+		font-size: 14px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+	}
+	.sm-warn :global(li.bad) {
+		color: var(--warn);
+		background: var(--warn-bg);
+		border-color: transparent;
+		font-weight: 600;
+	}
+	.sm-warn :global(li.warn) {
+		color: var(--warn);
+	}
+	.sm-dl {
+		margin: 0;
+		padding: 10px 14px 14px;
+		display: grid;
+		gap: 8px;
+	}
+	.sm-dl :global(.sm-row) {
+		display: grid;
+		grid-template-columns: minmax(110px, 160px) 1fr;
+		gap: 10px;
+		font-size: 14px;
+	}
+	.sm-dl :global(dt) {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+		padding-top: 2px;
+	}
+	.sm-dl :global(dd) {
+		margin: 0;
+		min-width: 0;
+		font-family: var(--mono);
+		font-size: 13px;
+		overflow-wrap: anywhere;
+	}
+	.sm-dl :global(dd.bad) {
+		color: var(--warn);
+		font-weight: 700;
+	}
+	.sm-scroll {
+		overflow-x: auto;
+	}
+	.sm-scroll:focus-visible,
+	.sm-xml:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	.sm-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 13px;
+	}
+	.sm-table th,
+	.sm-table :global(td) {
+		padding: 6px 14px;
+		border-bottom: 1px solid var(--border);
+		text-align: left;
+		vertical-align: top;
+	}
+	.sm-table th {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.sm-table :global(.sm-name) {
+		font-family: var(--mono);
+		white-space: nowrap;
+	}
+	.sm-table :global(.sm-empty) {
+		color: var(--ink-soft);
+	}
+	.sm-xml {
+		max-height: 480px;
+		overflow: auto;
+		white-space: pre-wrap;
+	}
+</style>

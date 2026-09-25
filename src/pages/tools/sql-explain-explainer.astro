@@ -1,0 +1,737 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const pgText = `Sort  (cost=18234.52..18259.52 rows=10000 width=48) (actual time=412.337..498.120 rows=184233 loops=1)
+  Sort Key: o.created_at DESC
+  Sort Method: external merge  Disk: 9872kB
+  ->  Hash Join  (cost=1245.00..17570.13 rows=10000 width=48) (actual time=12.410..301.556 rows=184233 loops=1)
+        Hash Cond: (o.customer_id = c.id)
+        ->  Seq Scan on orders o  (cost=0.00..15406.00 rows=500000 width=40) (actual time=0.011..142.876 rows=498211 loops=1)
+              Filter: (status = 'paid'::text)
+              Rows Removed by Filter: 1789
+        ->  Hash  (cost=1120.00..1120.00 rows=10 width=16) (actual time=12.301..12.302 rows=9800 loops=1)
+              Buckets: 16384  Batches: 1  Memory Usage: 588kB
+              ->  Nested Loop  (cost=0.29..1120.00 rows=10 width=16) (actual time=0.030..10.880 rows=9800 loops=1)
+                    ->  Seq Scan on regions r  (cost=0.00..1.05 rows=1 width=4) (actual time=0.005..0.007 rows=1 loops=1)
+                          Filter: (code = 'EU'::text)
+                    ->  Index Scan using customers_region_id_idx on customers c  (cost=0.29..1118.85 rows=10 width=20) (actual time=0.020..9.901 rows=9800 loops=1)
+                          Index Cond: (region_id = r.id)
+Planning Time: 0.412 ms
+Execution Time: 512.904 ms`;
+---
+
+<ToolShell
+	slug="sql-explain-explainer"
+	title="SQL EXPLAIN Explainer"
+	description="Paste a Postgres EXPLAIN (ANALYZE) or MySQL EXPLAIN plan, as text, table or JSON, and see the plan tree with cost and time bars and plain-English advice on the slow parts."
+>
+	<div class="se" id="se-tool">
+		<div class="toolbar">
+			<div class="chips" id="se-samples" aria-label="Load a sample">
+				<button data-value="pg-text" aria-pressed="true">
+					Postgres text
+				</button>
+				<button data-value="pg-json" aria-pressed="false">
+					Postgres JSON
+				</button>
+				<button data-value="my-table" aria-pressed="false">
+					MySQL table
+				</button>
+				<button data-value="my-json" aria-pressed="false">
+					MySQL JSON
+				</button>
+			</div>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="se-in-label">Plan</span>
+				<button class="btn" id="se-copy">
+					Copy findings
+				</button>
+			</div>
+			<textarea id="se-in" spellcheck="false" aria-labelledby="se-in-label">{pgText}</textarea>
+		</section>
+		<p class="error" id="se-error" hidden></p>
+		<div class="stats" id="se-stats"></div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Findings</span>
+				<span class="se-n" id="se-count"></span>
+			</div>
+			<ul class="se-findings" id="se-findings"></ul>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="se-tree-label">Plan tree</span>
+			</div>
+			<div class="se-scroll" tabindex="0" role="region" aria-labelledby="se-tree-label">
+				<ul class="se-tree" id="se-tree"></ul>
+			</div>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Flag = { title: string; advice: string };
+	type PlanNode = {
+		label: string;
+		kind: string;
+		relation?: string;
+		cost?: number;
+		time?: number;
+		est?: number;
+		actual?: number;
+		loops: number;
+		details: string[];
+		children: PlanNode[];
+		flags: Flag[];
+		never?: boolean;
+	};
+	type Plan = { format: string; root: PlanNode; planning?: number; execution?: number };
+
+	const node = (label: string): PlanNode => ({ label, kind: label, loops: 1, details: [], children: [], flags: [] });
+	const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)) ? Number(v) : undefined);
+
+	const SAMPLES: Record<string, string> = {
+		'pg-json': JSON.stringify(
+			[
+				{
+					Plan: {
+						'Node Type': 'Aggregate',
+						Strategy: 'Hashed',
+						'Total Cost': 24890.1,
+						'Plan Rows': 200,
+						'Actual Total Time': 845.2,
+						'Actual Rows': 187,
+						'Actual Loops': 1,
+						'Group Key': ['p.category_id'],
+						Plans: [
+							{
+								'Node Type': 'Nested Loop',
+								'Total Cost': 23100.4,
+								'Plan Rows': 120,
+								'Actual Total Time': 790.5,
+								'Actual Rows': 96400,
+								'Actual Loops': 1,
+								Plans: [
+									{
+										'Node Type': 'Seq Scan',
+										'Relation Name': 'order_items',
+										Alias: 'oi',
+										'Total Cost': 9800,
+										'Plan Rows': 400000,
+										'Actual Total Time': 180.3,
+										'Actual Rows': 402113,
+										'Actual Loops': 1,
+										Filter: '(quantity > 0)',
+									},
+									{
+										'Node Type': 'Index Scan',
+										'Relation Name': 'products',
+										'Index Name': 'products_pkey',
+										Alias: 'p',
+										'Total Cost': 0.42,
+										'Plan Rows': 1,
+										'Actual Total Time': 0.0012,
+										'Actual Rows': 0,
+										'Actual Loops': 402113,
+										'Index Cond': '(id = oi.product_id)',
+									},
+								],
+							},
+						],
+					},
+					'Planning Time': 0.9,
+					'Execution Time': 846.7,
+				},
+			],
+			null,
+			2,
+		),
+		'my-table': `+----+-------------+-------+------------+------+---------------+-------------+---------+-------------+--------+----------+----------------------------------------------+
+| id | select_type | table | partitions | type | possible_keys | key         | key_len | ref         | rows   | filtered | Extra                                        |
++----+-------------+-------+------------+------+---------------+-------------+---------+-------------+--------+----------+----------------------------------------------+
+|  1 | SIMPLE      | o     | NULL       | ALL  | idx_customer  | NULL        | NULL    | NULL        | 248130 |    10.00 | Using where; Using temporary; Using filesort |
+|  1 | SIMPLE      | c     | NULL       | ref  | PRIMARY       | PRIMARY     | 4       | shop.o.cid  |      1 |   100.00 | NULL                                         |
++----+-------------+-------+------------+------+---------------+-------------+---------+-------------+--------+----------+----------------------------------------------+`,
+		'my-json': JSON.stringify(
+			{
+				query_block: {
+					select_id: 1,
+					cost_info: { query_cost: '52110.40' },
+					ordering_operation: {
+						using_filesort: true,
+						nested_loop: [
+							{
+								table: {
+									table_name: 'orders',
+									access_type: 'ALL',
+									possible_keys: ['idx_status'],
+									rows_examined_per_scan: 248130,
+									rows_produced_per_join: 24813,
+									filtered: '10.00',
+									cost_info: { read_cost: '22410.20', eval_cost: '2481.30', prefix_cost: '24891.50' },
+									attached_condition: "(`shop`.`orders`.`status` = 'paid')",
+								},
+							},
+							{
+								table: {
+									table_name: 'order_items',
+									access_type: 'ALL',
+									rows_examined_per_scan: 61200,
+									rows_produced_per_join: 24813,
+									filtered: '0.10',
+									using_join_buffer: 'hash join',
+									cost_info: { read_cost: '1720.50', eval_cost: '2481.30', prefix_cost: '52110.40' },
+									attached_condition: '(`shop`.`order_items`.`order_id` = `shop`.`orders`.`id`)',
+								},
+							},
+						],
+					},
+				},
+			},
+			null,
+			2,
+		),
+	};
+
+	const relationOf = (label: string) => / on ([\w."]+)/.exec(label)?.[1]?.replace(/"/g, '');
+
+	const parsePgText = (text: string): Plan => {
+		const lines = text
+			.split('\n')
+			.map((l) => l.replace(/\s*\+\s*$/, '').replace(/^\s*\|\s?|\s*\|\s*$/g, ''))
+			.filter((l) => l.trim() && !/^\s*QUERY PLAN\s*$/i.test(l) && !/^[\s-]+$/.test(l) && !/^\s*\(\d+ rows?\)\s*$/.test(l));
+		const stack: { indent: number; n: PlanNode }[] = [];
+		let root: PlanNode | undefined;
+		let planning: number | undefined;
+		let execution: number | undefined;
+		const tree = lines.some((l) => /^\s*->/.test(l)) && !lines.some((l) => /\(cost=\d/.test(l) && !/^\s*->/.test(l)) ? 'mysql' : 'pg';
+		for (const line of lines) {
+			const pt = /^\s*Planning Time:\s*([\d.]+)/i.exec(line);
+			const et = /^\s*Execution Time:\s*([\d.]+)/i.exec(line);
+			if (pt) planning = Number(pt[1]);
+			if (et) execution = Number(et[1]);
+			if (pt || et) continue;
+			const isNode = /\((cost|actual)[= ]/.test(line) || /\(never executed\)/.test(line) || /^\s*->/.test(line);
+			if (isNode) {
+				const indent = line.search(/\S/);
+				const label = line
+					.replace(/^\s*->\s*/, '')
+					.replace(/\s*\((cost|actual)[^)]*\).*$/, '')
+					.replace(/\s*\(never executed\).*$/, '')
+					.trim();
+				const n = node(label);
+				n.kind = label.replace(/ (on|using) .*$/, '');
+				n.relation = relationOf(label);
+				const cost = /cost=([\d.e+]+)(?:\.\.([\d.e+]+))?\s+rows=([\d.e+]+)/.exec(line);
+				if (cost) {
+					n.cost = Number(cost[2] ?? cost[1]);
+					n.est = Number(cost[3]);
+				}
+				const act = /actual (?:time=([\d.]+)\.\.([\d.]+) )?rows=([\d.]+) loops=(\d+)/.exec(line);
+				if (act) {
+					if (act[2]) n.time = Number(act[2]);
+					n.actual = Number(act[3]);
+					n.loops = Number(act[4]);
+				}
+				n.never = /never executed/.test(line);
+				while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+				if (stack.length) stack[stack.length - 1].n.children.push(n);
+				else if (!root) root = n;
+				else {
+					const wrap = node('Plan');
+					wrap.children.push(root, n);
+					root = wrap;
+				}
+				stack.push({ indent, n });
+			} else if (stack.length) stack[stack.length - 1].n.details.push(line.trim());
+		}
+		if (!root) throw new Error('No plan nodes found. Paste the output of EXPLAIN or EXPLAIN ANALYZE.');
+		return { format: tree === 'mysql' ? 'MySQL EXPLAIN ANALYZE' : 'Postgres text', root, planning, execution };
+	};
+
+	const PG_DETAILS = [
+		'Sort Key',
+		'Sort Method',
+		'Group Key',
+		'Hash Cond',
+		'Merge Cond',
+		'Join Filter',
+		'Index Cond',
+		'Recheck Cond',
+		'Filter',
+		'Rows Removed by Filter',
+		'Workers Planned',
+	];
+
+	const fromPgJson = (p: Record<string, unknown>): PlanNode => {
+		const type = String(p['Node Type'] ?? 'Node');
+		const rel = p['Relation Name'] as string | undefined;
+		const idx = p['Index Name'] as string | undefined;
+		const alias = p['Alias'] && p['Alias'] !== rel ? ` ${p['Alias']}` : '';
+		const n = node(`${type}${idx ? ` using ${idx}` : ''}${rel ? ` on ${rel}${alias}` : ''}`);
+		n.kind = type;
+		n.relation = rel;
+		n.cost = num(p['Total Cost']);
+		n.est = num(p['Plan Rows']);
+		n.time = num(p['Actual Total Time']);
+		n.actual = num(p['Actual Rows']);
+		n.loops = num(p['Actual Loops']) ?? 1;
+		n.never = p['Actual Loops'] === 0;
+		for (const k of PG_DETAILS) if (p[k] !== undefined) n.details.push(`${k}: ${Array.isArray(p[k]) ? (p[k] as unknown[]).join(', ') : p[k]}`);
+		if (p['Sort Space Type'])
+			n.details.push(
+				`Sort Method: ${p['Sort Method'] ?? ''} ${p['Sort Space Type']}: ${p['Sort Space Used'] ?? '?'}kB`.replace('Sort Method:  ', 'Sort Method: '),
+			);
+		n.children = ((p['Plans'] as Record<string, unknown>[]) ?? []).map(fromPgJson);
+		return n;
+	};
+
+	const fromMyJson = (obj: Record<string, unknown>, label: string): PlanNode => {
+		const n = node(label);
+		const cost = obj['cost_info'] as Record<string, unknown> | undefined;
+		n.cost = num(cost?.['query_cost'] ?? cost?.['prefix_cost'] ?? cost?.['sort_cost']);
+		const ops: [string, string][] = [
+			['ordering_operation', 'Sort'],
+			['grouping_operation', 'Group'],
+			['duplicates_removal', 'Distinct'],
+			['windowing', 'Window'],
+			['buffer_result', 'Buffer'],
+		];
+		for (const [key, name] of ops) {
+			const op = obj[key] as Record<string, unknown> | undefined;
+			if (!op) continue;
+			const child = fromMyJson(op, name);
+			if (op['using_filesort']) child.details.push('Using filesort');
+			if (op['using_temporary_table']) child.details.push('Using temporary');
+			n.children.push(child);
+		}
+		const tableNode = (t: Record<string, unknown>) => {
+			const access = String(t['access_type'] ?? '?');
+			const tn = node(
+				`${access === 'ALL' ? 'Full table scan' : access === 'index' ? 'Full index scan' : `${access} access`} on ${t['table_name']}${t['key'] ? ` using ${t['key']}` : ''}`,
+			);
+			tn.kind = access;
+			tn.relation = String(t['table_name']);
+			tn.est = num(t['rows_examined_per_scan']);
+			const c = t['cost_info'] as Record<string, unknown> | undefined;
+			tn.cost = num(c?.['prefix_cost'] ?? c?.['read_cost']);
+			if (t['possible_keys']) tn.details.push(`Possible keys: ${(t['possible_keys'] as string[]).join(', ')}`);
+			if (t['key']) tn.details.push(`Key: ${t['key']}`);
+			if (t['filtered']) tn.details.push(`Filtered: ${t['filtered']}%`);
+			if (t['attached_condition']) tn.details.push(`Condition: ${t['attached_condition']}`);
+			if (t['using_join_buffer']) tn.details.push(`Using join buffer (${t['using_join_buffer']})`);
+			if (t['using_filesort']) tn.details.push('Using filesort');
+			if (t['using_temporary_table']) tn.details.push('Using temporary');
+			const sub = t['materialized_from_subquery'] as Record<string, unknown> | undefined;
+			if (sub?.['query_block']) tn.children.push(fromMyJson(sub['query_block'] as Record<string, unknown>, 'Derived table'));
+			return tn;
+		};
+		if (obj['table']) n.children.push(tableNode(obj['table'] as Record<string, unknown>));
+		if (Array.isArray(obj['nested_loop'])) {
+			const loop = node('Nested loop join');
+			loop.kind = 'Nested Loop';
+			for (const item of obj['nested_loop'] as Record<string, unknown>[])
+				if (item['table']) loop.children.push(tableNode(item['table'] as Record<string, unknown>));
+			loop.cost = loop.children.reduce((m, c) => Math.max(m, c.cost ?? 0), 0) || undefined;
+			n.children.push(loop);
+		}
+		for (const key of ['attached_subqueries', 'optimized_away_subqueries']) {
+			const subs = obj[key];
+			if (Array.isArray(subs))
+				for (const s of subs as Record<string, unknown>[])
+					if (s['query_block']) n.children.push(fromMyJson(s['query_block'] as Record<string, unknown>, 'Subquery'));
+		}
+		if (n.cost === undefined) n.cost = n.children.reduce((m, c) => Math.max(m, c.cost ?? 0), 0) || undefined;
+		return n;
+	};
+
+	const parseMyTable = (text: string): Plan => {
+		const rows = text
+			.split('\n')
+			.filter((l) => l.trim() && !/^\s*\+[-+]+\+\s*$/.test(l))
+			.map((l) => (l.includes('|') ? l.replace(/^\s*\||\|\s*$/g, '').split('|') : l.split('\t')).map((c) => c.trim()));
+		const head = rows.shift()?.map((h) => h.toLowerCase()) ?? [];
+		const col = (r: string[], name: string) => {
+			const v = r[head.indexOf(name)];
+			return v === undefined || v === 'NULL' ? '' : v;
+		};
+		const root = node(rows.length > 1 ? 'Nested loop join' : 'Query');
+		root.kind = rows.length > 1 ? 'Nested Loop' : 'Query';
+		for (const r of rows) {
+			const type = col(r, 'type');
+			const table = col(r, 'table');
+			const key = col(r, 'key');
+			const n = node(
+				`${type === 'ALL' ? 'Full table scan' : type === 'index' ? 'Full index scan' : `${type || '?'} access`} on ${table}${key ? ` using ${key}` : ''}`,
+			);
+			n.kind = type;
+			n.relation = table;
+			n.est = num(col(r, 'rows'));
+			if (col(r, 'select_type') && col(r, 'select_type') !== 'SIMPLE') n.details.push(`Select type: ${col(r, 'select_type')}`);
+			if (col(r, 'possible_keys')) n.details.push(`Possible keys: ${col(r, 'possible_keys')}`);
+			if (col(r, 'ref')) n.details.push(`Ref: ${col(r, 'ref')}`);
+			if (col(r, 'filtered')) n.details.push(`Filtered: ${col(r, 'filtered')}%`);
+			col(r, 'extra')
+				.split(';')
+				.map((s) => s.trim())
+				.filter(Boolean)
+				.forEach((e) => n.details.push(e));
+			n.cost = n.est;
+			root.children.push(n);
+		}
+		if (!root.children.length) throw new Error('No rows found in the EXPLAIN table.');
+		if (rows.length === 1) return { format: 'MySQL table', root: root.children[0] };
+		root.cost = Math.max(...root.children.map((c) => c.cost ?? 0));
+		return { format: 'MySQL table', root };
+	};
+
+	const parse = (text: string): Plan => {
+		const t = text.trim();
+		if (!t) throw new Error('Paste an EXPLAIN plan to analyse it.');
+		if (t.startsWith('{') || t.startsWith('[')) {
+			const data = JSON.parse(t);
+			const first = Array.isArray(data) ? data[0] : data;
+			if (first?.['Plan'])
+				return { format: 'Postgres JSON', root: fromPgJson(first['Plan']), planning: num(first['Planning Time']), execution: num(first['Execution Time']) };
+			if (first?.['query_block']) {
+				const root = fromMyJson(first['query_block'], 'Query');
+				return { format: 'MySQL JSON', root: root.children.length === 1 && root.cost === root.children[0].cost ? root.children[0] : root };
+			}
+			throw new Error('Unrecognised JSON plan. Expected Postgres EXPLAIN (FORMAT JSON) or MySQL EXPLAIN FORMAT=JSON.');
+		}
+		if (/\|\s*select_type\s*\|/i.test(t) || /^id\tselect_type/i.test(t)) return parseMyTable(t);
+		return parsePgText(t);
+	};
+
+	const fmt = (v: number) => (v >= 100 ? Math.round(v).toLocaleString('en-US') : String(Math.round(v * 1000) / 1000));
+	const total = (n: PlanNode) => (n.actual !== undefined ? n.actual * n.loops : undefined);
+
+	const analyse = (n: PlanNode, isMy: boolean) => {
+		const flag = (title: string, advice: string) => n.flags.push({ title, advice });
+		const detail = n.details.join('\n');
+		const rows = total(n) ?? n.est ?? 0;
+		if (n.est !== undefined && n.actual !== undefined && !n.never) {
+			const est = Math.max(n.est, 1);
+			const act = Math.max(n.actual, 1);
+			const ratio = act / est;
+			if (ratio >= 10 || ratio <= 0.1)
+				flag(
+					`Row estimate off by ${fmt(ratio >= 1 ? ratio : 1 / ratio)}× (${fmt(n.est)} estimated, ${fmt(n.actual)} actual)`,
+					`The planner ${ratio >= 1 ? 'underestimated' : 'overestimated'} this step, so it may have picked the wrong join or scan. Run ANALYZE${n.relation ? ` ${n.relation}` : ''}, raise the statistics target on the filtered columns, or add extended statistics for correlated columns.`,
+				);
+		}
+		if (/^Seq Scan|^Parallel Seq Scan/.test(n.kind) && rows >= 10000) {
+			const removed = /Rows Removed by Filter: (\d+)/.exec(detail);
+			const filter = /Filter: (.*)/.exec(detail);
+			flag(
+				`Sequential scan reads ${fmt(rows + (removed ? Number(removed[1]) : 0))} rows of ${n.relation ?? 'a table'}`,
+				filter
+					? `Every row is read and checked against ${filter[1]}. If this query should return a small slice, add an index on those columns.`
+					: `The whole table is read. That is fine for reports over most rows; otherwise add a WHERE clause backed by an index.`,
+			);
+		}
+		if (isMy && n.kind === 'ALL' && rows >= 10000)
+			flag(
+				`Full table scan of ${n.relation} (${fmt(rows)} rows examined)`,
+				/Possible keys/.test(detail)
+					? 'A candidate index exists but was not used: the condition may not be selective, or a function or type cast on the column prevents it. Check the WHERE clause and consider a composite index.'
+					: 'No usable index. Add an index on the columns in the WHERE or JOIN condition.',
+			);
+		if (/external (merge|sort)|Disk: \d+|Sort Method: .*Disk/i.test(detail)) {
+			const disk = /Disk:\s*(\d+)\s*kB/i.exec(detail);
+			flag(
+				`Sort spilled to disk${disk ? ` (${fmt(Number(disk[1]) / 1024)} MB)` : ''}`,
+				`The rows did not fit in work_mem. Raise work_mem for this session (SET work_mem = '${disk ? Math.ceil((Number(disk[1]) * 2) / 1024) : 64}MB'), return fewer rows, or add an index matching the ORDER BY so no sort is needed.`,
+			);
+		}
+		if (/Using filesort/.test(detail))
+			flag(
+				'Using filesort',
+				'MySQL sorts the rows after reading them. An index that matches the ORDER BY columns, in order, lets it read rows already sorted.',
+			);
+		if (/Using temporary/.test(detail))
+			flag('Using temporary table', 'A temporary table is built for GROUP BY, DISTINCT or UNION. Index the grouped columns or simplify the query to avoid it.');
+		if (/Using join buffer/.test(detail))
+			flag(`Join on ${n.relation} has no index`, `Rows are matched through a join buffer. Add an index on the join column of ${n.relation}.`);
+		if (/^Nested Loop/i.test(n.kind) || /^Nested loop/i.test(n.label)) {
+			const inner = n.children[1];
+			const outer = n.children[0];
+			const loops = inner?.loops ?? 1;
+			const outerRows = outer ? (total(outer) ?? outer.est ?? 0) : 0;
+			if (loops >= 1000 || outerRows >= 1000 || rows >= 5000)
+				flag(
+					`Nested loop over ${fmt(Math.max(loops, outerRows, rows))} rows`,
+					`The inner side runs once per outer row${loops > 1 ? ` (${fmt(loops)} times here)` : ''}. With this many rows a hash join is usually faster: check the row estimates, and make sure the join column${inner?.relation ? ` on ${inner.relation}` : ''} is indexed.`,
+				);
+		}
+		n.children.forEach((c) => analyse(c, isMy));
+	};
+
+	const walk = (n: PlanNode, fn: (n: PlanNode, depth: number) => void, depth = 0) => {
+		fn(n, depth);
+		n.children.forEach((c) => walk(c, fn, depth + 1));
+	};
+
+	const el = (tag: string, cls: string, text?: string) => {
+		const e = document.createElement(tag);
+		if (cls) e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		return e;
+	};
+
+	onPage('se-tool', () => {
+		const input = byId<HTMLTextAreaElement>('se-in');
+		const samples = byId('se-samples');
+		SAMPLES['pg-text'] = input.value;
+		let summary = '';
+
+		const render = () => {
+			const err = byId('se-error');
+			let plan: Plan;
+			try {
+				plan = parse(input.value);
+				err.hidden = true;
+			} catch (e) {
+				err.textContent = e instanceof Error ? e.message : String(e);
+				err.hidden = false;
+				['se-stats', 'se-findings', 'se-tree'].forEach((id) => byId(id).replaceChildren());
+				byId('se-count').textContent = '';
+				summary = '';
+				return;
+			}
+			const isMy = plan.format.startsWith('MySQL');
+			analyse(plan.root, isMy);
+			const hasTime = plan.root.time !== undefined;
+			const metric = (n: PlanNode) => (hasTime ? (n.time ?? 0) * n.loops : (n.cost ?? n.est ?? 0));
+			let max = 0;
+			let count = 0;
+			const found: { n: PlanNode; f: Flag }[] = [];
+			walk(plan.root, (n) => {
+				count++;
+				max = Math.max(max, metric(n));
+				n.flags.forEach((f) => found.push({ n, f }));
+			});
+			byId('se-in-label').textContent = `Plan · ${plan.format}`;
+
+			const stat = (value: string, label: string) => {
+				const d = el('div', 'stat');
+				d.append(el('b', '', value), el('span', '', label));
+				return d;
+			};
+			const stats = [stat(String(count), 'Nodes'), stat(String(found.length), found.length === 1 ? 'Finding' : 'Findings')];
+			if (plan.execution !== undefined) stats.push(stat(`${fmt(plan.execution)} ms`, 'Execution time'));
+			if (plan.planning !== undefined) stats.push(stat(`${fmt(plan.planning)} ms`, 'Planning time'));
+			if (!hasTime && plan.root.cost !== undefined) stats.push(stat(fmt(plan.root.cost), 'Total cost'));
+			byId('se-stats').replaceChildren(...stats);
+
+			byId('se-count').textContent = found.length ? `${found.length} to review` : 'none';
+			byId('se-findings').replaceChildren(
+				...(found.length
+					? found.map(({ n, f }) => {
+							const li = el('li', 'se-finding');
+							li.append(el('strong', '', f.title), el('code', 'se-where', n.label), el('p', '', f.advice));
+							return li;
+						})
+					: [el('li', 'se-ok', 'No obvious problems: estimates are close and nothing scans, sorts or loops excessively.')]),
+			);
+
+			const build = (n: PlanNode): HTMLLIElement => {
+				const li = el('li', 'se-item') as HTMLLIElement;
+				const box = el('div', `se-node${n.flags.length ? ' se-flagged' : ''}${n.never ? ' se-never' : ''}`);
+				const head = el('div', 'se-head');
+				head.append(el('span', 'se-label', n.label));
+				const m = metric(n);
+				const metrics: string[] = [];
+				if (n.time !== undefined) metrics.push(`${fmt(n.time * n.loops)} ms`);
+				if (n.cost !== undefined) metrics.push(`cost ${fmt(n.cost)}`);
+				if (n.est !== undefined) metrics.push(`${fmt(n.est)} est`);
+				if (n.actual !== undefined) metrics.push(`${fmt(n.actual)} actual`);
+				if (n.loops > 1) metrics.push(`× ${fmt(n.loops)} loops`);
+				if (n.never) metrics.push('never executed');
+				head.append(el('span', 'se-metrics', metrics.join(' · ')));
+				const bar = el('div', 'se-bar');
+				bar.setAttribute('aria-hidden', 'true');
+				const fill = el('i', '');
+				fill.style.width = `${max ? Math.max(1, (m / max) * 100) : 0}%`;
+				bar.append(fill);
+				box.append(head, bar);
+				if (n.details.length) box.append(el('pre', 'se-details', n.details.join('\n')));
+				n.flags.forEach((f) => box.append(el('p', 'se-flag', f.title)));
+				li.append(box);
+				if (n.children.length) {
+					const ul = el('ul', 'se-tree');
+					n.children.forEach((c) => ul.append(build(c)));
+					li.append(ul);
+				}
+				return li;
+			};
+			byId('se-tree-label').textContent = `Plan tree · bars show ${hasTime ? 'inclusive time' : plan.root.cost !== undefined ? 'cost' : 'rows'}`;
+			byId('se-tree').replaceChildren(build(plan.root));
+
+			const lines: string[] = [];
+			walk(plan.root, (n, d) =>
+				lines.push(`${'  '.repeat(d)}${n.label}${n.flags.length ? `  [${n.flags.length} finding${n.flags.length > 1 ? 's' : ''}]` : ''}`),
+			);
+			summary = [
+				`${plan.format} plan, ${count} nodes${plan.execution !== undefined ? `, ${fmt(plan.execution)} ms` : ''}`,
+				'',
+				...found.map(({ n, f }) => `- ${f.title} (${n.label}): ${f.advice}`),
+				'',
+				...lines,
+			].join('\n');
+		};
+
+		samples.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
+			b.addEventListener('click', () => {
+				samples.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+				input.value = SAMPLES[b.dataset.value ?? ''] ?? '';
+				render();
+			}),
+		);
+		input.addEventListener('input', render);
+		copyButton(byId('se-copy'), () => summary);
+		render();
+	});
+</script>
+
+<style>
+	.se {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	#se-in {
+		min-height: 260px;
+		white-space: pre;
+		word-break: normal;
+		overflow-x: auto;
+	}
+	.se-n,
+	.se :global(.se-n) {
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 600;
+	}
+	.se-findings {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.se :global(.se-finding),
+	.se :global(.se-ok) {
+		padding: 12px 14px;
+		border-bottom: 1px solid var(--border);
+		font-size: 14px;
+	}
+	.se :global(.se-finding) {
+		border-left: 4px solid var(--warn);
+	}
+	.se :global(.se-ok) {
+		color: var(--ok);
+	}
+	.se :global(.se-finding strong) {
+		display: block;
+		color: var(--warn);
+	}
+	.se :global(.se-where) {
+		display: block;
+		margin-top: 2px;
+		font-family: var(--mono);
+		font-size: 12px;
+		color: var(--ink-soft);
+		word-break: break-all;
+	}
+	.se :global(.se-finding p) {
+		margin: 6px 0 0;
+		line-height: 1.5;
+	}
+	.se-scroll {
+		overflow-x: auto;
+		padding: 12px 14px;
+	}
+	.se-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: -2px;
+	}
+	.se :global(.se-tree) {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		min-width: 280px;
+	}
+	.se :global(.se-tree .se-tree) {
+		margin-left: 10px;
+		padding-left: 12px;
+		border-left: 2px solid var(--border);
+	}
+	.se :global(.se-item) {
+		padding-top: 8px;
+	}
+	.se :global(.se-node) {
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 8px 10px;
+		background: var(--surface);
+	}
+	.se :global(.se-node.se-flagged) {
+		border-color: var(--warn);
+	}
+	.se :global(.se-node.se-never) {
+		opacity: 0.7;
+	}
+	.se :global(.se-head) {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		gap: 4px 12px;
+	}
+	.se :global(.se-label) {
+		font-weight: 700;
+		font-size: 13.5px;
+		word-break: break-word;
+	}
+	.se :global(.se-metrics) {
+		font-family: var(--mono);
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.se :global(.se-bar) {
+		height: 6px;
+		margin-top: 6px;
+		border-radius: 999px;
+		background: var(--surface-2);
+		overflow: hidden;
+	}
+	.se :global(.se-bar i) {
+		display: block;
+		height: 100%;
+		border-radius: 999px;
+		background: var(--accent-strong);
+	}
+	.se :global(.se-flagged .se-bar i) {
+		background: var(--warn);
+	}
+	.se :global(.se-details) {
+		margin: 6px 0 0;
+		font-family: var(--mono);
+		font-size: 12px;
+		color: var(--ink-soft);
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+	.se :global(.se-flag) {
+		margin: 6px 0 0;
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--warn);
+		background: var(--warn-bg);
+		border-radius: 6px;
+		padding: 2px 8px;
+		display: inline-block;
+		margin-right: 6px;
+	}
+</style>

@@ -1,0 +1,277 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `[
+  {
+    "id": "7f3c2a9e-4b1d-4c8e-9a6f-2d5e8b1c0a47",
+    "email": "ada@example.com",
+    "name": "Ada Lovelace",
+    "age": 36,
+    "balance": 1250.5,
+    "verified": true,
+    "website": "https://ada.dev",
+    "createdAt": "2026-03-14T09:26:53Z",
+    "birthday": "1815-12-10",
+    "tags": ["admin", "beta"],
+    "address": { "street": "12 St James's Square", "city": "London", "zip": "SW1Y 4JH" },
+    "orders": [{ "id": 1042, "total": 99.9, "placedAt": "2026-09-01T12:00:00Z" }]
+  },
+  {
+    "id": "0b8d6e21-93f4-4a7c-b5e2-6c1f9d3a8e05",
+    "email": "grace@example.com",
+    "name": "Grace Hopper",
+    "age": 45,
+    "balance": 80,
+    "verified": false,
+    "website": null,
+    "createdAt": "2026-05-02T17:03:11Z",
+    "tags": [],
+    "address": { "street": "1 Navy Yard", "city": "Arlington" },
+    "orders": []
+  }
+]`;
+---
+
+<ToolShell
+	slug="json-to-openapi-schema"
+	title="JSON to OpenAPI Schema"
+	description="Paste one or more JSON samples and get an OpenAPI 3.1 component or JSON Schema with types, required fields and formats like date-time, email, uuid and uri detected."
+>
+	<div class="jo" id="jo-tool">
+		<div class="toolbar">
+			<div class="seg" id="jo-target" aria-label="Target">
+				<button data-value="openapi" aria-pressed="true">
+					OpenAPI 3.1
+				</button>
+				<button data-value="jsonschema" aria-pressed="false">
+					JSON Schema
+				</button>
+			</div>
+			<div class="seg" id="jo-format" aria-label="Output format">
+				<button data-value="yaml" aria-pressed="true">
+					YAML
+				</button>
+				<button data-value="json" aria-pressed="false">
+					JSON
+				</button>
+			</div>
+			<label class="check">
+				<input type="checkbox" id="jo-samples" checked /> Top-level array is a list of samples
+			</label>
+			<label class="check">
+				<input type="checkbox" id="jo-extract" checked /> Extract nested objects
+			</label>
+			<label class="check">
+				<input type="checkbox" id="jo-examples" /> Include examples
+			</label>
+		</div>
+		<div class="jo-name">
+			<label for="jo-root">Schema name</label>
+			<input id="jo-root" value="User" spellcheck="false" autocomplete="off" />
+		</div>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">
+					<span id="jo-in-label">JSON sample</span>
+				</div>
+				<textarea id="jo-in" spellcheck="false" aria-labelledby="jo-in-label">{sample}</textarea>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span id="jo-out-label">Schema</span>
+					<button class="btn" id="jo-copy">
+						Copy
+					</button>
+				</div>
+				<pre class="out" id="jo-out" tabindex="0" aria-labelledby="jo-out-label"></pre>
+			</section>
+		</div>
+		<p class="error" id="jo-error" hidden></p>
+	</div>
+</ToolShell>
+
+<script>
+	import { stringify } from 'yaml';
+	import { pascal, singular } from '../../scripts/json-shape';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Schema = Record<string, unknown>;
+	type Ctx = { extract: boolean; examples: boolean; defs: Map<string, Schema>; prefix: string };
+
+	const FORMATS: [string, RegExp][] = [
+		['date-time', /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i],
+		['date', /^\d{4}-\d{2}-\d{2}$/],
+		['time', /^\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/i],
+		['email', /^[^\s@]+@[^\s@]+\.[^\s@]+$/],
+		['uuid', /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i],
+		['uri', /^[a-z][a-z0-9+.-]*:\/\/[^\s]+$/i],
+		['ipv4', /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/],
+	];
+
+	const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+	const uniqueName = (ctx: Ctx, base: string) => {
+		let name = base;
+		for (let i = 2; ctx.defs.has(name); i++) name = `${base}${i}`;
+		return name;
+	};
+
+	const infer = (values: unknown[], name: string, ctx: Ctx): Schema => {
+		const types = new Set<string>();
+		const strings: string[] = [];
+		const objects: Record<string, unknown>[] = [];
+		const arrays: unknown[][] = [];
+		for (const v of values) {
+			if (v === null) types.add('null');
+			else if (Array.isArray(v)) {
+				types.add('array');
+				arrays.push(v);
+			} else if (isObject(v)) {
+				types.add('object');
+				objects.push(v);
+			} else if (typeof v === 'string') {
+				types.add('string');
+				strings.push(v);
+			} else if (typeof v === 'boolean') types.add('boolean');
+			else if (typeof v === 'number') types.add(Number.isInteger(v) ? 'integer' : 'number');
+		}
+		if (types.has('number')) types.delete('integer');
+		const out: Schema = {};
+		const list = ['string', 'integer', 'number', 'boolean', 'object', 'array', 'null'].filter((t) => types.has(t));
+		if (!list.length) return {};
+		out['type'] = list.length === 1 ? list[0] : list;
+		if (strings.length) {
+			const fmt = FORMATS.find(([, re]) => strings.every((s) => re.test(s)));
+			if (fmt) out['format'] = fmt[0];
+		}
+		if (objects.length) {
+			const keys: string[] = [];
+			for (const o of objects) for (const k of Object.keys(o)) if (!keys.includes(k)) keys.push(k);
+			const props: Record<string, Schema> = {};
+			const required: string[] = [];
+			for (const k of keys) {
+				const present = objects.filter((o) => k in o);
+				if (present.length === objects.length) required.push(k);
+				props[k] = infer(
+					present.map((o) => o[k]),
+					k,
+					ctx,
+				);
+			}
+			const obj: Schema = { type: 'object' };
+			if (required.length) obj['required'] = required;
+			obj['properties'] = props;
+			if (ctx.extract && name !== '$root') {
+				const def = uniqueName(ctx, pascal(name));
+				ctx.defs.set(def, obj);
+				const others = list.filter((t) => t !== 'object');
+				const ref = { $ref: `${ctx.prefix}${def}` };
+				return others.length ? { oneOf: [ref, { type: others.length === 1 ? others[0] : others }] } : ref;
+			}
+			Object.assign(out, obj, { type: out['type'] });
+		}
+		if (arrays.length) {
+			const items = arrays.flat();
+			out['items'] = items.length ? infer(items, singular(name), ctx) : {};
+		}
+		if (ctx.examples && !objects.length && !arrays.length) {
+			const ex = values.find((v) => v !== null);
+			if (ex !== undefined) out['examples'] = [ex];
+		}
+		return out;
+	};
+
+	onPage('jo-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jo-in');
+		const rootName = byId<HTMLInputElement>('jo-root');
+		const asSamples = byId<HTMLInputElement>('jo-samples');
+		const extract = byId<HTMLInputElement>('jo-extract');
+		const examples = byId<HTMLInputElement>('jo-examples');
+		const error = byId('jo-error');
+		let target = 'openapi';
+		let format = 'yaml';
+
+		const render = () => {
+			let data: unknown;
+			try {
+				data = JSON.parse(input.value);
+				error.hidden = true;
+			} catch (e) {
+				error.textContent = `Invalid JSON: ${(e as Error).message}`;
+				error.hidden = false;
+				return;
+			}
+			const name = pascal(rootName.value.trim() || 'Root');
+			const samples = asSamples.checked && Array.isArray(data) ? data : [data];
+			const ctx: Ctx = {
+				extract: extract.checked,
+				examples: examples.checked,
+				defs: new Map(),
+				prefix: target === 'openapi' ? '#/components/schemas/' : '#/$defs/',
+			};
+			ctx.defs.set(name, {});
+			const root = infer(samples, '$root', ctx);
+			ctx.defs.delete(name);
+			let doc: Schema;
+			if (target === 'openapi') {
+				const schemas: Record<string, Schema> = { [name]: root };
+				ctx.defs.forEach((v, k) => (schemas[k] = v));
+				doc = { components: { schemas } };
+			} else {
+				doc = { $schema: 'https://json-schema.org/draft/2020-12/schema', title: name, ...root };
+				if (ctx.defs.size) doc['$defs'] = Object.fromEntries(ctx.defs);
+			}
+			byId('jo-out').textContent = format === 'yaml' ? stringify(doc, { lineWidth: 0 }) : JSON.stringify(doc, null, 2) + '\n';
+			const n = samples.length;
+			byId('jo-in-label').textContent = `JSON · ${n} ${n === 1 ? 'sample' : 'samples'}`;
+			byId('jo-out-label').textContent =
+				`${target === 'openapi' ? 'OpenAPI 3.1 component' : 'JSON Schema 2020-12'} · ${ctx.defs.size + 1} ${ctx.defs.size ? 'schemas' : 'schema'}`;
+		};
+
+		segmented(byId('jo-target'), (v) => ((target = v), render()));
+		segmented(byId('jo-format'), (v) => ((format = v), render()));
+		[asSamples, extract, examples].forEach((c) => c.addEventListener('change', render));
+		[input, rootName].forEach((c) => c.addEventListener('input', render));
+		copyButton(byId('jo-copy'), () => byId('jo-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.jo {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	#jo-in,
+	#jo-out {
+		min-height: 420px;
+	}
+	.jo-name {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px;
+	}
+	.jo-name label {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--ink-soft);
+	}
+	.jo-name input {
+		font-family: var(--mono);
+		font-size: 13px;
+		padding: 6px 10px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+		color: var(--ink);
+		min-width: 0;
+		width: 200px;
+		max-width: 100%;
+	}
+	.jo-name input:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 1px;
+	}
+</style>
