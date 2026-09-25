@@ -332,7 +332,7 @@ Single-key shortcuts are off while typing in a field. The tool catalogue is serv
 
 ## Contributing
 
-Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first, and report security problems as described in [SECURITY.md](SECURITY.md).
+Issues and pull requests are welcome. Ideas for new tools go through the [Suggest a tool](https://github.com/techmefr/kodilo/issues/new?template=tool-suggestion.yml) issue form, also linked from the site sidebar, search and 404 page. Read [CONTRIBUTING.md](CONTRIBUTING.md) first, and report security problems as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
