@@ -6,7 +6,7 @@ Live at **https://techmefr.github.io/kodilo/**
 
 ## What's in here
 
-**216 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
+**219 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
 
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
@@ -120,7 +120,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [Fake Data Generator](https://techmefr.github.io/kodilo/tools/fake-data-generator/) — Generate realistic fake records as JSON, CSV or SQL INSERT statements, with a seed for reproducible output.
 - [License Generator](https://techmefr.github.io/kodilo/tools/license-generator/) — Pick an open source license, enter the year and copyright holder, and get a ready LICENSE file with what it allows, requires and limits.
 
-### Converters (12)
+### Converters (13)
 
 - [Date/Time Converter](https://techmefr.github.io/kodilo/tools/date-time-converter/) — Convert between timestamps, ISO dates and time zones.
 - [Color Converter](https://techmefr.github.io/kodilo/tools/color-converter/) — Convert colors between HEX, RGB, HSL and more.
@@ -134,8 +134,9 @@ Live at **https://techmefr.github.io/kodilo/**
 - [SQL to TypeScript & Prisma](https://techmefr.github.io/kodilo/tools/sql-to-typescript/) — Turn CREATE TABLE statements into TypeScript interfaces and Prisma models.
 - [CSV Cleaner](https://techmefr.github.io/kodilo/tools/csv-cleaner/) — Trim cells, drop duplicate and empty rows, remove empty columns and sort CSV.
 - [SQL ↔ CSV Converter](https://techmefr.github.io/kodilo/tools/sql-csv-converter/) — Turn CSV into INSERT statements for four SQL dialects, or INSERT VALUES back into CSV.
+- [Protobuf & MessagePack Decoder](https://techmefr.github.io/kodilo/tools/protobuf-msgpack-decoder/) — Decode hex or base64 as MessagePack or raw protobuf, optionally with a .proto schema, and encode JSON to MessagePack.
 
-### Network (11)
+### Network (12)
 
 - [IPv4 Subnet Calculator](https://techmefr.github.io/kodilo/tools/ipv4-subnet-calculator/) — Calculate subnet ranges, masks and host counts.
 - [IPv4 Range Expander](https://techmefr.github.io/kodilo/tools/ipv4-range-expander/) — Expand an IPv4 range or CIDR into individual addresses.
@@ -148,6 +149,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [URL Parser](https://techmefr.github.io/kodilo/tools/url-parser/) — Split a URL into its parts and edit query parameters.
 - [HTTP Headers & Cookie Parser](https://techmefr.github.io/kodilo/tools/http-headers-parser/) — Paste raw request or response headers to see each one explained, with Cache-Control, CSP and Set-Cookie decoded and common mistakes flagged.
 - [CIDR Aggregator & Splitter](https://techmefr.github.io/kodilo/tools/cidr-aggregator/) — Merge IPv4 addresses, ranges and CIDRs into the smallest CIDR list, subtract exclusions, or split a network into equal subnets.
+- [HAR Viewer](https://techmefr.github.io/kodilo/tools/har-viewer/) — Open a .har capture to see a waterfall, sortable requests, headers, cookies and bodies, and export a sanitized copy.
 
 ### Validators (3)
 
@@ -207,7 +209,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [SQL to ER Diagram](https://techmefr.github.io/kodilo/tools/sql-er-diagram/) — Draw an ER diagram from CREATE TABLE statements, export Mermaid or SVG.
 - [OpenAPI Viewer & Validator](https://techmefr.github.io/kodilo/tools/openapi-viewer/) — Validate an OpenAPI 3.x or Swagger 2.0 spec and browse its endpoints by tag.
 
-### DevOps & Sysadmin (47)
+### DevOps & Sysadmin (48)
 
 - [Uptime / SLA Calculator](https://techmefr.github.io/kodilo/tools/uptime-sla-calculator/) — Turn 99.9% into allowed downtime per day, month and year, and back.
 - [Byte Size Converter](https://techmefr.github.io/kodilo/tools/byte-size-converter/) — B, KB, KiB, MB, MiB, GB, GiB, TB, TiB: decimal and binary units side by side.
@@ -256,6 +258,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [iptables Explainer](https://techmefr.github.io/kodilo/tools/iptables-explainer/) — Read iptables -L -n -v or iptables-save rules in plain English, chain by chain, with packet flow
 - [ps and top Explainer](https://techmefr.github.io/kodilo/tools/ps-top-explainer/) — Explain ps aux and top output: columns, process states and a sortable table of the heaviest processes
 - [Access Log Analyzer](https://techmefr.github.io/kodilo/tools/access-log-analyzer/) — Analyze nginx and Apache access logs: status codes, top IPs and URLs, traffic chart, errors and bots.
+- [Cron to systemd Timer](https://techmefr.github.io/kodilo/tools/cron-to-systemd-timer/) — Turn a cron expression into systemd .timer and .service units, preview next runs, and convert OnCalendar back to cron.
 
 ### Calculators (5)
 
