@@ -13,7 +13,7 @@ export default defineConfig({
 		trace: 'retain-on-failure',
 	},
 	projects: [
-		{ name: 'desktop', use: { ...devices['Desktop Chrome'] }, testMatch: /smoke|tools|pwa-share|experience/ },
+		{ name: 'desktop', use: { ...devices['Desktop Chrome'] }, testMatch: /smoke|tools|pwa-share|experience|categories/ },
 		{ name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /smoke/ },
 		{ name: 'dark', use: { ...devices['Desktop Chrome'], colorScheme: 'dark' }, testMatch: /smoke/ },
 		{ name: 'a11y', use: { ...devices['Desktop Chrome'] }, testMatch: /a11y/ },

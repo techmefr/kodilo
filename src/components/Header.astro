@@ -1,7 +1,8 @@
 ---
 import Logo from './Logo.astro';
-import { builtCategories as categories } from '../data/tools';
+import { builtCategories as categories, categorySlug } from '../data/tools';
 import { categoryId } from '../scripts/experience';
+import { sitePath, toolRequestUrl } from '../scripts/seo';
 import { icon, iconUse } from '../scripts/icons';
 
 interface Props {
@@ -75,6 +76,12 @@ const shortcuts = [
 			</a>
 		))}
 	</nav>
+	<p class="side-links">
+		<a href={sitePath('categories/')}>All categories</a>
+		<a href={toolRequestUrl} target="_blank" rel="noopener">
+			Suggest a tool
+		</a>
+	</p>
 	{categories.map((c, i) => (
 		<div class="mega" id={`mega-${i}`} data-category={c.name} role="region" aria-label={`${c.name} tools`} hidden>
 			<div class="mega-intro">
@@ -82,7 +89,10 @@ const shortcuts = [
 				<div>
 					<b>{c.name}</b>
 					<p>
-						{c.blurb} · {c.tools.length} tool{c.tools.length === 1 ? '' : 's'}
+						{c.blurb} ·{' '}
+						<a class="mega-all" href={sitePath(`categories/${categorySlug(c.name)}/`)}>
+							All {c.tools.length} tool{c.tools.length === 1 ? '' : 's'}
+						</a>
 					</p>
 				</div>
 			</div>
@@ -374,6 +384,24 @@ const shortcuts = [
 		margin: 2px 0 0;
 		font-size: 13px;
 		color: var(--ink-soft);
+	}
+	.mega-all {
+		color: var(--accent-strong);
+	}
+	.side-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 12px;
+		margin: auto 0 0;
+		padding: 8px 8px 0;
+		font-size: 12px;
+	}
+	.side-links a {
+		color: var(--ink-soft);
+	}
+	.side-links a:hover,
+	.side-links a:focus-visible {
+		color: var(--accent-strong);
 	}
 	.mega-grid {
 		list-style: none;

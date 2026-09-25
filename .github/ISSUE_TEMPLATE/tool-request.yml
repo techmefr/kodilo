@@ -1,9 +1,10 @@
 name: Tool request
 description: Suggest a new tool or an improvement to an existing one.
+title: '[Tool] '
 labels: [enhancement]
 body:
   - type: input
-    id: name
+    id: tool-name
     attributes:
       label: Tool name
       placeholder: TOML Formatter
@@ -12,14 +13,21 @@ body:
   - type: textarea
     id: problem
     attributes:
-      label: What would you use it for?
+      label: Problem it solves
+      description: What you would use it for and why the existing tools do not cover it.
     validations:
       required: true
   - type: textarea
-    id: details
+    id: example
     attributes:
-      label: Inputs, outputs and options
-      description: What goes in, what comes out, and the options that matter.
+      label: Example input and output
+      description: What goes in, what comes out, and the options that matter. Never paste real secrets or personal data.
+      render: text
+  - type: textarea
+    id: similar
+    attributes:
+      label: Similar tools
+      description: Links to tools elsewhere that do something close, if any.
   - type: checkboxes
     id: offline
     attributes:

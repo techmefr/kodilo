@@ -1,0 +1,91 @@
+---
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import Header from '../../components/Header.astro';
+import { builtCategories, categorySlug } from '../../data/tools';
+import Base from '../../layouts/Base.astro';
+import { iconUse } from '../../scripts/icons';
+import { breadcrumbLd, itemListLd, sitePath } from '../../scripts/seo';
+
+const total = builtCategories.reduce((a, c) => a + c.tools.length, 0);
+const crumbs = [
+	{ name: 'Home', path: '' },
+	{ name: 'Categories', path: 'categories/' },
+];
+const jsonLd = [
+	breadcrumbLd(Astro.site, crumbs),
+	itemListLd(
+		Astro.site,
+		'Tool categories',
+		builtCategories.map((c) => ({ name: `${c.name} tools`, path: `categories/${categorySlug(c.name)}/` })),
+	),
+];
+---
+
+<Base
+	title="All tool categories — kodilo"
+	description={`Browse ${total} free developer tools across ${builtCategories.length} categories. No sign-up, and nothing leaves your browser.`}
+	jsonLd={jsonLd}
+>
+	<div class="shell">
+		<Header />
+		<main class="home category-page" id="main" tabindex="-1">
+			<Breadcrumbs crumbs={crumbs} />
+			<section class="home-cat" aria-labelledby="categories-title">
+				<h1 id="categories-title">Tool categories</h1>
+				<p class="category-intro">
+					{total} open-source developer tools, grouped in {builtCategories.length} categories. Every tool runs in your browser.
+				</p>
+				<ul class="tool-grid">
+					{builtCategories.map((c) => (
+						<li>
+							<a href={sitePath(`categories/${categorySlug(c.name)}/`)}>
+								<i class="t-icon" set:html={iconUse(c.icon)} />
+								<div class="t-text">
+									<b>{c.name}</b>
+									<span>
+										{c.blurb} · {c.tools.length} tool{c.tools.length === 1 ? '' : 's'}
+									</span>
+								</div>
+							</a>
+						</li>
+					))}
+				</ul>
+			</section>
+		</main>
+	</div>
+</Base>
+
+<style>
+	.shell {
+		display: flex;
+		min-height: 100vh;
+	}
+	@media (max-width: 760px) {
+		.shell {
+			display: block;
+		}
+	}
+	.category-page {
+		flex: 1;
+		min-width: 0;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 32px 16px 64px;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	h1 {
+		margin: 0;
+		font-size: 30px;
+		font-weight: 800;
+		letter-spacing: -0.02em;
+	}
+	.category-intro {
+		margin: 8px 0 20px;
+		max-width: 70ch;
+		color: var(--ink-soft);
+		font-size: 15px;
+		line-height: 1.5;
+	}
+</style>
