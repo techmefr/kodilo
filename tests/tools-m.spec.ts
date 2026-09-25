@@ -71,8 +71,8 @@ test('json to openapi schema detects formats and required', async ({ page }) => 
 	await expect(out).toContainText('format: date-time');
 	await expect(out).toContainText('$ref: "#/components/schemas/Address"');
 	await expect(out).toContainText('- "null"');
-	await page.getByRole('button', { name: 'JSON Schema' }).click();
-	await page.getByRole('button', { name: 'JSON', exact: true }).click();
+	await page.getByRole('radio', { name: 'JSON Schema' }).click();
+	await page.getByRole('radio', { name: 'JSON', exact: true }).click();
 	const json = JSON.parse((await out.textContent()) ?? '');
 	expect(json.$schema).toBe('https://json-schema.org/draft/2020-12/schema');
 	expect(json.required).not.toContain('birthday');

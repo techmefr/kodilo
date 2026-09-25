@@ -1,0 +1,17 @@
+{
+	"name": "Kodilo",
+	"short_name": "Kodilo",
+	"description": "Open-source tools for developers. No sign-up, no account, nothing leaves your browser.",
+	"id": "/kodilo/",
+	"start_url": "/kodilo/",
+	"scope": "/kodilo/",
+	"display": "standalone",
+	"background_color": "#f7f6f9",
+	"theme_color": "#6d4fe0",
+	"icons": [
+		{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+		{ "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+		{ "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+		{ "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+	]
+}

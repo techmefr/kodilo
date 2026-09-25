@@ -30,7 +30,7 @@ import ToolShell from '../../components/ToolShell.astro';
 	<div class="fields">
 		<div class="field wide">
 			<label for="hmac-key">Secret key</label>
-			<input id="hmac-key" spellcheck="false" value="whsec_example_secret" />
+			<input id="hmac-key" data-no-share spellcheck="false" value="whsec_example_secret" />
 		</div>
 	</div>
 	<section class="panel">
@@ -49,7 +49,7 @@ import ToolShell from '../../components/ToolShell.astro';
 	<div class="fields">
 		<div class="field wide" id="hmac-verify-field">
 			<label for="hmac-verify">Compare with an expected signature</label>
-			<input id="hmac-verify" spellcheck="false" placeholder="Paste the signature you received" />
+			<input id="hmac-verify" data-no-share spellcheck="false" placeholder="Paste the signature you received" />
 			<span class="field-note" id="hmac-verify-note"></span>
 		</div>
 	</div>

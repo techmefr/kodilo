@@ -2,7 +2,8 @@
 import Header from '../components/Header.astro';
 import { builtCategories as categories } from '../data/tools';
 import Base from '../layouts/Base.astro';
-import { icon } from '../scripts/icons';
+import { categoryId } from '../scripts/experience';
+import { icon, iconUse } from '../scripts/icons';
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const total = categories.reduce((a, c) => a + c.tools.length, 0);
@@ -11,7 +12,7 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 <Base title="kodilo — Developer tools, no sign-up">
 	<div class="shell">
 		<Header />
-		<main class="home">
+		<main class="home" id="main" tabindex="-1">
 			<section class="hero">
 				<h1>kodilo</h1>
 				<p>{total} open-source tools for developers. No sign-up, no account, nothing leaves your browser.</p>
@@ -21,10 +22,25 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 					<kbd>⌘K</kbd>
 				</button>
 			</section>
+			<section class="home-cat home-mine" id="favorites" tabindex="-1" aria-labelledby="favorites-title" hidden>
+				<h2 id="favorites-title">
+					<span class="home-icon" set:html={icon('star')} />
+					Pinned
+					<small>Press f on a tool to pin it</small>
+				</h2>
+				<ul id="favorites-list"></ul>
+			</section>
+			<section class="home-cat home-mine" id="recents" aria-labelledby="recents-title" hidden>
+				<h2 id="recents-title">
+					<span class="home-icon" set:html={icon('history')} />
+					Recent
+				</h2>
+				<ul id="recents-list"></ul>
+			</section>
 			{categories.map((c) => (
-				<section class="home-cat">
+				<section class="home-cat" id={categoryId(c.name)}>
 					<h2>
-						<span class="home-icon" set:html={icon(c.icon)} />
+						<span class="home-icon" set:html={iconUse(c.icon)} />
 						{c.name}
 						<small>{c.blurb}</small>
 					</h2>
@@ -32,7 +48,7 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 						{c.tools.map((t) => (
 							<li>
 								<a href={`${base}tools/${t.slug}/`}>
-									<i class="t-icon" set:html={icon(t.icon ?? 'wrench')} />
+									<i class="t-icon" set:html={iconUse(t.icon ?? 'wrench')} />
 									<div class="t-text">
 										<b>{t.name}</b>
 										<span>{t.description}</span>
@@ -48,12 +64,43 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 </Base>
 
 <script>
-	document.addEventListener('astro:page-load', () => {
-		document.getElementById('hero-search')?.addEventListener('click', () => document.getElementById('search-open')?.click());
+	import { favorites, loadCatalogue, recents, STORE_EVENT, toolCard } from '../scripts/experience';
+	import { byId, onPage } from '../scripts/ui';
+
+	onPage('favorites', () => {
+		byId('hero-search').addEventListener('click', () => document.getElementById('search-open')?.click());
+		const render = async () => {
+			const pinned = favorites();
+			const recent = recents();
+			if (!pinned.length && !recent.length) {
+				byId('favorites').hidden = location.hash !== '#favorites';
+				byId('recents').hidden = true;
+				return;
+			}
+			let catalogue;
+			try {
+				catalogue = await loadCatalogue();
+			} catch {
+				return;
+			}
+			const bySlug = new Map(catalogue.tools.map((t) => [t.s, t]));
+			const fill = (id: string, slugs: string[]) => {
+				const entries = slugs.flatMap((s) => bySlug.get(s) ?? []);
+				byId(`${id}-list`).replaceChildren(...entries.map((t) => toolCard(t, catalogue.icons)));
+				byId(id).hidden = !entries.length;
+			};
+			fill('favorites', pinned);
+			fill('recents', recent);
+			if (location.hash === '#favorites') byId('favorites').hidden = false;
+			if (location.hash === '#favorites' && document.activeElement === document.body) byId('favorites').focus();
+		};
+		render();
+		window.addEventListener(STORE_EVENT, render);
+		document.addEventListener('astro:before-swap', () => window.removeEventListener(STORE_EVENT, render), { once: true });
 	});
 </script>
 
-<style>
+<style is:global>
 	.shell {
 		display: flex;
 		min-height: 100vh;
@@ -111,7 +158,7 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 		border-radius: 5px;
 		background: var(--surface-2);
 	}
-	.hero-search :global(svg) {
+	.hero-search svg {
 		width: 16px;
 		height: 16px;
 		display: block;
@@ -134,7 +181,7 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 		display: flex;
 		color: var(--accent-strong);
 	}
-	.home-icon :global(svg) {
+	.home-icon svg {
 		width: 18px;
 		height: 18px;
 	}
@@ -159,13 +206,14 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 		color: var(--ink);
 		text-decoration: none;
 	}
-	.home-cat a:hover {
+	.home-cat a:hover,
+	.home-cat a:focus-visible {
 		border-color: var(--accent-strong);
 	}
 	.home-cat b {
 		font-size: 14px;
 	}
-	.t-icon {
+	.home-cat .t-icon {
 		flex: none;
 		display: grid;
 		place-items: center;
@@ -175,11 +223,11 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 		background: color-mix(in srgb, var(--accent-strong) 12%, transparent);
 		color: var(--accent-strong);
 	}
-	.t-icon :global(svg) {
+	.home-cat .t-icon svg {
 		width: 17px;
 		height: 17px;
 	}
-	.t-text {
+	.home-cat .t-text {
 		display: flex;
 		flex-direction: column;
 		gap: 3px;

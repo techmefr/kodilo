@@ -17,7 +17,7 @@ test('access log analyzer summarizes, filters and supports custom formats', asyn
 	await page.locator('#al-q').fill('');
 	await page.locator('#al-in').fill('10.0.0.1|2026-09-24T10:00:00Z|GET /health HTTP/1.1|503\n10.0.0.2|2026-09-24T10:01:00Z|GET / HTTP/1.1|200');
 	await expect(page.locator('#al-error')).toBeVisible();
-	await page.getByRole('button', { name: 'Custom format' }).click();
+	await page.getByRole('radio', { name: 'Custom format' }).click();
 	await page.locator('#al-custom').fill('$remote_addr|$time_iso8601|$request|$status');
 	await expect(page.locator('#al-error')).toBeHidden();
 	await expect(page.locator('#al-stats .stat').first()).toContainText('2');
@@ -93,7 +93,7 @@ test('oauth helper builds a PKCE url and decodes callbacks', async ({ page }) =>
 test('ssh key generator creates keys that parse like ssh-keygen output', async ({ page }) => {
 	for (const type of ['Ed25519', 'RSA 2048']) {
 		await page.goto('tools/ssh-key-generator/');
-		if (type !== 'Ed25519') await page.getByRole('button', { name: type }).click();
+		if (type !== 'Ed25519') await page.getByRole('radio', { name: type }).click();
 		await expect(page.locator('#sg-status')).toContainText('ready', { timeout: 20000 });
 		const pub = (await page.locator('#sg-pub').textContent()) ?? '';
 		expect(pub).toMatch(type === 'Ed25519' ? /^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5\S+ ada@laptop$/ : /^ssh-rsa AAAAB3NzaC1yc2E\S+ ada@laptop$/);

@@ -37,7 +37,7 @@ test('helm converter escapes keys and round-trips', async ({ page }) => {
 	await expect(out).toContainText("--set 'ingress.hosts[0].paths[0].path=/'");
 	await expect(out).toContainText('--set-string env.DEBUG=false');
 	await expect(out).toContainText("--set 'env.FEATURE_FLAGS=search\\,checkout'");
-	await page.getByRole('button', { name: '--set → values.yaml' }).click();
+	await page.getByRole('radio', { name: '--set → values.yaml' }).click();
 	await page.locator('#hv-in').fill("helm install x y --set a.b=1,c[0]=z --set-string tag=007 --set 'k\\.io=v'");
 	await expect(out).toContainText('b: 1');
 	await expect(out).toContainText('- z');

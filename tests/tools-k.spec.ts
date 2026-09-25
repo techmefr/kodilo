@@ -15,12 +15,12 @@ test('log graph explainer renders the sample history', async ({ page }) => {
 test('rebase visualizer switches operations', async ({ page }) => {
 	await page.goto('tools/git-rebase-visualizer/');
 	await expect(page.locator('#rv-after [data-id="M"]')).toHaveCount(1);
-	await page.getByRole('button', { name: 'Rebase', exact: true }).click();
+	await page.getByRole('radio', { name: 'Rebase', exact: true }).click();
 	await expect(page.locator('#rv-after .rv-node.new')).toHaveCount(2);
 	await expect(page.locator('#rv-cmd')).toHaveText('git switch feature\ngit rebase main');
 	await page.locator('#rv-ff').check();
 	await expect(page.locator('#rv-cmd')).toContainText('--ff-only');
-	await page.getByRole('button', { name: 'Cherry-pick' }).click();
+	await page.getByRole('radio', { name: 'Cherry-pick' }).click();
 	await expect(page.locator('#rv-cmd')).toContainText('git cherry-pick');
 	await expect(page.locator('#rv-ff-wrap')).toBeHidden();
 });
@@ -33,7 +33,7 @@ test('gitattributes generator reacts to options', async ({ page }) => {
 	await expect(out).toContainText('*.sln');
 	await page.locator('#ga-lfs').uncheck();
 	await expect(out).toContainText('*.png             binary');
-	await page.getByRole('button', { name: 'Force LF' }).click();
+	await page.getByRole('radio', { name: 'Force LF' }).click();
 	await expect(out).toContainText('text=auto eol=lf');
 	await page.getByLabel('PHP').check();
 	await expect(out).toContainText('diff=php');
@@ -45,9 +45,9 @@ test('clip-path editor moves a point with the keyboard', async ({ page }) => {
 	await expect(css).toHaveText('clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);');
 	await page.getByRole('slider', { name: 'Point 1' }).press('ArrowDown');
 	await expect(css).toContainText('polygon(25% 1%');
-	await page.getByRole('button', { name: 'Circle' }).click();
+	await page.getByRole('radio', { name: 'Circle' }).click();
 	await expect(css).toHaveText('clip-path: circle(40% at 50% 50%);');
-	await page.getByRole('button', { name: 'Inset' }).click();
+	await page.getByRole('radio', { name: 'Inset' }).click();
 	await expect(css).toContainText('inset(15% 10% 15% 10% round 8px)');
 });
 
@@ -90,7 +90,7 @@ test('svg shape generator is deterministic per seed', async ({ page }) => {
 	await expect(svg).not.toHaveText(first!);
 	await page.locator('#sg-seed').fill('4217');
 	await expect(svg).toHaveText(first!);
-	await page.getByRole('button', { name: 'Blob' }).click();
+	await page.getByRole('radio', { name: 'Blob' }).click();
 	await expect(page.locator('#sg-stage path')).toHaveCount(1);
 	await expect(svg).toContainText('viewBox="0 0 400 400"');
 	await expect(page.locator('#sg-css')).toContainText('data:image/svg+xml');

@@ -1,7 +1,8 @@
 ---
 import Logo from './Logo.astro';
 import { builtCategories as categories } from '../data/tools';
-import { icon } from '../scripts/icons';
+import { categoryId } from '../scripts/experience';
+import { icon, iconUse } from '../scripts/icons';
 
 interface Props {
 	activeSlug?: string;
@@ -9,8 +10,17 @@ interface Props {
 
 const { activeSlug } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
-const index = categories.flatMap((c) => c.tools.map((t) => ({ n: t.name, d: t.description, c: c.name, u: `${base}tools/${t.slug}/` })));
-const total = index.length;
+const total = categories.reduce((a, c) => a + c.tools.length, 0);
+const shortcuts = [
+	{ keys: ['/'], alt: ['⌘', 'K'], label: 'Search tools' },
+	{ keys: ['g', 'h'], label: 'Go to the home page' },
+	{ keys: ['g', 'f'], label: 'Go to your pinned tools' },
+	{ keys: ['f'], label: 'Pin or unpin the current tool' },
+	{ keys: ['⌘', 'Enter'], label: 'Run the main action of the tool' },
+	{ keys: ['⌘', 'Shift', 'C'], label: 'Copy the first output' },
+	{ keys: ['?'], label: 'Show this help' },
+	{ keys: ['Esc'], label: 'Close a menu or dialog' },
+];
 ---
 
 <div class="mobile-bar">
@@ -26,16 +36,21 @@ const total = index.length;
 	</button>
 </div>
 
-<aside class="site-header" id="site-nav" transition:name="site-nav">
+<aside class="site-header" id="site-nav" data-active-slug={activeSlug} transition:name="site-nav">
 	<div class="brand-row">
 		<a class="brand" href={base} aria-label="kodilo home">
 			<Logo />
 			kodilo
 		</a>
-		<button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Toggle theme">
-			<span class="icon-sun" set:html={icon('sun')} />
-			<span class="icon-moon" set:html={icon('moon')} />
-		</button>
+		<div class="brand-actions">
+			<button type="button" class="icon-btn" id="shortcuts-open" aria-label="Keyboard shortcuts" aria-haspopup="dialog">
+				<span set:html={icon('keyboard')} />
+			</button>
+			<button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+				<span class="icon-sun" set:html={icon('sun')} />
+				<span class="icon-moon" set:html={icon('moon')} />
+			</button>
+		</div>
 	</div>
 	<button type="button" class="search-btn" id="search-open" aria-label="Search tools">
 		<span set:html={icon('search')} />
@@ -44,26 +59,26 @@ const total = index.length;
 	</button>
 	<nav class="cats" aria-label="Tool categories">
 		{categories.map((c, i) => (
-			<button
-				type="button"
+			<a
+				href={`${base}#${categoryId(c.name)}`}
 				class="cat-btn"
 				aria-expanded="false"
 				aria-controls={`mega-${i}`}
 				data-active={c.tools.some((t) => t.slug === activeSlug) ? 'true' : undefined}
 			>
-				<span class="cat-btn-icon" set:html={icon(c.icon)} />
+				<span class="cat-btn-icon" set:html={iconUse(c.icon)} />
 				<span class="cat-btn-text">
 					<b>{c.name}</b>
 					<small>{c.blurb}</small>
 				</span>
 				<span class="cat-count">{c.tools.length}</span>
-			</button>
+			</a>
 		))}
 	</nav>
 	{categories.map((c, i) => (
-		<div class="mega" id={`mega-${i}`} hidden>
+		<div class="mega" id={`mega-${i}`} data-category={c.name} role="region" aria-label={`${c.name} tools`} hidden>
 			<div class="mega-intro">
-				<span class="mega-icon" set:html={icon(c.icon)} />
+				<span class="mega-icon" set:html={iconUse(c.icon)} />
 				<div>
 					<b>{c.name}</b>
 					<p>
@@ -72,17 +87,7 @@ const total = index.length;
 				</div>
 			</div>
 			<ul class="mega-grid">
-				{c.tools.map((t) => (
-					<li>
-						<a href={`${base}tools/${t.slug}/`} aria-current={t.slug === activeSlug ? 'page' : undefined}>
-							<i class="t-icon" set:html={icon(t.icon ?? 'wrench')} />
-							<div class="t-text">
-								<b>{t.name}</b>
-								<span>{t.description}</span>
-							</div>
-						</a>
-					</li>
-				))}
+				<li class="mega-status">Loading tools…</li>
 			</ul>
 		</div>
 	))}
@@ -96,14 +101,19 @@ const total = index.length;
 			<input
 				id="palette-q"
 				type="search"
+				role="combobox"
+				aria-label="Search tools"
+				aria-autocomplete="list"
+				aria-expanded="true"
+				aria-controls="palette-list"
 				placeholder="Search tools, e.g. jwt, base64, cron…"
 				autocomplete="off"
 				spellcheck="false"
-				aria-controls="palette-list"
 			/>
 			<kbd>Esc</kbd>
 		</div>
-		<ul class="palette-list" id="palette-list" role="listbox" data-index={JSON.stringify(index)}></ul>
+		<ul class="palette-list" id="palette-list" role="listbox" aria-label="Tools"></ul>
+		<p class="visually-hidden" id="palette-status" role="status"></p>
 		<div class="palette-foot">
 			<span>
 				<kbd>↑</kbd>
@@ -112,199 +122,43 @@ const total = index.length;
 			<span>
 				<kbd>↵</kbd> to open
 			</span>
+			<span>
+				<kbd>?</kbd> for shortcuts
+			</span>
 		</div>
 	</div>
 </dialog>
 
+<dialog class="shortcuts" id="shortcuts" aria-labelledby="shortcuts-title">
+	<div class="shortcuts-box">
+		<div class="shortcuts-head">
+			<h2 id="shortcuts-title">Keyboard shortcuts</h2>
+			<button type="button" class="icon-btn" id="shortcuts-close" aria-label="Close">
+				<span set:html={icon('x')} />
+			</button>
+		</div>
+		<dl>
+			{shortcuts.map((s) => (
+				<div>
+					<dt>
+						{s.keys.map((k) => (
+							<kbd data-key={k}>{k}</kbd>
+						))}
+						{s.alt && <span class="or">or</span>}
+						{s.alt?.map((k) => (
+							<kbd data-key={k}>{k}</kbd>
+						))}
+					</dt>
+					<dd>{s.label}</dd>
+				</div>
+			))}
+		</dl>
+		<p class="shortcuts-note">Single-key shortcuts are off while you type in a field.</p>
+	</div>
+</dialog>
+
 <script>
-	import { navigate } from 'astro:transitions/client';
-
-	type Entry = { n: string; d: string; c: string; u: string };
-
-	const open = () => {
-		const dialog = document.getElementById('palette') as HTMLDialogElement | null;
-		if (!dialog || dialog.open) return;
-		closeMega();
-		closeDrawer();
-		dialog.showModal();
-		const q = document.getElementById('palette-q') as HTMLInputElement;
-		q.value = '';
-		q.dispatchEvent(new Event('input'));
-		q.focus();
-	};
-
-	function closeMega() {
-		document.querySelectorAll<HTMLElement>('.mega').forEach((m) => (m.hidden = true));
-		document.querySelectorAll('.cat-btn').forEach((b) => b.setAttribute('aria-expanded', 'false'));
-		const scrim = document.getElementById('mega-scrim');
-		if (scrim) scrim.hidden = true;
-	}
-
-	function closeDrawer() {
-		document.getElementById('site-nav')?.classList.remove('open');
-		document.getElementById('nav-open')?.setAttribute('aria-expanded', 'false');
-	}
-
-	document.addEventListener('keydown', (e) => {
-		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-			e.preventDefault();
-			open();
-		} else if (e.key === '/' && !(e.target as HTMLElement).closest('input, textarea, [contenteditable]')) {
-			e.preventDefault();
-			open();
-		} else if (e.key === 'Escape') closeMega();
-	});
-
-	function score(entry: Entry, terms: string[]): number {
-		const name = entry.n.toLowerCase();
-		const hay = `${name} ${entry.d.toLowerCase()} ${entry.c.toLowerCase()}`;
-		let s = 0;
-		for (const t of terms) {
-			if (name.startsWith(t)) s += 10;
-			else if (name.split(/[\s/-]+/).some((w) => w.startsWith(t))) s += 6;
-			else if (name.includes(t)) s += 4;
-			else if (hay.includes(t)) s += 1;
-			else {
-				let k = 0;
-				for (const ch of name) if (ch === t[k]) k++;
-				if (k < t.length) return 0;
-				s += 0.5;
-			}
-		}
-		return s;
-	}
-
-	document.addEventListener('astro:page-load', () => {
-		const buttons = [...document.querySelectorAll<HTMLButtonElement>('.cat-btn')];
-		const scrim = document.getElementById('mega-scrim')!;
-		const hover = () => matchMedia('(hover: hover) and (min-width: 761px)').matches;
-		let hoverTimer: number | undefined;
-		let moved = false;
-		document.addEventListener('pointermove', () => (moved = true), { once: true });
-		const show = (btn: HTMLButtonElement, toggle = true) => {
-			const panel = document.getElementById(btn.getAttribute('aria-controls')!)!;
-			const wasOpen = !panel.hidden;
-			closeMega();
-			if (wasOpen && toggle) return;
-			panel.hidden = false;
-			scrim.hidden = false;
-			btn.setAttribute('aria-expanded', 'true');
-		};
-		buttons.forEach((btn) => {
-			btn.addEventListener('click', () => show(btn));
-			btn.addEventListener('mouseenter', () => {
-				if (!moved || !hover()) return;
-				clearTimeout(hoverTimer);
-				hoverTimer = window.setTimeout(() => show(btn, false), 90);
-			});
-			btn.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
-		});
-		document.getElementById('site-nav')!.addEventListener('mouseleave', () => {
-			clearTimeout(hoverTimer);
-			if (hover()) closeMega();
-		});
-		scrim.addEventListener('click', closeMega);
-		document.querySelectorAll('.mega a').forEach((a) =>
-			a.addEventListener('click', () => {
-				closeMega();
-				closeDrawer();
-			}),
-		);
-
-		const navBtn = document.getElementById('nav-open')!;
-		navBtn.addEventListener('click', () => {
-			const isOpen = document.getElementById('site-nav')!.classList.toggle('open');
-			navBtn.setAttribute('aria-expanded', String(isOpen));
-			if (!isOpen) closeMega();
-		});
-		document.getElementById('mobile-search')!.addEventListener('click', open);
-
-		const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
-		document.getElementById('search-kbd')!.textContent = isMac ? '⌘K' : 'Ctrl K';
-		document.getElementById('search-open')!.addEventListener('click', open);
-
-		const dialog = document.getElementById('palette') as HTMLDialogElement;
-		const q = document.getElementById('palette-q') as HTMLInputElement;
-		const list = document.getElementById('palette-list')!;
-		const entries: Entry[] = JSON.parse(list.dataset.index!);
-		let results: Entry[] = [];
-		let active = 0;
-
-		const paint = () => {
-			list.querySelectorAll('li').forEach((li, i) => {
-				li.setAttribute('aria-selected', String(i === active));
-				if (i === active) li.scrollIntoView({ block: 'nearest' });
-			});
-		};
-		const go = (entry?: Entry) => {
-			if (!entry) return;
-			dialog.close();
-			navigate(entry.u);
-		};
-
-		q.addEventListener('input', () => {
-			const terms = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-			results = terms.length
-				? entries
-						.map((e) => [e, score(e, terms)] as const)
-						.filter(([, s]) => s > 0)
-						.sort((a, b) => b[1] - a[1] || a[0].n.localeCompare(b[0].n))
-						.map(([e]) => e)
-						.slice(0, 50)
-				: entries;
-			active = 0;
-			if (!results.length) {
-				const li = document.createElement('li');
-				li.className = 'palette-empty';
-				li.textContent = `No tool matches “${q.value.trim()}”.`;
-				list.replaceChildren(li);
-				return;
-			}
-			list.replaceChildren(
-				...results.map((e, i) => {
-					const li = document.createElement('li');
-					li.setAttribute('role', 'option');
-					li.innerHTML = '<div><b></b><span></span></div><em></em>';
-					li.querySelector('b')!.textContent = e.n;
-					li.querySelector('span')!.textContent = e.d;
-					li.querySelector('em')!.textContent = e.c;
-					li.addEventListener('click', () => go(e));
-					li.addEventListener('mousemove', () => {
-						if (active !== i) {
-							active = i;
-							paint();
-						}
-					});
-					return li;
-				}),
-			);
-			paint();
-		});
-		q.addEventListener('keydown', (e) => {
-			if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-				e.preventDefault();
-				if (!results.length) return;
-				active = (active + (e.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length;
-				paint();
-			} else if (e.key === 'Enter') {
-				e.preventDefault();
-				go(results[active]);
-			}
-		});
-		dialog.addEventListener('click', (e) => {
-			if (e.target === dialog) dialog.close();
-		});
-
-		document.getElementById('theme-toggle')!.addEventListener('click', () => {
-			const root = document.documentElement;
-			const current = root.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-			const next = current === 'dark' ? 'light' : 'dark';
-			root.dataset.theme = next;
-			try {
-				localStorage.setItem('kodilo-theme', next);
-			} catch {}
-		});
-	});
+	import '../scripts/header';
 </script>
 
 <style>
@@ -424,6 +278,8 @@ const total = index.length;
 		padding: 0 4px;
 	}
 	.cat-btn {
+		box-sizing: border-box;
+		text-decoration: none;
 		display: flex;
 		align-items: center;
 		gap: 10px;
@@ -527,7 +383,7 @@ const total = index.length;
 		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 		gap: 4px 10px;
 	}
-	.mega-grid a {
+	.mega-grid :global(a) {
 		display: flex;
 		align-items: flex-start;
 		gap: 10px;
@@ -536,18 +392,18 @@ const total = index.length;
 		text-decoration: none;
 		color: var(--ink);
 	}
-	.mega-grid a:hover,
-	.mega-grid a:focus-visible {
+	.mega-grid :global(a:hover),
+	.mega-grid :global(a:focus-visible) {
 		background: var(--surface-2);
 	}
-	.mega-grid a[aria-current='page'] {
+	.mega-grid :global(a[aria-current='page']) {
 		background: var(--accent);
 	}
-	.mega-grid b {
+	.mega-grid :global(b) {
 		font-size: 14px;
 		font-weight: 700;
 	}
-	.mega-grid span {
+	.mega-grid :global(span) {
 		font-size: 12.5px;
 		line-height: 1.4;
 		color: var(--ink-soft);
@@ -696,7 +552,7 @@ const total = index.length;
 	.palette-foot kbd {
 		margin-right: 3px;
 	}
-	.t-icon {
+	.mega-grid :global(.t-icon) {
 		flex: none;
 		display: grid;
 		place-items: center;
@@ -706,14 +562,100 @@ const total = index.length;
 		background: color-mix(in srgb, var(--accent-strong) 12%, transparent);
 		color: var(--accent-strong);
 	}
-	.t-icon :global(svg) {
+	.mega-grid :global(.t-icon svg) {
 		width: 16px;
 		height: 16px;
 	}
-	.t-text {
+	.mega-grid :global(.t-text) {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 		min-width: 0;
+	}
+	.brand-actions {
+		display: flex;
+		gap: 6px;
+	}
+	.mega-status {
+		color: var(--ink-soft);
+		font-size: 13px;
+		padding: 10px 12px;
+	}
+	.palette-list :global(li[role='presentation']) {
+		cursor: default;
+		padding: 10px 12px 4px;
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--ink-soft);
+	}
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+	.shortcuts {
+		border: 0;
+		padding: 0;
+		background: transparent;
+		width: min(480px, calc(100vw - 32px));
+		color: var(--ink);
+	}
+	.shortcuts::backdrop {
+		background: rgba(0, 0, 0, 0.45);
+	}
+	.shortcuts-box {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 16px;
+		padding: 18px 20px;
+		box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+	}
+	.shortcuts-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 10px;
+	}
+	.shortcuts h2 {
+		margin: 0;
+		font-size: 18px;
+	}
+	.shortcuts dl {
+		margin: 0;
+		display: grid;
+		gap: 8px;
+	}
+	.shortcuts dl div {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+	}
+	.shortcuts dt {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		flex-wrap: wrap;
+	}
+	.shortcuts dd {
+		margin: 0;
+		font-size: 13.5px;
+		color: var(--ink-soft);
+		text-align: right;
+	}
+	.shortcuts .or {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.shortcuts-note {
+		margin: 14px 0 0;
+		font-size: 12.5px;
+		color: var(--ink-soft);
 	}
 </style>

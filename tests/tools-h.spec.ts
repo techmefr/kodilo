@@ -97,14 +97,14 @@ test('xml json converter round trips attributes and arrays', async ({ page }) =>
 	const json = JSON.parse((await out.textContent()) ?? '{}');
 	expect(json.catalog.book).toHaveLength(2);
 	expect(json.catalog.book[0].tags.tag).toEqual(['xml', 'reference']);
-	await page.getByRole('button', { name: 'JSON → XML' }).click();
+	await page.getByRole('radio', { name: 'JSON → XML' }).click();
 	await expect(page.locator('#xj-out-label')).toHaveText('XML');
 	await expect(out).toContainText('<book id="bk101" lang="en">');
 	await expect(out).toContainText('<price currency="USD">44.95</price>');
 	await expect(out).toContainText('<tag>reference</tag>');
 	await page.locator('#xj-in').fill('{"note": {"to": "Tove & Jani"}}');
 	await expect(out).toContainText('<to>Tove &amp; Jani</to>');
-	await page.getByRole('button', { name: 'XML → JSON' }).click();
+	await page.getByRole('radio', { name: 'XML → JSON' }).click();
 	await page.locator('#xj-in').fill('<a><b></a>');
 	await expect(page.locator('#xj-error')).toContainText('Invalid XML');
 });
@@ -149,7 +149,7 @@ test('sql to typescript builds interfaces and prisma relations', async ({ page }
 	expect(schema).toMatch(/posts\s+Post\[\]/);
 	expect(schema).toContain('@@map("users")');
 	expect(schema).toMatch(/status\s+String\s+@default\("draft"\)/);
-	await page.getByRole('button', { name: 'camelCase' }).click();
+	await page.getByRole('radio', { name: 'camelCase' }).click();
 	await expect(ts).toContainText('displayName: string | null;');
 	await expect(prisma).toContainText('@map("display_name")');
 	await page.locator('#st-type').check();

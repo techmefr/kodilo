@@ -8,10 +8,10 @@ test('gitlab ci generator outputs stages, rules and a manual deploy', async ({ p
 	await expect(out).toContainText('$CI_PIPELINE_SOURCE == "merge_request_event"');
 	await expect(out).toContainText('when: manual');
 	await expect(out).toContainText('- package-lock.json');
-	await page.getByRole('button', { name: 'Docker' }).click();
+	await page.getByRole('radio', { name: 'Docker' }).click();
 	await expect(out).toContainText('docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"');
 	expect(parse((await out.textContent()) ?? '').build.script).toHaveLength(3);
-	await page.getByRole('button', { name: 'Pages' }).click();
+	await page.getByRole('radio', { name: 'Pages' }).click();
 	await expect(out).toContainText('publish: dist');
 });
 
@@ -24,7 +24,7 @@ test('codeowners generator warns on shadowed patterns and bad owners', async ({ 
 	await page.getByLabel('Owners 7').fill('not an owner');
 	await expect(page.locator('#co-warn')).toContainText('never applies');
 	await expect(page.locator('#co-warn')).toContainText('"not" is not a valid owner');
-	await page.getByRole('button', { name: 'GitLab' }).click();
+	await page.getByRole('radio', { name: 'GitLab' }).click();
 	await expect(page.locator('#co-out')).toContainText('[Backend][2]');
 	await expect(page.locator('#co-out')).toContainText('^[Docs]');
 });
@@ -34,7 +34,7 @@ test('readme badge generator builds markdown and rst', async ({ page }) => {
 	const out = page.locator('#bd-out');
 	await expect(out).toContainText('![made with love](https://img.shields.io/badge/made%20with-love-ff69b4?style=flat&logo=astro)');
 	await expect(out).toContainText('https://img.shields.io/github/stars/withastro/astro');
-	await page.getByRole('button', { name: 'reStructuredText' }).click();
+	await page.getByRole('radio', { name: 'reStructuredText' }).click();
 	await expect(out).toContainText('.. image:: https://img.shields.io/github/license/withastro/astro?style=flat');
 	await expect(page.locator('#bd-preview img').first()).toHaveAttribute('alt', 'made with love');
 });
@@ -44,7 +44,7 @@ test('issue template generator writes an issue form and a gitlab mr template', a
 	await expect(page.locator('#it-file')).toHaveText('.github/ISSUE_TEMPLATE/bug-report.yml');
 	await expect(page.locator('#it-out')).toContainText('name: Bug report');
 	await expect(page.locator('#it-out')).toContainText('type: dropdown');
-	await page.getByRole('button', { name: 'GitLab MR' }).click();
+	await page.getByRole('radio', { name: 'GitLab MR' }).click();
 	await expect(page.locator('#it-file')).toHaveText('.gitlab/merge_request_templates/default.md');
 	await expect(page.locator('#it-out')).toContainText('/label ~bug ~triage');
 });
@@ -59,7 +59,7 @@ test('conventional commit builder adds breaking footer and parses a major bump',
 	await expect(page.locator('#cc-cmd')).toContainText("git commit -F - <<'EOF'");
 	await page.locator('#cc-subject').fill('Added things.');
 	await expect(page.locator('#cc-warn')).toContainText('imperative mood');
-	await page.getByRole('button', { name: 'Parse' }).click();
+	await page.getByRole('radio', { name: 'Parse' }).click();
 	await expect(page.locator('#cc-bump')).toHaveText('major');
 	await page.locator('#cc-in').fill('fix: handle empty input');
 	await expect(page.locator('#cc-bump')).toHaveText('patch');
