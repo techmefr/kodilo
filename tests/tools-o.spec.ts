@@ -13,7 +13,7 @@ test('media query tester matches queries at the chosen width', async ({ page }) 
 	await expect(row('width >= 1440px')).toHaveAttribute('data-match', 'true');
 	await expect(row('(orientation: landscape)')).toHaveAttribute('data-match', 'true');
 	await expect(row('(hover: none)')).toHaveAttribute('data-match', 'false');
-	await page.getByRole('button', { name: 'Dark' }).click();
+	await page.getByRole('radio', { name: 'Dark' }).click();
 	await expect(row('prefers-color-scheme: dark')).toHaveAttribute('data-match', 'true');
 	await page.getByLabel('Reduced motion').check();
 	await expect(row('prefers-reduced-motion')).toHaveAttribute('data-match', 'true');
@@ -30,7 +30,7 @@ test('srcset generator builds markup and explains the pick', async ({ page }) =>
 	await expect(page.locator('#sr-picture')).toContainText('/images/hero-2400.webp 2400w');
 	await expect(page.locator('#sr-explain')).toContainText('wants 1170 pixels, so it picks /images/hero-1200.avif');
 	await page.locator('#sr-vw').fill('1440');
-	await page.getByRole('button', { name: '2x' }).click();
+	await page.getByRole('radio', { name: '2x' }).click();
 	await expect(page.locator('#sr-explain')).toContainText('slot is 720px ((min-width: 1024px) 50vw)');
 	await expect(page.locator('#sr-explain')).toContainText('picks /images/hero-1600.avif');
 	await page.getByLabel('AVIF').uncheck();

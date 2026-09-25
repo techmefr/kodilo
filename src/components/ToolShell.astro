@@ -1,6 +1,8 @@
 ---
 import Base from '../layouts/Base.astro';
 import Header from './Header.astro';
+import ShareButton from './ShareButton.astro';
+import { icon } from '../scripts/icons';
 
 interface Props {
 	slug: string;
@@ -14,10 +16,17 @@ const { slug, title, description } = Astro.props;
 <Base title={`${title} — kodilo`} description={description}>
 	<div class="shell">
 		<Header activeSlug={slug} />
-		<main class="tool">
+		<main class="tool" id="main" tabindex="-1">
 			<header class="tool-head">
-				<h1>{title}</h1>
+				<div class="tool-title">
+					<h1>{title}</h1>
+					<button type="button" class="btn pin-btn" id="pin-tool" data-slug={slug} aria-pressed="false" aria-keyshortcuts="f" title="Pin this tool (f)">
+						<span class="pin-icon" set:html={icon('star')} />
+						<span class="pin-label">Pin</span>
+					</button>
+				</div>
 				<p>{description}</p>
+				<ShareButton />
 			</header>
 			<slot />
 		</main>
@@ -44,6 +53,12 @@ const { slug, title, description } = Astro.props;
 		flex-direction: column;
 		gap: 20px;
 	}
+	.tool-title {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+	}
 	.tool-head h1 {
 		margin: 0;
 		font-size: 26px;
@@ -54,5 +69,26 @@ const { slug, title, description } = Astro.props;
 		margin: 4px 0 0;
 		color: var(--ink-soft);
 		font-size: 14px;
+	}
+	.pin-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		flex: none;
+	}
+	.pin-icon {
+		display: flex;
+	}
+	.pin-icon :global(svg) {
+		width: 15px;
+		height: 15px;
+	}
+	.pin-btn[aria-pressed='true'] {
+		border-color: var(--accent-strong);
+		background: var(--accent);
+	}
+	.pin-btn[aria-pressed='true'] :global(svg) {
+		fill: currentColor;
+		color: var(--accent-strong);
 	}
 </style>

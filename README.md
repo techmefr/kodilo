@@ -288,6 +288,11 @@ Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools), [devbench
 - [Astro](https://astro.build) (static output)
 - Deployed to GitHub Pages via GitHub Actions on every push to `main`
 
+## Offline & sharing
+
+- kodilo is an installable PWA. The production build ships a service worker that precaches the app shell and the tool catalogue, then keeps every tool page you open available offline. A new deploy shows an "Update available" prompt.
+- Every tool has a **Share link** button. It packs the current inputs into the URL hash (compressed, never sent to a server) so the link reopens the tool in the same state. Secrets such as keys, passwords and tokens are left out, and links over 8 KB show a warning.
+
 ## Developing
 
 ```sh
@@ -303,6 +308,16 @@ npm run dev
 | `npm run preview` | Preview the build locally before deploying |
 
 Node version is pinned via `.nvmrc` (`lts/*`).
+
+### Keyboard shortcuts
+
+- `/` or `⌘K` / `Ctrl K`: search tools (fuzzy, with synonyms such as `b64`, `k8s` or `tls`)
+- `g h`: home, `g f`: pinned tools
+- `f`: pin or unpin the current tool (pinned and recent tools show on the home page and in empty search)
+- `⌘Enter` / `Ctrl Enter`: run the tool's main action, `⌘⇧C` / `Ctrl Shift C`: copy the first output
+- `?`: show every shortcut, `Esc`: close a menu or dialog
+
+Single-key shortcuts are off while typing in a field. The tool catalogue is served once as `tools.json` and the menus render from it.
 
 ## Adding a tool
 

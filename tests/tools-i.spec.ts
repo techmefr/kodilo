@@ -9,7 +9,7 @@ test('php formatter formats a class with PER braces', async ({ page }) => {
 	await expect(page.locator('#phf-out')).toContainText("return 'y';");
 	const text = await page.locator('#phf-out').textContent();
 	expect(text).toContain('class A\n{\n    public function b($x)\n    {');
-	await page.getByRole('button', { name: 'Same line' }).click();
+	await page.getByRole('radio', { name: 'Same line' }).click();
 	await expect(page.locator('#phf-out')).toContainText('class A {');
 	await page.locator('#phf-in').fill('<?php function (');
 	await expect(page.locator('#phf-error')).toBeVisible();
@@ -24,7 +24,7 @@ test('python formatter normalizes indentation, spacing and quotes', async ({ pag
 	expect(text).toContain('\n    x = a+b  # sum\n');
 	expect(text).toContain('    return f"{x}"\n');
 	expect(text).toContain("\n\n\nprint('it\\'s')");
-	await page.getByRole('button', { name: 'Single quotes' }).click();
+	await page.getByRole('radio', { name: 'Single quotes' }).click();
 	await expect(out).toContainText("return f'{x}'");
 });
 
@@ -72,7 +72,7 @@ test('sql csv converter builds inserts per dialect and parses them back', async 
 	await page.locator('#scc-batch').uncheck();
 	await expect(out).toContainText('INSERT INTO "app"."users" ("id"');
 	await expect(page.locator('#scc-rows')).toHaveText('3');
-	await page.getByRole('button', { name: 'SQL → CSV' }).click();
+	await page.getByRole('radio', { name: 'SQL → CSV' }).click();
 	await expect(out).toHaveText(
 		'id,name,price,stock,tags\r\n1,Mechanical keyboard,89.9,14,"hardware,input"\r\n2,USB-C hub,34.5,,hardware\r\n3,Monitor arm,59,3,desk\'s best',
 	);
@@ -83,7 +83,7 @@ test('ascii table generator draws boxes and aligns numbers', async ({ page }) =>
 	await page.goto('tools/ascii-table-generator/');
 	await page.locator('#atg-in').fill('Name,Qty\napple,5\nkiwi,12');
 	await expect(page.locator('#atg-out')).toHaveText('+-------+-----+\n| Name  | Qty |\n+=======+=====+\n| apple |   5 |\n| kiwi  |  12 |\n+-------+-----+');
-	await page.getByRole('button', { name: 'Rounded' }).click();
+	await page.getByRole('radio', { name: 'Rounded' }).click();
 	await expect(page.locator('#atg-out')).toHaveText('╭───────┬─────╮\n│ Name  │ Qty │\n├───────┼─────┤\n│ apple │   5 │\n│ kiwi  │  12 │\n╰───────┴─────╯');
 });
 
@@ -91,7 +91,7 @@ test('ascii art generator renders figlet banners', async ({ page }) => {
 	await page.goto('tools/ascii-art-generator/');
 	await page.locator('#aag-in').fill('Hi');
 	await expect(page.locator('#aag-out')).toHaveText(' _   _ _\n| | | (_)\n| |_| | |\n|  _  | |\n|_| |_|_|');
-	await page.getByRole('button', { name: 'ANSI Shadow' }).click();
+	await page.getByRole('radio', { name: 'ANSI Shadow' }).click();
 	await expect(page.locator('#aag-out')).toContainText('██╗');
 	await page.locator('#aag-comment').check();
 	await expect(page.locator('#aag-out')).toContainText('// ██╗');

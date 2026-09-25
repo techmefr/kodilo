@@ -15,7 +15,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			<button data-value="decrypt">Decrypt</button>
 		</div>
 		<label class="check">
-			Passphrase <input class="te-pass" id="te-pass" type="password" value="correct horse battery staple" autocomplete="off" />
+			Passphrase <input class="te-pass" id="te-pass" data-no-share type="password" value="correct horse battery staple" autocomplete="off" />
 		</label>
 		<label class="check">
 			<input type="checkbox" id="te-show" /> Show
@@ -26,7 +26,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			<div class="panel-head" id="te-in-label">
 				Plain text
 			</div>
-			<textarea id="te-in" spellcheck="false" aria-label="Input">Meet me at the usual place at 7.</textarea>
+			<textarea id="te-in" data-no-share spellcheck="false" aria-label="Input">Meet me at the usual place at 7.</textarea>
 		</section>
 		<section class="panel">
 			<div class="panel-head">

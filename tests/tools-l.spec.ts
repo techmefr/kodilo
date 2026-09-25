@@ -9,12 +9,12 @@ test('matrix builder shows inherited cells and exports', async ({ page }) => {
 	await expect(cell.locator('option[value="none"]')).toHaveText('team (via editor)');
 	await cell.selectOption('all');
 	await expect(page.locator('#rb-out')).toContainText('"create": "all"');
-	await page.getByRole('button', { name: 'Spatie seeder' }).click();
+	await page.getByRole('radio', { name: 'Spatie seeder' }).click();
 	await expect(page.locator('#rb-out')).toContainText("Role::findOrCreate('admin', 'web')");
 	await expect(page.locator('#rb-out')).toContainText('customers.create.all');
-	await page.getByRole('button', { name: 'CASL', exact: true }).click();
+	await page.getByRole('radio', { name: 'CASL', exact: true }).click();
 	await expect(page.locator('#rb-out')).toContainText("can('read', 'Customer', { teamId: user.teamId });");
-	await page.getByRole('button', { name: 'SQL', exact: true }).click();
+	await page.getByRole('radio', { name: 'SQL', exact: true }).click();
 	await expect(page.locator('#rb-out')).toContainText('INSERT INTO role_has_permissions');
 });
 

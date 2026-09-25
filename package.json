@@ -16,7 +16,7 @@
 		"format:check": "prettier --check .",
 		"test": "playwright test --project=desktop --project=mobile --project=dark",
 		"test:install": "playwright install --with-deps chromium",
-		"brand": "node scripts/build-brand.mjs",
+		"brand": "node scripts/build-brand.mjs && node scripts/build-icons.mjs",
 		"prebuild": "node scripts/build-oui.mjs",
 		"predev": "node scripts/build-oui.mjs",
 		"budget": "node scripts/check-budget.mjs",

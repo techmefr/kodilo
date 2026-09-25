@@ -10,17 +10,17 @@ test('raid 6 with 6 x 2 TB gives 8 TB usable', async ({ page }) => {
 	await page.goto('tools/raid-calculator/');
 	await page.locator('#rd-count').fill('6');
 	await page.locator('#rd-size').fill('2');
-	await page.getByRole('button', { name: 'RAID 6', exact: true }).click();
+	await page.getByRole('radio', { name: 'RAID 6', exact: true }).click();
 	await expect(page.locator('#rd-usable')).toHaveText('8 TB');
 	await expect(page.locator('#rd-tol')).toHaveText('2');
-	await page.getByRole('button', { name: 'TiB (binary)' }).click();
+	await page.getByRole('radio', { name: 'TiB (binary)' }).click();
 	await expect(page.locator('#rd-usable')).toHaveText('7.28 TiB');
 });
 
 test('raid 10 rejects an odd number of disks', async ({ page }) => {
 	await page.goto('tools/raid-calculator/');
 	await page.locator('#rd-count').fill('5');
-	await page.getByRole('button', { name: 'RAID 10', exact: true }).click();
+	await page.getByRole('radio', { name: 'RAID 10', exact: true }).click();
 	await expect(page.locator('#rd-error')).toContainText('even number');
 });
 
@@ -28,14 +28,14 @@ test('tar create with gzip and its opposite', async ({ page }) => {
 	await page.goto('tools/tar-command-builder/');
 	await expect(page.locator('#tr-out')).toHaveText("tar -czf backup.tar.gz --exclude=node_modules --exclude='*.log' -C /var/www site uploads");
 	await expect(page.locator('#tr-opp')).toHaveText('tar -xzf backup.tar.gz -C /var/www');
-	await page.getByRole('button', { name: 'xz' }).click();
+	await page.getByRole('radio', { name: 'xz' }).click();
 	await expect(page.locator('#tr-name')).toHaveValue('backup.tar.xz');
 	await expect(page.locator('#tr-out')).toContainText('tar -cJf backup.tar.xz');
 });
 
 test('tar extract with strip-components', async ({ page }) => {
 	await page.goto('tools/tar-command-builder/');
-	await page.getByRole('button', { name: 'extract' }).click();
+	await page.getByRole('radio', { name: 'extract' }).click();
 	await page.locator('#tr-strip').fill('1');
 	await expect(page.locator('#tr-out')).toHaveText('tar -xzf backup.tar.gz -C /var/www --strip-components=1');
 });
@@ -45,9 +45,9 @@ test('find builds a pruned command and warns on delete', async ({ page }) => {
 	await expect(page.locator('#fd-out')).toHaveText(
 		"find . \\( -path ./node_modules -o -path ./.git \\) -prune -o -type f -name '*.log' -size +10M -mtime +30 -print",
 	);
-	await page.getByRole('button', { name: 'xargs -0' }).click();
+	await page.getByRole('radio', { name: 'xargs -0' }).click();
 	await expect(page.locator('#fd-out')).toContainText('-print0 | xargs -0 gzip -9');
-	await page.getByRole('button', { name: 'delete' }).click();
+	await page.getByRole('radio', { name: 'delete' }).click();
 	await expect(page.locator('#fd-warn')).toContainText('removes files for good');
 });
 
@@ -69,7 +69,7 @@ test('logrotate file and dry-run command', async ({ page }) => {
 	await expect(out).toContainText('create 0640 www-data adm');
 	await expect(out).toContainText('systemctl reload nginx');
 	await expect(page.locator('#lr-cmd')).toContainText('sudo logrotate -d /etc/logrotate.d/nginx');
-	await page.getByRole('button', { name: 'copytruncate' }).click();
+	await page.getByRole('radio', { name: 'copytruncate' }).click();
 	await expect(out).toContainText('copytruncate');
 	await expect(out).not.toContainText('postrotate');
 });
@@ -88,10 +88,10 @@ test('firewall warns when ssh is blocked and outputs all formats', async ({ page
 	const out = page.locator('#fw-out');
 	await expect(out).toContainText("sudo ufw allow in proto tcp from 203.0.113.0/24 to any port 22 comment 'SSH from office'");
 	await expect(page.locator('#fw-warn')).toBeEmpty();
-	await page.getByRole('button', { name: 'iptables' }).click();
+	await page.getByRole('radio', { name: 'iptables' }).click();
 	await expect(out).toContainText(':INPUT DROP [0:0]');
 	await expect(out).toContainText('-A INPUT -p tcp -m multiport --dports 80,443 -m comment --comment "Web" -j ACCEPT');
-	await page.getByRole('button', { name: 'nftables' }).click();
+	await page.getByRole('radio', { name: 'nftables' }).click();
 	await expect(out).toContainText('table inet filter {');
 	await expect(out).toContainText('udp dport 51820 accept');
 	await page.getByRole('button', { name: 'Remove rule 1' }).click();

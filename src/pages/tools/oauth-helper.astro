@@ -75,7 +75,7 @@ const tokenSample = JSON.stringify(
 		<div class="fields oa-secrets">
 			<div class="field">
 				<label for="oa-verifier">code_verifier</label>
-				<input id="oa-verifier" spellcheck="false" readonly />
+				<input id="oa-verifier" data-no-share spellcheck="false" readonly />
 				<span class="field-note">Keep it in the session; send it with the token request.</span>
 			</div>
 			<div class="field">
@@ -134,7 +134,7 @@ const tokenSample = JSON.stringify(
 		</div>
 		<section class="panel">
 			<div class="panel-head">Callback URL, fragment or token JSON</div>
-			<textarea id="oa-in" spellcheck="false" aria-label="Callback URL or token response"></textarea>
+			<textarea id="oa-in" data-no-share spellcheck="false" aria-label="Callback URL or token response"></textarea>
 		</section>
 		<ul class="oa-checks" id="oa-checks" aria-live="polite"></ul>
 		<section class="panel">

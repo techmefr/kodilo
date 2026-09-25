@@ -1,6 +1,7 @@
 ---
 import { ClientRouter } from 'astro:transitions';
 import '../styles/global.css';
+import Pwa from '../components/Pwa.astro';
 
 interface Props {
 	title?: string;
@@ -55,9 +56,13 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 			applyStoredTheme(document.documentElement);
 			document.addEventListener('astro:before-swap', (event) => applyStoredTheme(event.newDocument.documentElement));
 		</script>
+		<Pwa />
 		<ClientRouter />
 	</head>
 	<body>
+		<a class="skip-link" href="#main">
+			Skip to content
+		</a>
 		<slot />
 	</body>
 </html>
