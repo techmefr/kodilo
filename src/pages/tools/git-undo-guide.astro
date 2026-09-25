@@ -1,0 +1,330 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const situations = [
+	['undo-commit', 'Undo last commit, keep changes'],
+	['discard-file', 'Discard local changes to a file'],
+	['unstage', 'Unstage a file'],
+	['amend-message', 'Fix the last commit message'],
+	['remove-history', 'Remove a file from history'],
+	['recover-branch', 'Recover a deleted branch'],
+	['revert-pushed', 'Undo a pushed commit'],
+	['reset-remote', 'Reset to the remote branch'],
+	['abort', 'Abort a merge or rebase'],
+	['move-commits', 'Move commits to a new branch'],
+	['change-author', 'Change author of last commit'],
+	['delete-remote', 'Delete a remote branch'],
+	['rename-branch', 'Rename a branch locally and remotely'],
+];
+---
+
+<ToolShell
+	slug="git-undo-guide"
+	title="Git Undo Guide"
+	description="Pick what went wrong and get the exact Git commands to fix it, with a warning on the ones that rewrite history."
+>
+	<div class="fields" id="gu-tool">
+		<div class="field wide">
+			<label for="gu-search">Search</label>
+			<input id="gu-search" type="search" placeholder="commit, branch, file…" />
+		</div>
+	</div>
+	<div class="chips" id="gu-chips" role="group" aria-label="Situations">
+		{situations.map(([value, label], i) => (
+			<button data-value={value} aria-pressed={i === 0 ? 'true' : 'false'}>
+				{label}
+			</button>
+		))}
+	</div>
+	<p class="gu-empty" id="gu-empty" hidden>
+		No situation matches your search.
+	</p>
+	<div class="fields">
+		<div class="field">
+			<label for="gu-branch">Branch</label>
+			<input id="gu-branch" spellcheck="false" value="feature/login" />
+		</div>
+		<div class="field">
+			<label for="gu-file">File path</label>
+			<input id="gu-file" spellcheck="false" value="src/app.ts" />
+		</div>
+		<div class="field">
+			<label for="gu-count">Commit count</label>
+			<input id="gu-count" type="number" min="1" value="1" />
+		</div>
+		<div class="field">
+			<label for="gu-remote">Remote</label>
+			<input id="gu-remote" spellcheck="false" value="origin" />
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="gu-title"></span>
+			<span class="gu-head-right">
+				<span class="gu-badge" id="gu-badge" hidden>
+					Rewrites history
+				</span>
+				<button class="btn" id="gu-copy">
+					Copy
+				</button>
+			</span>
+		</div>
+		<p class="gu-note" id="gu-note"></p>
+		<ol class="gu-steps" id="gu-steps"></ol>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Ctx = { branch: string; file: string; n: number; remote: string };
+	type Step = [string, string];
+	type Situation = { title: string; keywords: string; danger: boolean; note: string; steps: (c: Ctx) => Step[] };
+
+	const q = (s: string) => (/^[\w./@:-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
+
+	const SITUATIONS: Record<string, Situation> = {
+		'undo-commit': {
+			title: 'Undo last commit, keep changes',
+			keywords: 'reset soft uncommit',
+			danger: true,
+			note: 'Only do this before pushing. If the commit is already shared, revert it instead.',
+			steps: ({ n }) => [
+				[`git reset --soft HEAD~${n}`, 'Moves the branch back and keeps the changes staged.'],
+				['git status', 'Check that your changes are still there.'],
+			],
+		},
+		'discard-file': {
+			title: 'Discard local changes to a file',
+			keywords: 'restore checkout revert file throw away',
+			danger: false,
+			note: 'Unstaged changes to the file are lost for good.',
+			steps: ({ file }) => [
+				[`git restore ${q(file)}`, 'Puts the file back to its last committed state.'],
+				[`git restore --source=HEAD --staged --worktree ${q(file)}`, 'Also drops the staged version of the file.'],
+			],
+		},
+		unstage: {
+			title: 'Unstage a file',
+			keywords: 'reset add index staged',
+			danger: false,
+			note: 'Your edits stay in the working tree, they are just removed from the next commit.',
+			steps: ({ file }) => [[`git restore --staged ${q(file)}`, 'Removes the file from the staging area.']],
+		},
+		'amend-message': {
+			title: 'Fix the last commit message',
+			keywords: 'amend reword typo message',
+			danger: true,
+			note: 'Amending replaces the commit. Force push only if nobody else built on it.',
+			steps: ({ branch, remote }) => [
+				['git commit --amend -m "new message"', 'Replaces the last commit message.'],
+				[`git push --force-with-lease ${q(remote)} ${q(branch)}`, 'Only if the commit was already pushed.'],
+			],
+		},
+		'remove-history': {
+			title: 'Remove a file from history',
+			keywords: 'secret password leak filter-repo purge',
+			danger: true,
+			note: 'This rewrites every commit. Rotate any leaked secret first, everyone must re-clone afterwards.',
+			steps: ({ file, remote }) => [
+				[`git filter-repo --invert-paths --path ${q(file)}`, 'Needs git-filter-repo installed, rewrites all history without the file.'],
+				[`git remote add ${q(remote)} <url>`, 'filter-repo removes the remote as a safety measure.'],
+				[`git push --force --all ${q(remote)}`, 'Publishes the rewritten history.'],
+			],
+		},
+		'recover-branch': {
+			title: 'Recover a deleted branch',
+			keywords: 'reflog restore lost deleted branch',
+			danger: false,
+			note: 'The reflog keeps unreachable commits for about 90 days.',
+			steps: ({ branch }) => [
+				['git reflog', 'Find the hash of the last commit on the deleted branch.'],
+				[`git switch -c ${q(branch)} <commit>`, 'Recreates the branch at that commit.'],
+			],
+		},
+		'revert-pushed': {
+			title: 'Undo a pushed commit',
+			keywords: 'revert shared public pushed',
+			danger: false,
+			note: 'Safe for shared branches: it adds a new commit instead of rewriting history.',
+			steps: ({ n, branch, remote }) => [
+				[n > 1 ? `git revert --no-edit HEAD~${n}..HEAD` : 'git revert --no-edit HEAD', 'Creates commits that undo the changes.'],
+				[`git push ${q(remote)} ${q(branch)}`, 'Pushes the revert like any other commit.'],
+			],
+		},
+		'reset-remote': {
+			title: 'Reset to the remote branch',
+			keywords: 'hard reset origin match remote throw away',
+			danger: true,
+			note: 'Every local commit and uncommitted change on this branch is lost.',
+			steps: ({ branch, remote }) => [
+				[`git fetch ${q(remote)}`, 'Gets the latest state of the remote.'],
+				[`git reset --hard ${q(`${remote}/${branch}`)}`, 'Makes your branch identical to the remote one.'],
+				['git clean -fd', 'Optional, removes untracked files and folders too.'],
+			],
+		},
+		abort: {
+			title: 'Abort a merge or rebase',
+			keywords: 'conflict cancel stop merge rebase cherry-pick',
+			danger: false,
+			note: 'Returns the branch to where it was before the operation started.',
+			steps: () => [
+				['git merge --abort', 'Cancels a merge in progress.'],
+				['git rebase --abort', 'Cancels a rebase in progress.'],
+				['git cherry-pick --abort', 'Cancels a cherry-pick in progress.'],
+			],
+		},
+		'move-commits': {
+			title: 'Move commits to a new branch',
+			keywords: 'wrong branch committed to main',
+			danger: true,
+			note: 'Use when you committed on the wrong branch and have not pushed yet.',
+			steps: ({ branch, n }) => [
+				[`git branch ${q(branch)}`, 'Creates the new branch pointing at your commits.'],
+				[`git reset --hard HEAD~${n}`, 'Moves the current branch back, the commits stay on the new branch.'],
+				[`git switch ${q(branch)}`, 'Continue working on the new branch.'],
+			],
+		},
+		'change-author': {
+			title: 'Change author of last commit',
+			keywords: 'author email name identity amend',
+			danger: true,
+			note: 'Rewrites the last commit, force push if it was already pushed.',
+			steps: () => [
+				['git commit --amend --no-edit --author="Jane Doe <jane@example.com>"', 'Sets a new author on the last commit.'],
+				['git commit --amend --no-edit --reset-author', 'Or use your current user.name and user.email.'],
+			],
+		},
+		'delete-remote': {
+			title: 'Delete a remote branch',
+			keywords: 'remove remote branch push delete',
+			danger: false,
+			note: 'Others still have their local copy until they fetch with prune.',
+			steps: ({ branch, remote }) => [
+				[`git push ${q(remote)} --delete ${q(branch)}`, 'Deletes the branch on the remote.'],
+				[`git branch -d ${q(branch)}`, 'Deletes the local branch too, use -D if it is not merged.'],
+				['git fetch --prune', 'Cleans stale remote tracking branches.'],
+			],
+		},
+		'rename-branch': {
+			title: 'Rename a branch locally and remotely',
+			keywords: 'rename move branch name',
+			danger: false,
+			note: 'Run it on the branch you want to rename.',
+			steps: ({ branch, remote }) => [
+				[`git branch -m ${q(branch)}`, 'Renames the current branch locally.'],
+				[`git push ${q(remote)} -u ${q(branch)}`, 'Pushes the new name and tracks it.'],
+				[`git push ${q(remote)} --delete <old-name>`, 'Removes the old name on the remote.'],
+			],
+		},
+	};
+
+	onPage('gu-tool', () => {
+		const chips = [...document.querySelectorAll<HTMLButtonElement>('#gu-chips button')];
+		let current = chips[0].dataset.value!;
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+
+		const render = () => {
+			const s = SITUATIONS[current];
+			const ctx: Ctx = {
+				branch: val('gu-branch') || 'my-branch',
+				file: val('gu-file') || 'path/to/file',
+				n: Math.max(1, Number(val('gu-count')) || 1),
+				remote: val('gu-remote') || 'origin',
+			};
+			byId('gu-title').textContent = s.title;
+			byId('gu-badge').hidden = !s.danger;
+			byId('gu-note').textContent = s.note;
+			byId('gu-steps').replaceChildren(
+				...s.steps(ctx).map(([cmd, why]) => {
+					const li = document.createElement('li');
+					const code = document.createElement('code');
+					code.textContent = cmd;
+					const p = document.createElement('span');
+					p.textContent = why;
+					li.append(code, p);
+					return li;
+				}),
+			);
+		};
+
+		const filter = () => {
+			const term = val('gu-search').toLowerCase();
+			let visible = 0;
+			chips.forEach((b) => {
+				const s = SITUATIONS[b.dataset.value!];
+				const hit = !term || `${s.title} ${s.keywords}`.toLowerCase().includes(term);
+				b.hidden = !hit;
+				if (hit) visible++;
+			});
+			byId('gu-empty').hidden = visible > 0;
+			const first = chips.find((b) => !b.hidden);
+			if (first && chips.find((b) => b.dataset.value === current)?.hidden) {
+				chips.forEach((b) => b.setAttribute('aria-pressed', String(b === first)));
+				current = first.dataset.value!;
+				render();
+			}
+		};
+
+		chips.forEach((b) =>
+			b.addEventListener('click', () => {
+				chips.forEach((c) => c.setAttribute('aria-pressed', String(c === b)));
+				current = b.dataset.value!;
+				render();
+			}),
+		);
+		byId('gu-search').addEventListener('input', filter);
+		document.querySelectorAll('#gu-branch, #gu-file, #gu-count, #gu-remote').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('gu-copy'), () => [...document.querySelectorAll('#gu-steps code')].map((c) => c.textContent).join('\n'));
+		render();
+	});
+</script>
+
+<style>
+	.gu-empty,
+	.gu-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.gu-note {
+		padding: 12px 14px 0;
+	}
+	.gu-head-right {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.gu-badge {
+		color: var(--bad);
+		border: 1px solid var(--bad);
+		border-radius: 999px;
+		padding: 2px 8px;
+		font-size: 11px;
+	}
+	.gu-badge[hidden] {
+		display: none;
+	}
+	.gu-steps {
+		margin: 0;
+		padding: 12px 14px 14px 36px;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.gu-steps :global(li) {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.gu-steps :global(code) {
+		font-family: var(--mono);
+		font-size: 13px;
+		color: var(--ink);
+		overflow-wrap: anywhere;
+	}
+	.gu-steps :global(span) {
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+</style>

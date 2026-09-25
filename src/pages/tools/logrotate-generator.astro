@@ -1,0 +1,235 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const samplePaths = '/var/log/nginx/*.log';
+const samplePost = 'systemctl reload nginx > /dev/null 2>&1 || true';
+---
+
+<ToolShell
+	slug="logrotate-generator"
+	title="Logrotate Config Generator"
+	description="Build an /etc/logrotate.d file with rotation schedule, compression, permissions and a reload script, then dry-run it with logrotate -d."
+>
+	<div class="fields" id="lr-tool">
+		<div class="field">
+			<label for="lr-name">Config name</label>
+			<input id="lr-name" spellcheck="false" value="nginx" />
+		</div>
+		<div class="field">
+			<label for="lr-rotate">Keep rotated files</label>
+			<input id="lr-rotate" type="number" min="0" value="14" />
+		</div>
+		<div class="field wide">
+			<label for="lr-paths">Log paths · one per line, globs allowed</label>
+			<textarea id="lr-paths" class="lr-area" spellcheck="false">{samplePaths}</textarea>
+		</div>
+		<div class="field">
+			<label for="lr-size">size · rotate only above</label>
+			<input id="lr-size" spellcheck="false" placeholder="100M" />
+		</div>
+		<div class="field">
+			<label for="lr-maxsize">maxsize · rotate early above</label>
+			<input id="lr-maxsize" spellcheck="false" value="500M" />
+		</div>
+		<div class="field">
+			<label for="lr-mode">create mode</label>
+			<input id="lr-mode" spellcheck="false" value="0640" />
+		</div>
+		<div class="field">
+			<label for="lr-owner">Owner</label>
+			<input id="lr-owner" spellcheck="false" value="www-data" />
+		</div>
+		<div class="field">
+			<label for="lr-group">Group</label>
+			<input id="lr-group" spellcheck="false" value="adm" />
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="lr-freq" role="group" aria-label="Frequency">
+			<button data-value="hourly">hourly</button>
+			<button data-value="daily" aria-pressed="true">
+				daily
+			</button>
+			<button data-value="weekly">weekly</button>
+			<button data-value="monthly">monthly</button>
+			<button data-value="yearly">yearly</button>
+		</div>
+		<div class="seg" id="lr-mode-seg" role="group" aria-label="How the running program lets go of the file">
+			<button data-value="post" aria-pressed="true">
+				postrotate script
+			</button>
+			<button data-value="copytruncate">copytruncate</button>
+			<button data-value="none">nothing</button>
+		</div>
+	</div>
+	<div class="toolbar">
+		<label class="check">
+			<input type="checkbox" id="lr-compress" checked /> compress
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lr-delay" checked /> delaycompress
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lr-missing" checked /> missingok
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lr-notif" checked /> notifempty
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lr-create" checked /> create
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lr-date" checked /> dateext
+		</label>
+		<label class="check">
+			<input type="checkbox" id="lr-shared" checked /> sharedscripts
+		</label>
+	</div>
+	<div class="field" id="lr-post-field">
+		<label for="lr-post">postrotate command</label>
+		<textarea id="lr-post" class="lr-area" spellcheck="false">{samplePost}</textarea>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="lr-file"></span>
+			<button class="btn" id="lr-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out" id="lr-out"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Test it</span>
+			<button class="btn" id="lr-cmd-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out lr-cmd" id="lr-cmd"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Line by line</span>
+		</div>
+		<dl class="lr-explain" id="lr-explain"></dl>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('lr-tool', () => {
+		let freq = 'daily';
+		let mode = 'post';
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const on = (id: string) => byId<HTMLInputElement>(id).checked;
+		const q = (s: string) => (/^[A-Za-z0-9_/.,:@%+=-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
+
+		const render = () => {
+			const name = (val('lr-name') || 'app').replace(/[^\w.-]/g, '-');
+			const paths = byId<HTMLTextAreaElement>('lr-paths')
+				.value.split('\n')
+				.map((l) => l.trim())
+				.filter(Boolean)
+				.map((p) => (/\s/.test(p) ? `"${p.replace(/"/g, '')}"` : p));
+			const body: [string, string][] = [];
+			const add = (line: string, why: string) => body.push([line, why]);
+			add(
+				freq,
+				`Rotate ${freq === 'daily' ? 'once a day' : freq === 'hourly' ? 'every hour (logrotate itself must run hourly for this to work)' : `once a ${freq.replace('ly', '')}`}.`,
+			);
+			const rotate = Math.max(0, Number(val('lr-rotate')) || 0);
+			add(`rotate ${rotate}`, `Keep ${rotate} old files; older ones are deleted.`);
+			if (val('lr-size')) add(`size ${val('lr-size')}`, `Rotate only once the file is bigger than ${val('lr-size')}, ignoring the schedule.`);
+			if (val('lr-maxsize')) add(`maxsize ${val('lr-maxsize')}`, `Also rotate before the schedule if the file grows past ${val('lr-maxsize')}.`);
+			if (on('lr-missing')) add('missingok', 'Do not fail when a log file is missing.');
+			if (on('lr-notif')) add('notifempty', 'Skip rotation when the file is empty.');
+			if (on('lr-compress')) add('compress', 'Gzip rotated files.');
+			if (on('lr-compress') && on('lr-delay'))
+				add('delaycompress', 'Leave the most recent rotated file uncompressed, for programs that still write to it briefly.');
+			if (on('lr-date')) add('dateext', 'Name rotated files with a date suffix (access.log-20260925) instead of .1, .2.');
+			if (mode === 'copytruncate')
+				add('copytruncate', 'Copy the file then empty it in place, for programs that cannot reopen their log. A few lines may be lost.');
+			else if (on('lr-create')) {
+				const c = ['create', val('lr-mode'), val('lr-owner'), val('lr-group')].filter(Boolean).join(' ');
+				add(
+					c,
+					`Create a fresh empty log after rotating${val('lr-mode') ? ` with mode ${val('lr-mode')}` : ''}${val('lr-owner') ? `, owned by ${val('lr-owner')}` : ''}${val('lr-group') ? `:${val('lr-group')}` : ''}.`,
+				);
+			}
+			const post = byId<HTMLTextAreaElement>('lr-post')
+				.value.split('\n')
+				.map((l) => l.trim())
+				.filter(Boolean);
+			if (mode === 'post' && post.length) {
+				if (on('lr-shared')) add('sharedscripts', 'Run the script once for all matched files, not once per file.');
+				add('postrotate … endscript', `After rotating, run: ${post.join('; ')}. This tells the program to reopen its log files.`);
+			}
+			const lines = [`${paths.join(' ') || '/var/log/app.log'} {`];
+			body.forEach(([l]) => {
+				if (l.startsWith('postrotate')) lines.push('\tpostrotate', ...post.map((p) => `\t\t${p}`), '\tendscript');
+				else lines.push(`\t${l}`);
+			});
+			lines.push('}');
+			const file = `/etc/logrotate.d/${name}`;
+			byId('lr-file').textContent = file;
+			byId('lr-out').textContent = lines.join('\n');
+			byId('lr-post-field').hidden = mode !== 'post';
+			byId('lr-cmd').textContent = [`sudo logrotate -d ${q(file)}`, `sudo logrotate -f -v ${q(file)}`].join('\n');
+			byId('lr-explain').replaceChildren(
+				...body.flatMap(([l, why]) => {
+					const dt = document.createElement('dt');
+					dt.textContent = l;
+					const dd = document.createElement('dd');
+					dd.textContent = why;
+					return [dt, dd];
+				}),
+			);
+		};
+
+		segmented(byId('lr-freq'), (v) => ((freq = v), render()));
+		segmented(byId('lr-mode-seg'), (v) => ((mode = v), render()));
+		document.querySelectorAll('main input, main textarea').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('lr-copy'), () => byId('lr-out').textContent ?? '');
+		copyButton(byId('lr-cmd-copy'), () => byId('lr-cmd').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.lr-area {
+		min-height: 60px;
+		font-family: var(--mono) !important;
+		font-size: 14px !important;
+	}
+	.lr-cmd {
+		min-height: auto !important;
+	}
+	.lr-explain {
+		margin: 0;
+		padding: 12px 14px;
+		display: grid;
+		grid-template-columns: minmax(0, max-content) 1fr;
+		gap: 6px 16px;
+		font-size: 14px;
+	}
+	.lr-explain :global(dt) {
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--ink);
+		overflow-wrap: anywhere;
+	}
+	.lr-explain :global(dd) {
+		margin: 0;
+		color: var(--ink);
+	}
+	@media (max-width: 560px) {
+		.lr-explain {
+			grid-template-columns: 1fr;
+		}
+		.lr-explain :global(dd) {
+			margin-bottom: 6px;
+		}
+	}
+</style>

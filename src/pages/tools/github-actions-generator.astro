@@ -1,0 +1,243 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="github-actions-generator"
+	title="GitHub Actions Workflow Generator"
+	description="Pick a stack and triggers to get a ready-to-commit workflow with a version matrix, caching, least-privilege permissions and concurrency control."
+>
+	<div class="toolbar" id="gha-tool">
+		<div class="seg" id="gha-stack" aria-label="Stack">
+			<button data-value="node" aria-pressed="true">
+				Node
+			</button>
+			<button data-value="python" aria-pressed="false">
+				Python
+			</button>
+			<button data-value="go" aria-pressed="false">
+				Go
+			</button>
+			<button data-value="docker" aria-pressed="false">
+				Docker
+			</button>
+			<button data-value="pages" aria-pressed="false">
+				Pages
+			</button>
+		</div>
+	</div>
+	<div class="fields">
+		<div class="field">
+			<label for="gha-name">Workflow name</label>
+			<input id="gha-name" spellcheck="false" value="CI" />
+		</div>
+		<div class="field">
+			<label for="gha-branches">Branches · comma separated</label>
+			<input id="gha-branches" spellcheck="false" value="main" />
+		</div>
+		<div class="field">
+			<label for="gha-matrix">Matrix versions</label>
+			<input id="gha-matrix" spellcheck="false" value="20, 22" />
+		</div>
+		<div class="field">
+			<label for="gha-cron">Schedule · cron</label>
+			<input id="gha-cron" spellcheck="false" placeholder="0 3 * * 1" />
+		</div>
+		<div class="field">
+			<label for="gha-cmd">Build and test commands · one per line</label>
+			<textarea id="gha-cmd" class="gha-cmd" spellcheck="false">npm ci
+npm test
+npm run build</textarea>
+		</div>
+		<div class="field">
+			<label for="gha-image">Image · Docker only</label>
+			<input id="gha-image" spellcheck="false" value="ghcr.io/acme/api" />
+		</div>
+		<div class="field">
+			<label for="gha-timeout">Timeout · minutes</label>
+			<input id="gha-timeout" type="number" min="1" max="360" value="15" />
+		</div>
+	</div>
+	<div class="toolbar">
+		<label class="check">
+			<input type="checkbox" id="gha-push" checked /> push
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gha-pr" checked /> pull_request
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gha-dispatch" checked /> workflow_dispatch
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gha-cache" checked /> Cache
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gha-perms" checked /> Permissions
+		</label>
+		<label class="check">
+			<input type="checkbox" id="gha-conc" checked /> Cancel in progress
+		</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>.github/workflows/ci.yml</span>
+			<span class="gha-actions">
+				<button class="btn" id="gha-copy">
+					Copy
+				</button>
+				<button class="btn" id="gha-dl">
+					Download
+				</button>
+			</span>
+		</div>
+		<pre class="out" id="gha-out" tabindex="0" aria-label="Workflow YAML"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { saveBlob } from '../../scripts/files';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('gha-tool', () => {
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const on = (id: string) => byId<HTMLInputElement>(id).checked;
+		const defaults: Record<string, { matrix: string; cmd: string }> = {
+			node: { matrix: '20, 22', cmd: 'npm ci\nnpm test\nnpm run build' },
+			python: { matrix: '3.11, 3.12', cmd: 'pip install -r requirements.txt\npytest' },
+			go: { matrix: '1.22, 1.23', cmd: 'go vet ./...\ngo test ./...\ngo build ./...' },
+			docker: { matrix: '', cmd: '' },
+			pages: { matrix: '', cmd: 'npm ci\nnpm run build' },
+		};
+		let stack = 'node';
+		const q = (s: string) => (/^[\w./-]+$/.test(s) ? s : `'${s.replace(/'/g, "''")}'`);
+
+		const render = () => {
+			const branches = val('gha-branches')
+				.split(',')
+				.map((b) => b.trim())
+				.filter(Boolean);
+			const matrix = val('gha-matrix')
+				.split(',')
+				.map((v) => v.trim())
+				.filter(Boolean);
+			const cmds = byId<HTMLTextAreaElement>('gha-cmd')
+				.value.split('\n')
+				.map((c) => c.trim())
+				.filter(Boolean);
+			const cache = on('gha-cache');
+			const cron = val('gha-cron');
+			const branchList = `[${branches.map(q).join(', ')}]`;
+			const L: string[] = [`name: ${q(val('gha-name') || 'CI')}`, '', 'on:'];
+			if (on('gha-push') || stack === 'pages') L.push('  push:', `    branches: ${branchList}`);
+			if (on('gha-pr') && stack !== 'pages') L.push('  pull_request:', `    branches: ${branchList}`);
+			if (cron) L.push('  schedule:', `    - cron: '${cron}'`);
+			if (on('gha-dispatch') || L.length === 3) L.push('  workflow_dispatch:');
+			if (on('gha-perms')) {
+				L.push('', 'permissions:', '  contents: read');
+				if (stack === 'docker') L.push('  packages: write');
+				if (stack === 'pages') L.push('  pages: write', '  id-token: write');
+			}
+			if (on('gha-conc')) {
+				L.push('', 'concurrency:', '  group: ${{ github.workflow }}-${{ github.ref }}', `  cancel-in-progress: ${stack === 'pages' ? 'false' : 'true'}`);
+			}
+			L.push('', 'jobs:');
+			const timeout = `    timeout-minutes: ${Math.max(1, Number(val('gha-timeout')) || 15)}`;
+			const run = (list: string[]) => list.map((c) => `      - run: ${c}`);
+			const useMatrix = matrix.length > 0 && ['node', 'python', 'go'].includes(stack);
+			const ver = useMatrix ? '${{ matrix.version }}' : matrix[0] || '';
+			const job = (name: string) => {
+				L.push(`  ${name}:`, '    runs-on: ubuntu-latest', timeout);
+				if (useMatrix && matrix.length > 1)
+					L.push('    strategy:', '      fail-fast: false', '      matrix:', `        version: [${matrix.map((m) => `'${m}'`).join(', ')}]`);
+				L.push('    steps:', '      - uses: actions/checkout@v4');
+			};
+			if (stack === 'node' || stack === 'python' || stack === 'go') {
+				job(stack === 'go' ? 'build' : 'test');
+				const v = matrix.length > 1 ? '${{ matrix.version }}' : ver;
+				if (stack === 'node') {
+					L.push('      - uses: actions/setup-node@v4', '        with:', `          node-version: '${v || '22'}'`);
+					if (cache) L.push('          cache: npm');
+				} else if (stack === 'python') {
+					L.push('      - uses: actions/setup-python@v5', '        with:', `          python-version: '${v || '3.12'}'`);
+					if (cache) L.push('          cache: pip');
+				} else {
+					L.push('      - uses: actions/setup-go@v5', '        with:', `          go-version: '${v || '1.23'}'`);
+					L.push(`          cache: ${cache ? 'true' : 'false'}`);
+				}
+				L.push(...run(cmds));
+			} else if (stack === 'docker') {
+				const image = val('gha-image') || 'ghcr.io/owner/app';
+				L.push('  docker:', '    runs-on: ubuntu-latest', timeout, '    steps:', '      - uses: actions/checkout@v4');
+				L.push('      - uses: docker/setup-buildx-action@v3');
+				L.push(
+					'      - uses: docker/login-action@v3',
+					"        if: github.event_name != 'pull_request'",
+					'        with:',
+					'          registry: ghcr.io',
+					'          username: ${{ github.actor }}',
+					'          password: ${{ secrets.GITHUB_TOKEN }}',
+				);
+				L.push('      - id: meta', '        uses: docker/metadata-action@v5', '        with:', `          images: ${image}`);
+				L.push(
+					'      - uses: docker/build-push-action@v6',
+					'        with:',
+					'          context: .',
+					"          push: ${{ github.event_name != 'pull_request' }}",
+					'          tags: ${{ steps.meta.outputs.tags }}',
+					'          labels: ${{ steps.meta.outputs.labels }}',
+				);
+				if (cache) L.push('          cache-from: type=gha', '          cache-to: type=gha,mode=max');
+			} else {
+				L.push('  build:', '    runs-on: ubuntu-latest', timeout, '    steps:', '      - uses: actions/checkout@v4');
+				L.push('      - uses: actions/setup-node@v4', '        with:', `          node-version: '${matrix[0] || '22'}'`);
+				if (cache) L.push('          cache: npm');
+				L.push(
+					...run(cmds),
+					'      - uses: actions/configure-pages@v5',
+					'      - uses: actions/upload-pages-artifact@v3',
+					'        with:',
+					'          path: dist',
+				);
+				L.push(
+					'  deploy:',
+					'    needs: build',
+					'    runs-on: ubuntu-latest',
+					timeout,
+					'    environment:',
+					'      name: github-pages',
+					'      url: ${{ steps.deployment.outputs.page_url }}',
+					'    steps:',
+					'      - id: deployment',
+					'        uses: actions/deploy-pages@v4',
+				);
+			}
+			byId('gha-out').textContent = L.join('\n') + '\n';
+		};
+
+		segmented(byId('gha-stack'), (v) => {
+			stack = v;
+			byId<HTMLInputElement>('gha-matrix').value = defaults[v].matrix;
+			byId<HTMLTextAreaElement>('gha-cmd').value = defaults[v].cmd;
+			render();
+		});
+		document.querySelectorAll('main input, main textarea').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('gha-copy'), () => byId('gha-out').textContent ?? '');
+		byId('gha-dl').addEventListener('click', () => saveBlob(new Blob([byId('gha-out').textContent ?? ''], { type: 'text/yaml' }), 'ci.yml'));
+		render();
+	});
+</script>
+
+<style>
+	.gha-cmd {
+		min-height: 80px;
+		font-family: var(--mono) !important;
+		font-size: 14px !important;
+	}
+	.gha-actions {
+		display: flex;
+		gap: 6px;
+	}
+	#gha-out {
+		overflow: auto;
+	}
+</style>

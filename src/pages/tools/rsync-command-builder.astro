@@ -1,0 +1,218 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sampleExcludes = 'node_modules/\n.git/\n*.log';
+const toggles = [
+	['a', 'archive', 'Archive (-a)', true],
+	['v', 'verbose', 'Verbose (-v)', true],
+	['z', 'compress', 'Compress (-z)', true],
+	['h', 'human', 'Human-readable (-h)', true],
+	['H', 'hard', 'Hard links (-H)', false],
+	['A', 'acls', 'ACLs (-A)', false],
+	['X', 'xattrs', 'xattrs (-X)', false],
+	['--delete', 'delete', 'Delete extraneous (--delete)', true],
+	['--dry-run', 'dry', 'Dry run (--dry-run)', true],
+	['--progress', 'progress', 'Progress (--progress)', true],
+	['--partial', 'partial', 'Keep partial (--partial)', true],
+	['--checksum', 'checksum', 'Checksum (--checksum)', false],
+	['--numeric-ids', 'numeric', 'Numeric ids (--numeric-ids)', false],
+] as const;
+---
+
+<ToolShell
+	slug="rsync-command-builder"
+	title="rsync Command Builder"
+	description="Build a safe rsync command for local or SSH copies, with excludes, bandwidth limits and a live explanation of the trailing slash rule."
+>
+	<div class="fields" id="rs-tool">
+		<div class="field">
+			<label for="rs-src">Source</label>
+			<input id="rs-src" spellcheck="false" value="./site/" />
+		</div>
+		<div class="field">
+			<label for="rs-dst">Destination · path or user@host:path</label>
+			<input id="rs-dst" spellcheck="false" value="deploy@example.com:/var/www/site" />
+		</div>
+		<div class="field">
+			<label for="rs-port">SSH port</label>
+			<input id="rs-port" spellcheck="false" inputmode="numeric" value="2222" />
+		</div>
+		<div class="field">
+			<label for="rs-key">SSH key</label>
+			<input id="rs-key" spellcheck="false" value="~/.ssh/id_ed25519" />
+		</div>
+		<div class="field">
+			<label for="rs-bw">Bandwidth limit · KiB/s or 5m</label>
+			<input id="rs-bw" spellcheck="false" placeholder="5000" />
+		</div>
+		<div class="field wide">
+			<label for="rs-ex">Excludes · one pattern per line</label>
+			<textarea id="rs-ex" class="rs-area" spellcheck="false">{sampleExcludes}</textarea>
+		</div>
+	</div>
+	<div class="toolbar">
+		{toggles.map(([flag, id, label, on]) => (
+			<label class="check">
+				<input type="checkbox" class="rs-opt" id={`rs-${id}`} data-flag={flag} checked={on} /> {label}
+			</label>
+		))}
+	</div>
+	<p class="rs-slash" id="rs-slash"></p>
+	<ul class="rs-warn" id="rs-warn"></ul>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Command</span>
+			<button class="btn" id="rs-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out rs-cmd" id="rs-out"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>What each part does</span>
+		</div>
+		<dl class="rs-explain" id="rs-explain"></dl>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	onPage('rs-tool', () => {
+		const val = (id: string) => byId<HTMLInputElement>(id).value.trim();
+		const q = (s: string) => (/^~?[A-Za-z0-9_/.,:@%+=-]*$/.test(s) && s !== '' ? s : `'${s.replace(/'/g, `'\\''`)}'`);
+		const words: Record<string, string> = {
+			a: 'archive: recurse and keep permissions, times, symlinks, owner and group',
+			v: 'verbose: list the files being transferred',
+			z: 'compress data during the transfer',
+			h: 'human-readable sizes',
+			H: 'preserve hard links',
+			A: 'preserve ACLs',
+			X: 'preserve extended attributes',
+			'--delete': 'delete files in the destination that no longer exist in the source',
+			'--dry-run': 'show what would happen without changing anything',
+			'--progress': 'show per-file progress',
+			'--partial': 'keep partially transferred files so a retry can resume',
+			'--checksum': 'compare files by checksum instead of size and time (slower, exact)',
+			'--numeric-ids': 'keep numeric user and group ids instead of mapping names',
+		};
+
+		const render = () => {
+			const opts = Array.from(document.querySelectorAll<HTMLInputElement>('.rs-opt')).filter((i) => i.checked);
+			const short = opts.map((o) => o.dataset.flag ?? '').filter((f) => f.length === 1);
+			const long = opts.map((o) => o.dataset.flag ?? '').filter((f) => f.length > 1);
+			const src = val('rs-src') || '.';
+			const dst = val('rs-dst') || './backup';
+			const remote = /^[^/]*:/.test(dst) || /^[^/]*:/.test(src);
+			const parts: [string, string][] = [['rsync', 'The rsync program.']];
+			if (short.length) parts.push([`-${short.join('')}`, short.map((f) => `-${f} ${words[f]}`).join('; ') + '.']);
+			long.forEach((f) => parts.push([f, `${words[f][0].toUpperCase()}${words[f].slice(1)}.`]));
+			const bw = val('rs-bw');
+			if (bw) parts.push([`--bwlimit=${q(bw)}`, `Cap bandwidth at ${bw}${/^\d+$/.test(bw) ? ' KiB/s' : ''}.`]);
+			const port = val('rs-port');
+			const key = val('rs-key');
+			if (remote && ((port && port !== '22') || key)) {
+				const ssh = ['ssh', ...(port && port !== '22' ? ['-p', port] : []), ...(key ? ['-i', q(key)] : [])].join(' ');
+				parts.push([`-e ${q(ssh)}`, `Connect with: ${ssh}.`]);
+			}
+			const ex = byId<HTMLTextAreaElement>('rs-ex')
+				.value.split('\n')
+				.map((l) => l.trim())
+				.filter(Boolean);
+			ex.forEach((e) =>
+				parts.push([`--exclude=${q(e)}`, `Skip anything matching ${e}${long.includes('--delete') ? ' (and do not delete it on the other side)' : ''}.`]),
+			);
+			parts.push([q(src), `Source${/^[^/]*:/.test(src) ? ' on the remote host' : ''}.`]);
+			parts.push([q(dst), `Destination${/^[^/]*:/.test(dst) ? ' on the remote host, over SSH' : ''}.`]);
+			byId('rs-out').textContent = parts.map(([p]) => p).join(' ');
+			byId('rs-explain').replaceChildren(
+				...parts.flatMap(([k, v]) => {
+					const dt = document.createElement('dt');
+					dt.textContent = k;
+					const dd = document.createElement('dd');
+					dd.textContent = v;
+					return [dt, dd];
+				}),
+			);
+			const name = src.replace(/\/+$/, '').split(/[/:]/).pop() || src;
+			const target = dst.replace(/\/+$/, '');
+			byId('rs-slash').textContent = src.endsWith('/')
+				? `Source ends with a slash: the contents of ${src} go straight into ${target}/ (for example ${target}/index.html).`
+				: `Source has no trailing slash: the folder itself is copied, so you get ${target}/${name}/. Add a slash to copy only its contents.`;
+			const warns: string[] = [];
+			if (long.includes('--delete') && !long.includes('--dry-run'))
+				warns.push('--delete without --dry-run will remove files in the destination. Run a dry run first.');
+			if (long.includes('--delete') && !src.endsWith('/'))
+				warns.push('--delete with a source that has no trailing slash only cleans inside the copied folder, not the whole destination.');
+			if (src.startsWith(dst) || dst.startsWith(src.replace(/\/+$/, '') + '/'))
+				warns.push('The destination is inside the source: rsync would copy into itself.');
+			byId('rs-warn').replaceChildren(
+				...warns.map((t) => {
+					const li = document.createElement('li');
+					li.className = 'error';
+					li.textContent = t;
+					return li;
+				}),
+			);
+		};
+
+		document.querySelectorAll('main input, main textarea').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('rs-copy'), () => byId('rs-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.rs-area {
+		min-height: 70px;
+		font-family: var(--mono) !important;
+		font-size: 14px !important;
+	}
+	.rs-cmd {
+		min-height: auto !important;
+	}
+	.rs-slash {
+		margin: 0;
+		padding: 12px 14px;
+		border-radius: 12px;
+		background: var(--surface-2);
+		color: var(--ink);
+		font-size: 14px;
+	}
+	.rs-warn {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.rs-warn:empty {
+		display: none;
+	}
+	.rs-explain {
+		margin: 0;
+		padding: 12px 14px;
+		display: grid;
+		grid-template-columns: minmax(0, max-content) 1fr;
+		gap: 6px 16px;
+		font-size: 14px;
+	}
+	.rs-explain :global(dt) {
+		font-family: var(--mono);
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--ink);
+		overflow-wrap: anywhere;
+		max-width: 320px;
+	}
+	.rs-explain :global(dd) {
+		margin: 0;
+	}
+	@media (max-width: 560px) {
+		.rs-explain {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

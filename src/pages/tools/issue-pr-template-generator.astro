@@ -1,0 +1,336 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sampleFields = [
+	{ type: 'textarea', label: 'What happened?', extra: 'A clear description of the bug and what you expected instead.', required: true },
+	{ type: 'input', label: 'Version', extra: '1.4.2', required: true },
+	{ type: 'dropdown', label: 'Browser', extra: 'Chrome, Firefox, Safari, Edge', required: false },
+	{ type: 'textarea', label: 'Relevant log output', extra: 'Paste any logs here.', required: false },
+	{ type: 'checkboxes', label: 'Code of Conduct', extra: 'I agree to follow the Code of Conduct', required: true },
+];
+const sampleJson = JSON.stringify(sampleFields);
+---
+
+<ToolShell
+	slug="issue-pr-template-generator"
+	title="Issue & PR Template Generator"
+	description="GitHub issue forms and pull request templates, GitLab issue and merge request templates with quick actions, ready to drop in your repo."
+>
+	<div class="toolbar" id="it-tool" data-sample={sampleJson}>
+		<div class="seg" id="it-kind" role="group" aria-label="Template kind">
+			<button data-value="gh-issue" aria-pressed="true">
+				GitHub issue form
+			</button>
+			<button data-value="gh-pr" aria-pressed="false">
+				GitHub PR
+			</button>
+			<button data-value="gl-issue" aria-pressed="false">
+				GitLab issue
+			</button>
+			<button data-value="gl-mr" aria-pressed="false">
+				GitLab MR
+			</button>
+		</div>
+	</div>
+	<div class="fields">
+		<div class="field">
+			<label for="it-name">Template name</label>
+			<input id="it-name" value="Bug report" />
+		</div>
+		<div class="field">
+			<label for="it-desc">Description</label>
+			<input id="it-desc" value="Report something that is not working" />
+		</div>
+		<div class="field">
+			<label for="it-title">Title prefix</label>
+			<input id="it-title" value="[Bug]: " />
+		</div>
+		<div class="field">
+			<label for="it-labels">Labels · comma separated</label>
+			<input id="it-labels" spellcheck="false" value="bug, triage" />
+		</div>
+		<div class="field">
+			<label for="it-assignees">Assignees · comma separated</label>
+			<input id="it-assignees" spellcheck="false" value="octocat" />
+		</div>
+		<div class="field">
+			<label for="it-milestone">GitLab milestone</label>
+			<input id="it-milestone" spellcheck="false" value="" placeholder="v2.0" />
+		</div>
+	</div>
+	<section class="panel" id="it-form-panel">
+		<div class="panel-head">
+			<span>Form fields</span>
+			<button class="btn" id="it-add">
+				Add field
+			</button>
+		</div>
+		<div class="it-rows" id="it-rows"></div>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="it-file"></span>
+			<span class="it-actions">
+				<button class="btn" id="it-copy">
+					Copy
+				</button>
+				<button class="btn" id="it-dl">
+					Download
+				</button>
+			</span>
+		</div>
+		<pre class="out" id="it-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { stringify } from 'yaml';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Field = { type: string; label: string; extra: string; required: boolean };
+
+	const TYPES = ['input', 'textarea', 'dropdown', 'checkboxes', 'markdown'];
+	const EXTRA: Record<string, string> = {
+		input: 'Placeholder',
+		textarea: 'Description',
+		dropdown: 'Options, comma separated',
+		checkboxes: 'Options, comma separated',
+		markdown: 'Text',
+	};
+	const slugify = (s: string) =>
+		s
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-|-$/g, '') || 'template';
+	const csv = (s: string) =>
+		s
+			.split(',')
+			.map((x) => x.trim())
+			.filter(Boolean);
+
+	onPage('it-tool', () => {
+		let kind = 'gh-issue';
+		const fields: Field[] = JSON.parse(byId('it-tool').dataset.sample ?? '[]');
+		const val = (id: string) => byId<HTMLInputElement>(id).value;
+		const rowsEl = byId('it-rows');
+
+		const drawRows = () => {
+			rowsEl.replaceChildren(
+				...fields.map((f, i) => {
+					const row = document.createElement('div');
+					row.className = 'it-row';
+					const type = document.createElement('select');
+					type.setAttribute('aria-label', `Field ${i + 1} type`);
+					TYPES.forEach((t) => type.add(new Option(t, t, false, t === f.type)));
+					type.addEventListener('change', () => {
+						f.type = type.value;
+						drawRows();
+						render();
+					});
+					const text = (key: 'label' | 'extra', label: string) => {
+						const input = document.createElement('input');
+						input.value = f[key];
+						input.placeholder = label;
+						input.setAttribute('aria-label', `Field ${i + 1} ${label.toLowerCase()}`);
+						input.addEventListener('input', () => ((f[key] = input.value), render()));
+						return input;
+					};
+					const reqLabel = document.createElement('label');
+					reqLabel.className = 'check';
+					const req = document.createElement('input');
+					req.type = 'checkbox';
+					req.checked = f.required;
+					req.disabled = f.type === 'markdown';
+					req.addEventListener('input', () => ((f.required = req.checked), render()));
+					reqLabel.append(req, ' Required');
+					const del = document.createElement('button');
+					del.className = 'btn';
+					del.textContent = 'Remove';
+					del.setAttribute('aria-label', `Remove field ${i + 1}`);
+					del.addEventListener('click', () => {
+						fields.splice(i, 1);
+						drawRows();
+						render();
+					});
+					row.append(type, ...(f.type === 'markdown' ? [] : [text('label', 'Label')]), text('extra', EXTRA[f.type]), reqLabel, del);
+					return row;
+				}),
+			);
+		};
+
+		const issueForm = () => {
+			const used = new Set<string>();
+			const body = fields.map((f) => {
+				if (f.type === 'markdown') return { type: 'markdown', attributes: { value: f.extra } };
+				let id = slugify(f.label);
+				while (used.has(id)) id = `${id}-2`;
+				used.add(id);
+				const attributes: Record<string, unknown> = { label: f.label };
+				if (f.type === 'input') {
+					if (f.extra) attributes.placeholder = f.extra;
+				} else if (f.type === 'textarea') {
+					if (f.extra) attributes.description = f.extra;
+					if (/log/i.test(f.label)) attributes.render = 'shell';
+				} else if (f.type === 'dropdown') {
+					attributes.options = csv(f.extra);
+				} else {
+					attributes.options = csv(f.extra).map((label) => ({ label, required: f.required }));
+					return { type: f.type, id, attributes };
+				}
+				return { type: f.type, id, attributes, validations: { required: f.required } };
+			});
+			const doc: Record<string, unknown> = { name: val('it-name').trim() || 'Template', description: val('it-desc').trim() || 'Template' };
+			if (val('it-title')) doc.title = val('it-title');
+			if (csv(val('it-labels')).length) doc.labels = csv(val('it-labels'));
+			if (csv(val('it-assignees')).length) doc.assignees = csv(val('it-assignees'));
+			doc.body = body;
+			return stringify(doc, { lineWidth: 0 });
+		};
+
+		const quick = () => {
+			const lines: string[] = [];
+			const labels = csv(val('it-labels')).map((l) => (/\s/.test(l) ? `~"${l}"` : `~${l}`));
+			if (labels.length) lines.push(`/label ${labels.join(' ')}`);
+			const who = csv(val('it-assignees')).map((a) => `@${a.replace(/^@/, '')}`);
+			if (who.length) lines.push(`/assign ${who.join(' ')}`);
+			if (val('it-milestone').trim()) lines.push(`/milestone %"${val('it-milestone').trim()}"`);
+			return lines;
+		};
+
+		const render = () => {
+			const name = slugify(val('it-name'));
+			byId('it-form-panel').hidden = kind !== 'gh-issue';
+			let file: string;
+			let out: string;
+			if (kind === 'gh-issue') {
+				file = `.github/ISSUE_TEMPLATE/${name}.yml`;
+				out = issueForm();
+			} else if (kind === 'gh-pr') {
+				file = '.github/pull_request_template.md';
+				out = [
+					'## Summary',
+					'',
+					'What does this pull request change, and why?',
+					'',
+					'Closes #',
+					'',
+					'## Type of change',
+					'',
+					'- [ ] Bug fix',
+					'- [ ] New feature',
+					'- [ ] Breaking change',
+					'- [ ] Documentation',
+					'',
+					'## How to test',
+					'',
+					'1. ',
+					'',
+					'## Checklist',
+					'',
+					'- [ ] Tests added or updated',
+					'- [ ] Documentation updated',
+					'- [ ] Self-reviewed the diff',
+					'',
+				].join('\n');
+			} else if (kind === 'gl-issue') {
+				file = `.gitlab/issue_templates/${name}.md`;
+				out = [
+					`## ${val('it-name').trim() || 'Issue'}`,
+					'',
+					...fields
+						.filter((f) => f.type !== 'markdown')
+						.flatMap((f) => [
+							`### ${f.label}${f.required ? '' : ' (optional)'}`,
+							'',
+							...(f.type === 'dropdown' || f.type === 'checkboxes' ? csv(f.extra).map((o) => `- [ ] ${o}`) : [`<!-- ${f.extra || f.label} -->`]),
+							'',
+						]),
+					...quick(),
+					'',
+				].join('\n');
+			} else {
+				file = `.gitlab/merge_request_templates/${name}.md`;
+				out = [
+					'## What does this MR do?',
+					'',
+					'<!-- Describe the change and why it is needed. -->',
+					'',
+					'Closes #',
+					'',
+					'## How to test',
+					'',
+					'1. ',
+					'',
+					'## Checklist',
+					'',
+					'- [ ] Tests added or updated',
+					'- [ ] Documentation updated',
+					'- [ ] Pipeline is green',
+					'',
+					...quick(),
+					'',
+				].join('\n');
+			}
+			byId('it-file').textContent = file;
+			byId('it-out').textContent = out;
+		};
+
+		segmented(byId('it-kind'), (v) => {
+			kind = v;
+			const fresh: Record<string, string> = { 'gh-pr': 'Pull request', 'gl-mr': 'Default' };
+			if (fresh[v]) byId<HTMLInputElement>('it-name').value = fresh[v];
+			else if (['Pull request', 'Default'].includes(val('it-name'))) byId<HTMLInputElement>('it-name').value = 'Bug report';
+			render();
+		});
+		byId('it-add').addEventListener('click', () => {
+			fields.push({ type: 'input', label: 'New field', extra: '', required: false });
+			drawRows();
+			render();
+		});
+		document.querySelectorAll('main .fields input').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('it-copy'), () => byId('it-out').textContent ?? '');
+		byId('it-dl').addEventListener('click', () => {
+			const link = document.createElement('a');
+			link.href = URL.createObjectURL(new Blob([byId('it-out').textContent ?? ''], { type: 'text/plain' }));
+			link.download = (byId('it-file').textContent ?? 'template.md').split('/').pop() ?? 'template.md';
+			link.click();
+			URL.revokeObjectURL(link.href);
+		});
+		drawRows();
+		render();
+	});
+</script>
+
+<style>
+	.it-rows {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 12px 14px;
+	}
+	.it-rows :global(.it-row) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+	}
+	.it-rows :global(input:not([type='checkbox'])),
+	.it-rows :global(select) {
+		flex: 1 1 140px;
+		min-width: 0;
+		font: inherit;
+		font-size: 13px;
+		padding: 8px 10px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+		color: var(--ink);
+	}
+	.it-rows :global(select) {
+		flex: 0 1 130px;
+	}
+	.it-actions {
+		display: inline-flex;
+		gap: 6px;
+	}
+</style>

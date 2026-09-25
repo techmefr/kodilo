@@ -1,0 +1,151 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = JSON.stringify(
+	{
+		store: {
+			book: [
+				{ category: 'reference', author: 'Nigel Rees', title: 'Sayings of the Century', price: 8.95 },
+				{ category: 'fiction', author: 'Evelyn Waugh', title: 'Sword of Honour', price: 12.99 },
+				{ category: 'fiction', author: 'Herman Melville', title: 'Moby Dick', isbn: '0-553-21311-3', price: 8.99 },
+				{ category: 'fiction', author: 'J. R. R. Tolkien', title: 'The Lord of the Rings', isbn: '0-395-19395-8', price: 22.99 },
+			],
+			bicycle: { color: 'red', price: 19.95 },
+		},
+	},
+	null,
+	2,
+);
+
+const examples = [
+	'$..author',
+	'$.store.book[*].title',
+	'$.store.book[?(@.price < 10)]',
+	'$..book[?(@.isbn)]',
+	'$..book[-1:]',
+	'$..book[0,1]',
+	'$.store.*',
+	'$..price',
+];
+---
+
+<ToolShell
+	slug="jsonpath-tester"
+	title="JSONPath Tester"
+	description="Run JSONPath expressions against a JSON document and see every match with its exact path, live as you type."
+>
+	<div class="fields" id="jp-tool">
+		<div class="field wide" id="jp-field">
+			<label for="jp-expr">JSONPath expression</label>
+			<input id="jp-expr" spellcheck="false" value="$.store.book[?(@.price < 10)].title" />
+			<span class="field-note" id="jp-note"></span>
+		</div>
+	</div>
+	<div class="chips" id="jp-examples">
+		{examples.map((e) => (
+			<button data-expr={e}>{e}</button>
+		))}
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">JSON</div>
+			<textarea id="jp-in" spellcheck="false" aria-label="JSON input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="jp-count">Results</span>
+				<button class="btn" id="jp-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="jp-out" tabindex="0"></pre>
+		</section>
+	</div>
+	<p class="error" id="jp-error" hidden></p>
+	<section class="panel">
+		<div class="panel-head">Matched paths</div>
+		<ol class="jp-paths" id="jp-paths" tabindex="0"></ol>
+	</section>
+</ToolShell>
+
+<script>
+	import { JSONPath } from 'jsonpath-plus';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	onPage('jp-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jp-in');
+		const expr = byId<HTMLInputElement>('jp-expr');
+		const output = byId('jp-out');
+		const error = byId('jp-error');
+
+		const render = () => {
+			let json: unknown;
+			try {
+				json = JSON.parse(input.value);
+			} catch (e) {
+				error.textContent = `Invalid JSON: ${(e as Error).message}`;
+				error.hidden = false;
+				return;
+			}
+			try {
+				const matches = JSONPath({ path: expr.value.trim() || '$', json: json as object, resultType: 'all', eval: 'safe' }) as {
+					path: string;
+					value: unknown;
+				}[];
+				output.textContent = JSON.stringify(
+					matches.map((m) => m.value),
+					null,
+					2,
+				);
+				byId('jp-count').textContent = `${matches.length} ${matches.length === 1 ? 'match' : 'matches'}`;
+				byId('jp-paths').replaceChildren(
+					...matches.map((m) => {
+						const li = document.createElement('li');
+						li.textContent = m.path;
+						return li;
+					}),
+				);
+				byId('jp-field').classList.remove('invalid');
+				byId('jp-note').textContent = '';
+				error.hidden = true;
+			} catch (e) {
+				byId('jp-field').classList.add('invalid');
+				byId('jp-note').textContent = (e as Error).message;
+				output.textContent = '';
+				byId('jp-count').textContent = 'Results';
+				byId('jp-paths').replaceChildren();
+			}
+		};
+
+		byId('jp-examples')
+			.querySelectorAll<HTMLButtonElement>('button')
+			.forEach((b) =>
+				b.addEventListener('click', () => {
+					expr.value = b.dataset.expr ?? '';
+					render();
+				}),
+			);
+		input.addEventListener('input', render);
+		expr.addEventListener('input', render);
+		copyButton(byId('jp-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.chips :global(button) {
+		font-family: var(--mono);
+		font-size: 12px;
+	}
+	.jp-paths {
+		margin: 0;
+		padding: 12px 14px 12px 42px;
+		font-family: var(--mono);
+		font-size: 13px;
+		line-height: 1.7;
+		color: var(--ink);
+		max-height: 260px;
+		overflow: auto;
+		word-break: break-all;
+	}
+</style>
