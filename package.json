@@ -15,6 +15,7 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"test": "playwright test --project=desktop --project=mobile --project=dark",
+		"test:changed": "node scripts/test-changed.mjs",
 		"test:install": "playwright install --with-deps chromium",
 		"brand": "node scripts/build-brand.mjs && node scripts/build-icons.mjs",
 		"prebuild": "node scripts/build-oui.mjs",
