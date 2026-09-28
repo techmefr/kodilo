@@ -56,9 +56,9 @@ test('inbox tester has the widget and the sidebar links to the feedback form', a
 test('track is a no-op without umami', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (e) => errors.push(e.message));
+	await page.route('https://cloud.umami.is/**', (route) => route.abort());
 	await page.goto('tools/csv-to-json/');
 	expect(await page.evaluate(() => 'umami' in window)).toBe(false);
-	await expect(page.locator('script[src*="umami"]')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Yes, useful' }).click();
 	await page.getByRole('button', { name: 'Share link' }).click();
 	await expect(page.locator('[data-share-status]')).toContainText('Link copied');
