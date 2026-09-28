@@ -1,0 +1,228 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sliders = [
+	['blur', 'Blur', 0, 40, 16, 'px'],
+	['alpha', 'Transparency', 0, 100, 22, '%'],
+	['sat', 'Saturation', 100, 250, 180, '%'],
+	['border', 'Border', 0, 100, 35, '%'],
+	['radius', 'Radius', 0, 48, 24, 'px'],
+];
+---
+
+<ToolShell
+	slug="glassmorphism-generator"
+	title="Glassmorphism Generator"
+	description="Frosted glass cards with backdrop blur, tint and border, previewed over a colorful background."
+>
+	<div class="gl-stage user-colors" id="gl-tool" data-bg="aurora">
+		<span class="gl-blob gl-a"></span>
+		<span class="gl-blob gl-b"></span>
+		<span class="gl-blob gl-c"></span>
+		<div class="gl-card" id="gl-card">
+			<p class="gl-eyebrow">Now playing</p>
+			<p class="gl-title">Midnight City</p>
+			<p class="gl-artist">M83 · Hurry Up, We're Dreaming</p>
+			<span class="gl-bar">
+				<span></span>
+			</span>
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="gl-bg" aria-label="Background">
+			<button data-value="aurora" aria-pressed="true">
+				Aurora
+			</button>
+			<button data-value="sunset" aria-pressed="false">
+				Sunset
+			</button>
+			<button data-value="ocean" aria-pressed="false">
+				Ocean
+			</button>
+		</div>
+		<label class="check">
+			Tint <input type="color" id="gl-color" value="#ffffff" class="gl-color" />
+		</label>
+	</div>
+	<section class="panel gl-controls">
+		{sliders.map(([id, label, min, max, value]) => (
+			<label class="gl-slider">
+				<span>{label}</span>
+				<input type="range" id={`gl-${id}`} min={min} max={max} value={value} />
+				<b id={`gl-${id}-value`} />
+			</label>
+		))}
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="gl-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out gl-out" id="gl-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const UNITS: Record<string, string> = { blur: 'px', alpha: '%', sat: '%', border: '%', radius: 'px' };
+
+	onPage('gl-tool', () => {
+		const color = byId<HTMLInputElement>('gl-color');
+		const v = (id: string) => Number(byId<HTMLInputElement>(`gl-${id}`).value);
+
+		const render = () => {
+			Object.entries(UNITS).forEach(([id, unit]) => (byId(`gl-${id}-value`).textContent = `${v(id)}${unit}`));
+			const n = parseInt(color.value.slice(1), 16);
+			const rgb = `${n >> 16} ${(n >> 8) & 255} ${n & 255}`;
+			const filter = `blur(${v('blur')}px) saturate(${v('sat')}%)`;
+			const decls: [string, string][] = [
+				['background', `rgb(${rgb} / ${v('alpha')}%)`],
+				['backdrop-filter', filter],
+				['-webkit-backdrop-filter', filter],
+				['border', `1px solid rgb(${rgb} / ${v('border')}%)`],
+				['border-radius', `${v('radius')}px`],
+				['box-shadow', '0 8px 32px rgb(0 0 0 / 18%)'],
+			];
+			const card = byId('gl-card');
+			decls.forEach(([k, value]) => card.style.setProperty(k, value));
+			byId('gl-css').textContent = `.glass {\n${decls.map(([k, value]) => `  ${k}: ${value};`).join('\n')}\n}`;
+		};
+
+		Object.keys(UNITS).forEach((id) => byId(`gl-${id}`).addEventListener('input', render));
+		color.addEventListener('input', render);
+		segmented(byId('gl-bg'), (value) => (byId('gl-tool').dataset.bg = value));
+		copyButton(byId('gl-copy'), () => byId('gl-css').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.gl-stage {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 320px;
+		padding: 24px 16px;
+		border-radius: 14px;
+		overflow: hidden;
+		background: linear-gradient(135deg, #1e1b4b, #312e81);
+	}
+	.gl-stage[data-bg='sunset'] {
+		background: linear-gradient(135deg, #7c2d12, #be185d);
+	}
+	.gl-stage[data-bg='ocean'] {
+		background: linear-gradient(135deg, #083344, #1e3a8a);
+	}
+	.gl-blob {
+		position: absolute;
+		border-radius: 50%;
+		width: 200px;
+		height: 200px;
+	}
+	.gl-a {
+		background: #22d3ee;
+		top: 8%;
+		left: 10%;
+	}
+	.gl-b {
+		background: #f472b6;
+		bottom: 4%;
+		right: 12%;
+	}
+	.gl-c {
+		background: #facc15;
+		width: 120px;
+		height: 120px;
+		top: 18%;
+		right: 30%;
+	}
+	[data-bg='sunset'] .gl-a {
+		background: #fb923c;
+	}
+	[data-bg='sunset'] .gl-c {
+		background: #fde047;
+	}
+	[data-bg='ocean'] .gl-b {
+		background: #34d399;
+	}
+	[data-bg='ocean'] .gl-c {
+		background: #a78bfa;
+	}
+	.gl-card {
+		position: relative;
+		width: 100%;
+		max-width: 300px;
+		padding: 22px;
+		color: #ffffff;
+	}
+	.gl-card p {
+		margin: 0;
+	}
+	.gl-eyebrow {
+		font-size: 11px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		opacity: 0.85;
+	}
+	.gl-title {
+		font-size: 22px;
+		font-weight: 800;
+		margin-top: 6px !important;
+	}
+	.gl-artist {
+		font-size: 13px;
+		opacity: 0.9;
+	}
+	.gl-bar {
+		display: block;
+		height: 4px;
+		margin-top: 18px;
+		border-radius: 4px;
+		background: rgb(255 255 255 / 30%);
+	}
+	.gl-bar span {
+		display: block;
+		width: 42%;
+		height: 100%;
+		border-radius: 4px;
+		background: #ffffff;
+	}
+	.gl-color {
+		width: 44px;
+		height: 30px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: transparent;
+	}
+	.gl-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 10px 14px;
+	}
+	.gl-slider {
+		display: grid;
+		grid-template-columns: 96px minmax(0, 1fr) 56px;
+		align-items: center;
+		gap: 12px;
+		font-size: 13px;
+		color: var(--ink-soft);
+		font-weight: 600;
+	}
+	.gl-slider input {
+		accent-color: var(--accent-strong);
+		min-width: 0;
+	}
+	.gl-slider b {
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+	.gl-out {
+		min-height: auto !important;
+	}
+</style>

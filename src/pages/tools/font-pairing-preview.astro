@@ -1,0 +1,201 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const pairs = [
+	['Playfair Display', 'serif', '700', 'Source Sans 3', 'sans-serif'],
+	['Montserrat', 'sans-serif', '700', 'Merriweather', 'serif'],
+	['Poppins', 'sans-serif', '600', 'Lora', 'serif'],
+	['Space Grotesk', 'sans-serif', '700', 'Inter', 'sans-serif'],
+	['DM Serif Display', 'serif', '400', 'DM Sans', 'sans-serif'],
+	['Fraunces', 'serif', '700', 'Work Sans', 'sans-serif'],
+	['Oswald', 'sans-serif', '600', 'Open Sans', 'sans-serif'],
+	['Libre Baskerville', 'serif', '700', 'Nunito Sans', 'sans-serif'],
+	['Raleway', 'sans-serif', '700', 'Roboto', 'sans-serif'],
+	['Archivo Black', 'sans-serif', '400', 'Archivo', 'sans-serif'],
+	['Cormorant Garamond', 'serif', '600', 'Proza Libre', 'sans-serif'],
+	['Sora', 'sans-serif', '700', 'IBM Plex Serif', 'serif'],
+];
+---
+
+<ToolShell
+	slug="font-pairing-preview"
+	title="Font Pairing Preview"
+	description="Try curated Google Fonts heading and body pairs on a realistic article, then copy the link tag and CSS."
+>
+	<div class="toolbar" id="fp-tool">
+		<label class="check">
+			Pair
+			<select id="fp-pair" class="fp-select">
+				{pairs.map(([h, hc, hw, b, bc], i) => (
+					<option value={String(i)} data-pair={JSON.stringify({ h, hc, hw, b, bc })}>{`${h} + ${b}`}</option>
+				))}
+			</select>
+		</label>
+		<button class="btn" id="fp-prev" aria-label="Previous pair">
+			‹
+		</button>
+		<button class="btn" id="fp-next" aria-label="Next pair">
+			›
+		</button>
+		<label class="check">
+			<input type="checkbox" id="fp-load" /> Load fonts from Google Fonts
+		</label>
+	</div>
+	<p class="fp-note" id="fp-status">
+		Fonts are fetched from fonts.googleapis.com only after you tick the box. Until then the preview uses local fallbacks.
+	</p>
+	<article class="fp-article" id="fp-article">
+		<p class="fp-kicker">Field notes</p>
+		<h2 class="fp-heading" id="fp-heading-preview" contenteditable="plaintext-only" aria-label="Heading preview text" spellcheck="false">
+			Designing calm interfaces for busy people
+		</h2>
+		<p class="fp-body">
+			Good typography disappears. The reader should notice the story, not the letters. Pair a characterful heading face with a quiet, legible text face, keep
+			line length between 60 and 75 characters and give paragraphs room to breathe.
+		</p>
+		<h3 class="fp-heading fp-sub">A rhythm you can feel</h3>
+		<p class="fp-body">
+			Headings set the tone, body text carries the weight. Contrast in style, harmony in proportion. <strong>Bold for emphasis</strong>, and
+			<em>italics for voice</em>.
+		</p>
+	</article>
+	<section class="panel">
+		<div class="panel-head">
+			<span>HTML link</span>
+			<button class="btn" id="fp-copy-link">
+				Copy
+			</button>
+		</div>
+		<pre class="out fp-out" id="fp-link"></pre>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="fp-copy-css">
+				Copy
+			</button>
+		</div>
+		<pre class="out fp-out" id="fp-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Pair = { h: string; hc: string; hw: string; b: string; bc: string };
+
+	const family = (name: string, weights: string) => `family=${name.replace(/ /g, '+')}:${weights}`;
+
+	onPage('fp-tool', () => {
+		const select = byId<HTMLSelectElement>('fp-pair');
+		const load = byId<HTMLInputElement>('fp-load');
+		const current = (): Pair => JSON.parse(select.selectedOptions[0].dataset.pair!);
+
+		const url = (p: Pair) => {
+			const heading = p.h === p.b ? '' : `${family(p.h, `wght@${p.hw}`)}&`;
+			return `https://fonts.googleapis.com/css2?${heading}${family(p.b, 'ital,wght@0,400;0,700;1,400')}&display=swap`;
+		};
+
+		const inject = (href: string) => {
+			let link = document.getElementById('fp-font-link') as HTMLLinkElement | null;
+			if (!link) {
+				link = document.createElement('link');
+				link.id = 'fp-font-link';
+				link.rel = 'stylesheet';
+				document.head.append(link);
+			}
+			if (link.href !== href) link.href = href;
+		};
+
+		const render = () => {
+			const p = current();
+			const href = url(p);
+			const article = byId('fp-article');
+			article.style.setProperty('--fp-heading', `'${p.h}', ${p.hc}`);
+			article.style.setProperty('--fp-heading-weight', p.hw);
+			article.style.setProperty('--fp-body', `'${p.b}', ${p.bc}`);
+			if (load.checked) inject(href);
+			byId('fp-status').textContent = load.checked
+				? `Loaded ${p.h} and ${p.b} from Google Fonts.`
+				: 'Fonts are fetched from fonts.googleapis.com only after you tick the box. Until then the preview uses local fallbacks.';
+			byId('fp-link').textContent =
+				`<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link href="${href}" rel="stylesheet">`;
+			byId('fp-css').textContent =
+				`h1, h2, h3 {\n  font-family: '${p.h}', ${p.hc};\n  font-weight: ${p.hw};\n}\n\nbody {\n  font-family: '${p.b}', ${p.bc};\n}`;
+		};
+
+		const step = (d: number) => {
+			select.selectedIndex = (select.selectedIndex + d + select.options.length) % select.options.length;
+			render();
+		};
+
+		select.addEventListener('input', render);
+		load.addEventListener('change', render);
+		byId('fp-prev').addEventListener('click', () => step(-1));
+		byId('fp-next').addEventListener('click', () => step(1));
+		copyButton(byId('fp-copy-link'), () => byId('fp-link').textContent ?? '');
+		copyButton(byId('fp-copy-css'), () => byId('fp-css').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.fp-select {
+		font: inherit;
+		font-size: 13px;
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+		color: var(--ink);
+		max-width: 100%;
+	}
+	.fp-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.fp-article {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 14px;
+		padding: 24px;
+		color: var(--ink);
+		font-family: var(--fp-body);
+		overflow-wrap: anywhere;
+	}
+	.fp-kicker {
+		margin: 0 0 6px;
+		font-size: 12px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--ink-soft);
+	}
+	.fp-heading {
+		font-family: var(--fp-heading);
+		font-weight: var(--fp-heading-weight);
+		font-size: clamp(1.6rem, 1rem + 2.5vw, 2.6rem);
+		line-height: 1.15;
+		margin: 0 0 14px;
+		outline: none;
+	}
+	.fp-heading:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 4px;
+	}
+	.fp-sub {
+		font-size: 1.4rem;
+		margin-top: 20px;
+	}
+	.fp-body {
+		font-size: 17px;
+		line-height: 1.65;
+		margin: 0;
+		max-width: 65ch;
+	}
+	.fp-out {
+		min-height: auto !important;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+</style>

@@ -1,0 +1,172 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const rows = [
+	['h1', 36, 64],
+	['h2', 28, 44],
+	['body', 16, 19],
+	['gap', 16, 48],
+];
+---
+
+<ToolShell
+	slug="fluid-clamp-generator"
+	title="Fluid Clamp Generator"
+	description="Turn min and max sizes into CSS clamp() values that scale smoothly between two viewport widths."
+>
+	<div class="toolbar" id="fc-tool">
+		<label class="check">
+			Min viewport <input class="num" type="number" id="fc-vmin" min="200" max="3000" value="360" /> px
+		</label>
+		<label class="check">
+			Max viewport <input class="num" type="number" id="fc-vmax" min="200" max="4000" value="1280" /> px
+		</label>
+		<label class="check">
+			Root <input class="num" type="number" id="fc-root" min="8" max="32" value="16" /> px
+		</label>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Sizes</span>
+			<span class="fc-hint">name · min px · max px</span>
+		</div>
+		<div class="fc-rows">
+			{rows.map(([name, min, max], i) => (
+				<div class="fc-row">
+					<input class="num fc-name" id={`fc-n${i}`} value={name} aria-label={`Row ${i + 1} name`} />
+					<input class="num" type="number" id={`fc-a${i}`} value={min} min="0" aria-label={`Row ${i + 1} minimum size in px`} />
+					<input class="num" type="number" id={`fc-b${i}`} value={max} min="0" aria-label={`Row ${i + 1} maximum size in px`} />
+					<code class="fc-value" id={`fc-v${i}`} />
+				</div>
+			))}
+		</div>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<label class="check fc-vw">
+				Viewport <input type="range" id="fc-vw" min="320" max="1600" value="768" /> <b id="fc-vw-value">768px</b>
+			</label>
+		</div>
+		<div class="fc-preview" id="fc-preview"></div>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="fc-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out fc-out" id="fc-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const ROWS = 4;
+	const r = (v: number, d = 4) => String(Number(v.toFixed(d)));
+
+	onPage('fc-tool', () => {
+		const num = (id: string) => Number(byId<HTMLInputElement>(id).value) || 0;
+
+		const render = () => {
+			const vmin = num('fc-vmin');
+			const vmax = num('fc-vmax');
+			const root = num('fc-root') || 16;
+			const vw = num('fc-vw');
+			byId('fc-vw-value').textContent = `${vw}px`;
+			const lines: string[] = [];
+			const preview: HTMLElement[] = [];
+			for (let i = 0; i < ROWS; i++) {
+				const name = byId<HTMLInputElement>(`fc-n${i}`)
+					.value.trim()
+					.replace(/[^\w-]/g, '-');
+				const min = num(`fc-a${i}`);
+				const max = num(`fc-b${i}`);
+				const slope = vmax === vmin ? 0 : (max - min) / (vmax - vmin);
+				const intercept = min - slope * vmin;
+				const lo = Math.min(min, max);
+				const hi = Math.max(min, max);
+				const value = `clamp(${r(lo / root)}rem, ${r(intercept / root)}rem + ${r(slope * 100)}vw, ${r(hi / root)}rem)`;
+				byId(`fc-v${i}`).textContent = value;
+				if (!name) continue;
+				lines.push(`  --${name}: ${value};`);
+				const size = Math.min(hi, Math.max(lo, intercept + slope * vw));
+				const item = document.createElement('p');
+				const label = document.createElement('span');
+				label.textContent = `${name} · ${r(size, 1)}px`;
+				const sample = document.createElement('span');
+				sample.className = 'fc-sample';
+				sample.style.fontSize = `${size}px`;
+				sample.textContent = 'Fluid typography';
+				item.append(label, sample);
+				preview.push(item);
+			}
+			byId('fc-preview').replaceChildren(...preview);
+			byId('fc-out').textContent = `:root {\n${lines.join('\n')}\n}`;
+		};
+
+		document.querySelectorAll<HTMLInputElement>('input[id^="fc-"]').forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('fc-copy'), () => byId('fc-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.fc-hint {
+		font-size: 12px;
+		color: var(--ink-soft);
+		padding-right: 6px;
+	}
+	.fc-rows {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 12px 14px;
+	}
+	.fc-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+	}
+	.fc-name {
+		width: 90px;
+	}
+	.fc-value {
+		font-family: var(--mono);
+		font-size: 12px;
+		color: var(--ink);
+		overflow-wrap: anywhere;
+		min-width: 0;
+		flex: 1 1 220px;
+	}
+	.fc-vw input {
+		accent-color: var(--accent-strong);
+		width: 180px;
+		max-width: 40vw;
+	}
+	.fc-preview {
+		padding: 10px 14px;
+		overflow: hidden;
+	}
+	.fc-preview :global(p) {
+		display: flex;
+		flex-direction: column;
+		margin: 0 0 10px;
+		font-size: 12px;
+		color: var(--ink-soft);
+		font-family: var(--mono);
+	}
+	.fc-preview :global(.fc-sample) {
+		font-family: var(--sans);
+		color: var(--ink);
+		line-height: 1.15;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.fc-out {
+		min-height: auto !important;
+	}
+</style>

@@ -1,0 +1,223 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const directions = [
+	['up-left', '◤'],
+	['up', '▲'],
+	['up-right', '◥'],
+	['left', '◀'],
+	['right', '▶'],
+	['down-left', '◣'],
+	['down', '▼'],
+	['down-right', '◢'],
+];
+---
+
+<ToolShell
+	slug="css-triangle-generator"
+	title="CSS Triangle Generator"
+	description="Triangles in any of 8 directions with the border trick or clip-path, ready to copy."
+>
+	<div class="tr-stage user-colors" id="tr-tool">
+		<div id="tr-shape"></div>
+	</div>
+	<div class="toolbar">
+		<div class="seg tr-dirs" id="tr-dir" aria-label="Direction">
+			{directions.map(([value, glyph]) => (
+				<button data-value={value} aria-pressed={value === 'up'} aria-label={value.replace('-', ' ')}>
+					<span aria-hidden="true">{glyph}</span>
+				</button>
+			))}
+		</div>
+		<div class="seg" id="tr-method" aria-label="Technique">
+			<button data-value="border" aria-pressed="true">
+				Borders
+			</button>
+			<button data-value="clip" aria-pressed="false">
+				clip-path
+			</button>
+		</div>
+	</div>
+	<section class="panel tr-controls">
+		<label class="tr-slider">
+			<span>Width</span>
+			<input type="range" id="tr-w" min="4" max="240" value="120" />
+			<b id="tr-w-value"></b>
+		</label>
+		<label class="tr-slider">
+			<span>Height</span>
+			<input type="range" id="tr-h" min="4" max="240" value="90" />
+			<b id="tr-h-value"></b>
+		</label>
+		<label class="tr-slider">
+			<span>Color</span>
+			<input type="color" id="tr-color" value="#6d4fe0" />
+			<span></span>
+		</label>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="tr-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out tr-out" id="tr-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const POLYGONS: Record<string, string> = {
+		up: '50% 0, 100% 100%, 0 100%',
+		down: '0 0, 100% 0, 50% 100%',
+		left: '100% 0, 100% 100%, 0 50%',
+		right: '0 0, 100% 50%, 0 100%',
+		'up-left': '0 0, 100% 0, 0 100%',
+		'up-right': '0 0, 100% 0, 100% 100%',
+		'down-left': '0 0, 100% 100%, 0 100%',
+		'down-right': '100% 0, 100% 100%, 0 100%',
+	};
+
+	const borders = (dir: string, w: number, h: number, color: string): [string, string][] => {
+		const t = 'transparent';
+		const half = (n: number) => Number((n / 2).toFixed(2));
+		switch (dir) {
+			case 'up':
+				return [
+					['border-left', `${half(w)}px solid ${t}`],
+					['border-right', `${half(w)}px solid ${t}`],
+					['border-bottom', `${h}px solid ${color}`],
+				];
+			case 'down':
+				return [
+					['border-left', `${half(w)}px solid ${t}`],
+					['border-right', `${half(w)}px solid ${t}`],
+					['border-top', `${h}px solid ${color}`],
+				];
+			case 'left':
+				return [
+					['border-top', `${half(h)}px solid ${t}`],
+					['border-bottom', `${half(h)}px solid ${t}`],
+					['border-right', `${w}px solid ${color}`],
+				];
+			case 'right':
+				return [
+					['border-top', `${half(h)}px solid ${t}`],
+					['border-bottom', `${half(h)}px solid ${t}`],
+					['border-left', `${w}px solid ${color}`],
+				];
+			case 'up-left':
+				return [
+					['border-top', `${h}px solid ${color}`],
+					['border-right', `${w}px solid ${t}`],
+				];
+			case 'up-right':
+				return [
+					['border-top', `${h}px solid ${color}`],
+					['border-left', `${w}px solid ${t}`],
+				];
+			case 'down-left':
+				return [
+					['border-bottom', `${h}px solid ${color}`],
+					['border-right', `${w}px solid ${t}`],
+				];
+			default:
+				return [
+					['border-bottom', `${h}px solid ${color}`],
+					['border-left', `${w}px solid ${t}`],
+				];
+		}
+	};
+
+	onPage('tr-tool', () => {
+		let dir = 'up';
+		let method = 'border';
+		const w = byId<HTMLInputElement>('tr-w');
+		const h = byId<HTMLInputElement>('tr-h');
+		const color = byId<HTMLInputElement>('tr-color');
+
+		const render = () => {
+			byId('tr-w-value').textContent = `${w.value}px`;
+			byId('tr-h-value').textContent = `${h.value}px`;
+			const W = Number(w.value);
+			const H = Number(h.value);
+			const decls: [string, string][] =
+				method === 'border'
+					? [['width', '0'], ['height', '0'], ...borders(dir, W, H, color.value)]
+					: [
+							['width', `${W}px`],
+							['height', `${H}px`],
+							['background', color.value],
+							['clip-path', `polygon(${POLYGONS[dir]})`],
+						];
+			const shape = byId('tr-shape');
+			shape.removeAttribute('style');
+			decls.forEach(([k, v]) => shape.style.setProperty(k, v));
+			byId('tr-css').textContent = `.triangle {\n${decls.map(([k, v]) => `  ${k}: ${v};`).join('\n')}\n}`;
+		};
+
+		[w, h, color].forEach((el) => el.addEventListener('input', render));
+		segmented(byId('tr-dir'), (value) => {
+			dir = value;
+			render();
+		});
+		segmented(byId('tr-method'), (value) => {
+			method = value;
+			render();
+		});
+		copyButton(byId('tr-copy'), () => byId('tr-css').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.tr-stage {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 280px;
+		border-radius: 14px;
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		overflow: hidden;
+	}
+	.tr-dirs button {
+		min-width: 36px;
+	}
+	.tr-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 10px 14px;
+	}
+	.tr-slider {
+		display: grid;
+		grid-template-columns: 70px minmax(0, 1fr) 56px;
+		align-items: center;
+		gap: 12px;
+		font-size: 13px;
+		color: var(--ink-soft);
+		font-weight: 600;
+	}
+	.tr-slider input[type='range'] {
+		accent-color: var(--accent-strong);
+		min-width: 0;
+	}
+	.tr-slider input[type='color'] {
+		width: 100%;
+		height: 30px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: transparent;
+	}
+	.tr-slider b {
+		color: var(--ink);
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+	}
+	.tr-out {
+		min-height: auto !important;
+	}
+</style>

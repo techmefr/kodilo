@@ -1,0 +1,228 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const corners = [
+	['tl', 'Top left', 30, 30],
+	['tr', 'Top right', 70, 30],
+	['br', 'Bottom right', 70, 70],
+	['bl', 'Bottom left', 30, 70],
+];
+---
+
+<ToolShell
+	slug="border-radius-generator"
+	title="Border Radius Generator"
+	description="Shape boxes with all 8 border-radius values, drag the handles for organic blobs, copy the CSS."
+>
+	<div class="br-stage user-colors" id="br-tool">
+		<div class="br-frame" id="br-frame">
+			<div class="br-shape" id="br-shape"></div>
+			<span class="br-handle" data-key="tlh" aria-hidden="true"></span>
+			<span class="br-handle" data-key="trh" aria-hidden="true"></span>
+			<span class="br-handle" data-key="trv" aria-hidden="true"></span>
+			<span class="br-handle" data-key="brv" aria-hidden="true"></span>
+			<span class="br-handle" data-key="brh" aria-hidden="true"></span>
+			<span class="br-handle" data-key="blh" aria-hidden="true"></span>
+			<span class="br-handle" data-key="blv" aria-hidden="true"></span>
+			<span class="br-handle" data-key="tlv" aria-hidden="true"></span>
+		</div>
+	</div>
+	<p class="br-note">Drag the dots around the edges, or use the sliders. Horizontal and vertical radii are separate, which is what makes organic shapes.</p>
+	<div class="chips" id="br-presets">
+		<button data-values="30,70,70,30,30,30,70,70">Blob</button>
+		<button data-values="0,100,0,100,0,100,0,100">Leaf</button>
+		<button data-values="50,50,50,50,60,60,40,40">Egg</button>
+		<button data-values="50,50,50,50,50,50,50,50">Circle</button>
+		<button data-values="0,50,50,50,0,50,50,50">Drop</button>
+		<button data-values="12,12,12,12,12,12,12,12">Card</button>
+		<button id="br-random">Random organic</button>
+	</div>
+	<section class="panel br-controls">
+		{corners.map(([id, label, h, v]) => (
+			<fieldset class="br-corner">
+				<legend>{label}</legend>
+				<label class="br-slider">
+					<span>Horizontal</span>
+					<input type="range" id={`br-${id}h`} min="0" max="100" value={h} />
+					<b id={`br-${id}h-value`} />
+				</label>
+				<label class="br-slider">
+					<span>Vertical</span>
+					<input type="range" id={`br-${id}v`} min="0" max="100" value={v} />
+					<b id={`br-${id}v-value`} />
+				</label>
+			</fieldset>
+		))}
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="br-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out br-out" id="br-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const KEYS = ['tlh', 'trh', 'brh', 'blh', 'tlv', 'trv', 'brv', 'blv'];
+
+	onPage('br-tool', () => {
+		const input = (key: string) => byId<HTMLInputElement>(`br-${key}`);
+		const v = (key: string) => Number(input(key).value);
+		const handles = Array.from(document.querySelectorAll<HTMLElement>('.br-handle'));
+
+		const place = (el: HTMLElement) => {
+			const key = el.dataset.key!;
+			const p = v(key);
+			const pos: Record<string, [number, number]> = {
+				tlh: [p, 0],
+				trh: [100 - p, 0],
+				trv: [100, p],
+				brv: [100, 100 - p],
+				brh: [100 - p, 100],
+				blh: [p, 100],
+				blv: [0, 100 - p],
+				tlv: [0, p],
+			};
+			el.style.left = `${pos[key][0]}%`;
+			el.style.top = `${pos[key][1]}%`;
+		};
+
+		const render = () => {
+			KEYS.forEach((key) => (byId(`br-${key}-value`).textContent = `${v(key)}%`));
+			const h = ['tlh', 'trh', 'brh', 'blh'].map((k) => `${v(k)}%`);
+			const vert = ['tlv', 'trv', 'brv', 'blv'].map((k) => `${v(k)}%`);
+			const same = h.join() === vert.join();
+			const allSame = same && new Set(h).size === 1;
+			const value = allSame ? h[0] : same ? h.join(' ') : `${h.join(' ')} / ${vert.join(' ')}`;
+			byId('br-shape').style.borderRadius = value;
+			handles.forEach(place);
+			byId('br-css').textContent = `border-radius: ${value};`;
+		};
+
+		const set = (values: number[]) => {
+			KEYS.forEach((key, i) => (input(key).value = String(values[i])));
+			render();
+		};
+
+		handles.forEach((el) =>
+			el.addEventListener('pointerdown', (e) => {
+				e.preventDefault();
+				el.setPointerCapture(e.pointerId);
+				const key = el.dataset.key!;
+				const move = (ev: PointerEvent) => {
+					const rect = byId('br-frame').getBoundingClientRect();
+					const x = ((ev.clientX - rect.left) / rect.width) * 100;
+					const y = ((ev.clientY - rect.top) / rect.height) * 100;
+					const raw = key === 'tlh' || key === 'blh' ? x : key === 'trh' || key === 'brh' ? 100 - x : key === 'tlv' || key === 'trv' ? y : 100 - y;
+					input(key).value = String(Math.round(Math.min(100, Math.max(0, raw))));
+					render();
+				};
+				const up = () => {
+					el.removeEventListener('pointermove', move);
+					el.removeEventListener('pointerup', up);
+				};
+				el.addEventListener('pointermove', move);
+				el.addEventListener('pointerup', up);
+			}),
+		);
+		KEYS.forEach((key) => input(key).addEventListener('input', render));
+		document
+			.querySelectorAll<HTMLButtonElement>('#br-presets button[data-values]')
+			.forEach((button) => button.addEventListener('click', () => set(button.dataset.values!.split(',').map(Number))));
+		byId('br-random').addEventListener('click', () => {
+			const a = Array.from({ length: 4 }, () => 20 + Math.round(Math.random() * 60));
+			const b = Array.from({ length: 4 }, () => 20 + Math.round(Math.random() * 60));
+			set([a[0], 100 - a[0], a[1], 100 - a[1], b[0], b[1], 100 - b[1], 100 - b[0]]);
+		});
+		copyButton(byId('br-copy'), () => byId('br-css').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.br-stage {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 36px 24px;
+		border-radius: 14px;
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+	}
+	.br-frame {
+		position: relative;
+		width: min(260px, 100%);
+		aspect-ratio: 1;
+		outline: 1px dashed var(--border);
+		touch-action: none;
+	}
+	.br-shape {
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(135deg, #8b5cf6, #ec4899);
+	}
+	.br-handle {
+		position: absolute;
+		width: 18px;
+		height: 18px;
+		margin: -9px 0 0 -9px;
+		border-radius: 50%;
+		background: #ffffff;
+		border: 2px solid #6d4fe0;
+		box-shadow: 0 1px 4px rgb(0 0 0 / 30%);
+		cursor: grab;
+		touch-action: none;
+	}
+	.br-handle:active {
+		cursor: grabbing;
+	}
+	.br-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.br-controls {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		gap: 8px 20px;
+		padding: 10px 14px;
+	}
+	.br-corner {
+		border: 0;
+		margin: 0;
+		padding: 0;
+		min-width: 0;
+	}
+	.br-corner legend {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink);
+		padding: 4px 0;
+	}
+	.br-slider {
+		display: grid;
+		grid-template-columns: 80px minmax(0, 1fr) 48px;
+		align-items: center;
+		gap: 10px;
+		font-size: 13px;
+		color: var(--ink-soft);
+		font-weight: 600;
+	}
+	.br-slider input {
+		accent-color: var(--accent-strong);
+		min-width: 0;
+	}
+	.br-slider b {
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+	.br-out {
+		min-height: auto !important;
+	}
+</style>

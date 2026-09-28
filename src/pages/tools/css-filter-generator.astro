@@ -1,0 +1,212 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sliders = [
+	['blur', 'Blur', 0, 20, 0, 'px'],
+	['brightness', 'Brightness', 0, 200, 100, '%'],
+	['contrast', 'Contrast', 0, 200, 100, '%'],
+	['grayscale', 'Grayscale', 0, 100, 0, '%'],
+	['hue-rotate', 'Hue rotate', 0, 360, 0, 'deg'],
+	['invert', 'Invert', 0, 100, 0, '%'],
+	['opacity', 'Opacity', 0, 100, 100, '%'],
+	['saturate', 'Saturate', 0, 300, 100, '%'],
+	['sepia', 'Sepia', 0, 100, 0, '%'],
+];
+---
+
+<ToolShell slug="css-filter-generator" title="CSS Filter Generator" description="Tune filter and backdrop-filter functions on a sample image and copy the CSS.">
+	<div class="cf-stage user-colors" id="cf-tool" data-mode="filter">
+		<svg class="cf-image" id="cf-image" viewBox="0 0 640 360" role="img" aria-label="Sample landscape with mountains, a lake and a setting sun">
+			<defs>
+				<linearGradient id="cf-sky" x1="0" y1="0" x2="0" y2="1">
+					<stop offset="0" stop-color="#1e3a8a"></stop>
+					<stop offset="0.55" stop-color="#f472b6"></stop>
+					<stop offset="1" stop-color="#fbbf24"></stop>
+				</linearGradient>
+				<linearGradient id="cf-lake" x1="0" y1="0" x2="0" y2="1">
+					<stop offset="0" stop-color="#fb923c"></stop>
+					<stop offset="1" stop-color="#1e3a8a"></stop>
+				</linearGradient>
+			</defs>
+			<rect width="640" height="360" fill="url(#cf-sky)"></rect>
+			<circle cx="420" cy="190" r="60" fill="#fde68a"></circle>
+			<path d="M0 250 L120 130 L200 210 L300 90 L420 230 L520 150 L640 240 L640 360 L0 360 Z" fill="#4c1d95"></path>
+			<path d="M0 270 L90 200 L180 260 L260 180 L380 270 L480 210 L640 280 L640 360 L0 360 Z" fill="#1f2937"></path>
+			<rect y="290" width="640" height="70" fill="url(#cf-lake)"></rect>
+			<path d="M40 320 h80 M200 310 h120 M380 330 h90 M500 315 h70" stroke="#fde68a" stroke-width="3" stroke-linecap="round" opacity="0.6"></path>
+			<g fill="#064e3b">
+				<path d="M60 300 l14 -46 l14 46 z"></path>
+				<path d="M92 300 l10 -34 l10 34 z"></path>
+				<path d="M560 300 l14 -52 l14 52 z"></path>
+			</g>
+		</svg>
+		<div class="cf-glass" id="cf-glass">
+			<strong>Backdrop</strong>
+			<span>filters what is behind</span>
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="cf-mode" aria-label="Property">
+			<button data-value="filter" aria-pressed="true">
+				filter
+			</button>
+			<button data-value="backdrop-filter" aria-pressed="false">
+				backdrop-filter
+			</button>
+		</div>
+		<button class="btn" id="cf-reset">
+			Reset
+		</button>
+	</div>
+	<div class="chips" id="cf-presets">
+		<button data-preset="sepia:60,contrast:110,brightness:105,saturate:80">Vintage</button>
+		<button data-preset="grayscale:100,contrast:130">Noir</button>
+		<button data-preset="saturate:180,contrast:115">Vivid</button>
+		<button data-preset="hue-rotate:190,saturate:120">Cool</button>
+		<button data-preset="blur:2,brightness:115,saturate:130">Dreamy</button>
+	</div>
+	<section class="panel cf-controls">
+		{sliders.map(([id, label, min, max, value]) => (
+			<label class="cf-slider">
+				<span>{label}</span>
+				<input type="range" id={`cf-${id}`} min={min} max={max} value={value} data-default={value} />
+				<b id={`cf-${id}-value`} />
+			</label>
+		))}
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="cf-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out cf-out" id="cf-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const UNITS: Record<string, string> = {
+		blur: 'px',
+		brightness: '%',
+		contrast: '%',
+		grayscale: '%',
+		'hue-rotate': 'deg',
+		invert: '%',
+		opacity: '%',
+		saturate: '%',
+		sepia: '%',
+	};
+
+	onPage('cf-tool', () => {
+		let mode = 'filter';
+		const input = (id: string) => byId<HTMLInputElement>(`cf-${id}`);
+
+		const render = () => {
+			const parts: string[] = [];
+			Object.entries(UNITS).forEach(([id, unit]) => {
+				const el = input(id);
+				byId(`cf-${id}-value`).textContent = `${el.value}${unit}`;
+				if (el.value !== el.dataset.default) parts.push(`${id}(${el.value}${unit})`);
+			});
+			const value = parts.join(' ') || 'none';
+			const stage = byId('cf-tool');
+			stage.dataset.mode = mode;
+			byId('cf-image').style.filter = mode === 'filter' ? value : '';
+			const glass = byId('cf-glass');
+			glass.style.setProperty('backdrop-filter', mode === 'filter' ? '' : value);
+			glass.style.setProperty('-webkit-backdrop-filter', mode === 'filter' ? '' : value);
+			byId('cf-css').textContent = mode === 'filter' ? `filter: ${value};` : `backdrop-filter: ${value};\n-webkit-backdrop-filter: ${value};`;
+		};
+
+		const reset = () => Object.keys(UNITS).forEach((id) => (input(id).value = input(id).dataset.default!));
+
+		Object.keys(UNITS).forEach((id) => input(id).addEventListener('input', render));
+		segmented(byId('cf-mode'), (value) => {
+			mode = value;
+			render();
+		});
+		byId('cf-reset').addEventListener('click', () => {
+			reset();
+			render();
+		});
+		document.querySelectorAll<HTMLButtonElement>('#cf-presets button').forEach((button) =>
+			button.addEventListener('click', () => {
+				reset();
+				button.dataset.preset!.split(',').forEach((pair) => {
+					const [id, value] = pair.split(':');
+					input(id).value = value;
+				});
+				render();
+			}),
+		);
+		copyButton(byId('cf-copy'), () => byId('cf-css').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.cf-stage {
+		position: relative;
+		border-radius: 14px;
+		overflow: hidden;
+		border: 1px solid var(--border);
+		line-height: 0;
+	}
+	.cf-image {
+		display: block;
+		width: 100%;
+		height: auto;
+	}
+	.cf-glass {
+		display: none;
+		position: absolute;
+		inset: 18% 22%;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 4px;
+		border-radius: 16px;
+		border: 1px solid rgb(255 255 255 / 45%);
+		background: rgb(255 255 255 / 8%);
+		color: #ffffff;
+		line-height: 1.3;
+		text-align: center;
+		font-size: 13px;
+	}
+	.cf-glass strong {
+		font-size: 18px;
+	}
+	.cf-stage[data-mode='backdrop-filter'] .cf-glass {
+		display: flex;
+	}
+	.cf-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 10px 14px;
+	}
+	.cf-slider {
+		display: grid;
+		grid-template-columns: 90px minmax(0, 1fr) 64px;
+		align-items: center;
+		gap: 12px;
+		font-size: 13px;
+		color: var(--ink-soft);
+		font-weight: 600;
+	}
+	.cf-slider input {
+		accent-color: var(--accent-strong);
+		min-width: 0;
+	}
+	.cf-slider b {
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+	.cf-out {
+		min-height: auto !important;
+	}
+</style>

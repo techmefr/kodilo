@@ -1,0 +1,237 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sliders = [
+	['l', 'Lightness', 0, 100, 0.1, 62],
+	['c', 'Chroma', 0, 0.37, 0.001, 0.2],
+	['h', 'Hue', 0, 360, 0.5, 290],
+];
+const rows = ['oklch', 'hex', 'rgb', 'hsl', 'oklab', 'p3'];
+---
+
+<ToolShell
+	slug="oklch-color-picker"
+	title="OKLCH Color Picker"
+	description="Pick colors by lightness, chroma and hue, check sRGB and Display P3 gamuts, convert to hex, rgb, hsl and oklab."
+>
+	<div class="ok-stage user-colors" id="ok-tool">
+		<div class="ok-half" id="ok-wide">
+			<span>oklch()</span>
+		</div>
+		<div class="ok-half" id="ok-fallback">
+			<span>sRGB fallback</span>
+		</div>
+	</div>
+	<div class="ok-badges" id="ok-badges"></div>
+	<section class="panel ok-controls">
+		{sliders.map(([id, label, min, max, step, value]) => (
+			<label class="ok-slider">
+				<span>{label}</span>
+				<input type="range" id={`ok-${id}`} min={min} max={max} step={step} value={value} />
+				<b id={`ok-${id}-value`} />
+			</label>
+		))}
+		<label class="ok-slider">
+			<span>From hex</span>
+			<input class="num ok-hex" id="ok-hex" value="" placeholder="#6d4fe0" spellcheck="false" />
+			<span />
+		</label>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Conversions</span>
+		</div>
+		<dl class="ok-rows">
+			{rows.map((key) => (
+				<div class="ok-row">
+					<dt>{key === 'p3' ? 'Display P3' : key.toUpperCase()}</dt>
+					<dd>
+						<code id={`ok-out-${key}`} />
+						<button class="btn" id={`ok-copy-${key}`} aria-label={`Copy ${key === 'p3' ? 'Display P3' : key.toUpperCase()}`}>
+							Copy
+						</button>
+					</dd>
+				</div>
+			))}
+		</dl>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS with fallback</span>
+			<button class="btn" id="ok-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out ok-out" id="ok-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { formatHsl, formatOklab, formatOklch, formatP3, formatRgb, fromHex, inP3, inSrgb, toHex, type Oklch } from '../../scripts/oklch';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	onPage('ok-tool', () => {
+		const l = byId<HTMLInputElement>('ok-l');
+		const c = byId<HTMLInputElement>('ok-c');
+		const h = byId<HTMLInputElement>('ok-h');
+		const hex = byId<HTMLInputElement>('ok-hex');
+		const values: Record<string, string> = {};
+		let exact: Oklch | null = null;
+
+		const render = () => {
+			const color: Oklch = exact ?? { l: Number(l.value) / 100, c: Number(c.value), h: Number(h.value) };
+			byId('ok-l-value').textContent = `${Number(l.value).toFixed(1)}%`;
+			byId('ok-c-value').textContent = Number(c.value).toFixed(3);
+			byId('ok-h-value').textContent = `${Number(h.value).toFixed(1)}°`;
+			const srgbOk = inSrgb(color);
+			const p3Ok = inP3(color);
+			Object.assign(values, {
+				oklch: formatOklch(color),
+				hex: toHex(color),
+				rgb: formatRgb(color),
+				hsl: formatHsl(color),
+				oklab: formatOklab(color),
+				p3: formatP3(color),
+			});
+			Object.entries(values).forEach(([key, value]) => (byId(`ok-out-${key}`).textContent = value));
+			byId('ok-wide').style.background = values.oklch;
+			byId('ok-fallback').style.background = values.hex;
+			const ink = color.l > 0.65 ? '#000000' : '#ffffff';
+			byId('ok-wide').style.color = ink;
+			byId('ok-fallback').style.color = ink;
+			const badge = (ok: boolean, text: string) => {
+				const span = document.createElement('span');
+				span.className = ok ? 'ok-in' : 'ok-outside';
+				span.textContent = `${ok ? 'Inside' : 'Outside'} ${text}`;
+				return span;
+			};
+			byId('ok-badges').replaceChildren(badge(srgbOk, 'sRGB'), badge(p3Ok, 'Display P3'));
+			byId('ok-css').textContent = `.element {\n  color: ${values.hex};\n  color: ${values.oklch};\n}${
+				srgbOk ? '' : `\n\n@media (color-gamut: p3) {\n  .element {\n    color: ${p3Ok ? values.oklch : values.p3};\n  }\n}`
+			}`;
+		};
+
+		[l, c, h].forEach((el) =>
+			el.addEventListener('input', () => {
+				exact = null;
+				render();
+			}),
+		);
+		hex.addEventListener('input', () => {
+			const o = fromHex(hex.value);
+			if (!o) return;
+			l.value = String(o.l * 100);
+			c.value = String(o.c);
+			h.value = String(o.h);
+			exact = o;
+			render();
+		});
+		Object.keys({ oklch: 0, hex: 0, rgb: 0, hsl: 0, oklab: 0, p3: 0 }).forEach((key) => copyButton(byId(`ok-copy-${key}`), () => values[key]));
+		copyButton(byId('ok-copy'), () => byId('ok-css').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.ok-stage {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		min-height: 200px;
+		border-radius: 14px;
+		overflow: hidden;
+		border: 1px solid var(--border);
+	}
+	.ok-half {
+		display: flex;
+		align-items: flex-end;
+		padding: 12px;
+		font-family: var(--mono);
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.ok-badges {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+	.ok-badges :global(span) {
+		font-size: 13px;
+		font-weight: 600;
+		padding: 4px 10px;
+		border-radius: 999px;
+	}
+	.ok-badges :global(.ok-in) {
+		background: var(--ok-bg);
+		color: var(--ok);
+	}
+	.ok-badges :global(.ok-outside) {
+		background: var(--warn-bg);
+		color: var(--warn);
+	}
+	.ok-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 10px 14px;
+	}
+	.ok-slider {
+		display: grid;
+		grid-template-columns: 80px minmax(0, 1fr) 64px;
+		align-items: center;
+		gap: 12px;
+		font-size: 13px;
+		color: var(--ink-soft);
+		font-weight: 600;
+	}
+	.ok-slider input[type='range'] {
+		accent-color: var(--accent-strong);
+		min-width: 0;
+	}
+	.ok-slider b {
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+	.ok-hex {
+		width: 100%;
+		font-family: var(--mono);
+	}
+	.ok-rows {
+		margin: 0;
+		padding: 6px 14px;
+	}
+	.ok-row {
+		display: grid;
+		grid-template-columns: 90px minmax(0, 1fr);
+		align-items: center;
+		gap: 8px;
+		padding: 6px 0;
+		border-bottom: 1px solid var(--border);
+	}
+	.ok-row:last-child {
+		border-bottom: 0;
+	}
+	.ok-row dt {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+	}
+	.ok-row dd {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		margin: 0;
+		min-width: 0;
+	}
+	.ok-row code {
+		font-family: var(--mono);
+		font-size: 13px;
+		color: var(--ink);
+		overflow-wrap: anywhere;
+		min-width: 0;
+	}
+	.ok-out {
+		min-height: auto !important;
+	}
+</style>

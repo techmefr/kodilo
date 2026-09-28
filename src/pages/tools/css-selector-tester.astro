@@ -1,0 +1,135 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `<main id="shop">
+  <h1 class="title">Spring collection</h1>
+  <ul class="products">
+    <li class="product featured" data-stock="12">Linen shirt</li>
+    <li class="product" data-stock="0">Canvas tote</li>
+    <li class="product sale" data-stock="4">Leather belt</li>
+    <li class="product" data-stock="7">Wool scarf</li>
+  </ul>
+  <form>
+    <input type="email" required placeholder="Email">
+    <input type="checkbox" checked> Subscribe
+    <button type="submit" disabled>Join</button>
+  </form>
+</main>`;
+---
+
+<ToolShell
+	slug="css-selector-tester"
+	title="CSS Selector Tester"
+	description="Paste HTML, type a selector, and see every matching element highlighted in the parsed DOM."
+>
+	<div class="field" id="st-tool">
+		<label for="st-sel">Selector</label>
+		<input id="st-sel" value=".product:not([data-stock='0'])" spellcheck="false" autocomplete="off" />
+		<span class="field-note" id="st-count" aria-live="polite"></span>
+	</div>
+	<div class="chips" id="st-examples">
+		<button>li:nth-child(odd)</button>
+		<button>.product.sale, .featured</button>
+		<button>[data-stock="0"]</button>
+		<button>input:is([required], :checked)</button>
+		<button>ul &gt; li:last-child</button>
+		<button>main :has(&gt; input)</button>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">
+				<span>HTML</span>
+			</div>
+			<textarea id="st-html" spellcheck="false" aria-label="HTML to test against">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Parsed DOM</span>
+			</div>
+			<pre class="out st-tree" id="st-tree" tabindex="0" role="region" aria-label="Parsed DOM with matches highlighted"></pre>
+		</section>
+	</div>
+	<p class="st-note">The HTML is parsed with DOMParser, so scripts never run and nothing loads. Matches use your browser's own querySelectorAll.</p>
+</ToolShell>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+
+	onPage('st-tool', () => {
+		const sel = byId<HTMLInputElement>('st-sel');
+		const html = byId<HTMLTextAreaElement>('st-html');
+
+		const openTag = (el: Element) =>
+			`<${el.tagName.toLowerCase()}${Array.from(el.attributes)
+				.map((a) => (a.value === '' ? ` ${a.name}` : ` ${a.name}="${a.value}"`))
+				.join('')}>`;
+
+		const render = () => {
+			const doc = new DOMParser().parseFromString(html.value, 'text/html');
+			let matches: Element[] = [];
+			let error = '';
+			try {
+				matches = sel.value.trim() ? Array.from(doc.body.querySelectorAll(sel.value)) : [];
+			} catch {
+				error = 'Invalid selector';
+			}
+			const set = new Set(matches);
+			const lines: HTMLElement[] = [];
+			const walk = (node: Node, depth: number) => {
+				node.childNodes.forEach((child) => {
+					if (child.nodeType === Node.TEXT_NODE) {
+						const text = child.textContent?.trim();
+						if (!text) return;
+						const line = document.createElement('span');
+						line.className = 'st-text';
+						line.textContent = `${'  '.repeat(depth)}${text}`;
+						lines.push(line);
+						return;
+					}
+					if (!(child instanceof Element)) return;
+					const line = document.createElement(set.has(child) ? 'mark' : 'span');
+					line.textContent = `${'  '.repeat(depth)}${openTag(child)}`;
+					if (set.has(child)) line.dataset.match = '';
+					lines.push(line);
+					walk(child, depth + 1);
+				});
+			};
+			walk(doc.body, 0);
+			byId('st-tree').replaceChildren(...lines.flatMap((line, i) => (i ? [document.createTextNode('\n'), line] : [line])));
+			const count = byId('st-count');
+			count.textContent = error || `${matches.length} ${matches.length === 1 ? 'match' : 'matches'}`;
+			byId('st-tool').classList.toggle('invalid', !!error);
+		};
+
+		[sel, html].forEach((el) => el.addEventListener('input', render));
+		document.querySelectorAll<HTMLButtonElement>('#st-examples button').forEach((button) =>
+			button.addEventListener('click', () => {
+				sel.value = button.textContent ?? '';
+				render();
+			}),
+		);
+		render();
+	});
+</script>
+
+<style>
+	.st-tree {
+		white-space: pre;
+		overflow-x: auto;
+	}
+	.st-tree :global(mark) {
+		background: var(--accent);
+		color: var(--ink);
+		border-radius: 4px;
+		box-shadow: inset 3px 0 0 var(--accent-strong);
+		font-weight: 700;
+	}
+	.st-tree :global(.st-text) {
+		color: var(--ink-soft);
+	}
+	.st-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+</style>

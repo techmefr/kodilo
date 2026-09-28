@@ -1,0 +1,441 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = 'M 20 80 C 20 30, 70 20, 100 50 S 170 90, 180 40 L 180 110 Q 140 150 100 120 T 30 120 Z';
+---
+
+<ToolShell
+	slug="svg-path-editor"
+	title="SVG Path Editor"
+	description="Paste a path d attribute, drag its points, list every command, convert between absolute and relative, round and minify."
+>
+	<section class="panel" id="pe-tool">
+		<div class="panel-head">
+			<span>Path data (d)</span>
+		</div>
+		<textarea id="pe-d" spellcheck="false" aria-label="Path data" class="pe-input">{sample}</textarea>
+	</section>
+	<p class="error" id="pe-error" hidden></p>
+	<div class="toolbar">
+		<div class="seg" id="pe-mode" aria-label="Coordinates">
+			<button data-value="abs" aria-pressed="true">
+				Absolute
+			</button>
+			<button data-value="rel" aria-pressed="false">
+				Relative
+			</button>
+			<button data-value="min" aria-pressed="false">
+				Minified
+			</button>
+		</div>
+		<label class="check">
+			Decimals
+			<select id="pe-precision" class="pe-select">
+				<option value="0">0</option>
+				<option value="1">1</option>
+				<option value="2" selected>
+					2
+				</option>
+				<option value="3">3</option>
+			</select>
+		</label>
+		<button class="btn" id="pe-apply">
+			Apply to input
+		</button>
+		<label class="check">
+			<input type="checkbox" id="pe-controls" checked /> Show control points
+		</label>
+	</div>
+	<div class="pe-stage user-colors">
+		<svg id="pe-svg" class="pe-svg" role="img" aria-label="Path preview with draggable points">
+			<path id="pe-guides" class="pe-guides"></path>
+			<path id="pe-path" class="pe-path"></path>
+			<g id="pe-points"></g>
+		</svg>
+	</div>
+	<p class="pe-note">Drag a point to move it. Square points are endpoints, round ones are curve controls.</p>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">
+				<span id="pe-out-label">Output</span>
+				<button class="btn" id="pe-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out pe-out" id="pe-out"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="pe-count">Commands</span>
+			</div>
+			<ol class="pe-list" id="pe-list"></ol>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Seg = { cmd: string; args: number[] };
+	type Pt = { seg: number; ix: number; iy: number; end: boolean };
+
+	const COUNTS: Record<string, number> = { M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, Q: 4, T: 2, A: 7, Z: 0 };
+	const NAMES: Record<string, string> = {
+		M: 'Move to',
+		L: 'Line to',
+		H: 'Horizontal line',
+		V: 'Vertical line',
+		C: 'Cubic curve',
+		S: 'Smooth cubic',
+		Q: 'Quadratic curve',
+		T: 'Smooth quadratic',
+		A: 'Arc',
+		Z: 'Close path',
+	};
+	const SVGNS = 'http://www.w3.org/2000/svg';
+
+	function parse(d: string): Seg[] {
+		const tokens = d.match(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g) ?? [];
+		if (d.replace(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?|[\s,]/g, '').length) throw new Error('Unexpected characters in path data');
+		const segs: Seg[] = [];
+		let i = 0;
+		let cx = 0;
+		let cy = 0;
+		let sx = 0;
+		let sy = 0;
+		let cmd = '';
+		while (i < tokens.length) {
+			if (/[a-zA-Z]/.test(tokens[i])) cmd = tokens[i++];
+			else if (!cmd) throw new Error('Path must start with a command');
+			const up = cmd.toUpperCase();
+			if (!(up in COUNTS)) throw new Error(`Unknown command ${cmd}`);
+			const rel = cmd !== up;
+			if (up === 'Z') {
+				segs.push({ cmd: 'Z', args: [] });
+				cx = sx;
+				cy = sy;
+				if (i < tokens.length && !/[a-zA-Z]/.test(tokens[i])) throw new Error('Z takes no numbers');
+				continue;
+			}
+			const n = COUNTS[up];
+			const raw = tokens.slice(i, i + n).map(Number);
+			if (raw.length < n || raw.some(Number.isNaN)) throw new Error(`${cmd} needs ${n} numbers`);
+			i += n;
+			const args = raw.slice();
+			if (rel) {
+				if (up === 'H') args[0] += cx;
+				else if (up === 'V') args[0] += cy;
+				else if (up === 'A') {
+					args[5] += cx;
+					args[6] += cy;
+				} else
+					for (let k = 0; k < n; k += 2) {
+						args[k] += cx;
+						args[k + 1] += cy;
+					}
+			}
+			segs.push({ cmd: up, args });
+			if (up === 'H') cx = args[0];
+			else if (up === 'V') cy = args[0];
+			else {
+				cx = args[n - 2];
+				cy = args[n - 1];
+			}
+			if (up === 'M') {
+				sx = cx;
+				sy = cy;
+				cmd = rel ? 'l' : 'L';
+			}
+		}
+		return segs;
+	}
+
+	const fmt = (v: number, p: number) => {
+		const s = String(Number(v.toFixed(p)));
+		return s === '-0' ? '0' : s;
+	};
+
+	function segStrings(segs: Seg[], p: number) {
+		let cx = 0;
+		let cy = 0;
+		let sx = 0;
+		let sy = 0;
+		return segs.map(({ cmd, args }) => {
+			let rel: number[];
+			if (cmd === 'H') rel = [args[0] - cx];
+			else if (cmd === 'V') rel = [args[0] - cy];
+			else if (cmd === 'A') rel = [...args.slice(0, 5), args[5] - cx, args[6] - cy];
+			else rel = args.map((v, k) => v - (k % 2 ? cy : cx));
+			const abs = `${cmd}${args.length ? ' ' : ''}${args.map((v) => fmt(v, p)).join(' ')}`;
+			const relative = `${cmd.toLowerCase()}${rel.length ? ' ' : ''}${rel.map((v) => fmt(v, p)).join(' ')}`;
+			if (cmd === 'Z') {
+				cx = sx;
+				cy = sy;
+			} else if (cmd === 'H') cx = args[0];
+			else if (cmd === 'V') cy = args[0];
+			else {
+				cx = args[args.length - 2];
+				cy = args[args.length - 1];
+			}
+			if (cmd === 'M') {
+				sx = cx;
+				sy = cy;
+			}
+			return { abs, rel: cmd === 'Z' ? 'z' : relative, cmd };
+		});
+	}
+
+	const compact = (s: string) =>
+		s
+			.replace(/(^|[\s-])0\./g, '$1.')
+			.replace(/\s+-/g, '-')
+			.replace(/([a-zA-Z])\s+/g, '$1')
+			.replace(/(\.\d+)\s+(?=\.)/g, '$1');
+
+	function serialize(segs: Seg[], mode: string, p: number) {
+		const parts = segStrings(segs, p);
+		if (mode === 'abs') return parts.map((s) => s.abs).join(' ');
+		if (mode === 'rel') return parts.map((s, i) => (i === 0 ? s.abs : s.rel)).join(' ');
+		return parts
+			.map((s, i) => {
+				const a = compact(s.abs);
+				const r = compact(s.rel);
+				return i === 0 || a.length <= r.length ? a : r;
+			})
+			.join('');
+	}
+
+	onPage('pe-tool', () => {
+		let mode = 'abs';
+		let segs: Seg[] = [];
+		const input = byId<HTMLTextAreaElement>('pe-d');
+		const precision = byId<HTMLSelectElement>('pe-precision');
+		const showControls = byId<HTMLInputElement>('pe-controls');
+		const svg = byId('pe-svg') as unknown as SVGSVGElement;
+		let viewBox = [0, 0, 200, 160];
+
+		const points = (): { x: number; y: number; pt: Pt }[] => {
+			const out: { x: number; y: number; pt: Pt }[] = [];
+			let cx = 0;
+			let cy = 0;
+			segs.forEach(({ cmd, args }, seg) => {
+				if (cmd === 'H') out.push({ x: args[0], y: cy, pt: { seg, ix: 0, iy: -1, end: true } });
+				else if (cmd === 'V') out.push({ x: cx, y: args[0], pt: { seg, ix: -1, iy: 0, end: true } });
+				else if (cmd === 'A') out.push({ x: args[5], y: args[6], pt: { seg, ix: 5, iy: 6, end: true } });
+				else for (let k = 0; k < args.length; k += 2) out.push({ x: args[k], y: args[k + 1], pt: { seg, ix: k, iy: k + 1, end: k === args.length - 2 } });
+				const last = out[out.length - 1];
+				if (cmd !== 'Z' && last) {
+					cx = last.x;
+					cy = last.y;
+				}
+			});
+			return out;
+		};
+
+		const fit = () => {
+			const pts = points();
+			if (!pts.length) return;
+			const xs = pts.map((p) => p.x);
+			const ys = pts.map((p) => p.y);
+			const minX = Math.min(...xs);
+			const minY = Math.min(...ys);
+			const w = Math.max(Math.max(...xs) - minX, 1);
+			const h = Math.max(Math.max(...ys) - minY, 1);
+			const pad = Math.max(w, h) * 0.12;
+			viewBox = [minX - pad, minY - pad, w + pad * 2, h + pad * 2];
+			svg.setAttribute('viewBox', viewBox.join(' '));
+		};
+
+		const draw = () => {
+			const p = Number(precision.value);
+			const d = serialize(segs, 'abs', 6);
+			byId('pe-path').setAttribute('d', d);
+			const unit = Math.max(viewBox[2], viewBox[3]) / 100;
+			svg.style.setProperty('--pe-unit', String(unit));
+			const pts = points();
+			const guides: string[] = [];
+			let prevEnd: { x: number; y: number } | null = null;
+			segs.forEach(({ cmd }, seg) => {
+				const own = pts.filter((q) => q.pt.seg === seg);
+				const end = own[own.length - 1];
+				if ((cmd === 'C' || cmd === 'S' || cmd === 'Q') && prevEnd && end) {
+					const c = own.filter((q) => !q.pt.end);
+					if (cmd === 'Q') guides.push(`M${prevEnd.x} ${prevEnd.y}L${c[0].x} ${c[0].y}L${end.x} ${end.y}`);
+					else if (cmd === 'C') guides.push(`M${prevEnd.x} ${prevEnd.y}L${c[0].x} ${c[0].y}M${c[1].x} ${c[1].y}L${end.x} ${end.y}`);
+					else guides.push(`M${c[0].x} ${c[0].y}L${end.x} ${end.y}`);
+				}
+				if (end && cmd !== 'Z') prevEnd = end;
+			});
+			byId('pe-guides').setAttribute('d', showControls.checked ? guides.join('') : '');
+			byId('pe-points').replaceChildren(
+				...pts
+					.filter((q) => q.pt.end || showControls.checked)
+					.map((q) => {
+						const shape = document.createElementNS(SVGNS, q.pt.end ? 'rect' : 'circle');
+						const r = unit * 1.8;
+						if (q.pt.end) {
+							shape.setAttribute('x', String(q.x - r));
+							shape.setAttribute('y', String(q.y - r));
+							shape.setAttribute('width', String(r * 2));
+							shape.setAttribute('height', String(r * 2));
+						} else {
+							shape.setAttribute('cx', String(q.x));
+							shape.setAttribute('cy', String(q.y));
+							shape.setAttribute('r', String(r));
+						}
+						shape.setAttribute('class', q.pt.end ? 'pe-end' : 'pe-ctrl');
+						shape.addEventListener('pointerdown', (e) => startDrag(e as PointerEvent, q.pt, shape));
+						return shape;
+					}),
+			);
+			const out = serialize(segs, mode, p);
+			byId('pe-out').textContent = out;
+			byId('pe-out-label').textContent = `Output · ${out.length} chars`;
+			byId('pe-count').textContent = `Commands · ${segs.length}`;
+			const strings = segStrings(segs, p);
+			byId('pe-list').replaceChildren(
+				...strings.map((s) => {
+					const li = document.createElement('li');
+					const name = document.createElement('span');
+					name.textContent = NAMES[s.cmd];
+					const code = document.createElement('code');
+					code.textContent = mode === 'abs' ? s.abs : s.rel;
+					li.append(name, code);
+					return li;
+				}),
+			);
+		};
+
+		const startDrag = (e: PointerEvent, pt: Pt, el: Element) => {
+			e.preventDefault();
+			(el as SVGElement).setPointerCapture(e.pointerId);
+			const matrix = svg.getScreenCTM()?.inverse();
+			if (!matrix) return;
+			const move = (ev: PointerEvent) => {
+				const pos = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(matrix);
+				const p = Number(precision.value);
+				const round = (v: number) => Number(v.toFixed(p));
+				if (pt.ix >= 0) segs[pt.seg].args[pt.ix] = round(pos.x);
+				if (pt.iy >= 0) segs[pt.seg].args[pt.iy] = round(pos.y);
+				input.value = serialize(segs, mode === 'min' ? 'abs' : mode, p);
+				draw();
+			};
+			const up = () => {
+				window.removeEventListener('pointermove', move);
+				window.removeEventListener('pointerup', up);
+			};
+			window.addEventListener('pointermove', move);
+			window.addEventListener('pointerup', up);
+		};
+
+		const load = () => {
+			const error = byId('pe-error');
+			try {
+				segs = parse(input.value);
+				error.hidden = true;
+			} catch (err) {
+				error.textContent = (err as Error).message;
+				error.hidden = false;
+				return;
+			}
+			fit();
+			draw();
+		};
+
+		input.addEventListener('input', load);
+		precision.addEventListener('input', draw);
+		showControls.addEventListener('change', draw);
+		segmented(byId('pe-mode'), (value) => {
+			mode = value;
+			draw();
+		});
+		byId('pe-apply').addEventListener('click', () => {
+			input.value = byId('pe-out').textContent ?? '';
+			load();
+		});
+		copyButton(byId('pe-copy'), () => byId('pe-out').textContent ?? '');
+		load();
+	});
+</script>
+
+<style>
+	.pe-input {
+		min-height: 90px !important;
+		font-family: var(--mono);
+	}
+	.pe-select {
+		font: inherit;
+		font-size: 13px;
+		padding: 4px 6px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+		color: var(--ink);
+	}
+	.pe-stage {
+		border-radius: 14px;
+		border: 1px solid var(--border);
+		background: #ffffff;
+		background-image: linear-gradient(#eef0f5 1px, transparent 1px), linear-gradient(90deg, #eef0f5 1px, transparent 1px);
+		background-size: 20px 20px;
+		overflow: hidden;
+	}
+	.pe-svg {
+		display: block;
+		width: 100%;
+		height: 340px;
+		touch-action: none;
+	}
+	.pe-path {
+		fill: rgb(109 79 224 / 14%);
+		stroke: #6d4fe0;
+		stroke-width: calc(var(--pe-unit) * 0.6);
+		stroke-linejoin: round;
+	}
+	.pe-guides {
+		fill: none;
+		stroke: #9ca3af;
+		stroke-width: calc(var(--pe-unit) * 0.3);
+		stroke-dasharray: calc(var(--pe-unit) * 1.2);
+	}
+	.pe-svg :global(.pe-end) {
+		fill: #ffffff;
+		stroke: #6d4fe0;
+		stroke-width: calc(var(--pe-unit) * 0.5);
+		cursor: grab;
+	}
+	.pe-svg :global(.pe-ctrl) {
+		fill: #ec4899;
+		stroke: #ffffff;
+		stroke-width: calc(var(--pe-unit) * 0.4);
+		cursor: grab;
+	}
+	.pe-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.pe-out {
+		min-height: auto !important;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	.pe-list {
+		margin: 0;
+		padding: 8px 14px 8px 40px;
+		font-size: 13px;
+	}
+	.pe-list :global(li) {
+		padding: 3px 0;
+		color: var(--ink-soft);
+	}
+	.pe-list :global(li span) {
+		display: inline-block;
+		min-width: 120px;
+	}
+	.pe-list :global(code) {
+		font-family: var(--mono);
+		color: var(--ink);
+		overflow-wrap: anywhere;
+	}
+</style>
