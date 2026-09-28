@@ -1,0 +1,137 @@
+---
+import { bugReportUrl, improvementUrl } from '../scripts/seo';
+
+interface Props {
+	slug: string;
+	title: string;
+}
+
+const { slug, title } = Astro.props;
+---
+
+<section class="tool-feedback" data-feedback data-slug={slug} aria-labelledby="feedback-title">
+	<div class="feedback-row">
+		<h2 id="feedback-title">Was this tool useful?</h2>
+		<div class="feedback-votes" role="group" aria-labelledby="feedback-title">
+			<button type="button" class="btn feedback-vote" data-vote="up" aria-pressed="false" aria-label="Yes, useful">
+				👍
+			</button>
+			<button type="button" class="btn feedback-vote" data-vote="down" aria-pressed="false" aria-label="No, not useful">
+				👎
+			</button>
+		</div>
+		<span class="feedback-status" data-feedback-status role="status" aria-live="polite"></span>
+	</div>
+	<p class="feedback-links" data-feedback-links hidden>
+		<a data-feedback-bug href={bugReportUrl(Astro.site, slug, title)} target="_blank" rel="noopener">
+			Report a bug
+		</a>
+		<a data-feedback-improve href={improvementUrl(Astro.site, slug, title)} target="_blank" rel="noopener">
+			Suggest an improvement
+		</a>
+	</p>
+</section>
+
+<script>
+	import { track } from '../scripts/analytics';
+
+	const KEY = 'kodilo-feedback';
+
+	function readVotes(): Record<string, string> {
+		try {
+			const parsed = JSON.parse(localStorage.getItem(KEY) ?? '{}');
+			return parsed && typeof parsed === 'object' ? parsed : {};
+		} catch {
+			return {};
+		}
+	}
+
+	function saveVote(slug: string, value: string) {
+		try {
+			localStorage.setItem(KEY, JSON.stringify({ ...readVotes(), [slug]: value }));
+		} catch {}
+	}
+
+	document.addEventListener('astro:page-load', () => {
+		const root = document.querySelector<HTMLElement>('[data-feedback]');
+		if (!root) return;
+		const slug = root.dataset.slug!;
+		const buttons = [...root.querySelectorAll<HTMLButtonElement>('[data-vote]')];
+		const links = root.querySelector<HTMLElement>('[data-feedback-links]')!;
+		const status = root.querySelector<HTMLElement>('[data-feedback-status]')!;
+		const paint = (value?: string) => {
+			buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.vote === value)));
+			links.hidden = !value;
+			links.classList.toggle('feedback-links-small', value === 'up');
+		};
+		paint(readVotes()[slug]);
+		buttons.forEach((button) =>
+			button.addEventListener('click', () => {
+				const value = button.dataset.vote!;
+				if (readVotes()[slug] === value) return;
+				saveVote(slug, value);
+				paint(value);
+				status.textContent = 'Thanks for your feedback';
+				track('tool-feedback', { tool: slug, value });
+			}),
+		);
+	});
+</script>
+
+<style>
+	.tool-feedback {
+		margin-top: 12px;
+		padding-top: 16px;
+		border-top: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		font-size: 14px;
+	}
+	.feedback-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px;
+	}
+	.tool-feedback h2 {
+		margin: 0;
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.feedback-votes {
+		display: flex;
+		gap: 6px;
+	}
+	.feedback-vote {
+		min-width: 44px;
+		min-height: 36px;
+	}
+	.feedback-vote[aria-pressed='true'] {
+		border-color: var(--accent-strong);
+		background: var(--accent);
+	}
+	.feedback-status {
+		color: var(--ink-soft);
+		font-size: 13px;
+	}
+	.feedback-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 16px;
+		margin: 0;
+	}
+	.feedback-links[hidden] {
+		display: none;
+	}
+	.feedback-links-small {
+		font-size: 12px;
+	}
+	.feedback-links a {
+		color: var(--ink-soft);
+	}
+	.feedback-links a:hover,
+	.feedback-links a:focus-visible {
+		color: var(--accent-strong);
+	}
+</style>

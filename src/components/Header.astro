@@ -2,7 +2,7 @@
 import Logo from './Logo.astro';
 import { builtCategories as categories, categorySlug } from '../data/tools';
 import { categoryId } from '../scripts/experience';
-import { sitePath } from '../scripts/seo';
+import { feedbackUrl, sitePath } from '../scripts/seo';
 import { icon, iconUse } from '../scripts/icons';
 import { suggestUrl } from '../scripts/suggest';
 
@@ -82,6 +82,9 @@ const shortcuts = [
 	</a>
 	<a class="side-suggest" href={suggestUrl()} target="_blank" rel="noopener" aria-label="Suggest a tool (opens GitHub in a new tab)">
 		Suggest a tool
+	</a>
+	<a class="side-feedback" href={feedbackUrl()} target="_blank" rel="noopener" aria-label="Feedback (opens GitHub in a new tab)">
+		Feedback
 	</a>
 	{categories.map((c, i) => (
 		<div class="mega" id={`mega-${i}`} data-category={c.name} role="region" aria-label={`${c.name} tools`} hidden>
@@ -580,6 +583,11 @@ const shortcuts = [
 	.side-suggest:focus-visible {
 		background: var(--surface-2);
 		text-decoration: underline;
+	}
+	.side-feedback {
+		padding: 6px 8px;
+		font-size: 13px;
+		color: var(--ink-soft);
 	}
 	.side-categories {
 		padding: 6px 8px;

@@ -1,5 +1,6 @@
 import { navigate } from 'astro:transitions/client';
 import { suggestUrl } from './suggest';
+import { track } from './analytics';
 import {
 	base,
 	favorites,
@@ -88,6 +89,7 @@ document.addEventListener('keydown', (e) => {
 	const mod = e.metaKey || e.ctrlKey;
 	if (mod && !e.shiftKey && key.toLowerCase() === 'k') {
 		e.preventDefault();
+		track('shortcut-used', { key: 'mod+k' });
 		openPalette();
 		return;
 	}
@@ -97,6 +99,7 @@ document.addEventListener('keydown', (e) => {
 		);
 		if (primary) {
 			e.preventDefault();
+			track('shortcut-used', { key: 'mod+enter' });
 			primary.click();
 		}
 		return;
@@ -105,6 +108,7 @@ document.addEventListener('keydown', (e) => {
 		const copy = [...document.querySelectorAll<HTMLElement>('main [data-copy]')].find((b) => visible(b) && !(b as HTMLButtonElement).disabled);
 		if (copy) {
 			e.preventDefault();
+			track('shortcut-used', { key: 'mod+shift+c' });
 			copy.click();
 		}
 		return;
@@ -118,9 +122,11 @@ document.addEventListener('keydown', (e) => {
 		pendingG = 0;
 		if (key === 'h') {
 			e.preventDefault();
+			track('shortcut-used', { key: 'g h' });
 			navigate(base);
 		} else if (key === 'f') {
 			e.preventDefault();
+			track('shortcut-used', { key: 'g f' });
 			goFavorites();
 		}
 		return;
@@ -128,14 +134,17 @@ document.addEventListener('keydown', (e) => {
 	pendingG = 0;
 	if (key === '/') {
 		e.preventDefault();
+		track('shortcut-used', { key: '/' });
 		openPalette();
 	} else if (key === '?') {
 		e.preventDefault();
+		track('shortcut-used', { key: '?' });
 		openShortcuts();
 	} else if (key === 'g') {
 		pendingG = Date.now();
 	} else if (key === 'f' && el('pin-tool')) {
 		e.preventDefault();
+		track('shortcut-used', { key: 'f' });
 		togglePin();
 	}
 });
@@ -259,6 +268,7 @@ function setupPalette() {
 	};
 	const go = (entry?: Entry) => {
 		if (!entry) return;
+		track('search-select', { tool: entry.s, queryLength: q.value.trim().length });
 		dialog.close();
 		navigate(toolUrl(entry.s));
 	};
@@ -403,6 +413,7 @@ function setupPin() {
 	button.addEventListener('click', () => {
 		toggleFavorite(slug);
 		sync();
+		track('tool-pin', { tool: slug, pinned: isFavorite(slug) });
 	});
 	window.addEventListener(STORE_EVENT, sync);
 	document.addEventListener('astro:before-swap', () => window.removeEventListener(STORE_EVENT, sync), { once: true });
