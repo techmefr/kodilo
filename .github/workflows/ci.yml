@@ -32,7 +32,7 @@ jobs:
       - run: npm run check
       - run: npm run build
         env:
-          PUBLIC_GOATCOUNTER_CODE: ${{ vars.GOATCOUNTER_CODE }}
+          PUBLIC_UMAMI_WEBSITE_ID: ${{ vars.UMAMI_WEBSITE_ID }}
       - run: npm run budget
       - uses: actions/upload-artifact@v4
         with:
