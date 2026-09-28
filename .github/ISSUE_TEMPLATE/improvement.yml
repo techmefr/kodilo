@@ -1,0 +1,25 @@
+name: Suggest an improvement
+description: Propose a change to an existing tool.
+title: '[Improvement] '
+labels: [improvement]
+body:
+  - type: input
+    id: tool-url
+    attributes:
+      label: Tool URL
+      description: The page of the tool you want to improve.
+      placeholder: https://techmefr.github.io/kodilo/tools/jwt-decoder/
+    validations:
+      required: true
+  - type: textarea
+    id: improvement
+    attributes:
+      label: What would make it better?
+      description: The option, output or behaviour you are missing. Never paste real secrets, keys or personal data.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why does it matter?
+      description: How you use the tool and what the change would unlock.
