@@ -6,7 +6,7 @@ Live at **https://techmefr.github.io/kodilo/**
 
 ## What's in here
 
-**219 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
+**236 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
 
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
@@ -28,7 +28,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [JSON to Go](https://techmefr.github.io/kodilo/tools/json-to-go/) — Generate Go structs with json tags from a JSON sample.
 - [JSON to OpenAPI Schema](https://techmefr.github.io/kodilo/tools/json-to-openapi-schema/) — Infer an OpenAPI 3.1 component or JSON Schema from JSON samples, with formats.
 
-### HTML / CSS (12)
+### HTML / CSS (21)
 
 - [HTML Formatter](https://techmefr.github.io/kodilo/tools/html-formatter/) — Beautify and format HTML code.
 - [CSS Formatter & Minifier](https://techmefr.github.io/kodilo/tools/css-formatter/) — Format and minify CSS stylesheets.
@@ -42,6 +42,15 @@ Live at **https://techmefr.github.io/kodilo/**
 - [CSS clip-path Editor](https://techmefr.github.io/kodilo/tools/clip-path-editor/) — Drag handles to shape a polygon, circle, ellipse or inset clip-path and copy the CSS.
 - [CSS Keyframes Generator](https://techmefr.github.io/kodilo/tools/css-keyframes-generator/) — Build @keyframes animations step by step with timing, iteration and a live preview.
 - [Media Query Tester](https://techmefr.github.io/kodilo/tools/media-query-tester/) — See which media queries match at any width, orientation, color scheme or pointer, with a live resizable preview.
+- [Fluid Clamp Generator](https://techmefr.github.io/kodilo/tools/fluid-clamp-generator/) — Min and max sizes between two viewports turned into CSS clamp() values.
+- [Text Shadow Generator](https://techmefr.github.io/kodilo/tools/text-shadow-generator/) — Layered text-shadow for soft, neon, retro or outline type.
+- [CSS Filter Generator](https://techmefr.github.io/kodilo/tools/css-filter-generator/) — filter and backdrop-filter functions tuned on a sample image.
+- [Border Radius Generator](https://techmefr.github.io/kodilo/tools/border-radius-generator/) — All 8 border-radius values with drag handles for organic shapes.
+- [Scrollbar Styler](https://techmefr.github.io/kodilo/tools/scrollbar-styler/) — scrollbar-color and scrollbar-width with a ::-webkit-scrollbar fallback.
+- [CSS Triangle Generator](https://techmefr.github.io/kodilo/tools/css-triangle-generator/) — Triangles in 8 directions with borders or clip-path.
+- [CSS Specificity Calculator](https://techmefr.github.io/kodilo/tools/css-specificity-calculator/) — (a, b, c) specificity for a list of selectors, sorted and explained.
+- [CSS Selector Tester](https://techmefr.github.io/kodilo/tools/css-selector-tester/) — Paste HTML, type a selector, see every match highlighted.
+- [Tailwind CSS Converter](https://techmefr.github.io/kodilo/tools/tailwind-css-converter/) — Common Tailwind utilities to plain CSS and back.
 
 ### Markdown (7)
 
@@ -272,7 +281,7 @@ Live at **https://techmefr.github.io/kodilo/**
 
 - [Pomodoro Timer](https://techmefr.github.io/kodilo/tools/pomodoro-timer/) — A simple focus timer with work/break intervals.
 
-### Design (8)
+### Design (16)
 
 - [WCAG Contrast Checker](https://techmefr.github.io/kodilo/tools/wcag-contrast-checker/) — Check text and background contrast against WCAG AA and AAA.
 - [px, rem & em Converter](https://techmefr.github.io/kodilo/tools/px-rem-converter/) — Convert px, rem, em, pt and percent, or a whole CSS snippet to rem.
@@ -282,6 +291,14 @@ Live at **https://techmefr.github.io/kodilo/**
 - [Color Shades Generator](https://techmefr.github.io/kodilo/tools/color-shades-generator/) — Generate a Tailwind-style 50 to 950 shade scale from one color in OKLCH, with WCAG contrast for each shade and export as Tailwind config, CSS variables or a list.
 - [Color Blindness Simulator](https://techmefr.github.io/kodilo/tools/color-blindness-simulator/) — Render your HTML or an image as people with protanopia, deuteranopia, tritanopia or achromatopsia see it.
 - [SVG Wave & Blob Generator](https://techmefr.github.io/kodilo/tools/svg-shape-generator/) — Generate SVG waves and blobs with sliders and a seed, then copy the SVG or a CSS background.
+- [Type Scale Generator](https://techmefr.github.io/kodilo/tools/type-scale-generator/) — Modular type scale from a base size and ratio, exported as CSS, Tailwind or JSON.
+- [Font Pairing Preview](https://techmefr.github.io/kodilo/tools/font-pairing-preview/) — Curated Google Fonts heading and body pairs on a realistic article.
+- [Color Harmony Generator](https://techmefr.github.io/kodilo/tools/color-harmony-generator/) — Complementary, analogous, triadic, tetradic and split palettes in OKLCH.
+- [OKLCH Color Picker](https://techmefr.github.io/kodilo/tools/oklch-color-picker/) — Pick colors in OKLCH, check sRGB and P3 gamuts, convert to hex, rgb, hsl and oklab.
+- [Design Tokens Generator](https://techmefr.github.io/kodilo/tools/design-tokens-generator/) — Colors, spacing, radii, shadows and type exported as CSS, Tailwind, DTCG JSON or SCSS.
+- [Glassmorphism Generator](https://techmefr.github.io/kodilo/tools/glassmorphism-generator/) — Frosted glass cards with backdrop blur, tint and border.
+- [Neumorphism Generator](https://techmefr.github.io/kodilo/tools/neumorphism-generator/) — Soft UI shapes with paired light and dark shadows.
+- [SVG Path Editor](https://techmefr.github.io/kodilo/tools/svg-path-editor/) — Edit path data visually, convert absolute and relative, round and minify.
 
 Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools), [devbench.site](https://devbench.site/),
 [OpenFormatter](https://openformatter.com/tools) and [CyberChef](https://github.com/gchq/CyberChef).

@@ -1,0 +1,186 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const items = Array.from({ length: 14 }, (_, i) => `Release ${3 - Math.floor(i / 5)}.${(14 - i) % 5}.${i % 3}`);
+---
+
+<ToolShell
+	slug="scrollbar-styler"
+	title="Scrollbar Styler"
+	description="Style scrollbars with the standard scrollbar-color and scrollbar-width, plus a ::-webkit-scrollbar fallback."
+>
+	<div class="toolbar" id="sb-tool">
+		<label class="check">
+			Thumb <input type="color" id="sb-thumb" value="#8b5cf6" class="sb-color" />
+		</label>
+		<label class="check">
+			Hover <input type="color" id="sb-hover" value="#6d28d9" class="sb-color" />
+		</label>
+		<label class="check">
+			Track <input type="color" id="sb-track" value="#ede9fe" class="sb-color" />
+		</label>
+		<div class="seg" id="sb-width" aria-label="scrollbar-width">
+			<button data-value="auto" aria-pressed="false">
+				auto
+			</button>
+			<button data-value="thin" aria-pressed="true">
+				thin
+			</button>
+			<button data-value="none" aria-pressed="false">
+				none
+			</button>
+		</div>
+	</div>
+	<section class="panel sb-controls">
+		<label class="sb-slider">
+			<span>WebKit size</span>
+			<input type="range" id="sb-size" min="4" max="24" value="10" />
+			<b id="sb-size-value"></b>
+		</label>
+		<label class="sb-slider">
+			<span>Thumb radius</span>
+			<input type="range" id="sb-radius" min="0" max="12" value="8" />
+			<b id="sb-radius-value"></b>
+		</label>
+		<label class="sb-slider">
+			<span>Thumb inset</span>
+			<input type="range" id="sb-gap" min="0" max="6" value="2" />
+			<b id="sb-gap-value"></b>
+		</label>
+		<label class="sb-slider">
+			<span>Selector</span>
+			<input class="num sb-selector" id="sb-selector" value=".scroll-area" spellcheck="false" />
+			<span></span>
+		</label>
+	</section>
+	<style id="sb-live" is:inline></style>
+	<div class="sb-preview" id="sb-preview" tabindex="0" role="region" aria-label="Scrollable preview">
+		<h2>Changelog</h2>
+		<ul>
+			{items.map((item) => (
+				<li>
+					<strong>{item}</strong> Faster search, smarter defaults and a handful of fixes that make everyday work smoother.
+				</li>
+			))}
+		</ul>
+		<div class="sb-wide">A wide row so the horizontal scrollbar shows up as well →</div>
+	</div>
+	<p class="sb-note">
+		Browsers that support scrollbar-color (Chrome 121+, Firefox, Safari 26+) ignore ::-webkit-scrollbar once it is set, so the fallback is wrapped in @supports
+		not.
+	</p>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="sb-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out sb-out" id="sb-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('sb-tool', () => {
+		let width = 'thin';
+		const val = (id: string) => byId<HTMLInputElement>(`sb-${id}`).value;
+
+		const css = (sel: string) => {
+			const size = val('size');
+			return `${sel} {\n  scrollbar-width: ${width};\n  scrollbar-color: ${val('thumb')} ${val('track')};\n}\n\n@supports not (scrollbar-color: auto) {\n  ${sel}::-webkit-scrollbar {\n    width: ${size}px;\n    height: ${size}px;\n  }\n  ${sel}::-webkit-scrollbar-track {\n    background: ${val('track')};\n  }\n  ${sel}::-webkit-scrollbar-thumb {\n    background: ${val('thumb')};\n    border-radius: ${val('radius')}px;\n    border: ${val('gap')}px solid ${val('track')};\n  }\n  ${sel}::-webkit-scrollbar-thumb:hover {\n    background: ${val('hover')};\n  }\n}`;
+		};
+
+		const render = () => {
+			byId('sb-size-value').textContent = `${val('size')}px`;
+			byId('sb-radius-value').textContent = `${val('radius')}px`;
+			byId('sb-gap-value').textContent = `${val('gap')}px`;
+			byId('sb-live').textContent = css('#sb-preview');
+			byId('sb-css').textContent = css(val('selector').trim() || '.scroll-area');
+		};
+
+		['thumb', 'hover', 'track', 'size', 'radius', 'gap', 'selector'].forEach((id) => byId(`sb-${id}`).addEventListener('input', render));
+		segmented(byId('sb-width'), (value) => {
+			width = value;
+			render();
+		});
+		copyButton(byId('sb-copy'), () => byId('sb-css').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.sb-color {
+		width: 44px;
+		height: 30px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: transparent;
+	}
+	.sb-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 10px 14px;
+	}
+	.sb-slider {
+		display: grid;
+		grid-template-columns: 96px minmax(0, 1fr) 48px;
+		align-items: center;
+		gap: 12px;
+		font-size: 13px;
+		color: var(--ink-soft);
+		font-weight: 600;
+	}
+	.sb-slider input[type='range'] {
+		accent-color: var(--accent-strong);
+		min-width: 0;
+	}
+	.sb-slider b {
+		color: var(--ink);
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+	}
+	.sb-selector {
+		width: 100%;
+		font-family: var(--mono);
+	}
+	.sb-preview {
+		height: 260px;
+		overflow: auto;
+		padding: 16px 20px;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--ink);
+	}
+	.sb-preview:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 2px;
+	}
+	.sb-preview h2 {
+		margin: 0 0 8px;
+		font-size: 18px;
+	}
+	.sb-preview ul {
+		margin: 0;
+		padding-left: 18px;
+		line-height: 1.6;
+		font-size: 14px;
+	}
+	.sb-wide {
+		width: 900px;
+		margin-top: 12px;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.sb-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.sb-out {
+		min-height: auto !important;
+	}
+</style>

@@ -1,0 +1,177 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sliders = [
+	['size', 'Size', 80, 260, 180, 'px'],
+	['radius', 'Radius', 0, 130, 40, 'px'],
+	['distance', 'Distance', 1, 50, 18, 'px'],
+	['intensity', 'Intensity', 1, 40, 15, '%'],
+	['blur', 'Blur', 0, 100, 36, 'px'],
+];
+---
+
+<ToolShell
+	slug="neumorphism-generator"
+	title="Neumorphism Generator"
+	description="Soft UI shapes with paired light and dark shadows: flat, concave, convex or pressed."
+>
+	<div class="nm-stage user-colors" id="nm-tool">
+		<div class="nm-shape" id="nm-shape-box">
+			<span class="nm-icon" aria-hidden="true">
+				▶
+			</span>
+		</div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="nm-shape" aria-label="Shape">
+			<button data-value="flat" aria-pressed="true">
+				Flat
+			</button>
+			<button data-value="concave" aria-pressed="false">
+				Concave
+			</button>
+			<button data-value="convex" aria-pressed="false">
+				Convex
+			</button>
+			<button data-value="pressed" aria-pressed="false">
+				Pressed
+			</button>
+		</div>
+		<label class="check">
+			Surface <input type="color" id="nm-color" value="#e0e5ec" class="nm-color" />
+		</label>
+	</div>
+	<section class="panel nm-controls">
+		{sliders.map(([id, label, min, max, value]) => (
+			<label class="nm-slider">
+				<span>{label}</span>
+				<input type="range" id={`nm-${id}`} min={min} max={max} value={value} />
+				<b id={`nm-${id}-value`} />
+			</label>
+		))}
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="nm-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out nm-out" id="nm-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const UNITS: Record<string, string> = { size: 'px', radius: 'px', distance: 'px', intensity: '%', blur: 'px' };
+
+	const shade = (hex: string, amount: number) => {
+		const n = parseInt(hex.slice(1), 16);
+		return `#${[n >> 16, (n >> 8) & 255, n & 255]
+			.map((c) =>
+				Math.round(Math.min(255, Math.max(0, c + (amount > 0 ? (255 - c) * amount : c * amount))))
+					.toString(16)
+					.padStart(2, '0'),
+			)
+			.join('')}`;
+	};
+
+	onPage('nm-tool', () => {
+		let shape = 'flat';
+		const color = byId<HTMLInputElement>('nm-color');
+		const v = (id: string) => Number(byId<HTMLInputElement>(`nm-${id}`).value);
+
+		const render = () => {
+			Object.entries(UNITS).forEach(([id, unit]) => (byId(`nm-${id}-value`).textContent = `${v(id)}${unit}`));
+			const base = color.value;
+			const i = v('intensity') / 100;
+			const dark = shade(base, -i);
+			const light = shade(base, i * 2.5);
+			const d = v('distance');
+			const b = v('blur');
+			const inset = shape === 'pressed' ? 'inset ' : '';
+			const background =
+				shape === 'concave'
+					? `linear-gradient(145deg, ${shade(base, -0.08)}, ${shade(base, 0.12)})`
+					: shape === 'convex'
+						? `linear-gradient(145deg, ${shade(base, 0.12)}, ${shade(base, -0.08)})`
+						: base;
+			const decls: [string, string][] = [
+				['width', `${v('size')}px`],
+				['height', `${v('size')}px`],
+				['border-radius', `${v('radius')}px`],
+				['background', background],
+				['box-shadow', `${inset}${d}px ${d}px ${b}px ${dark}, ${inset}-${d}px -${d}px ${b}px ${light}`],
+			];
+			byId('nm-tool').style.background = base;
+			byId('nm-tool').style.color = shade(base, -0.55);
+			const box = byId('nm-shape-box');
+			decls.forEach(([k, value]) => box.style.setProperty(k, value));
+			byId('nm-css').textContent = `.parent {\n  background: ${base};\n}\n\n.soft {\n${decls.map(([k, value]) => `  ${k}: ${value};`).join('\n')}\n}`;
+		};
+
+		Object.keys(UNITS).forEach((id) => byId(`nm-${id}`).addEventListener('input', render));
+		color.addEventListener('input', render);
+		segmented(byId('nm-shape'), (value) => {
+			shape = value;
+			render();
+		});
+		copyButton(byId('nm-copy'), () => byId('nm-css').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.nm-stage {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 320px;
+		border-radius: 14px;
+		overflow: hidden;
+	}
+	.nm-shape {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		max-width: 100%;
+	}
+	.nm-icon {
+		font-size: 32px;
+	}
+	.nm-color {
+		width: 44px;
+		height: 30px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: transparent;
+	}
+	.nm-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 10px 14px;
+	}
+	.nm-slider {
+		display: grid;
+		grid-template-columns: 80px minmax(0, 1fr) 56px;
+		align-items: center;
+		gap: 12px;
+		font-size: 13px;
+		color: var(--ink-soft);
+		font-weight: 600;
+	}
+	.nm-slider input {
+		accent-color: var(--accent-strong);
+		min-width: 0;
+	}
+	.nm-slider b {
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+	.nm-out {
+		min-height: auto !important;
+	}
+</style>

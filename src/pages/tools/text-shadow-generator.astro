@@ -1,0 +1,247 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sliders = [
+	['x', 'Offset X', -40, 40, 2],
+	['y', 'Offset Y', -40, 40, 3],
+	['blur', 'Blur', 0, 60, 6],
+	['opacity', 'Opacity', 0, 100, 35],
+];
+---
+
+<ToolShell
+	slug="text-shadow-generator"
+	title="Text Shadow Generator"
+	description="Stack text-shadow layers for soft, neon, retro or outline type, and copy the CSS."
+>
+	<div class="tx-stage user-colors" id="tx-tool">
+		<p class="tx-text" id="tx-preview">
+			Hello, world
+		</p>
+	</div>
+	<div class="toolbar">
+		<div class="chips" id="tx-layers"></div>
+		<button class="btn" id="tx-add">
+			+ Layer
+		</button>
+		<button class="btn" id="tx-remove">
+			Remove layer
+		</button>
+	</div>
+	<section class="panel tx-controls">
+		{sliders.map(([id, label, min, max, value]) => (
+			<label class="tx-slider">
+				<span>{label}</span>
+				<input type="range" id={`tx-${id}`} min={min} max={max} value={value} />
+				<b id={`tx-${id}-value`} />
+			</label>
+		))}
+		<label class="tx-slider">
+			<span>Shadow color</span>
+			<input type="color" id="tx-color" value="#000000" />
+			<span></span>
+		</label>
+	</section>
+	<div class="toolbar">
+		<label class="check">
+			Text <input id="tx-text" class="num tx-input" value="Hello, world" />
+		</label>
+		<label class="check">
+			Size <input type="range" id="tx-size" min="24" max="120" value="64" class="tx-range" />
+		</label>
+		<label class="check">
+			Ink <input type="color" id="tx-fg" value="#201c2e" class="tx-swatch" />
+		</label>
+		<label class="check">
+			Backdrop <input type="color" id="tx-bg" value="#f4f1ff" class="tx-swatch" />
+		</label>
+	</div>
+	<div class="chips" id="tx-presets">
+		<button data-preset="soft">Soft</button>
+		<button data-preset="neon">Neon</button>
+		<button data-preset="retro">Retro 3D</button>
+		<button data-preset="outline">Outline</button>
+		<button data-preset="emboss">Emboss</button>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="tx-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out tx-out" id="tx-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	type Layer = { x: number; y: number; blur: number; opacity: number; color: string };
+	const KEYS = ['x', 'y', 'blur', 'opacity'] as const;
+	const L = (x: number, y: number, blur: number, opacity: number, color: string): Layer => ({ x, y, blur, opacity, color });
+
+	const PRESETS: Record<string, { layers: Layer[]; fg: string; bg: string }> = {
+		soft: { layers: [L(2, 3, 6, 35, '#000000')], fg: '#201c2e', bg: '#f4f1ff' },
+		neon: {
+			layers: [L(0, 0, 4, 100, '#ffffff'), L(0, 0, 12, 100, '#ff2bd6'), L(0, 0, 28, 100, '#ff2bd6'), L(0, 0, 48, 80, '#8b5cf6')],
+			fg: '#ffe6fb',
+			bg: '#12091f',
+		},
+		retro: {
+			layers: [L(2, 2, 0, 100, '#f97316'), L(4, 4, 0, 100, '#ea580c'), L(6, 6, 0, 100, '#c2410c'), L(8, 8, 0, 100, '#9a3412')],
+			fg: '#fde68a',
+			bg: '#1c1917',
+		},
+		outline: {
+			layers: [L(-2, 0, 0, 100, '#111827'), L(2, 0, 0, 100, '#111827'), L(0, -2, 0, 100, '#111827'), L(0, 2, 0, 100, '#111827')],
+			fg: '#ffffff',
+			bg: '#bae6fd',
+		},
+		emboss: { layers: [L(-1, -1, 0, 70, '#ffffff'), L(1, 1, 1, 30, '#000000')], fg: '#cbd5e1', bg: '#cbd5e1' },
+	};
+
+	const rgba = (hex: string, opacity: number) => {
+		const n = parseInt(hex.slice(1), 16);
+		return `rgb(${n >> 16} ${(n >> 8) & 255} ${n & 255} / ${opacity}%)`;
+	};
+
+	onPage('tx-tool', () => {
+		let layers: Layer[] = structuredClone(PRESETS.soft.layers);
+		let active = 0;
+		const color = byId<HTMLInputElement>('tx-color');
+		const text = byId<HTMLInputElement>('tx-text');
+		const size = byId<HTMLInputElement>('tx-size');
+		const fg = byId<HTMLInputElement>('tx-fg');
+		const bg = byId<HTMLInputElement>('tx-bg');
+
+		const css = () => layers.map((l) => `${l.x}px ${l.y}px ${l.blur}px ${rgba(l.color, l.opacity)}`).join(',\n    ');
+
+		const sync = () => {
+			const layer = layers[active];
+			KEYS.forEach((key) => {
+				byId<HTMLInputElement>(`tx-${key}`).value = String(layer[key]);
+				byId(`tx-${key}-value`).textContent = key === 'opacity' ? `${layer[key]}%` : `${layer[key]}px`;
+			});
+			color.value = layer.color;
+			byId('tx-layers').replaceChildren(
+				...layers.map((_, i) => {
+					const button = document.createElement('button');
+					button.textContent = `Layer ${i + 1}`;
+					button.setAttribute('aria-pressed', String(i === active));
+					button.addEventListener('click', () => {
+						active = i;
+						sync();
+					});
+					return button;
+				}),
+			);
+			byId('tx-remove').hidden = layers.length < 2;
+			const value = css();
+			const preview = byId('tx-preview');
+			preview.style.textShadow = value;
+			preview.textContent = text.value || 'Aa';
+			preview.style.fontSize = `${size.value}px`;
+			preview.style.color = fg.value;
+			byId('tx-tool').style.background = bg.value;
+			byId('tx-css').textContent = `text-shadow: ${value};`;
+		};
+
+		KEYS.forEach((key) =>
+			byId<HTMLInputElement>(`tx-${key}`).addEventListener('input', (e) => {
+				layers[active][key] = Number((e.target as HTMLInputElement).value);
+				sync();
+			}),
+		);
+		color.addEventListener('input', () => {
+			layers[active].color = color.value;
+			sync();
+		});
+		[text, size, fg, bg].forEach((el) => el.addEventListener('input', sync));
+		byId('tx-add').addEventListener('click', () => {
+			layers.push({ ...layers[active] });
+			active = layers.length - 1;
+			sync();
+		});
+		byId('tx-remove').addEventListener('click', () => {
+			layers.splice(active, 1);
+			active = Math.max(0, active - 1);
+			sync();
+		});
+		document.querySelectorAll<HTMLButtonElement>('#tx-presets button').forEach((button) =>
+			button.addEventListener('click', () => {
+				const preset = PRESETS[button.dataset.preset!];
+				layers = structuredClone(preset.layers);
+				fg.value = preset.fg;
+				bg.value = preset.bg;
+				active = 0;
+				sync();
+			}),
+		);
+		copyButton(byId('tx-copy'), () => byId('tx-css').textContent ?? '');
+		sync();
+	});
+</script>
+
+<style>
+	.tx-stage {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 240px;
+		padding: 24px 16px;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+		overflow: hidden;
+	}
+	.tx-text {
+		margin: 0;
+		font-weight: 800;
+		line-height: 1.1;
+		text-align: center;
+		overflow-wrap: anywhere;
+		max-width: 100%;
+	}
+	.tx-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 10px 14px;
+	}
+	.tx-slider {
+		display: grid;
+		grid-template-columns: 96px minmax(0, 1fr) 56px;
+		align-items: center;
+		gap: 12px;
+		font-size: 13px;
+		color: var(--ink-soft);
+		font-weight: 600;
+	}
+	.tx-slider input[type='range'],
+	.tx-range {
+		accent-color: var(--accent-strong);
+		min-width: 0;
+	}
+	.tx-range {
+		width: 120px;
+	}
+	.tx-slider b {
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+	.tx-slider input[type='color'],
+	.tx-swatch {
+		width: 44px;
+		height: 30px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: transparent;
+	}
+	.tx-input {
+		width: 150px;
+	}
+	.tx-out {
+		min-height: auto !important;
+	}
+</style>

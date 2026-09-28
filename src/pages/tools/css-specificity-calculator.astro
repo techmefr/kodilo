@@ -1,0 +1,280 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `#app .nav > li a:hover
+.btn.btn-primary
+nav ul li::before
+:is(#main, .content) p
+:where(.card) h2
+a[href^="https"]:not(.external, #skip)
+li:nth-child(2 of .item)
+*`;
+---
+
+<ToolShell
+	slug="css-specificity-calculator"
+	title="CSS Specificity Calculator"
+	description="Compute (a, b, c) specificity for a list of selectors, sort them and see exactly what counts."
+>
+	<section class="panel" id="sp-tool">
+		<div class="panel-head">
+			<span>Selectors, one per line</span>
+		</div>
+		<textarea id="sp-in" spellcheck="false" aria-label="Selectors, one per line">{sample}</textarea>
+	</section>
+	<div class="toolbar">
+		<div class="seg" id="sp-sort" aria-label="Order">
+			<button data-value="input" aria-pressed="false">
+				Input order
+			</button>
+			<button data-value="spec" aria-pressed="true">
+				Highest first
+			</button>
+		</div>
+		<span class="sp-winner" id="sp-winner" aria-live="polite"></span>
+	</div>
+	<ol class="sp-list" id="sp-list"></ol>
+</ToolShell>
+
+<script>
+	import { byId, onPage, segmented } from '../../scripts/ui';
+
+	type Spec = [number, number, number];
+	type Part = { text: string; kind: 'a' | 'b' | 'c' | '0'; note: string };
+
+	const LEGACY = new Set(['before', 'after', 'first-line', 'first-letter']);
+	const FORGIVING = new Set(['is', 'not', 'has', 'matches', '-webkit-any', '-moz-any']);
+
+	const splitList = (s: string) => {
+		const out: string[] = [];
+		let depth = 0;
+		let quote = '';
+		let cur = '';
+		for (const ch of s) {
+			if (quote) {
+				if (ch === quote) quote = '';
+			} else if (ch === '"' || ch === "'") quote = ch;
+			else if (ch === '(' || ch === '[') depth++;
+			else if (ch === ')' || ch === ']') depth--;
+			else if (ch === ',' && depth === 0) {
+				out.push(cur.trim());
+				cur = '';
+				continue;
+			}
+			cur += ch;
+		}
+		if (cur.trim()) out.push(cur.trim());
+		return out;
+	};
+
+	const add = (a: Spec, b: Spec): Spec => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+	const cmp = (a: Spec, b: Spec) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+	const max = (list: string[]) => list.map((s) => compute(s).spec).reduce((m, s) => (cmp(s, m) > 0 ? s : m), [0, 0, 0] as Spec);
+
+	function compute(sel: string): { spec: Spec; parts: Part[] } {
+		let spec: Spec = [0, 0, 0];
+		const parts: Part[] = [];
+		let i = 0;
+		const ident = () => {
+			const m = /^(?:\\.|[\w-]|[\u0080-￿])+/.exec(sel.slice(i));
+			const v = m ? m[0] : '';
+			i += v.length;
+			return v;
+		};
+		const balanced = () => {
+			let depth = 0;
+			const start = i;
+			for (; i < sel.length; i++) {
+				if (sel[i] === '(') depth++;
+				else if (sel[i] === ')' && --depth === 0) {
+					i++;
+					break;
+				}
+			}
+			return sel.slice(start + 1, i - 1);
+		};
+		const push = (text: string, kind: Part['kind'], note: string, s: Spec) => {
+			parts.push({ text, kind, note });
+			spec = add(spec, s);
+		};
+		while (i < sel.length) {
+			const ch = sel[i];
+			if (/[\s>+~]/.test(ch) || ch === '|') {
+				i++;
+			} else if (ch === '#') {
+				i++;
+				push(`#${ident()}`, 'a', 'ID selector', [1, 0, 0]);
+			} else if (ch === '.') {
+				i++;
+				push(`.${ident()}`, 'b', 'class', [0, 1, 0]);
+			} else if (ch === '[') {
+				const start = i;
+				let quote = '';
+				for (; i < sel.length; i++) {
+					const c = sel[i];
+					if (quote) {
+						if (c === quote) quote = '';
+					} else if (c === '"' || c === "'") quote = c;
+					else if (c === ']') {
+						i++;
+						break;
+					}
+				}
+				push(sel.slice(start, i), 'b', 'attribute selector', [0, 1, 0]);
+			} else if (ch === ':' && sel[i + 1] === ':') {
+				i += 2;
+				const name = ident();
+				const arg = sel[i] === '(' ? `(${balanced()})` : '';
+				push(`::${name}${arg}`, 'c', 'pseudo-element', [0, 0, 1]);
+			} else if (ch === ':') {
+				i++;
+				const name = ident();
+				const lower = name.toLowerCase();
+				const arg = sel[i] === '(' ? balanced() : null;
+				const text = `:${name}${arg === null ? '' : `(${arg})`}`;
+				if (LEGACY.has(lower)) push(text, 'c', 'legacy pseudo-element', [0, 0, 1]);
+				else if (lower === 'where') push(text, '0', ':where() always counts zero', [0, 0, 0]);
+				else if (FORGIVING.has(lower) && arg !== null) {
+					const s = max(splitList(arg));
+					push(text, s[0] ? 'a' : s[1] ? 'b' : s[2] ? 'c' : '0', `takes its most specific argument (${s.join(',')})`, s);
+				} else if ((lower === 'nth-child' || lower === 'nth-last-child') && arg && /\sof\s/i.test(arg)) {
+					const s = add([0, 1, 0], max(splitList(arg.split(/\sof\s/i)[1])));
+					push(text, 'b', `pseudo-class plus its "of" selector (${s.join(',')})`, s);
+				} else push(text, 'b', 'pseudo-class', [0, 1, 0]);
+			} else if (ch === '*') {
+				i++;
+				push('*', '0', 'universal selector counts zero', [0, 0, 0]);
+			} else if (ch === '&') {
+				i++;
+				push('&', '0', 'nesting selector takes the parent specificity', [0, 0, 0]);
+			} else {
+				const name = ident();
+				if (!name) {
+					i++;
+					continue;
+				}
+				push(name, 'c', 'type selector', [0, 0, 1]);
+			}
+		}
+		return { spec, parts };
+	}
+
+	onPage('sp-tool', () => {
+		let order = 'spec';
+		const input = byId<HTMLTextAreaElement>('sp-in');
+
+		const render = () => {
+			const rows = input.value
+				.split('\n')
+				.flatMap((line) => splitList(line))
+				.filter(Boolean)
+				.map((sel, index) => ({ sel, index, ...compute(sel) }));
+			const sorted = order === 'spec' ? [...rows].sort((a, b) => cmp(b.spec, a.spec) || a.index - b.index) : rows;
+			const top = [...rows].sort((a, b) => cmp(b.spec, a.spec) || b.index - a.index)[0];
+			byId('sp-winner').textContent = top ? `Wins when all match: ${top.sel} (later rules win ties)` : '';
+			byId('sp-list').replaceChildren(
+				...sorted.map((row) => {
+					const li = document.createElement('li');
+					const head = document.createElement('div');
+					head.className = 'sp-head';
+					const code = document.createElement('code');
+					code.textContent = row.sel;
+					const score = document.createElement('span');
+					score.className = 'sp-score';
+					score.textContent = `(${row.spec.join(', ')})`;
+					head.append(code, score);
+					const parts = document.createElement('ul');
+					parts.className = 'sp-parts';
+					row.parts.forEach((p) => {
+						const item = document.createElement('li');
+						item.dataset.kind = p.kind;
+						const tag = document.createElement('code');
+						tag.textContent = p.text;
+						item.append(tag, ` ${p.note}`);
+						parts.append(item);
+					});
+					li.append(head, parts);
+					return li;
+				}),
+			);
+		};
+
+		input.addEventListener('input', render);
+		segmented(byId('sp-sort'), (value) => {
+			order = value;
+			render();
+		});
+		render();
+	});
+</script>
+
+<style>
+	.sp-winner {
+		font-size: 13px;
+		color: var(--ink-soft);
+		overflow-wrap: anywhere;
+	}
+	.sp-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.sp-list > :global(li) {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		padding: 10px 14px;
+	}
+	.sp-list :global(.sp-head) {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		gap: 8px;
+		align-items: baseline;
+	}
+	.sp-list :global(.sp-head code) {
+		font-family: var(--mono);
+		font-size: 14px;
+		color: var(--ink);
+		overflow-wrap: anywhere;
+		min-width: 0;
+	}
+	.sp-list :global(.sp-score) {
+		font-family: var(--mono);
+		font-weight: 700;
+		color: var(--accent-strong);
+	}
+	.sp-list :global(.sp-parts) {
+		list-style: none;
+		margin: 6px 0 0;
+		padding: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.sp-list :global(.sp-parts li) {
+		font-size: 12px;
+		color: var(--ink-soft);
+		background: var(--surface-2);
+		border-radius: 8px;
+		padding: 3px 8px;
+		overflow-wrap: anywhere;
+	}
+	.sp-list :global(.sp-parts code) {
+		font-family: var(--mono);
+		color: var(--ink);
+		font-weight: 700;
+	}
+	.sp-list :global(.sp-parts li[data-kind='a']) {
+		box-shadow: inset 3px 0 0 var(--bad);
+	}
+	.sp-list :global(.sp-parts li[data-kind='b']) {
+		box-shadow: inset 3px 0 0 var(--accent-strong);
+	}
+	.sp-list :global(.sp-parts li[data-kind='c']) {
+		box-shadow: inset 3px 0 0 var(--ok);
+	}
+</style>

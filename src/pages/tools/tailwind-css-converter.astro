@@ -1,0 +1,664 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="tailwind-css-converter"
+	title="Tailwind CSS Converter"
+	description="Convert common Tailwind utility classes to plain CSS and back, with variants and arbitrary values."
+>
+	<div class="toolbar" id="tw-tool">
+		<div class="seg" id="tw-dir" aria-label="Direction">
+			<button data-value="tw" aria-pressed="true">
+				Tailwind → CSS
+			</button>
+			<button data-value="css" aria-pressed="false">
+				CSS → Tailwind
+			</button>
+		</div>
+		<button class="btn" id="tw-sample">
+			Load sample
+		</button>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">
+				<span id="tw-in-label">Classes</span>
+			</div>
+			<textarea
+				id="tw-in"
+				spellcheck="false"
+				aria-labelledby="tw-in-label"
+			>flex items-center justify-between gap-4 px-6 py-3 rounded-xl bg-white shadow-md text-sm font-semibold hover:shadow-lg md:px-8 w-[37rem] bg-brand-500</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Result</span>
+				<button class="btn" id="tw-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="tw-out"></pre>
+		</section>
+	</div>
+	<p class="tw-unknown" id="tw-unknown" aria-live="polite"></p>
+	<details class="tw-coverage">
+		<summary>What is covered</summary>
+		<p>
+			Tailwind v4 default scale for spacing, sizing, inset, gap, display, position, flex and grid basics, typography (sizes, weights, alignment, leading,
+			tracking, case, decoration), borders, radius, shadows, opacity, z-index, overflow, cursor, object-fit and aspect ratio. Variants: hover, focus,
+			focus-visible, active, disabled, first, last, odd, even, dark and the sm to 2xl breakpoints. Arbitrary values like w-[37rem] and arbitrary properties like
+			[mask-type:luminance] work both ways.
+		</p>
+		<p>
+			Not covered: the named color palette (bg-slate-800 and friends), gradients, transforms, transitions and animations, filters, ring, divide, space-x, group
+			and peer variants, and plugins. Anything unknown is listed instead of silently dropped, and CSS that has no utility match comes back as an arbitrary
+			value.
+		</p>
+	</details>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Decl = [string, string];
+
+	const SPACING_PROPS: Record<string, string[]> = {
+		p: ['padding'],
+		px: ['padding-inline'],
+		py: ['padding-block'],
+		pt: ['padding-top'],
+		pr: ['padding-right'],
+		pb: ['padding-bottom'],
+		pl: ['padding-left'],
+		ps: ['padding-inline-start'],
+		pe: ['padding-inline-end'],
+		m: ['margin'],
+		mx: ['margin-inline'],
+		my: ['margin-block'],
+		mt: ['margin-top'],
+		mr: ['margin-right'],
+		mb: ['margin-bottom'],
+		ml: ['margin-left'],
+		ms: ['margin-inline-start'],
+		me: ['margin-inline-end'],
+		gap: ['gap'],
+		'gap-x': ['column-gap'],
+		'gap-y': ['row-gap'],
+		inset: ['inset'],
+		'inset-x': ['inset-inline'],
+		'inset-y': ['inset-block'],
+		top: ['top'],
+		right: ['right'],
+		bottom: ['bottom'],
+		left: ['left'],
+		w: ['width'],
+		h: ['height'],
+		'min-w': ['min-width'],
+		'min-h': ['min-height'],
+		'max-w': ['max-width'],
+		'max-h': ['max-height'],
+		size: ['width', 'height'],
+		leading: ['line-height'],
+		basis: ['flex-basis'],
+	};
+	const NEGATABLE = /^(m[xytrblse]?|inset(-[xy])?|top|right|bottom|left)$/;
+	const SIZED = /^(w|h|min-w|min-h|max-w|max-h|size|inset(-[xy])?|top|right|bottom|left|basis)$/;
+	const CONTAINERS: Record<string, string> = {
+		'3xs': '16rem',
+		'2xs': '18rem',
+		xs: '20rem',
+		sm: '24rem',
+		md: '28rem',
+		lg: '32rem',
+		xl: '36rem',
+		'2xl': '42rem',
+		'3xl': '48rem',
+		'4xl': '56rem',
+		'5xl': '64rem',
+		'6xl': '72rem',
+		'7xl': '80rem',
+		prose: '65ch',
+	};
+	const TEXT: Record<string, [string, string]> = {
+		xs: ['0.75rem', '1rem'],
+		sm: ['0.875rem', '1.25rem'],
+		base: ['1rem', '1.5rem'],
+		lg: ['1.125rem', '1.75rem'],
+		xl: ['1.25rem', '1.75rem'],
+		'2xl': ['1.5rem', '2rem'],
+		'3xl': ['1.875rem', '2.25rem'],
+		'4xl': ['2.25rem', '2.5rem'],
+		'5xl': ['3rem', '1'],
+		'6xl': ['3.75rem', '1'],
+		'7xl': ['4.5rem', '1'],
+		'8xl': ['6rem', '1'],
+		'9xl': ['8rem', '1'],
+	};
+	const RADIUS: Record<string, string> = {
+		none: '0',
+		xs: '0.125rem',
+		sm: '0.25rem',
+		'': '0.25rem',
+		md: '0.375rem',
+		lg: '0.5rem',
+		xl: '0.75rem',
+		'2xl': '1rem',
+		'3xl': '1.5rem',
+		'4xl': '2rem',
+		full: '9999px',
+	};
+	const RADIUS_SIDES: Record<string, string[]> = {
+		'': ['border-radius'],
+		t: ['border-top-left-radius', 'border-top-right-radius'],
+		r: ['border-top-right-radius', 'border-bottom-right-radius'],
+		b: ['border-bottom-right-radius', 'border-bottom-left-radius'],
+		l: ['border-top-left-radius', 'border-bottom-left-radius'],
+		tl: ['border-top-left-radius'],
+		tr: ['border-top-right-radius'],
+		br: ['border-bottom-right-radius'],
+		bl: ['border-bottom-left-radius'],
+	};
+	const SHADOW: Record<string, string> = {
+		'2xs': '0 1px rgb(0 0 0 / 0.05)',
+		xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+		sm: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+		md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+		lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+		xl: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+		'2xl': '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+		none: '0 0 #0000',
+	};
+	const WEIGHTS: Record<string, string> = {
+		thin: '100',
+		extralight: '200',
+		light: '300',
+		normal: '400',
+		medium: '500',
+		semibold: '600',
+		bold: '700',
+		extrabold: '800',
+		black: '900',
+	};
+	const LEADING: Record<string, string> = { none: '1', tight: '1.25', snug: '1.375', normal: '1.5', relaxed: '1.625', loose: '2' };
+	const TRACKING: Record<string, string> = { tighter: '-0.05em', tight: '-0.025em', normal: '0em', wide: '0.025em', wider: '0.05em', widest: '0.1em' };
+	const COLORS: Record<string, string> = { white: '#fff', black: '#000', transparent: 'transparent', current: 'currentColor', inherit: 'inherit' };
+	const one = (prop: string, value: string): Decl[] => [[prop, value]];
+
+	const STATIC: Record<string, Decl[]> = {
+		block: one('display', 'block'),
+		'inline-block': one('display', 'inline-block'),
+		inline: one('display', 'inline'),
+		flex: one('display', 'flex'),
+		'inline-flex': one('display', 'inline-flex'),
+		grid: one('display', 'grid'),
+		'inline-grid': one('display', 'inline-grid'),
+		contents: one('display', 'contents'),
+		table: one('display', 'table'),
+		hidden: one('display', 'none'),
+		static: one('position', 'static'),
+		fixed: one('position', 'fixed'),
+		absolute: one('position', 'absolute'),
+		relative: one('position', 'relative'),
+		sticky: one('position', 'sticky'),
+		'flex-row': one('flex-direction', 'row'),
+		'flex-row-reverse': one('flex-direction', 'row-reverse'),
+		'flex-col': one('flex-direction', 'column'),
+		'flex-col-reverse': one('flex-direction', 'column-reverse'),
+		'flex-wrap': one('flex-wrap', 'wrap'),
+		'flex-nowrap': one('flex-wrap', 'nowrap'),
+		'flex-1': one('flex', '1 1 0%'),
+		'flex-auto': one('flex', '1 1 auto'),
+		'flex-initial': one('flex', '0 1 auto'),
+		'flex-none': one('flex', 'none'),
+		grow: one('flex-grow', '1'),
+		'grow-0': one('flex-grow', '0'),
+		shrink: one('flex-shrink', '1'),
+		'shrink-0': one('flex-shrink', '0'),
+		'text-left': one('text-align', 'left'),
+		'text-center': one('text-align', 'center'),
+		'text-right': one('text-align', 'right'),
+		'text-justify': one('text-align', 'justify'),
+		'font-sans': one('font-family', 'ui-sans-serif, system-ui, sans-serif'),
+		'font-serif': one('font-family', 'ui-serif, Georgia, serif'),
+		'font-mono': one('font-family', 'ui-monospace, SFMono-Regular, monospace'),
+		italic: one('font-style', 'italic'),
+		'not-italic': one('font-style', 'normal'),
+		underline: one('text-decoration-line', 'underline'),
+		'line-through': one('text-decoration-line', 'line-through'),
+		'no-underline': one('text-decoration-line', 'none'),
+		uppercase: one('text-transform', 'uppercase'),
+		lowercase: one('text-transform', 'lowercase'),
+		capitalize: one('text-transform', 'capitalize'),
+		'normal-case': one('text-transform', 'none'),
+		truncate: [
+			['overflow', 'hidden'],
+			['text-overflow', 'ellipsis'],
+			['white-space', 'nowrap'],
+		],
+		'whitespace-nowrap': one('white-space', 'nowrap'),
+		'whitespace-normal': one('white-space', 'normal'),
+		'whitespace-pre': one('white-space', 'pre'),
+		'whitespace-pre-wrap': one('white-space', 'pre-wrap'),
+		'break-words': one('overflow-wrap', 'break-word'),
+		'break-all': one('word-break', 'break-all'),
+		border: one('border-width', '1px'),
+		'border-solid': one('border-style', 'solid'),
+		'border-dashed': one('border-style', 'dashed'),
+		'border-dotted': one('border-style', 'dotted'),
+		'border-none': one('border-style', 'none'),
+		'pointer-events-none': one('pointer-events', 'none'),
+		'pointer-events-auto': one('pointer-events', 'auto'),
+		'select-none': one('user-select', 'none'),
+		'select-text': one('user-select', 'text'),
+		'select-all': one('user-select', 'all'),
+		'object-cover': one('object-fit', 'cover'),
+		'object-contain': one('object-fit', 'contain'),
+		'object-fill': one('object-fit', 'fill'),
+		'aspect-square': one('aspect-ratio', '1 / 1'),
+		'aspect-video': one('aspect-ratio', '16 / 9'),
+		'aspect-auto': one('aspect-ratio', 'auto'),
+		'z-auto': one('z-index', 'auto'),
+		'col-span-full': one('grid-column', '1 / -1'),
+		'sr-only': [
+			['position', 'absolute'],
+			['width', '1px'],
+			['height', '1px'],
+			['padding', '0'],
+			['margin', '-1px'],
+			['overflow', 'hidden'],
+			['clip-path', 'inset(50%)'],
+			['white-space', 'nowrap'],
+			['border-width', '0'],
+		],
+	};
+	[
+		['items', 'align-items'],
+		['self', 'align-self'],
+		['justify', 'justify-content'],
+		['content', 'align-content'],
+	].forEach(([prefix, prop]) =>
+		Object.entries({
+			start: 'flex-start',
+			end: 'flex-end',
+			center: 'center',
+			baseline: 'baseline',
+			stretch: 'stretch',
+			between: 'space-between',
+			around: 'space-around',
+			evenly: 'space-evenly',
+			auto: 'auto',
+		}).forEach(([k, v]) => {
+			const ok = prefix === 'items' || prefix === 'self' ? !['between', 'around', 'evenly'].includes(k) : !['baseline', 'auto'].includes(k);
+			if (ok && !(prefix === 'items' && k === 'auto')) STATIC[`${prefix}-${k}`] = one(prop, v);
+		}),
+	);
+	['auto', 'hidden', 'visible', 'scroll', 'clip'].forEach((v) => {
+		STATIC[`overflow-${v}`] = one('overflow', v);
+		STATIC[`overflow-x-${v}`] = one('overflow-x', v);
+		STATIC[`overflow-y-${v}`] = one('overflow-y', v);
+	});
+	['pointer', 'default', 'not-allowed', 'wait', 'text', 'move', 'grab', 'help'].forEach((v) => (STATIC[`cursor-${v}`] = one('cursor', v)));
+	Object.entries(WEIGHTS).forEach(([k, v]) => (STATIC[`font-${k}`] = one('font-weight', v)));
+	Object.entries(TRACKING).forEach(([k, v]) => (STATIC[`tracking-${k}`] = one('letter-spacing', v)));
+	Object.entries(SHADOW).forEach(([k, v]) => (STATIC[`shadow-${k}`] = one('box-shadow', v)));
+	STATIC.shadow = STATIC['shadow-sm'];
+	Object.entries(RADIUS_SIDES).forEach(([side, props]) =>
+		Object.entries(RADIUS).forEach(([k, v]) => {
+			const name = ['rounded', side, k].filter(Boolean).join('-');
+			STATIC[name] = props.map((p) => [p, v]);
+		}),
+	);
+
+	const unbracket = (v: string) => v.slice(1, -1).replace(/_/g, ' ');
+	const spacing = (key: string, raw: string): string | null => {
+		if (/^\[.+\]$/.test(raw)) return unbracket(raw);
+		if (raw === 'px') return '1px';
+		if (raw === '0') return '0';
+		if (/^\d+(\.\d+)?$/.test(raw)) return `${Number(raw) * 0.25}rem`;
+		if (SIZED.test(key)) {
+			if (/^\d+\/\d+$/.test(raw)) {
+				const [a, b] = raw.split('/').map(Number);
+				return `${Number(((a / b) * 100).toFixed(6))}%`;
+			}
+			const words: Record<string, string> = { auto: 'auto', full: '100%', min: 'min-content', max: 'max-content', fit: 'fit-content', none: 'none' };
+			if (raw in words) return words[raw];
+			if (raw === 'screen') return key.includes('h') && !key.includes('w') ? '100vh' : '100vw';
+			if (key === 'max-w' && CONTAINERS[raw]) return CONTAINERS[raw];
+		}
+		if (key.startsWith('m') && key !== 'max-w' && key !== 'max-h' && key !== 'min-w' && key !== 'min-h' && raw === 'auto') return 'auto';
+		if (key === 'leading' && LEADING[raw]) return LEADING[raw];
+		return null;
+	};
+
+	const isColor = (v: string) => /^(#|rgb|hsl|oklch|oklab|color\(|var\()/.test(v) || v in COLORS;
+
+	function utility(name: string): Decl[] | null {
+		if (STATIC[name]) return STATIC[name];
+		const arbitrary = /^\[([a-z-]+):(.+)\]$/.exec(name);
+		if (arbitrary) return one(arbitrary[1], arbitrary[2].replace(/_/g, ' '));
+		const neg = name.startsWith('-');
+		const base = neg ? name.slice(1) : name;
+		const m = /^([a-z]+(?:-[a-z]+)?)-(.+)$/.exec(base);
+		if (!m) return null;
+		let [, key, raw] = m;
+		if (!SPACING_PROPS[key]) {
+			const short = /^([a-z]+)-(.+)$/.exec(base);
+			if (short && SPACING_PROPS[short[1]]) [, key, raw] = short;
+		}
+		if (SPACING_PROPS[key] && !(neg && !NEGATABLE.test(key))) {
+			const v = spacing(key, raw);
+			if (v !== null) return SPACING_PROPS[key].map((p) => [p, neg && v !== '0' ? (v.startsWith('-') ? v.slice(1) : `-${v}`) : v]);
+		}
+		if (neg) return null;
+		const [, prefix, rest] = /^([a-z]+)-(.+)$/.exec(base) ?? [];
+		const value = rest?.startsWith('[') ? unbracket(rest) : undefined;
+		if (prefix === 'text') {
+			if (TEXT[rest])
+				return [
+					['font-size', TEXT[rest][0]],
+					['line-height', TEXT[rest][1]],
+				];
+			if (COLORS[rest]) return one('color', COLORS[rest]);
+			if (value) return one(isColor(value) ? 'color' : 'font-size', value);
+		}
+		if (prefix === 'bg') {
+			if (COLORS[rest]) return one('background-color', COLORS[rest]);
+			if (value) return one(isColor(value) ? 'background-color' : 'background', value);
+		}
+		if (prefix === 'border') {
+			if (/^\d+$/.test(rest)) return one('border-width', `${rest}px`);
+			const side = /^([trblxy])(?:-(\d+))?$/.exec(rest);
+			if (side) {
+				const names: Record<string, string> = {
+					t: 'border-top-width',
+					r: 'border-right-width',
+					b: 'border-bottom-width',
+					l: 'border-left-width',
+					x: 'border-inline-width',
+					y: 'border-block-width',
+				};
+				return one(names[side[1]], `${side[2] ?? 1}px`);
+			}
+			if (COLORS[rest]) return one('border-color', COLORS[rest]);
+			if (value) return one(isColor(value) ? 'border-color' : 'border-width', value);
+		}
+		if (prefix === 'font' && value) return one('font-weight', value);
+		if (prefix === 'rounded' && value) return one('border-radius', value);
+		if (prefix === 'shadow' && value) return one('box-shadow', value);
+		if (prefix === 'tracking' && value) return one('letter-spacing', value);
+		if (prefix === 'opacity') return /^\d+$/.test(rest) ? one('opacity', String(Number(rest) / 100)) : value ? one('opacity', value) : null;
+		if (prefix === 'z') return /^\d+$/.test(rest) ? one('z-index', rest) : value ? one('z-index', value) : null;
+		if (prefix === 'duration' && /^\d+$/.test(rest)) return one('transition-duration', `${rest}ms`);
+		if (prefix === 'aspect' && value) return one('aspect-ratio', value);
+		const grid = /^(grid-cols|grid-rows|col-span|row-span)-(\d+)$/.exec(base);
+		if (grid) {
+			const n = grid[2];
+			if (grid[1] === 'grid-cols') return one('grid-template-columns', `repeat(${n}, minmax(0, 1fr))`);
+			if (grid[1] === 'grid-rows') return one('grid-template-rows', `repeat(${n}, minmax(0, 1fr))`);
+			return one(grid[1] === 'col-span' ? 'grid-column' : 'grid-row', `span ${n} / span ${n}`);
+		}
+		return null;
+	}
+
+	const PSEUDO: Record<string, string> = {
+		hover: ':hover',
+		focus: ':focus',
+		'focus-visible': ':focus-visible',
+		'focus-within': ':focus-within',
+		active: ':active',
+		disabled: ':disabled',
+		first: ':first-child',
+		last: ':last-child',
+		odd: ':nth-child(odd)',
+		even: ':nth-child(even)',
+		placeholder: '::placeholder',
+	};
+	const MEDIA: Record<string, string> = {
+		sm: '(width >= 40rem)',
+		md: '(width >= 48rem)',
+		lg: '(width >= 64rem)',
+		xl: '(width >= 80rem)',
+		'2xl': '(width >= 96rem)',
+		dark: '(prefers-color-scheme: dark)',
+	};
+
+	const splitVariants = (cls: string) => {
+		const parts: string[] = [];
+		let depth = 0;
+		let cur = '';
+		for (const ch of cls) {
+			if (ch === '[') depth++;
+			if (ch === ']') depth--;
+			if (ch === ':' && depth === 0) {
+				parts.push(cur);
+				cur = '';
+			} else cur += ch;
+		}
+		parts.push(cur);
+		return parts;
+	};
+
+	function toCss(input: string) {
+		const groups = new Map<string, { media: string[]; pseudo: string; decls: Decl[] }>();
+		const unknown: string[] = [];
+		input
+			.split(/\s+/)
+			.filter(Boolean)
+			.forEach((cls) => {
+				const parts = splitVariants(cls);
+				let name = parts.pop()!;
+				let important = false;
+				if (name.startsWith('!') || name.endsWith('!')) {
+					important = true;
+					name = name.replace(/^!|!$/g, '');
+				}
+				const media: string[] = [];
+				let pseudo = '';
+				for (const v of parts) {
+					if (MEDIA[v]) media.push(MEDIA[v]);
+					else if (PSEUDO[v]) pseudo += PSEUDO[v];
+					else return unknown.push(cls);
+				}
+				const decls = utility(name);
+				if (!decls) return unknown.push(cls);
+				const key = `${media.join('|')}#${pseudo}`;
+				const group = groups.get(key) ?? { media, pseudo, decls: [] };
+				group.decls.push(...decls.map(([p, v]): Decl => [p, important ? `${v} !important` : v]));
+				groups.set(key, group);
+			});
+		const blocks = [...groups.values()].map(({ media, pseudo, decls }) => {
+			const indent = '  '.repeat(media.length);
+			let block = `${indent}.element${pseudo} {\n${decls.map(([p, v]) => `${indent}  ${p}: ${v};`).join('\n')}\n${indent}}`;
+			[...media].reverse().forEach((q, i) => {
+				const pad = '  '.repeat(media.length - 1 - i);
+				block = `${pad}@media ${q} {\n${block}\n${pad}}`;
+			});
+			return block;
+		});
+		return { out: blocks.join('\n\n'), unknown };
+	}
+
+	const reverse = new Map<string, string>();
+	const addReverse = (name: string) => {
+		const decls = utility(name);
+		if (decls && decls.length === 1) {
+			const key = `${decls[0][0]}:${decls[0][1]}`;
+			if (!reverse.has(key)) reverse.set(key, name);
+		}
+	};
+	const SCALE = [
+		'0',
+		'px',
+		'0.5',
+		'1',
+		'1.5',
+		'2',
+		'2.5',
+		'3',
+		'3.5',
+		'4',
+		'5',
+		'6',
+		'7',
+		'8',
+		'9',
+		'10',
+		'11',
+		'12',
+		'14',
+		'16',
+		'20',
+		'24',
+		'28',
+		'32',
+		'36',
+		'40',
+		'44',
+		'48',
+		'52',
+		'56',
+		'60',
+		'64',
+		'72',
+		'80',
+		'96',
+	];
+	const buildReverse = () => {
+		if (reverse.size) return;
+		Object.keys(STATIC).forEach(addReverse);
+		Object.keys(SPACING_PROPS).forEach((key) => {
+			[...SCALE, 'auto', 'full', 'screen', 'min', 'max', 'fit', '1/2', '1/3', '2/3', '1/4', '3/4', ...Object.keys(CONTAINERS), ...Object.keys(LEADING)].forEach(
+				(v) => addReverse(`${key}-${v}`),
+			);
+			if (NEGATABLE.test(key)) SCALE.slice(1).forEach((v) => addReverse(`-${key}-${v}`));
+		});
+		Object.keys(COLORS).forEach((c) => ['text', 'bg', 'border'].forEach((p) => addReverse(`${p}-${c}`)));
+		for (let i = 0; i <= 100; i += 5) addReverse(`opacity-${i}`);
+		[0, 10, 20, 30, 40, 50].forEach((z) => addReverse(`z-${z}`));
+		for (let i = 1; i <= 12; i++) ['grid-cols', 'grid-rows', 'col-span', 'row-span'].forEach((p) => addReverse(`${p}-${i}`));
+		[0, 2, 4, 8].forEach((b) => addReverse(`border-${b}`));
+		['t', 'r', 'b', 'l', 'x', 'y'].forEach((s) => addReverse(`border-${s}`));
+		[75, 100, 150, 200, 300, 500, 700, 1000].forEach((d) => addReverse(`duration-${d}`));
+	};
+	const PREFIX: Record<string, string> = {
+		...Object.fromEntries(
+			Object.entries(SPACING_PROPS)
+				.filter(([, p]) => p.length === 1)
+				.map(([k, p]) => [p[0], k]),
+		),
+		color: 'text',
+		'background-color': 'bg',
+		'border-color': 'border',
+		'border-width': 'border',
+		'border-radius': 'rounded',
+		'box-shadow': 'shadow',
+		'font-size': 'text',
+		'font-weight': 'font',
+		'letter-spacing': 'tracking',
+		opacity: 'opacity',
+		'z-index': 'z',
+		'aspect-ratio': 'aspect',
+	};
+	const normalize = (v: string) =>
+		v
+			.trim()
+			.replace(/\s+/g, ' ')
+			.replace(/\s*!important$/, '')
+			.replace(/^0(px|rem|em|%)$/, '0')
+			.replace(/^(-?)(\d*\.?\d+)px$/, (all, sign, n) => (n === '1' ? all : `${sign}${Number(n) / 16}rem`));
+
+	function toTailwind(input: string) {
+		buildReverse();
+		const body = input.includes('{') ? (input.match(/\{([^{}]*)\}/g) ?? []).map((b) => b.slice(1, -1)).join(';') : input;
+		const decls = body
+			.split(';')
+			.map((d) => d.trim())
+			.filter(Boolean)
+			.map((d) => {
+				const i = d.indexOf(':');
+				return i < 0 ? null : ([d.slice(0, i).trim().toLowerCase(), d.slice(i + 1).trim()] as Decl);
+			})
+			.filter((d): d is Decl => !!d);
+		const classes: string[] = [];
+		const used = new Set<number>();
+		decls.forEach(([prop, raw], i) => {
+			if (used.has(i)) return;
+			const important = /!important$/.test(raw) ? '!' : '';
+			const value = normalize(raw);
+			if (prop === 'font-size') {
+				const size = Object.entries(TEXT).find(([, [fs]]) => fs === value);
+				if (size) {
+					const lh = decls.findIndex(([p, v], j) => p === 'line-height' && normalize(v) === size[1][1] && !used.has(j));
+					if (lh >= 0) used.add(lh);
+					classes.push(`${important}text-${size[0]}`);
+					return;
+				}
+			}
+			const hit = reverse.get(`${prop}:${value}`) ?? reverse.get(`${prop}:${raw.replace(/\s*!important$/, '').trim()}`);
+			if (hit) return classes.push(`${important}${hit}`);
+			const arb = raw
+				.replace(/\s*!important$/, '')
+				.trim()
+				.replace(/\s+/g, '_');
+			classes.push(`${important}${PREFIX[prop] ? `${PREFIX[prop]}-[${arb}]` : `[${prop}:${arb}]`}`);
+		});
+		return { out: classes.join(' '), unknown: [] as string[] };
+	}
+
+	const SAMPLES: Record<string, string> = {
+		tw: 'flex items-center justify-between gap-4 px-6 py-3 rounded-xl bg-white shadow-md text-sm font-semibold hover:shadow-lg md:px-8 w-[37rem] bg-brand-500',
+		css: '.card {\n  display: flex;\n  flex-direction: column;\n  gap: 1rem;\n  padding: 24px;\n  border-radius: 0.75rem;\n  font-size: 1.125rem;\n  line-height: 1.75rem;\n  max-width: 28rem;\n  background-color: #fff;\n  mask-type: luminance;\n}',
+	};
+
+	onPage('tw-tool', () => {
+		let dir = 'tw';
+		const input = byId<HTMLTextAreaElement>('tw-in');
+
+		const render = () => {
+			const { out, unknown } = dir === 'tw' ? toCss(input.value) : toTailwind(input.value);
+			byId('tw-out').textContent = out;
+			byId('tw-unknown').textContent = unknown.length ? `Not converted: ${unknown.join(' ')}` : '';
+		};
+
+		input.addEventListener('input', render);
+		segmented(byId('tw-dir'), (value) => {
+			dir = value;
+			byId('tw-in-label').textContent = dir === 'tw' ? 'Classes' : 'CSS';
+			input.value = SAMPLES[dir];
+			render();
+		});
+		byId('tw-sample').addEventListener('click', () => {
+			input.value = SAMPLES[dir];
+			render();
+		});
+		copyButton(byId('tw-copy'), () => byId('tw-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.tw-unknown {
+		margin: 0;
+		font-size: 13px;
+		color: var(--warn);
+		font-family: var(--mono);
+		overflow-wrap: anywhere;
+	}
+	.tw-unknown:empty {
+		display: none;
+	}
+	.tw-coverage {
+		font-size: 13px;
+		color: var(--ink-soft);
+		line-height: 1.55;
+	}
+	.tw-coverage summary {
+		cursor: pointer;
+		font-weight: 700;
+		color: var(--ink);
+	}
+	.tw-coverage p {
+		margin: 8px 0 0;
+	}
+</style>

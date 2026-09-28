@@ -1,0 +1,299 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="design-tokens-generator"
+	title="Design Tokens Generator"
+	description="Define colors, spacing, radii, shadows and typography once, export CSS variables, Tailwind config, W3C DTCG JSON or SCSS."
+>
+	<div class="fields" id="dt-tool">
+		<div class="field">
+			<label for="dt-primary">Primary</label>
+			<input type="color" id="dt-primary" value="#6d4fe0" class="dt-color" />
+		</div>
+		<div class="field">
+			<label for="dt-secondary">Secondary</label>
+			<input type="color" id="dt-secondary" value="#0ea5a4" class="dt-color" />
+		</div>
+		<div class="field">
+			<label for="dt-neutral">Neutral</label>
+			<input type="color" id="dt-neutral" value="#64748b" class="dt-color" />
+		</div>
+		<div class="field">
+			<label for="dt-space">Spacing unit (px)</label>
+			<input type="number" id="dt-space" min="1" max="16" value="4" />
+		</div>
+		<div class="field">
+			<label for="dt-radius">Base radius (px)</label>
+			<input type="number" id="dt-radius" min="0" max="32" value="8" />
+		</div>
+		<div class="field">
+			<label for="dt-shadow">Shadow strength (%)</label>
+			<input type="number" id="dt-shadow" min="0" max="60" value="14" />
+		</div>
+		<div class="field">
+			<label for="dt-font">Font family</label>
+			<input id="dt-font" value="Inter" />
+		</div>
+		<div class="field">
+			<label for="dt-size">Base font size (px)</label>
+			<input type="number" id="dt-size" min="10" max="24" value="16" />
+		</div>
+		<div class="field">
+			<label for="dt-ratio">Type ratio</label>
+			<input type="number" id="dt-ratio" min="1" max="2" step="0.001" value="1.25" />
+		</div>
+	</div>
+	<div class="dt-preview user-colors" id="dt-preview">
+		<div class="dt-card">
+			<span class="dt-badge">New</span>
+			<h2>Team plan</h2>
+			<p>Everything in Pro, plus shared workspaces and priority support.</p>
+			<div class="dt-actions">
+				<span class="dt-btn dt-primary">Upgrade</span>
+				<span class="dt-btn dt-ghost">Compare</span>
+			</div>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<div class="seg" id="dt-format" aria-label="Export format">
+				<button data-value="css" aria-pressed="true">
+					CSS
+				</button>
+				<button data-value="tailwind" aria-pressed="false">
+					Tailwind
+				</button>
+				<button data-value="dtcg" aria-pressed="false">
+					JSON (DTCG)
+				</button>
+				<button data-value="scss" aria-pressed="false">
+					SCSS
+				</button>
+			</div>
+			<button class="btn" id="dt-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out dt-out" id="dt-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { fromHex, toHex } from '../../scripts/oklch';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	type Shadow = { y: number; blur: number; spread: number; alpha: number };
+
+	const SHADES: [string, number | null][] = [
+		['50', 0.97],
+		['100', 0.93],
+		['300', 0.8],
+		['500', null],
+		['700', 0.42],
+		['900', 0.26],
+	];
+	const SPACE = [1, 2, 3, 4, 6, 8, 12, 16];
+	const SIZES: [string, number][] = [
+		['sm', -1],
+		['base', 0],
+		['lg', 1],
+		['xl', 2],
+		['2xl', 3],
+		['3xl', 4],
+	];
+	const n = (v: number) => Number(v.toFixed(3));
+
+	onPage('dt-tool', () => {
+		let format = 'css';
+		const val = (id: string) => byId<HTMLInputElement>(id).value;
+		const num = (id: string, fallback: number) => {
+			const v = Number(val(id));
+			return Number.isFinite(v) && val(id) !== '' ? v : fallback;
+		};
+
+		const tokens = () => {
+			const colors: Record<string, Record<string, string>> = {};
+			(['primary', 'secondary', 'neutral'] as const).forEach((name) => {
+				const base = fromHex(val(`dt-${name}`))!;
+				colors[name] = Object.fromEntries(
+					SHADES.map(([shade, l]) => [shade, l === null ? val(`dt-${name}`) : toHex({ ...base, l, c: base.c * (l > 0.9 ? 0.35 : 0.9) })]),
+				);
+			});
+			const unit = num('dt-space', 4);
+			const spacing = Object.fromEntries(SPACE.map((k) => [String(k), unit * k]));
+			const r = num('dt-radius', 8);
+			const radius = { sm: r / 2, md: r, lg: r * 2, full: 9999 };
+			const s = num('dt-shadow', 14) / 100;
+			const shadow: Record<string, Shadow> = {
+				sm: { y: 1, blur: 2, spread: 0, alpha: n(s * 0.8) },
+				md: { y: 4, blur: 12, spread: -2, alpha: n(s) },
+				lg: { y: 16, blur: 40, spread: -8, alpha: n(s * 1.4) },
+			};
+			const size = num('dt-size', 16);
+			const ratio = num('dt-ratio', 1.25);
+			const fontSize = Object.fromEntries(SIZES.map(([k, i]) => [k, n((size * ratio ** i) / 16)]));
+			const family = [val('dt-font').trim() || 'system-ui', 'system-ui', 'sans-serif'];
+			return { colors, spacing, radius, shadow, fontSize, family };
+		};
+
+		const shadowCss = (sh: Shadow) => `0 ${sh.y}px ${sh.blur}px ${sh.spread}px rgb(0 0 0 / ${n(sh.alpha * 100)}%)`;
+		const familyCss = (f: string[]) => f.map((x) => (/\s/.test(x) ? `'${x}'` : x)).join(', ');
+		const dim = (value: number, unit: string) => ({ value, unit });
+
+		const flat = (t: ReturnType<typeof tokens>): [string, string][] => [
+			...Object.entries(t.colors).flatMap(([name, shades]) => Object.entries(shades).map(([k, v]): [string, string] => [`color-${name}-${k}`, v])),
+			...Object.entries(t.spacing).map(([k, v]): [string, string] => [`space-${k}`, `${v}px`]),
+			...Object.entries(t.radius).map(([k, v]): [string, string] => [`radius-${k}`, `${v}px`]),
+			...Object.entries(t.shadow).map(([k, v]): [string, string] => [`shadow-${k}`, shadowCss(v)]),
+			['font-sans', familyCss(t.family)],
+			...Object.entries(t.fontSize).map(([k, v]): [string, string] => [`text-${k}`, `${v}rem`]),
+		];
+
+		const output = (t: ReturnType<typeof tokens>) => {
+			if (format === 'css')
+				return `:root {\n${flat(t)
+					.map(([k, v]) => `  --${k}: ${v};`)
+					.join('\n')}\n}`;
+			if (format === 'scss')
+				return flat(t)
+					.map(([k, v]) => `$${k}: ${v};`)
+					.join('\n');
+			if (format === 'tailwind') {
+				const config = {
+					theme: {
+						extend: {
+							colors: t.colors,
+							spacing: Object.fromEntries(Object.entries(t.spacing).map(([k, v]) => [k, `${v}px`])),
+							borderRadius: Object.fromEntries(Object.entries(t.radius).map(([k, v]) => [k, `${v}px`])),
+							boxShadow: Object.fromEntries(Object.entries(t.shadow).map(([k, v]) => [k, shadowCss(v)])),
+							fontFamily: { sans: t.family },
+							fontSize: Object.fromEntries(Object.entries(t.fontSize).map(([k, v]) => [k, `${v}rem`])),
+						},
+					},
+				};
+				return `export default ${JSON.stringify(config, null, 2).replace(/"([a-zA-Z_]\w*)":/g, '$1:')};`;
+			}
+			const dtcg = {
+				color: Object.fromEntries(
+					Object.entries(t.colors).map(([name, shades]) => [
+						name,
+						Object.fromEntries(Object.entries(shades).map(([k, v]) => [k, { $type: 'color', $value: v }])),
+					]),
+				),
+				spacing: Object.fromEntries(Object.entries(t.spacing).map(([k, v]) => [k, { $type: 'dimension', $value: dim(v, 'px') }])),
+				radius: Object.fromEntries(Object.entries(t.radius).map(([k, v]) => [k, { $type: 'dimension', $value: dim(v, 'px') }])),
+				shadow: Object.fromEntries(
+					Object.entries(t.shadow).map(([k, v]) => [
+						k,
+						{
+							$type: 'shadow',
+							$value: {
+								color: `#000000${Math.round(v.alpha * 255)
+									.toString(16)
+									.padStart(2, '0')}`,
+								offsetX: dim(0, 'px'),
+								offsetY: dim(v.y, 'px'),
+								blur: dim(v.blur, 'px'),
+								spread: dim(v.spread, 'px'),
+							},
+						},
+					]),
+				),
+				font: {
+					family: { sans: { $type: 'fontFamily', $value: t.family } },
+					size: Object.fromEntries(Object.entries(t.fontSize).map(([k, v]) => [k, { $type: 'dimension', $value: dim(v, 'rem') }])),
+				},
+			};
+			return JSON.stringify(dtcg, null, 2);
+		};
+
+		const render = () => {
+			const t = tokens();
+			const preview = byId('dt-preview');
+			flat(t).forEach(([k, v]) => preview.style.setProperty(`--${k}`, v));
+			byId('dt-out').textContent = output(t);
+		};
+
+		document.querySelectorAll<HTMLInputElement>('#dt-tool input').forEach((el) => el.addEventListener('input', render));
+		segmented(byId('dt-format'), (value) => {
+			format = value;
+			render();
+		});
+		copyButton(byId('dt-copy'), () => byId('dt-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.dt-color {
+		width: 100%;
+		height: 34px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: transparent;
+		padding: 0;
+	}
+	.dt-preview {
+		display: flex;
+		justify-content: center;
+		padding: 28px 16px;
+		border-radius: 14px;
+		background: var(--color-neutral-50);
+		border: 1px solid var(--border);
+		font-family: var(--font-sans);
+	}
+	.dt-card {
+		width: 100%;
+		max-width: 340px;
+		padding: var(--space-6);
+		border-radius: var(--radius-lg);
+		background: #ffffff;
+		box-shadow: var(--shadow-lg);
+		color: var(--color-neutral-900);
+	}
+	.dt-card h2 {
+		margin: var(--space-3) 0 var(--space-2);
+		font-size: var(--text-2xl);
+		line-height: 1.2;
+	}
+	.dt-card p {
+		margin: 0 0 var(--space-4);
+		font-size: var(--text-base);
+		line-height: 1.5;
+		color: var(--color-neutral-700);
+	}
+	.dt-badge {
+		display: inline-block;
+		padding: var(--space-1) var(--space-2);
+		border-radius: var(--radius-full);
+		background: var(--color-secondary-100);
+		color: var(--color-secondary-900);
+		font-size: var(--text-sm);
+		font-weight: 700;
+	}
+	.dt-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
+	.dt-btn {
+		padding: var(--space-2) var(--space-4);
+		border-radius: var(--radius-md);
+		font-size: var(--text-sm);
+		font-weight: 700;
+	}
+	.dt-primary {
+		background: var(--color-primary-500);
+		color: #ffffff;
+		box-shadow: var(--shadow-sm);
+	}
+	.dt-ghost {
+		border: 1px solid var(--color-neutral-300);
+		color: var(--color-neutral-900);
+	}
+	.dt-out {
+		min-height: auto !important;
+	}
+</style>

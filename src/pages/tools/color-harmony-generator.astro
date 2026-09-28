@@ -1,0 +1,152 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="color-harmony-generator"
+	title="Color Harmony Generator"
+	description="Complementary, analogous, triadic, tetradic and split palettes computed in OKLCH, with contrast notes and CSS variables."
+>
+	<div class="toolbar" id="ch-tool">
+		<label class="check">
+			Base <input type="color" id="ch-base" value="#6d4fe0" class="ch-color" />
+		</label>
+		<input class="num ch-hex" id="ch-hex" value="#6d4fe0" aria-label="Base color hex" spellcheck="false" />
+		<div class="seg" id="ch-mode" aria-label="Harmony">
+			<button data-value="complementary" aria-pressed="true">
+				Complementary
+			</button>
+			<button data-value="analogous" aria-pressed="false">
+				Analogous
+			</button>
+			<button data-value="triadic" aria-pressed="false">
+				Triadic
+			</button>
+			<button data-value="tetradic" aria-pressed="false">
+				Tetradic
+			</button>
+			<button data-value="split" aria-pressed="false">
+				Split
+			</button>
+		</div>
+	</div>
+	<div class="ch-swatches user-colors" id="ch-swatches"></div>
+	<p class="ch-note">
+		Hues rotate in OKLCH so every color keeps the same perceived lightness and chroma. Colors outside sRGB are pulled in by reducing chroma.
+	</p>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS variables</span>
+			<button class="btn" id="ch-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out ch-out" id="ch-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { contrast, formatOklch, fromHex, mapToSrgb, toHex } from '../../scripts/oklch';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const OFFSETS: Record<string, number[]> = {
+		complementary: [0, 180],
+		analogous: [-30, 0, 30],
+		triadic: [0, 120, 240],
+		tetradic: [0, 90, 180, 270],
+		split: [0, 150, 210],
+	};
+
+	const grade = (ratio: number) => (ratio >= 7 ? 'AAA' : ratio >= 4.5 ? 'AA' : ratio >= 3 ? 'AA large' : 'Fail');
+
+	onPage('ch-tool', () => {
+		let mode = 'complementary';
+		const base = byId<HTMLInputElement>('ch-base');
+		const hex = byId<HTMLInputElement>('ch-hex');
+
+		const render = () => {
+			const origin = fromHex(base.value)!;
+			const colors = OFFSETS[mode].map((d) => mapToSrgb({ ...origin, h: (origin.h + d + 360) % 360 }));
+			byId('ch-swatches').replaceChildren(
+				...colors.map((c, i) => {
+					const value = toHex(c);
+					const white = contrast(value, '#ffffff');
+					const black = contrast(value, '#000000');
+					const card = document.createElement('div');
+					card.className = 'ch-swatch';
+					card.style.background = value;
+					card.style.color = white >= black ? '#ffffff' : '#000000';
+					const title = document.createElement('strong');
+					title.textContent = `${i === OFFSETS[mode].indexOf(0) ? 'Base' : `Color ${i + 1}`} · ${value}`;
+					const oklch = document.createElement('span');
+					oklch.textContent = formatOklch(c);
+					const notes = document.createElement('span');
+					notes.textContent = `White ${white.toFixed(2)}:1 ${grade(white)} · Black ${black.toFixed(2)}:1 ${grade(black)}`;
+					card.append(title, oklch, notes);
+					return card;
+				}),
+			);
+			byId('ch-out').textContent =
+				`:root {\n${colors.map((c, i) => `  --harmony-${i + 1}: ${toHex(c)};\n  --harmony-${i + 1}-oklch: ${formatOklch(c)};`).join('\n')}\n}`;
+		};
+
+		base.addEventListener('input', () => {
+			hex.value = base.value;
+			render();
+		});
+		hex.addEventListener('input', () => {
+			const o = fromHex(hex.value);
+			if (!o) return;
+			base.value = toHex(o);
+			render();
+		});
+		segmented(byId('ch-mode'), (value) => {
+			mode = value;
+			render();
+		});
+		copyButton(byId('ch-copy'), () => byId('ch-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.ch-color {
+		width: 44px;
+		height: 30px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: transparent;
+	}
+	.ch-hex {
+		width: 96px;
+		font-family: var(--mono);
+	}
+	.ch-swatches {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		gap: 10px;
+	}
+	.ch-swatches :global(.ch-swatch) {
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-end;
+		gap: 4px;
+		min-height: 150px;
+		padding: 14px;
+		border-radius: 14px;
+		font-size: 12px;
+		font-family: var(--mono);
+		overflow-wrap: anywhere;
+	}
+	.ch-swatches :global(strong) {
+		font-size: 14px;
+	}
+	.ch-note {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	.ch-out {
+		min-height: auto !important;
+	}
+</style>

@@ -1,0 +1,176 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const ratios = [
+	['1.067', 'Minor second · 1.067'],
+	['1.125', 'Major second · 1.125'],
+	['1.2', 'Minor third · 1.2'],
+	['1.25', 'Major third · 1.25'],
+	['1.333', 'Perfect fourth · 1.333'],
+	['1.414', 'Augmented fourth · 1.414'],
+	['1.5', 'Perfect fifth · 1.5'],
+	['1.618', 'Golden ratio · 1.618'],
+];
+---
+
+<ToolShell
+	slug="type-scale-generator"
+	title="Type Scale Generator"
+	description="Build a modular type scale from a base size and a ratio, preview it with real text, export CSS, Tailwind or JSON."
+>
+	<div class="toolbar" id="ts-tool">
+		<label class="check">
+			Base <input class="num" type="number" id="ts-base" min="8" max="32" value="16" /> px
+		</label>
+		<label class="check">
+			Ratio
+			<select id="ts-ratio" class="ts-select">
+				{ratios.map(([value, label]) => (
+					<option value={value} selected={value === '1.25'}>
+						{label}
+					</option>
+				))}
+			</select>
+		</label>
+		<label class="check">
+			Steps up <input class="num" type="number" id="ts-up" min="1" max="10" value="6" />
+		</label>
+		<label class="check">
+			Steps down <input class="num" type="number" id="ts-down" min="0" max="4" value="2" />
+		</label>
+	</div>
+	<div class="field">
+		<label for="ts-text">Preview text</label>
+		<input id="ts-text" value="The quick brown fox jumps over the lazy dog" />
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Preview</span>
+		</div>
+		<ol class="ts-list" id="ts-list"></ol>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<div class="seg" id="ts-format" aria-label="Export format">
+				<button data-value="css" aria-pressed="true">
+					CSS
+				</button>
+				<button data-value="tailwind" aria-pressed="false">
+					Tailwind
+				</button>
+				<button data-value="json" aria-pressed="false">
+					JSON
+				</button>
+			</div>
+			<button class="btn" id="ts-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out ts-out" id="ts-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const stepName = (i: number) =>
+		i === 0 ? 'base' : i === 1 ? 'lg' : i === 2 ? 'xl' : i > 2 ? `${i - 1}xl` : i === -1 ? 'sm' : i === -2 ? 'xs' : `${-i - 1}xs`;
+	const round = (v: number, d = 3) => String(Number(v.toFixed(d)));
+
+	onPage('ts-tool', () => {
+		let format = 'css';
+		const base = byId<HTMLInputElement>('ts-base');
+		const ratio = byId<HTMLSelectElement>('ts-ratio');
+		const up = byId<HTMLInputElement>('ts-up');
+		const down = byId<HTMLInputElement>('ts-down');
+		const text = byId<HTMLInputElement>('ts-text');
+
+		const clampNum = (input: HTMLInputElement, fallback: number) => {
+			const v = Number(input.value);
+			return Number.isFinite(v) && v >= Number(input.min) && v <= Number(input.max) ? v : fallback;
+		};
+
+		const render = () => {
+			const px = clampNum(base, 16);
+			const r = Number(ratio.value);
+			const steps: { name: string; px: number; rem: string }[] = [];
+			for (let i = clampNum(up, 6); i >= -clampNum(down, 2); i--) {
+				const size = px * r ** i;
+				steps.push({ name: stepName(i), px: size, rem: `${round(size / 16)}rem` });
+			}
+			byId('ts-list').replaceChildren(
+				...steps.map((s) => {
+					const li = document.createElement('li');
+					const meta = document.createElement('span');
+					meta.className = 'ts-meta';
+					meta.textContent = `${s.name} · ${round(s.px, 1)}px · ${s.rem}`;
+					const sample = document.createElement('span');
+					sample.className = 'ts-sample';
+					sample.style.fontSize = `${s.px}px`;
+					sample.textContent = text.value || 'Aa';
+					li.append(meta, sample);
+					return li;
+				}),
+			);
+			const ordered = [...steps].reverse();
+			byId('ts-out').textContent =
+				format === 'css'
+					? `:root {\n${ordered.map((s) => `  --text-${s.name}: ${s.rem};`).join('\n')}\n}`
+					: format === 'tailwind'
+						? `export default {\n  theme: {\n    extend: {\n      fontSize: {\n${ordered.map((s) => `        '${s.name}': '${s.rem}',`).join('\n')}\n      },\n    },\n  },\n};`
+						: JSON.stringify(Object.fromEntries(ordered.map((s) => [s.name, s.rem])), null, 2);
+		};
+
+		[base, ratio, up, down, text].forEach((el) => el.addEventListener('input', render));
+		segmented(byId('ts-format'), (value) => {
+			format = value;
+			render();
+		});
+		copyButton(byId('ts-copy'), () => byId('ts-out').textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.ts-select {
+		font: inherit;
+		font-size: 13px;
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+		color: var(--ink);
+		max-width: 100%;
+	}
+	.ts-list {
+		list-style: none;
+		margin: 0;
+		padding: 6px 14px;
+	}
+	.ts-list :global(li) {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 8px 0;
+		border-bottom: 1px solid var(--border);
+		min-width: 0;
+	}
+	.ts-list :global(li:last-child) {
+		border-bottom: 0;
+	}
+	.ts-list :global(.ts-meta) {
+		font-family: var(--mono);
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.ts-list :global(.ts-sample) {
+		color: var(--ink);
+		line-height: 1.15;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.ts-out {
+		min-height: auto !important;
+	}
+</style>
