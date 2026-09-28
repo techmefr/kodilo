@@ -1,8 +1,11 @@
+import { currentTool, track } from './analytics';
+
 export function copyButton(button: HTMLElement, getText: () => string) {
 	const label = button.textContent;
 	button.dataset.copy = '';
 	button.addEventListener('click', async () => {
 		await navigator.clipboard.writeText(getText());
+		track('tool-copy', { tool: currentTool() });
 		button.textContent = 'Copied';
 		button.classList.add('copied');
 		setTimeout(() => {

@@ -316,8 +316,8 @@ Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools), [devbench
 ## Privacy
 
 - No cookies, no accounts and no personal data. kodilo has no backend: tools process your input in your browser.
-- Anonymous page view counts can optionally be collected with [GoatCounter](https://www.goatcounter.com/), a privacy-friendly counter without cookies. It is off by default and only loads when the site is built with the `PUBLIC_GOATCOUNTER_CODE` environment variable (set in CI from the `GOATCOUNTER_CODE` repository variable).
-- When counting is enabled, the counter script is not loaded at all if your browser sends Do Not Track or Global Privacy Control.
+- When the site is built with the `PUBLIC_UMAMI_WEBSITE_ID` environment variable (set in CI from the `UMAMI_WEBSITE_ID` repository variable), anonymous usage statistics are collected with [Umami Cloud](https://umami.is/): page views and a few named interactions (copy, share, pin, search selection, shortcut used, tool feedback), never what you type. `PUBLIC_UMAMI_DOMAINS` limits tracking to the production hosts (default `techmefr.github.io,kodilo.app`). Do Not Track and Global Privacy Control are respected: the script is not loaded at all.
+- Feedback goes through GitHub issues: the widget at the bottom of each tool and the Feedback link in the sidebar open prefilled issue forms.
 
 ## Developing
 

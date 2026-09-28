@@ -7,6 +7,7 @@
 
 <script>
 	import { applyState, decodeState, readHashCode, SHARE_LIMIT, shareUrl, snapshotDefaults } from '../scripts/share-state';
+	import { currentTool, track } from '../scripts/analytics';
 
 	document.addEventListener('astro:page-load', async () => {
 		const button = document.querySelector<HTMLButtonElement>('[data-share-button]');
@@ -16,6 +17,7 @@
 		snapshotDefaults(root);
 
 		button.addEventListener('click', async () => {
+			track('tool-share', { tool: currentTool() });
 			const url = await shareUrl(root);
 			history.replaceState(history.state, '', url);
 			const size = new Blob([url]).size;

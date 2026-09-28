@@ -54,7 +54,8 @@ test('tool pages link back to their category and describe the app', async ({ pag
 	);
 	const types = (await jsonLd(page)).map((d) => d['@type']);
 	expect(types).toEqual(['BreadcrumbList', 'WebApplication']);
-	const report = page.getByRole('link', { name: 'Report a problem with this tool' });
+	await page.getByRole('button', { name: 'No, not useful' }).click();
+	const report = page.getByRole('link', { name: 'Report a bug' });
 	const href = new URL((await report.getAttribute('href')) ?? '');
 	expect(href.searchParams.get('template')).toBe('bug-report.yml');
 	expect(href.searchParams.get('tool-url')).toBe('https://techmefr.github.io/kodilo/tools/base64/');

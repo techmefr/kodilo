@@ -1,0 +1,17 @@
+name: General feedback
+description: Share what you like, what is missing or what feels off about kodilo.
+title: '[Feedback] '
+labels: [feedback]
+body:
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Your feedback
+      description: Never paste real secrets, keys or personal data.
+    validations:
+      required: true
+  - type: input
+    id: page-url
+    attributes:
+      label: Page URL
+      description: Optional, the page your feedback is about.
