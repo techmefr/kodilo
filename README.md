@@ -316,7 +316,7 @@ Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools), [devbench
 ## Privacy
 
 - No cookies, no accounts and no personal data. kodilo has no backend: tools process your input in your browser.
-- When the site is built with the `PUBLIC_UMAMI_WEBSITE_ID` environment variable (set in CI from the `UMAMI_WEBSITE_ID` repository variable), anonymous usage statistics are collected with [Umami Cloud](https://umami.is/): page views and a few named interactions (copy, share, pin, search selection, shortcut used, tool feedback), never what you type. `PUBLIC_UMAMI_DOMAINS` limits tracking to the production hosts (default `techmefr.github.io,kodilo.app`). Do Not Track and Global Privacy Control are respected: the script is not loaded at all.
+- When the site is built with the `PUBLIC_UMAMI_WEBSITE_ID` environment variable (set in CI from the `UMAMI_WEBSITE_ID` repository variable), anonymous usage statistics are collected with [Umami Cloud](https://umami.is/): page views and a few named interactions (copy, share, pin, search selection, shortcut used, tool feedback), never what you type. `PUBLIC_UMAMI_DOMAINS` limits tracking to the production hosts (default `techmefr.github.io,kodilo.app`). When `PUBLIC_GOATCOUNTER_CODE` is set (from the `GOATCOUNTER_CODE` repository variable), page views are also counted with [GoatCounter](https://www.goatcounter.com/). Do Not Track and Global Privacy Control are respected: neither script is loaded at all.
 - Feedback goes through GitHub issues: the widget at the bottom of each tool and the Feedback link in the sidebar open prefilled issue forms.
 
 ## Developing
