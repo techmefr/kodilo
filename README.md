@@ -6,7 +6,7 @@ Live at **https://techmefr.github.io/kodilo/**
 
 ## What's in here
 
-**236 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
+**238 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
 
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
@@ -188,8 +188,9 @@ Live at **https://techmefr.github.io/kodilo/**
 - [PDF to JPG](https://techmefr.github.io/kodilo/tools/pdf-to-jpg/) — Convert PDF pages to JPG images.
 - [JPG to PDF](https://techmefr.github.io/kodilo/tools/jpg-to-pdf/) — Convert JPG images to a PDF.
 
-### Dev Utilities (27)
+### Dev Utilities (28)
 
+- [Text Compressor](https://techmefr.github.io/kodilo/tools/text-compressor/) — Compress or decompress text with gzip, deflate or deflate-raw, and see the size saved. Output as Base64 or hex.
 - [SQL Prettify](https://techmefr.github.io/kodilo/tools/sql-prettify/) — Format SQL queries.
 - [Math Evaluator](https://techmefr.github.io/kodilo/tools/math-evaluator/) — Evaluate a math expression on the fly.
 - [Docker Run to Compose Converter](https://techmefr.github.io/kodilo/tools/docker-run-to-compose/) — Convert a docker run command to a docker-compose.yml.
@@ -218,7 +219,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [SQL to ER Diagram](https://techmefr.github.io/kodilo/tools/sql-er-diagram/) — Draw an ER diagram from CREATE TABLE statements, export Mermaid or SVG.
 - [OpenAPI Viewer & Validator](https://techmefr.github.io/kodilo/tools/openapi-viewer/) — Validate an OpenAPI 3.x or Swagger 2.0 spec and browse its endpoints by tag.
 
-### DevOps & Sysadmin (48)
+### DevOps & Sysadmin (49)
 
 - [Uptime / SLA Calculator](https://techmefr.github.io/kodilo/tools/uptime-sla-calculator/) — Turn 99.9% into allowed downtime per day, month and year, and back.
 - [Byte Size Converter](https://techmefr.github.io/kodilo/tools/byte-size-converter/) — B, KB, KiB, MB, MiB, GB, GiB, TB, TiB: decimal and binary units side by side.
@@ -258,6 +259,7 @@ Live at **https://techmefr.github.io/kodilo/**
 - [Dockerfile Layer Visualizer](https://techmefr.github.io/kodilo/tools/dockerfile-layer-visualizer/) — Paste a Dockerfile to see its stages and layers, how stages copy from each other, and which layers a file change rebuilds.
 - [Docker Container Lifecycle](https://techmefr.github.io/kodilo/tools/docker-container-lifecycle/) — Explore the states a container goes through, the command behind every transition, the signals sent and what exit codes mean, then drive a demo container yourself.
 - [Cron Expression Tester](https://techmefr.github.io/kodilo/tools/cron-tester/) — Describe a cron expression in plain English and list its next 10 run times in your timezone.
+- [Cron from Plain English](https://techmefr.github.io/kodilo/tools/cron-from-english/) — Type a schedule in plain English and get the cron expression, broken down field by field.
 - [Terraform Plan Visualizer](https://techmefr.github.io/kodilo/tools/terraform-plan-visualizer/) — See what a terraform plan will create, update, replace and destroy, grouped by resource with risky changes flagged
 - [Helm Values Converter](https://techmefr.github.io/kodilo/tools/helm-values-converter/) — Convert a values.yaml into helm --set flags and back, with dots, commas, lists and strings escaped
 - [Nginx Location Tester](https://techmefr.github.io/kodilo/tools/nginx-location-tester/) — Find which nginx location block matches a request URI and why, following the real matching order
