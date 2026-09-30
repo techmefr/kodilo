@@ -1,3 +1,4 @@
+import { homePath } from './page-suffix';
 import { navigate } from 'astro:transitions/client';
 import { suggestUrl } from './suggest';
 import { track } from './analytics';
@@ -69,7 +70,7 @@ function goFavorites() {
 	if (el('favorites')) {
 		history.replaceState(history.state, '', '#favorites');
 		focusFavorites();
-	} else navigate(`${base}#favorites`);
+	} else navigate(homePath(base, '#favorites'));
 }
 
 function focusFavorites() {
@@ -123,7 +124,7 @@ document.addEventListener('keydown', (e) => {
 		if (key === 'h') {
 			e.preventDefault();
 			track('shortcut-used', { key: 'g h' });
-			navigate(base);
+			navigate(homePath(base));
 		} else if (key === 'f') {
 			e.preventDefault();
 			track('shortcut-used', { key: 'g f' });
