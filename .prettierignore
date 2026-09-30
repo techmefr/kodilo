@@ -6,3 +6,6 @@ test-results/
 playwright-report/
 public/oui/
 dist-extension
+dist-app
+android
+ios
