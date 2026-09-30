@@ -16,12 +16,15 @@ export default defineConfig({
 		{ name: 'desktop', use: { ...devices['Desktop Chrome'] }, testMatch: /smoke|tools|pwa-share|experience|categories|feedback/ },
 		{ name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /smoke/ },
 		{ name: 'dark', use: { ...devices['Desktop Chrome'], colorScheme: 'dark' }, testMatch: /smoke/ },
+		{ name: 'extension', testMatch: /extension/ },
 		{ name: 'a11y', use: { ...devices['Desktop Chrome'] }, testMatch: /a11y/ },
 		{ name: 'a11y-dark', use: { ...devices['Desktop Chrome'], colorScheme: 'dark' }, testMatch: /a11y/ },
 	],
-	webServer: {
-		command: `npx astro preview --port ${port}`,
-		url: `http://localhost:${port}/kodilo/`,
-		reuseExistingServer: !process.env.CI,
-	},
+	webServer: process.env.KODILO_EXTENSION_ONLY
+		? undefined
+		: {
+				command: `npx astro preview --port ${port}`,
+				url: `http://localhost:${port}/kodilo/`,
+				reuseExistingServer: !process.env.CI,
+			},
 });

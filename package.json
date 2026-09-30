@@ -23,7 +23,8 @@
 		"budget": "node scripts/check-budget.mjs",
 		"test:a11y": "playwright test --project=a11y --project=a11y-dark --workers=2",
 		"readme": "node scripts/build-readme.mjs",
-		"build:extension": "node scripts/build-extension.mjs"
+		"build:extension": "node scripts/build-extension.mjs",
+		"test:extension": "npm run build:extension && KODILO_EXTENSION_ONLY=1 playwright test --project=extension"
 	},
 	"dependencies": {
 		"@astrojs/sitemap": "^3.7.4",

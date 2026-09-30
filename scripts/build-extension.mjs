@@ -5,7 +5,7 @@ import { join } from 'node:path';
 const OUT = 'dist-extension';
 const SITE = join(OUT, 'site');
 const REMOVED_FROM_SITE = ['sw.js', 'manifest.webmanifest', 'og-image.png', 'apple-touch-icon.png'];
-const ICON_SIZES = { 16: 'icons/icon-192.png', 48: 'icons/icon-192.png', 128: 'icons/icon-512.png' };
+const ICON_SIZES = { 16: 'extension-icons/16.png', 32: 'extension-icons/32.png', 48: 'extension-icons/48.png', 128: 'extension-icons/128.png' };
 
 rmSync(OUT, { recursive: true, force: true });
 
@@ -37,7 +37,7 @@ const targets = {
 		...common,
 		background: { scripts: ['background.js'] },
 		sidebar_action: { default_panel: 'index.html', default_title: 'Kodilo', default_icon: ICON_SIZES, open_at_install: false },
-		browser_specific_settings: { gecko: { id: 'kodilo@techmefr', strict_min_version: '121.0' } },
+		browser_specific_settings: { gecko: { id: 'kodilo@techmefr', strict_min_version: '140.0', data_collection_permissions: { required: ['none'] } } },
 	},
 };
 
@@ -45,6 +45,7 @@ for (const [name, manifest] of Object.entries(targets)) {
 	const dir = join(OUT, name);
 	mkdirSync(dir, { recursive: true });
 	cpSync(SITE, dir, { recursive: true });
+	cpSync('extension/icons', join(dir, 'extension-icons'), { recursive: true });
 	cpSync('extension/background.js', join(dir, 'background.js'));
 	writeFileSync(join(dir, 'manifest.json'), `${JSON.stringify(manifest, null, '\t')}\n`);
 }
