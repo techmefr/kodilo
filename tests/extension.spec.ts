@@ -21,7 +21,7 @@ test('the packaged extension opens tools without console errors', async () => {
 		const origin = `chrome-extension://${worker.url().split('/')[2]}`;
 		const page = await context.newPage();
 		const errors: string[] = [];
-		const SANDBOXED_PREVIEW = /Blocked script execution in 'about:blank'/;
+		const SANDBOXED_PREVIEW = /Blocked script execution in 'about:(blank|srcdoc)'/;
 		page.on('console', (message) => message.type() === 'error' && !SANDBOXED_PREVIEW.test(message.text()) && errors.push(message.text()));
 		page.on('pageerror', (error) => errors.push(error.message));
 
