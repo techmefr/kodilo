@@ -1,0 +1,134 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+import { PAGE_SUFFIX } from '../../scripts/page-suffix';
+
+const examples = [
+	{ label: 'weekdays 9:30', text: 'every weekday at 9:30' },
+	{ label: 'every 15 min', text: 'every 15 minutes' },
+	{ label: 'first of month', text: 'on the 1st of every month at midnight' },
+	{ label: 'Sunday 2am', text: 'every sunday at 2am' },
+	{ label: 'twice a day', text: 'every day at 9am and 5pm' },
+	{ label: 'new year', text: 'every january 1st at 6:30' },
+];
+const fieldLabels = ['Minute', 'Hour', 'Day of month', 'Month', 'Day of week'];
+---
+
+<ToolShell
+	slug="cron-from-english"
+	title="Cron from Plain English"
+	description="Type a schedule in plain English and get the cron expression, broken down field by field."
+>
+	<div class="fields" id="ce-tool">
+		<div class="field wide" id="ce-field">
+			<label for="ce-text">Schedule</label>
+			<input id="ce-text" spellcheck="false" autocomplete="off" value={examples[0].text} />
+			<span class="field-note" id="ce-note" aria-live="polite"></span>
+		</div>
+	</div>
+	<div class="chips" id="ce-examples">
+		{examples.map((e) => (
+			<button data-text={e.text}>{e.label}</button>
+		))}
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Cron expression</span>
+			<button class="btn" id="ce-copy">
+				Copy
+			</button>
+		</div>
+		<p class="ce-expr" id="ce-expr" aria-live="polite"></p>
+	</section>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Fields</span>
+			<a href={`${import.meta.env.BASE_URL.replace(/\/?$/, '/')}tools/cron-tester/${PAGE_SUFFIX}`}>Check the next runs</a>
+		</div>
+		<dl class="ce-fields" id="ce-fields">
+			{fieldLabels.map((label) => (
+				<div>
+					<dt>{label}</dt>
+					<dd></dd>
+				</div>
+			))}
+		</dl>
+	</section>
+</ToolShell>
+
+<script>
+	import { parseEnglishCron } from '../../scripts/cron-english';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	onPage('ce-tool', () => {
+		const text = byId<HTMLInputElement>('ce-text');
+		const field = byId('ce-field');
+		const note = byId('ce-note');
+		const expression = byId('ce-expr');
+		const values = [...byId('ce-fields').querySelectorAll('dd')];
+		const HINT = 'Try "every 15 minutes", "every weekday at 9:30" or "on the 1st of every month at midnight".';
+
+		function render() {
+			const result = parseEnglishCron(text.value);
+			field.classList.toggle('invalid', !result.ok && text.value.trim() !== '');
+			if (!result.ok) {
+				note.textContent = result.error;
+				expression.textContent = '';
+				values.forEach((value) => (value.textContent = ''));
+				return;
+			}
+			note.textContent = HINT;
+			expression.textContent = result.expression;
+			const { minute, hour, dayOfMonth, month, dayOfWeek } = result.fields;
+			[minute, hour, dayOfMonth, month, dayOfWeek].forEach((part, index) => (values[index].textContent = part));
+		}
+
+		byId('ce-examples')
+			.querySelectorAll('button')
+			.forEach((button) =>
+				button.addEventListener('click', () => {
+					text.value = button.dataset.text ?? '';
+					render();
+				}),
+			);
+		text.addEventListener('input', render);
+		copyButton(byId('ce-copy'), () => expression.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.ce-expr {
+		margin: 0;
+		padding: 16px 14px;
+		font-family: var(--mono);
+		font-size: 22px;
+		font-weight: 600;
+		color: var(--ink);
+		min-height: 1.5em;
+	}
+	.ce-fields {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+		gap: 1px;
+		margin: 0;
+		background: var(--border);
+	}
+	.ce-fields :global(div) {
+		padding: 10px 14px;
+		background: var(--surface);
+	}
+	.ce-fields :global(dt) {
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.ce-fields :global(dd) {
+		margin: 4px 0 0;
+		font-family: var(--mono);
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--ink);
+	}
+	.chips :global(button) {
+		font-size: 12px;
+	}
+</style>

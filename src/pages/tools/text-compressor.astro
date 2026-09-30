@@ -1,0 +1,139 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `{"id":1,"name":"kodilo","tags":["json","json","json","json"],"description":"A sample payload that repeats itself, repeats itself, repeats itself."}`;
+---
+
+<ToolShell
+	slug="text-compressor"
+	title="Text Compressor"
+	description="Compress or decompress text with gzip, deflate or deflate-raw, and see the size saved. Output as Base64 or hex."
+>
+	<div class="toolbar" id="tc-tool">
+		<div class="seg" id="tc-mode" aria-label="Mode">
+			<button data-value="compress" aria-pressed="true">
+				Compress
+			</button>
+			<button data-value="decompress" aria-pressed="false">
+				Decompress
+			</button>
+		</div>
+		<div class="seg" id="tc-format" aria-label="Format">
+			<button data-value="gzip" aria-pressed="true">
+				gzip
+			</button>
+			<button data-value="deflate" aria-pressed="false">
+				deflate
+			</button>
+			<button data-value="deflate-raw" aria-pressed="false">
+				deflate-raw
+			</button>
+		</div>
+		<div class="seg" id="tc-encoding" aria-label="Encoding">
+			<button data-value="base64" aria-pressed="true">
+				Base64
+			</button>
+			<button data-value="hex" aria-pressed="false">
+				Hex
+			</button>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head" id="tc-in-head">
+				Text
+			</div>
+			<textarea id="tc-in" spellcheck="false" aria-label="Input">{sample}</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="tc-out-head">Compressed</span>
+				<button class="btn" id="tc-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="tc-out" aria-live="polite"></pre>
+		</section>
+	</div>
+	<div class="stats" id="tc-stats" aria-live="polite"></div>
+</ToolShell>
+
+<script>
+	import { compress, decodeBytes, decompress, encodeBytes, formatRatio } from '../../scripts/compression';
+	import type { ByteEncoding, CompressionFormat } from '../../scripts/compression';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('tc-tool', () => {
+		const input = byId<HTMLTextAreaElement>('tc-in');
+		const output = byId('tc-out');
+		const stats = byId('tc-stats');
+		let mode = 'compress';
+		let format: CompressionFormat = 'gzip';
+		let encoding: ByteEncoding = 'base64';
+		let pending = 0;
+
+		function showStats(entries: [string, string][]) {
+			stats.replaceChildren(
+				...entries.map(([label, value]) => {
+					const cell = document.createElement('div');
+					cell.className = 'stat';
+					cell.innerHTML = '<b></b><span></span>';
+					cell.querySelector('b')!.textContent = value;
+					cell.querySelector('span')!.textContent = label;
+					return cell;
+				}),
+			);
+		}
+
+		async function render() {
+			const current = ++pending;
+			const compressing = mode === 'compress';
+			byId('tc-in-head').textContent = compressing ? 'Text' : `Compressed (${encoding === 'hex' ? 'hex' : 'Base64'})`;
+			byId('tc-out-head').textContent = compressing ? 'Compressed' : 'Text';
+			output.removeAttribute('data-invalid');
+			try {
+				if (compressing) {
+					const original = new TextEncoder().encode(input.value);
+					const packed = await compress(original, format);
+					if (current !== pending) return;
+					output.textContent = encodeBytes(packed, encoding);
+					showStats([
+						['Original', `${original.length} B`],
+						['Compressed', `${packed.length} B`],
+						['Result', formatRatio(original.length, packed.length)],
+					]);
+					return;
+				}
+				const packed = decodeBytes(input.value, encoding);
+				const original = await decompress(packed, format);
+				if (current !== pending) return;
+				output.textContent = new TextDecoder('utf-8', { fatal: true }).decode(original);
+				showStats([
+					['Compressed', `${packed.length} B`],
+					['Original', `${original.length} B`],
+				]);
+			} catch (error) {
+				if (current !== pending) return;
+				output.setAttribute('data-invalid', '');
+				output.textContent = error instanceof Error && /Not valid/.test(error.message) ? error.message : `Could not decompress this input as ${format}`;
+				showStats([]);
+			}
+		}
+
+		segmented(byId('tc-mode'), (value) => {
+			mode = value;
+			render();
+		});
+		segmented(byId('tc-format'), (value) => {
+			format = value as CompressionFormat;
+			render();
+		});
+		segmented(byId('tc-encoding'), (value) => {
+			encoding = value as ByteEncoding;
+			render();
+		});
+		input.addEventListener('input', render);
+		copyButton(byId('tc-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>
