@@ -1,3 +1,0 @@
-import{i as e,n as t,r as n,t as r}from"./ui.CwCbUQFq.js";var i={ß:`ss`,æ:`ae`,Æ:`AE`,ø:`o`,Ø:`O`,œ:`oe`,Œ:`OE`,ł:`l`,Ł:`L`,đ:`d`,Đ:`D`,þ:`th`,Þ:`TH`,"&":` and `};function a(e,t,n,r){let a=e.replace(/[ßæÆøØœŒłŁđĐþÞ&]/g,e=>i[e]).normalize(`NFKD`).replace(/\p{M}/gu,``).replace(/[^\p{L}\p{N}]+/gu,t).replace(RegExp(`^\\${t}+|\\${t}+$`,`g`),``);return n&&(a=a.toLowerCase()),r>0&&a.length>r&&(a=a.slice(0,r).replace(RegExp(`\\${t}+$`),``)),a}n(`slug-tool`,()=>{let n=r(`slug-in`),i=r(`slug-out`),o=r(`slug-lower`),s=r(`slug-max`),c=`-`,l=()=>{i.textContent=n.value.split(`
-`).map(e=>a(e,c,o.checked,Number(s.value)||0)).join(`
-`)};e(r(`slug-sep`),e=>{c=e,l()}),[n,o,s].forEach(e=>e.addEventListener(`input`,l)),t(r(`slug-copy`),()=>i.textContent??``),l()});

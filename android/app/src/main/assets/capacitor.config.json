@@ -1,8 +1,0 @@
-{
-	"appId": "app.kodilo.tools",
-	"appName": "Kodilo",
-	"webDir": "dist-app",
-	"server": {
-		"androidScheme": "https"
-	}
-}

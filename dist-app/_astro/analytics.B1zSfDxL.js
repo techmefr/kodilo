@@ -1,1 +1,0 @@
-function e(e,t){let n=window.umami;if(n&&typeof n.track==`function`)try{n.track(e,t)}catch{}}function t(){let e=document.getElementById(`pin-tool`);if(e?.dataset.slug)return e.dataset.slug;let t=location.pathname.match(/\/tools\/([^/]+)\/?/);return t?t[1]:``}export{e as n,t};
