@@ -1,0 +1,1 @@
+function e(e){let t=e.replace(/\\\r?\n/g,` `),n=[],r=``,i=!1,a=null;for(let e=0;e<t.length;e++){let o=t[e];a?o===a?a=null:o===`\\`&&a===`"`&&e+1<t.length?r+=t[++e]:r+=o:o===`"`||o===`'`?(a=o,i=!0):o===`\\`&&e+1<t.length?(r+=t[++e],i=!0):/\s/.test(o)?((i||r)&&n.push(r),r=``,i=!1):r+=o}if(a)throw Error(`Unclosed quote.`);return(i||r)&&n.push(r),n}export{e as t};

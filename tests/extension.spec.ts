@@ -1,11 +1,17 @@
 import { chromium, expect, test } from '@playwright/test';
-import { mkdtempSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const EXTENSION_DIR = resolve('dist-extension/chrome');
 
+test.setTimeout(180_000);
+
 test('the packaged extension opens tools without console errors', async () => {
+	if (!existsSync(EXTENSION_DIR)) {
+		expect(spawnSync('npm', ['run', 'build:extension'], { stdio: 'inherit' }).status).toBe(0);
+	}
 	const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), 'kodilo-ext-')), {
 		headless: false,
 		args: ['--headless=new', `--disable-extensions-except=${EXTENSION_DIR}`, `--load-extension=${EXTENSION_DIR}`],
