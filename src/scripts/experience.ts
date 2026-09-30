@@ -1,9 +1,10 @@
+import { PAGE_SUFFIX } from './page-suffix';
 export type Entry = { s: string; n: string; d: string; c: string; i: string };
 export type Catalogue = { tools: Entry[]; icons: Record<string, string>; synonyms: string[][] };
 export type Match = { entry: Entry; score: number; needles: string[] };
 
 export const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
-export const toolUrl = (slug: string) => `${base}tools/${slug}/`;
+export const toolUrl = (slug: string) => `${base}tools/${slug}/${PAGE_SUFFIX}`;
 
 const FAVORITES = 'kodilo-favorites';
 const RECENTS = 'kodilo-recents';

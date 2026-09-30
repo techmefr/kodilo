@@ -1,4 +1,5 @@
 ---
+import { PAGE_SUFFIX } from '../scripts/page-suffix';
 import Header from '../components/Header.astro';
 import ToolGrid from '../components/ToolGrid.astro';
 import { builtCategories as categories, categorySlug } from '../data/tools';
@@ -43,7 +44,7 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 				<section class="home-cat" id={categoryId(c.name)}>
 					<h2>
 						<span class="home-icon" set:html={iconUse(c.icon)} />
-						<a class="cat-link" href={`${base}categories/${categorySlug(c.name)}/`}>
+						<a class="cat-link" href={`${base}categories/${categorySlug(c.name)}/${PAGE_SUFFIX}`}>
 							{c.name}
 						</a>
 						<small>{c.blurb}</small>
