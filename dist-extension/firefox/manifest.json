@@ -1,0 +1,51 @@
+{
+	"manifest_version": 3,
+	"name": "Kodilo",
+	"version": "0.0.1",
+	"description": "Developer tools that run entirely in your browser. No sign-up, no account, nothing leaves your machine.",
+	"icons": {
+		"16": "extension-icons/16.png",
+		"32": "extension-icons/32.png",
+		"48": "extension-icons/48.png",
+		"128": "extension-icons/128.png"
+	},
+	"action": {
+		"default_title": "Kodilo",
+		"default_icon": {
+			"16": "extension-icons/16.png",
+			"32": "extension-icons/32.png",
+			"48": "extension-icons/48.png",
+			"128": "extension-icons/128.png"
+		}
+	},
+	"content_security_policy": {
+		"extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+	},
+	"background": {
+		"scripts": [
+			"background.js"
+		]
+	},
+	"sidebar_action": {
+		"default_panel": "index.html",
+		"default_title": "Kodilo",
+		"default_icon": {
+			"16": "extension-icons/16.png",
+			"32": "extension-icons/32.png",
+			"48": "extension-icons/48.png",
+			"128": "extension-icons/128.png"
+		},
+		"open_at_install": false
+	},
+	"browser_specific_settings": {
+		"gecko": {
+			"id": "kodilo@techmefr",
+			"strict_min_version": "140.0",
+			"data_collection_permissions": {
+				"required": [
+					"none"
+				]
+			}
+		}
+	}
+}

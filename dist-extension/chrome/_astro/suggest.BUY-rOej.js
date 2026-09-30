@@ -1,0 +1,1 @@
+function e(e=``){let t=new URLSearchParams({template:`tool-suggestion.yml`}),n=e.trim();return t.set(`title`,n?`[Tool] ${n}`:`[Tool] `),n&&t.set(`name`,n),`https://github.com/techmefr/kodilo/issues/new?${t.toString().replace(/\+/g,`%20`)}`}function t(e){let t=e.split(/[^a-zA-Z0-9]+/).filter(Boolean).join(` `);return t.charAt(0).toUpperCase()+t.slice(1)}export{e as n,t};
