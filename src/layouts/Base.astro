@@ -29,7 +29,7 @@ const counterCode = String(import.meta.env.PUBLIC_GOATCOUNTER_CODE ?? '').trim()
 const goatcounter = /^[a-z0-9-]+$/i.test(counterCode) ? counterCode : '';
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
-const isExtension = process.env.KODILO_TARGET === 'extension';
+const isBundled = ['extension', 'app'].includes(process.env.KODILO_TARGET ?? '');
 const image = new URL(`${base}og-image.png`, Astro.site).href;
 ---
 
@@ -57,7 +57,7 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 		{jsonLd.map((data) => (
 			<script is:inline type="application/ld+json" set:html={JSON.stringify(data).replace(/</g, '\\u003c')}></script>
 		))}
-		{!isExtension && (
+		{!isBundled && (
 			<>
 				<link rel="preconnect" href="https://fonts.googleapis.com" />
 				<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -67,7 +67,7 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 				/>
 			</>
 		)}
-		{isExtension ? (
+		{isBundled ? (
 			<script is:inline src={`${base}theme-boot.js`}></script>
 		) : (
 			<script is:inline>
@@ -81,7 +81,7 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 				document.addEventListener('astro:before-swap', (event) => applyStoredTheme(event.newDocument.documentElement));
 			</script>
 		)}
-		{umami && !isExtension && <script is:inline id="umami-loader" data-website-id={umami} data-domains={umamiDomains}>
+		{umami && !isBundled && <script is:inline id="umami-loader" data-website-id={umami} data-domains={umamiDomains}>
 			(function loadUmami(current) {
 				const nav = navigator;
 				if (window.kodiloUmami || nav.doNotTrack === '1' || window.doNotTrack === '1' || nav.globalPrivacyControl === true) return;
@@ -95,7 +95,7 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 				document.head.appendChild(script);
 			})(document.currentScript);
 		</script>}
-		{goatcounter && !isExtension && <script is:inline id="goatcounter-loader" data-goatcounter={`https://${goatcounter}.goatcounter.com/count`}>
+		{goatcounter && !isBundled && <script is:inline id="goatcounter-loader" data-goatcounter={`https://${goatcounter}.goatcounter.com/count`}>
 			(function loadGoatCounter(current) {
 				const nav = navigator;
 				if (window.kodiloCounter || nav.doNotTrack === '1' || window.doNotTrack === '1' || nav.globalPrivacyControl === true) return;
@@ -108,7 +108,7 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 				document.addEventListener('astro:after-swap', () => window.goatcounter?.count?.({ path: location.pathname }));
 			})(document.currentScript);
 		</script>}
-		{!isExtension && <Pwa />}
+		{!isBundled && <Pwa />}
 		<ClientRouter />
 	</head>
 	<body>

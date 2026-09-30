@@ -26,3 +26,11 @@ test-results/
 playwright-report/
 public/oui/
 dist-extension/
+dist-app/
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+android/app/src/main/assets/public/
+ios/App/App/public/
+ios/App/Pods/
