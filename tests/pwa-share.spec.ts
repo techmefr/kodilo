@@ -38,6 +38,17 @@ test('manifest is linked and valid', async ({ page, request }) => {
 	}
 });
 
+test('manifest declares install metadata and shortcuts that resolve', async ({ request }) => {
+	const manifest = await (await request.get('/kodilo/manifest.webmanifest')).json();
+	expect(manifest.lang).toBe('en');
+	expect(manifest.categories).toContain('developer');
+	expect(manifest.shortcuts.length).toBeGreaterThan(0);
+	for (const shortcut of manifest.shortcuts) {
+		expect(shortcut.url.startsWith(manifest.scope)).toBe(true);
+		expect((await request.get(shortcut.url)).ok()).toBe(true);
+	}
+});
+
 test('service worker registers and serves a tool page offline', async ({ page, context }) => {
 	await page.goto('./');
 	await page.evaluate(() => navigator.serviceWorker.ready);
