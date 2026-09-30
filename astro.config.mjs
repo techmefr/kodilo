@@ -3,6 +3,7 @@ import sitemap from '@astrojs/sitemap';
 import { defineConfig } from 'astro/config';
 import pwa from './scripts/pwa-integration.mjs';
 
+/** @type {Record<string, string>} */
 const OUT_DIRS = { extension: './dist-extension/site', app: './dist-app' };
 const bundledTarget = OUT_DIRS[process.env.KODILO_TARGET ?? ''];
 
