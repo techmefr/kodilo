@@ -67,7 +67,9 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 				/>
 			</>
 		)}
-		{isExtension ? <script is:inline src={`${base}theme-boot.js`}></script> : (
+		{isExtension ? (
+			<script is:inline src={`${base}theme-boot.js`}></script>
+		) : (
 			<script is:inline>
 				function applyStoredTheme(root) {
 					try {
