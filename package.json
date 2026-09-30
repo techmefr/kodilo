@@ -26,7 +26,8 @@
 		"build:extension": "node scripts/build-extension.mjs",
 		"test:extension": "npm run build:extension && KODILO_EXTENSION_ONLY=1 playwright test --project=extension",
 		"build:app": "node scripts/build-app.mjs",
-		"cap:sync": "npm run build:app && cap sync"
+		"cap:sync": "npm run build:app && cap sync",
+		"tauri": "tauri"
 	},
 	"dependencies": {
 		"@astrojs/sitemap": "^3.7.4",
@@ -72,6 +73,7 @@
 		"@capacitor/cli": "^8.5.2",
 		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.63.0",
+		"@tauri-apps/cli": "^2.12.0",
 		"@types/papaparse": "^5.5.2",
 		"@types/qrcode": "^1.5.6",
 		"@types/turndown": "^5.0.6",

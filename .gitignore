@@ -34,3 +34,5 @@ android/local.properties
 android/app/src/main/assets/public/
 ios/App/App/public/
 ios/App/Pods/
+src-tauri/target/
+src-tauri/gen/
