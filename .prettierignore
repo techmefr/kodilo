@@ -9,3 +9,4 @@ dist-extension
 dist-app
 android
 ios
+src-tauri
