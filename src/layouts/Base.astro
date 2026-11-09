@@ -42,7 +42,8 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 		<link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
 		<link rel="sitemap" href={`${base}sitemap-index.xml`} />
 		<meta name="description" content={description} />
-		<meta name="theme-color" content="#6d4fe0" />
+		<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+		<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
 		{noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
 		<meta property="og:type" content="website" />
 		<meta property="og:site_name" content="kodilo" />
@@ -62,7 +63,7 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 				<link rel="preconnect" href="https://fonts.googleapis.com" />
 				<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 				<link
-					href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
+					href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400..700&family=Red+Hat+Mono:wght@400..600&family=Newsreader:ital,opsz,wght@1,6..72,400..600&display=swap"
 					rel="stylesheet"
 				/>
 			</>

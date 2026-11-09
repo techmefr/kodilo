@@ -1,6 +1,7 @@
 import { homePath } from './page-suffix';
 import { navigate } from 'astro:transitions/client';
 import { suggestUrl } from './suggest';
+import { setupTabs } from './tabs';
 import { track } from './analytics';
 import {
 	base,
@@ -164,7 +165,9 @@ function setupMega(active?: string) {
 		try {
 			const { tools, icons } = await loadCatalogue();
 			panel.dataset.filled = 'true';
-			list.replaceChildren(...tools.filter((t) => t.c === panel.dataset.category).map((t) => toolCard(t, icons, active)));
+			const cards = tools.filter((t) => t.c === panel.dataset.category).map((t) => toolCard(t, icons, active));
+			cards.forEach((card, index) => card.style.setProperty('--n', String(Math.min(index, 16))));
+			list.replaceChildren(...cards);
 		} catch {
 			const li = document.createElement('li');
 			li.className = 'mega-status';
@@ -425,6 +428,7 @@ document.addEventListener('astro:page-load', () => {
 	if (!nav) return;
 	const active = nav.dataset.activeSlug;
 	if (active) recordRecent(active);
+	setupTabs(active);
 	setupMega(active);
 	setupPalette();
 	setupShortcuts();

@@ -1,0 +1,68 @@
+---
+import { PAGE_SUFFIX } from '../../scripts/page-suffix';
+import { builtCategories as categories, categorySlug } from '../../data/tools';
+import { categoryId } from '../../scripts/experience';
+import { icon, iconUse } from '../../scripts/icons';
+import '../../styles/toolbox.css';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const total = categories.reduce((a, c) => a + c.tools.length, 0);
+---
+
+<section class="tb" id="toolbox" aria-labelledby="tb-title">
+	<div class="tb-head">
+		<div>
+			<p class="lp-kicker">The toolbox</p>
+			<h2 id="tb-title">{total} tools. One search box.</h2>
+			<p class="tb-sub">
+				The small jobs you usually open a random website for. <span class="hint-hover">Hover over</span>
+				<span class="hint-tap">Tap</span> a tool to see what goes in and what comes out.
+			</p>
+		</div>
+		<label class="tb-filter">
+			<span set:html={icon('search')} />
+			<input id="tb-filter" type="search" placeholder="Filter tools, for example jwt or hash" aria-label="Filter tools" autocomplete="off" />
+		</label>
+	</div>
+	<div class="tb-cats" id="tb-cats">
+		{categories.map((c, i) => (
+			<section class="tb-cat" id={categoryId(c.name)} style={`--i:${i % 6}`}>
+				<header>
+					<h3>
+						<span class="tb-cat-icon" set:html={iconUse(c.icon)} />
+						<a href={`${base}categories/${categorySlug(c.name)}/${PAGE_SUFFIX}`}>{c.name}</a>
+					</h3>
+					<span>{c.tools.length}</span>
+				</header>
+				<ul>
+					{c.tools.map((t) => (
+						<li>
+							<a class="trow" href={`${base}tools/${t.slug}/${PAGE_SUFFIX}`} data-slug={t.slug}>
+								<span class="ico" set:html={iconUse(t.icon ?? 'wrench')} />
+								<span class="trow-name">{t.name}</span>
+								<span class="go" set:html={icon('arrow-right')} />
+							</a>
+						</li>
+					))}
+				</ul>
+			</section>
+		))}
+	</div>
+	<p class="tb-empty" id="tb-empty" hidden>
+		No tool matches your filter.
+	</p>
+	<div class="tb-pop" id="tb-pop" role="tooltip" hidden>
+		<p class="tb-pop-name" id="tb-pop-name"></p>
+		<p class="tb-pop-label">In</p>
+		<pre class="tb-pop-in" id="tb-pop-in"></pre>
+		<p class="tb-pop-label">Out</p>
+		<pre class="tb-pop-out" id="tb-pop-out"></pre>
+	</div>
+</section>
+
+<script>
+	import { onPage } from '../../scripts/ui';
+	import { startToolbox } from '../../scripts/toolbox';
+
+	onPage('tb-cats', startToolbox);
+</script>

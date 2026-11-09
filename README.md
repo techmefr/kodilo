@@ -1,8 +1,37 @@
-# kodilo
+<p align="center">
+  <img src="public/favicon.svg" alt="kodilo" width="72" height="72" />
+</p>
 
-A collection of open-source tools for developers with no sign-up and no account.
+<h1 align="center">kodilo</h1>
 
-Live at **https://techmefr.github.io/kodilo/**
+<p align="center">
+  <b>Over 200 developer tools. No sign-up. Nothing leaves your browser.</b><br />
+  Format, decode, convert, compare, generate and inspect, from one search box.
+</p>
+
+<p align="center">
+  <a href="https://techmefr.github.io/kodilo/">Open kodilo</a> ·
+  <a href="#whats-in-here">Browse the tools</a> ·
+  <a href="https://github.com/techmefr/kodilo/issues/new?template=tool-suggestion.yml">Suggest a tool</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
+
+## Why kodilo
+
+Online formatters see every token, key and customer record you paste. kodilo is the opposite: a static site with no backend, so there is nothing to send your data to.
+
+- **Private by design.** Every tool runs client-side. Files, text and keys stay in the tab.
+- **Fast to reach.** Press `/` or `⌘K` / `Ctrl K` and search any tool by name, keyword or synonym (`b64`, `k8s`, `tls`).
+- **Works offline.** Installable as a PWA; every tool you open keeps working without a network.
+- **Shareable.** Copy a link that carries the tool's input in the URL hash, never sent to a server.
+- **Accessible.** Every page is audited with axe for WCAG 2.1 AA, in light and dark mode.
+- **Open source.** MIT licensed. Read the code, build it yourself.
+
+## The home page
+
+The home page is a landing page: an animated hero with live stats, three looping demos (JSON formatting, secret redaction, hashing), the details that make the tools pleasant to use, a proof that nothing is uploaded, then the full toolbox grouped by category with your pinned and recent tools on top. Hover a tool (tap on touch screens) to see an animated example of what goes in and what comes out, or filter the list by name or keyword. The examples live in `src/data/samples.ts`; add one when you add a tool. Motion respects `prefers-reduced-motion`.
+
+The landing lives in `src/components/landing/`, its styles in `src/styles/landing.css` and its animation logic in `src/scripts/landing.ts`.
 
 ## What's in here
 
@@ -307,8 +336,23 @@ Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools), [devbench
 
 ## Stack
 
-- [Astro](https://astro.build) (static output)
+- [Astro](https://astro.build) (static output) with client-side navigation
+- TypeScript, hand-written CSS with theme tokens, [Hugeicons](https://hugeicons.com) icons, Bricolage Grotesque, Hanken Grotesk, Red Hat Mono and Newsreader
+- [Playwright](https://playwright.dev) for functional, responsive and axe accessibility tests
 - Deployed to GitHub Pages via GitHub Actions on every push to `main`
+
+## Project layout
+
+| Path                    | What lives there                                             |
+| :---------------------- | :----------------------------------------------------------- |
+| `src/data/tools.ts`     | The catalogue: categories, tools, icons, descriptions        |
+| `src/pages/tools/`      | One Astro page per tool                                      |
+| `src/pages/index.astro` | The landing page and the toolbox                             |
+| `src/components/`       | Header, tool shell, grid, feedback, PWA, landing sections    |
+| `src/scripts/`          | Shared helpers (`ui.ts`, `icons.ts`, search, share, landing) |
+| `src/styles/`           | `global.css` theme and building blocks, `landing.css`        |
+| `scripts/`              | Build helpers: README, icons, brand, bundle budget           |
+| `tests/`                | Playwright specs, including accessibility                    |
 
 ## Offline & sharing
 
@@ -335,8 +379,17 @@ npm run dev
 | `npm run build`        | Build the production site to `./dist/`                               |
 | `npm run preview`      | Preview the build locally before deploying                           |
 | `npm run test:changed` | Run Playwright only on specs and tools changed against `origin/main` |
+| `npm test`             | Playwright on desktop, mobile and dark mode                          |
+| `npm run test:a11y`    | axe audit for WCAG 2.1 AA in light and dark mode                     |
+| `npm run check`        | Astro and TypeScript type check                                      |
+| `npm run lint`         | ESLint                                                               |
+| `npm run format`       | Prettier                                                             |
+| `npm run budget`       | Fail when a bundle grows past its size limit                         |
+| `npm run readme`       | Regenerate the tool list below from the catalogue                    |
 
-Node version is pinned via `.nvmrc` (`lts/*`).
+The site runs at `localhost:4321/kodilo/`. Node version is pinned via `.nvmrc` (`lts/*`).
+
+The tool list in this file is generated: edit `src/data/tools.ts`, then run `npm run readme`.
 
 ### Keyboard shortcuts
 

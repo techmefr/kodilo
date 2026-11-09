@@ -1,0 +1,107 @@
+.open-tabs {
+	padding: 0 4px;
+	max-height: 30vh;
+	overflow-x: hidden;
+	overflow-y: auto;
+	flex-shrink: 0;
+}
+.open-tabs-title {
+	margin: 0 6px 6px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+}
+.open-tabs ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 2px;
+}
+.open-tabs .tab {
+	display: flex;
+	align-items: center;
+	border-radius: 8px;
+	animation: tab-in 0.25s ease both;
+}
+.open-tabs .tab:hover,
+.open-tabs .tab:focus-within {
+	background: var(--surface-2);
+}
+.open-tabs .tab a {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 8px;
+	font-size: 13px;
+	font-weight: 600;
+	text-decoration: none;
+	color: var(--ink-soft);
+	border-radius: 8px;
+}
+.open-tabs .tab a[aria-current='page'] {
+	color: var(--accent-strong);
+	background: var(--accent);
+	box-shadow: inset 2px 0 0 var(--accent-strong);
+}
+.open-tabs .tab a i {
+	display: flex;
+	flex: none;
+}
+.open-tabs .tab a svg {
+	width: 14px;
+	height: 14px;
+}
+.open-tabs .tab a span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.open-tabs .tab-close {
+	flex: none;
+	display: grid;
+	place-items: center;
+	width: 22px;
+	height: 22px;
+	margin-right: 4px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--ink-soft);
+	cursor: pointer;
+	opacity: 0;
+	padding: 0;
+}
+.open-tabs .tab:hover .tab-close,
+.open-tabs .tab-close:focus-visible,
+.open-tabs .tab:has([aria-current='page']) .tab-close {
+	opacity: 1;
+}
+.open-tabs .tab-close:hover {
+	background: var(--border);
+	color: var(--ink);
+}
+.open-tabs .tab-close svg {
+	width: 12px;
+	height: 12px;
+}
+@keyframes tab-in {
+	from {
+		opacity: 0;
+		transform: translateX(-8px);
+	}
+}
+@media (hover: none) {
+	.open-tabs .tab-close {
+		opacity: 1;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.open-tabs .tab {
+		animation: none;
+	}
+}

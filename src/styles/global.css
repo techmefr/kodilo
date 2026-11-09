@@ -1,12 +1,16 @@
 :root {
-	--bg: #f7f6f9;
+	--bg: #fafafa;
+	--raised: #ffffff;
+	--side: #f1f1f4;
+	--hover: rgb(0 0 0 / 0.06);
+	--active: rgb(0 0 0 / 0.1);
 	--surface: #ffffff;
-	--surface-2: #f0eef6;
-	--border: #e2dff0;
-	--ink: #201c2e;
-	--ink-soft: #5f5b75;
-	--accent: #ede9fe;
-	--accent-strong: #6d4fe0;
+	--surface-2: #f4f4f5;
+	--border: #e6e6e8;
+	--ink: #0a0a0a;
+	--ink-soft: #5b5b60;
+	--accent: #efeff1;
+	--accent-strong: #0a0a0a;
 	--accent-ink: #ffffff;
 	--warn: #92400e;
 	--warn-bg: #fef3c7;
@@ -18,21 +22,29 @@
 	--ok-bg: #dcfce7;
 	--partial: #92400e;
 	--partial-bg: #fef3c7;
-	--mono: 'JetBrains Mono', ui-monospace, monospace;
-	--sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--mono: 'Red Hat Mono', ui-monospace, 'SF Mono', monospace;
+	--sans: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+	--display: 'Bricolage Grotesque', 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+	--serif: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+	--radius: 16px;
+	--ring: 0 0 0 1px var(--border);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
-		--bg: #282a36;
-		--surface: #21222c;
-		--surface-2: #343746;
-		--border: #44475a;
-		--ink: #f8f8f2;
-		--ink-soft: #bfc2d4;
-		--accent: #44475a;
-		--accent-strong: #bd93f9;
-		--accent-ink: #282a36;
+		--bg: #000000;
+		--surface: #0d0d0f;
+		--surface-2: #17171a;
+		--raised: #1a1a1e;
+		--side: #0d0d0f;
+		--hover: rgb(255 255 255 / 0.07);
+		--active: rgb(255 255 255 / 0.12);
+		--border: #2c2c31;
+		--ink: #ededed;
+		--ink-soft: #a1a1a6;
+		--accent: #1d1d20;
+		--accent-strong: #ffffff;
+		--accent-ink: #000000;
 		--warn: #ffb86c;
 		--warn-bg: #4a3a26;
 		--ok: #50fa7b;
@@ -47,15 +59,19 @@
 }
 
 :root[data-theme='dark'] {
-	--bg: #282a36;
-	--surface: #21222c;
-	--surface-2: #343746;
-	--border: #44475a;
-	--ink: #f8f8f2;
-	--ink-soft: #bfc2d4;
-	--accent: #44475a;
-	--accent-strong: #bd93f9;
-	--accent-ink: #282a36;
+	--bg: #000000;
+	--surface: #0d0d0f;
+	--surface-2: #17171a;
+	--raised: #1a1a1e;
+	--side: #0d0d0f;
+	--hover: rgb(255 255 255 / 0.07);
+	--active: rgb(255 255 255 / 0.12);
+	--border: #2c2c31;
+	--ink: #ededed;
+	--ink-soft: #a1a1a6;
+	--accent: #1d1d20;
+	--accent-strong: #ffffff;
+	--accent-ink: #000000;
 	--warn: #ffb86c;
 	--warn-bg: #4a3a26;
 	--ok: #50fa7b;
@@ -85,6 +101,12 @@ body {
 
 a {
 	color: inherit;
+}
+
+h1,
+h2 {
+	font-family: var(--display);
+	font-optical-sizing: auto;
 }
 
 .panel {
@@ -433,8 +455,9 @@ mark {
 	margin: 0;
 	padding: 0;
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-	gap: 10px;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+	grid-auto-rows: 1fr;
+	gap: 12px;
 }
 .home-cat li > a {
 	display: flex;
@@ -442,16 +465,31 @@ mark {
 	gap: 12px;
 	height: 100%;
 	box-sizing: border-box;
-	padding: 12px 14px;
+	padding: 14px 16px;
 	border: 1px solid var(--border);
-	border-radius: 12px;
+	border-radius: 18px;
 	background: var(--surface);
 	color: var(--ink);
 	text-decoration: none;
+	transition:
+		transform 0.2s ease,
+		box-shadow 0.2s ease,
+		border-color 0.2s ease;
 }
 .home-cat li > a:hover,
 .home-cat li > a:focus-visible {
-	border-color: var(--accent-strong);
+	border-color: var(--ink-soft);
+	transform: translateY(-2px);
+	box-shadow: 0 18px 40px -24px rgb(0 0 0 / 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+	.home-cat li > a {
+		transition: none;
+	}
+	.home-cat li > a:hover,
+	.home-cat li > a:focus-visible {
+		transform: none;
+	}
 }
 .home-cat b {
 	font-size: 14px;
@@ -463,8 +501,9 @@ mark {
 	width: 32px;
 	height: 32px;
 	border-radius: 9px;
-	background: color-mix(in srgb, var(--accent-strong) 12%, transparent);
-	color: var(--accent-strong);
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	color: var(--ink);
 }
 .home-cat .t-icon svg {
 	width: 17px;
@@ -480,6 +519,11 @@ mark {
 	font-size: 12.5px;
 	line-height: 1.4;
 	color: var(--ink-soft);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
 }
 .home-cat h2 .cat-link {
 	color: inherit;

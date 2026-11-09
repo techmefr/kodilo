@@ -35,7 +35,7 @@ npm run test:a11y
 
 ## Adding a tool
 
-1. Add or find the tool in `src/data/tools.ts` with a `slug`, `name`, `description` and a [Lucide](https://lucide.dev/icons/) `icon` name. Set `built: true` only when the page is ready.
+1. Add or find the tool in `src/data/tools.ts` with a `slug`, `name`, `description` and an `icon` name: either a key of `src/data/icon-map.ts` or a [Hugeicons](https://hugeicons.com/icons) free icon name without the `Icon` suffix, for example `Search01`. Set `built: true` only when the page is ready.
 2. Create `src/pages/tools/<slug>.astro` using `ToolShell`. One file per tool; shared helpers go in `src/scripts/`.
 3. Reuse the shared building blocks: `panel`, `fields`, `seg` segmented controls, `btn`, `stats` from `src/styles/global.css`, and `byId`, `copyButton`, `segmented`, `onPage` from `src/scripts/ui.ts`.
 4. Open the page with a realistic example already filled in, update results live as the user types, and show a "Copied" state on copy buttons.

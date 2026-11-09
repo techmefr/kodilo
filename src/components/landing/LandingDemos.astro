@@ -1,0 +1,68 @@
+---
+import { PAGE_SUFFIX } from '../../scripts/page-suffix';
+import { icon } from '../../scripts/icons';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+---
+
+<section class="lp-section" id="lp-demos" aria-labelledby="lp-demos-title">
+	<p class="lp-kicker">In action</p>
+	<h2 id="lp-demos-title">Paste. Watch it work.</h2>
+	<div class="lp-demos">
+		<article class="lp-card lp-reveal" data-demo="json">
+			<header class="lp-win">
+				<i></i>
+				<i></i>
+				<i></i>
+				<span>JSON Formatter</span>
+			</header>
+			<div class="lp-split" aria-hidden="true">
+				<pre class="lp-code" data-role="in"></pre>
+				<pre class="lp-code lp-out" data-role="out"></pre>
+			</div>
+			<footer>
+				<span set:html={icon('braces')} />
+				<a href={`${base}tools/json-formatter/${PAGE_SUFFIX}`}>Format, validate and minify JSON</a>
+			</footer>
+		</article>
+		<article class="lp-card lp-reveal" data-demo="mask">
+			<header class="lp-win">
+				<i></i>
+				<i></i>
+				<i></i>
+				<span>Secret Redactor</span>
+			</header>
+			<div class="lp-split" aria-hidden="true">
+				<pre class="lp-code" data-role="in"></pre>
+				<pre class="lp-code lp-out" data-role="out"></pre>
+			</div>
+			<footer>
+				<span set:html={icon('shield-check')} />
+				<span>Mask keys and emails before you paste into a chatbot</span>
+			</footer>
+		</article>
+		<article class="lp-card lp-reveal" data-demo="hash">
+			<header class="lp-win">
+				<i></i>
+				<i></i>
+				<i></i>
+				<span>Hash Generator</span>
+			</header>
+			<div class="lp-split" aria-hidden="true">
+				<pre class="lp-code" data-role="in"></pre>
+				<pre class="lp-code lp-out" data-role="out"></pre>
+			</div>
+			<footer>
+				<span set:html={icon('hash')} />
+				<span>SHA-256, computed locally with the Web Crypto API</span>
+			</footer>
+		</article>
+	</div>
+</section>
+
+<script>
+	import { onPage } from '../../scripts/ui';
+	import { startDemos } from '../../scripts/landing';
+
+	onPage('lp-demos', startDemos);
+</script>
