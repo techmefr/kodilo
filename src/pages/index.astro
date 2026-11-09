@@ -3,15 +3,13 @@ import Header from '../components/Header.astro';
 import LandingDemos from '../components/landing/LandingDemos.astro';
 import LandingHero from '../components/landing/LandingHero.astro';
 import LandingProof from '../components/landing/LandingProof.astro';
-import ToolGrid from '../components/ToolGrid.astro';
+import Toolbox from '../components/landing/Toolbox.astro';
 import '../styles/landing.css';
-import { builtCategories as categories, categorySlug } from '../data/tools';
+import { builtCategories as categories } from '../data/tools';
 import Base from '../layouts/Base.astro';
-import { categoryId } from '../scripts/experience';
-import { icon, iconUse } from '../scripts/icons';
+import { icon } from '../scripts/icons';
 import { suggestUrl } from '../scripts/suggest';
 
-const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const total = categories.reduce((a, c) => a + c.tools.length, 0);
 const names = categories.flatMap((c) => c.tools.map((t) => t.name)).slice(0, 60);
 ---
@@ -23,10 +21,6 @@ const names = categories.flatMap((c) => c.tools.map((t) => t.name)).slice(0, 60)
 			<LandingHero total={total} categoryCount={categories.length} names={names} />
 			<LandingDemos />
 			<LandingProof />
-			<div class="lp-toolbox-head" id="toolbox">
-				<p class="lp-kicker">The toolbox</p>
-				<h2>{total} tools. One sidebar.</h2>
-			</div>
 			<section class="home-cat home-mine" id="favorites" tabindex="-1" aria-labelledby="favorites-title" hidden>
 				<h2 id="favorites-title">
 					<span class="home-icon" set:html={icon('star')} />
@@ -42,18 +36,7 @@ const names = categories.flatMap((c) => c.tools.map((t) => t.name)).slice(0, 60)
 				</h2>
 				<ul id="recents-list"></ul>
 			</section>
-			{categories.map((c) => (
-				<section class="home-cat" id={categoryId(c.name)}>
-					<h2>
-						<span class="home-icon" set:html={iconUse(c.icon)} />
-						<a class="cat-link" href={`${base}categories/${categorySlug(c.name)}/`}>
-							{c.name}
-						</a>
-						<small>{c.blurb}</small>
-					</h2>
-					<ToolGrid tools={c.tools} />
-				</section>
-			))}
+			<Toolbox />
 			<p class="home-suggest">
 				Missing something?
 				<a href={suggestUrl()} target="_blank" rel="noopener">

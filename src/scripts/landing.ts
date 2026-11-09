@@ -2,7 +2,7 @@ const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const alive = (el: Element) => el.isConnected;
 
-function reveal(selector: string) {
+export function reveal(selector: string) {
 	const items = Array.from(document.querySelectorAll<HTMLElement>(selector));
 	if (reduced() || !('IntersectionObserver' in window)) {
 		items.forEach((el) => el.classList.add('in'));

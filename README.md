@@ -29,7 +29,7 @@ Online formatters see every token, key and customer record you paste. kodilo is 
 
 ## The home page
 
-The home page is a landing page: an animated hero with live stats, three looping demos (JSON formatting, secret redaction, hashing), the details that make the tools pleasant to use, a proof that nothing is uploaded, then the full toolbox grouped by category with your pinned and recent tools on top. Motion respects `prefers-reduced-motion`.
+The home page is a landing page: an animated hero with live stats, three looping demos (JSON formatting, secret redaction, hashing), the details that make the tools pleasant to use, a proof that nothing is uploaded, then the full toolbox grouped by category with your pinned and recent tools on top. Hover a tool (tap on touch screens) to see an animated example of what goes in and what comes out, or filter the list by name or keyword. The examples live in `src/data/samples.ts`; add one when you add a tool. Motion respects `prefers-reduced-motion`.
 
 The landing lives in `src/components/landing/`, its styles in `src/styles/landing.css` and its animation logic in `src/scripts/landing.ts`.
 
