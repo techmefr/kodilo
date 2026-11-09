@@ -96,7 +96,7 @@
 	font-size: clamp(44px, 9vw, 104px);
 	line-height: 1;
 	font-weight: 700;
-	letter-spacing: -0.055em;
+	letter-spacing: -0.04em;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -119,6 +119,12 @@
 	opacity: 0;
 }
 .lp-grad {
+	font-family: var(--serif);
+	font-style: italic;
+	font-weight: 500;
+	font-size: 1.1em;
+	letter-spacing: -0.035em;
+	padding-right: 0.08em;
 	background: linear-gradient(90deg, var(--ink-soft), var(--ink) 40%, var(--tint-3), var(--tint-2), var(--ink-soft));
 	background-size: 250% 100%;
 	-webkit-background-clip: text;
@@ -304,7 +310,7 @@
 	max-width: 18ch;
 	font-size: clamp(32px, 5.4vw, 60px);
 	font-weight: 700;
-	letter-spacing: -0.05em;
+	letter-spacing: -0.035em;
 	line-height: 1.02;
 }
 .lp-reveal,
@@ -558,7 +564,7 @@
 	max-width: 18ch;
 	font-size: clamp(32px, 5.4vw, 60px);
 	font-weight: 700;
-	letter-spacing: -0.05em;
+	letter-spacing: -0.035em;
 	line-height: 1.02;
 }
 @media (max-width: 560px) {
