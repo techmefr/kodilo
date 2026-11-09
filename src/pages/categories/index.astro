@@ -1,4 +1,5 @@
 ---
+import { PAGE_SUFFIX } from '../../scripts/page-suffix';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import Header from '../../components/Header.astro';
 import { builtCategories, categorySlug } from '../../data/tools';
@@ -38,7 +39,7 @@ const jsonLd = [
 				<ul class="tool-grid">
 					{builtCategories.map((c) => (
 						<li>
-							<a href={sitePath(`categories/${categorySlug(c.name)}/`)}>
+							<a href={sitePath(`categories/${categorySlug(c.name)}/${PAGE_SUFFIX}`)}>
 								<i class="t-icon" set:html={iconUse(c.icon)} />
 								<div class="t-text">
 									<b>{c.name}</b>

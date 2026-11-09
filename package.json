@@ -22,10 +22,17 @@
 		"predev": "node scripts/build-oui.mjs",
 		"budget": "node scripts/check-budget.mjs",
 		"test:a11y": "playwright test --project=a11y --project=a11y-dark --workers=2",
-		"readme": "node scripts/build-readme.mjs"
+		"readme": "node scripts/build-readme.mjs",
+		"build:extension": "node scripts/build-extension.mjs",
+		"test:extension": "npm run build:extension && KODILO_EXTENSION_ONLY=1 playwright test --project=extension",
+		"build:app": "node scripts/build-app.mjs",
+		"cap:sync": "npm run build:app && cap sync",
+		"tauri": "tauri"
 	},
 	"dependencies": {
 		"@astrojs/sitemap": "^3.7.4",
+		"@capacitor/android": "^8.5.2",
+		"@capacitor/core": "^8.5.2",
 		"@faker-js/faker": "^10.6.0",
 		"@peculiar/x509": "^2.1.0",
 		"@prettier/plugin-php": "^0.25.0",
@@ -62,9 +69,11 @@
 	"devDependencies": {
 		"@astrojs/check": "^0.9.10",
 		"@axe-core/playwright": "^4.13.0",
+		"@capacitor/cli": "^8.5.2",
 		"@eslint/js": "^10.0.1",
 		"@hugeicons/core-free-icons": "4.3.5",
 		"@playwright/test": "^1.63.0",
+		"@tauri-apps/cli": "^2.12.0",
 		"@types/papaparse": "^5.5.2",
 		"@types/qrcode": "^1.5.6",
 		"@types/turndown": "^5.0.6",
@@ -78,6 +87,7 @@
 		"typescript-eslint": "^8.70.1"
 	},
 	"overrides": {
-		"lodash-es": "^4.18.1"
+		"lodash-es": "^4.18.1",
+		"uuid": "^14.0.0"
 	}
 }

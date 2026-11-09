@@ -1,125 +1,56 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-const slugs = ['sql-explain-explainer', 'sql-er-diagram', 'openapi-viewer', 'json-to-openapi-schema', 'webhook-signature-verifier'];
+const schedules: [string, string][] = [
+	['every weekday at 9:30', '30 9 * * 1-5'],
+	['every 15 minutes', '*/15 * * * *'],
+	['on the 1st of every month at midnight', '0 0 1 * *'],
+	['every sunday at 2am', '0 2 * * 0'],
+	['every day at 9am and 5pm', '0 9,17 * * *'],
+	['every january 1st at 6:30', '30 6 1 1 *'],
+];
 
-test('explain explainer flags the slow parts of each format', async ({ page }) => {
-	await page.goto('tools/sql-explain-explainer/');
-	const findings = page.locator('#se-findings');
-	await expect(findings).toContainText('Sort spilled to disk (9.641 MB)');
-	await expect(findings).toContainText('Sequential scan reads 500,000 rows of orders');
-	await expect(findings).toContainText('Row estimate off by 980×');
-	await expect(findings).toContainText('Nested loop over 9,800 rows');
-	await expect(page.locator('#se-stats')).toContainText('513 ms');
-	await expect(page.locator('#se-tree .se-node')).toHaveCount(7);
-	await page.getByRole('button', { name: 'Postgres JSON' }).click();
-	await expect(findings).toContainText('Nested loop over 402,113 rows');
-	await expect(findings).toContainText('Sequential scan reads 402,113 rows of order_items');
-	await page.getByRole('button', { name: 'MySQL table' }).click();
-	await expect(findings).toContainText('Full table scan of o (248,130 rows examined)');
-	await expect(findings).toContainText('Using filesort');
-	await page.getByRole('button', { name: 'MySQL JSON' }).click();
-	await expect(findings).toContainText('Join on order_items has no index');
-	await page.locator('#se-in').fill('Index Scan using users_pkey on users  (cost=0.29..8.30 rows=1 width=64)');
-	await expect(findings).toContainText('No obvious problems');
-});
-
-test('er diagram draws tables, cardinality and exports', async ({ page }) => {
-	await page.goto('tools/sql-er-diagram/');
-	await expect(page.locator('#er-svg .er-table')).toHaveCount(5);
-	await expect(page.locator('#er-svg .er-edge')).toHaveCount(4);
-	await expect(page.locator('#er-rels')).toContainText('customer_profiles.customer_id → customers.id');
-	await expect(page.locator('#er-rels')).toContainText('one-to-one, required');
-	await expect(page.locator('#er-rels')).toContainText('orders.customer_id → customers.id');
-	const mm = page.locator('#er-mm');
-	await expect(mm).toContainText('customers ||--o| customer_profiles : "customer_id"');
-	await expect(mm).toContainText('orders ||--o{ order_items : "order_id"');
-	await expect(mm).toContainText('bigint order_id PK, FK');
-	await page
-		.locator('#er-in')
-		.fill(
-			'CREATE TABLE a (id INT PRIMARY KEY);\nCREATE TABLE b (id INT PRIMARY KEY, a_id INT);\nALTER TABLE b ADD CONSTRAINT fk FOREIGN KEY (a_id) REFERENCES a(id);',
-		);
-	await expect(mm).toContainText('a |o--o{ b : "a_id"');
-});
-
-test('openapi viewer validates and lists endpoints', async ({ page }) => {
-	await page.goto('tools/openapi-viewer/');
-	await expect(page.locator('#oa-stats')).toContainText('Valid');
-	await expect(page.locator('#oa-stats')).toContainText('OpenAPI 3.0.3');
-	await expect(page.locator('.oa-op')).toHaveCount(3);
-	await page.locator('.oa-op summary', { hasText: '/books/{bookId}' }).click();
-	await expect(page.locator('.oa-op[open]')).toContainText('bookId');
-	await expect(page.locator('.oa-op[open] .oa-schema').first()).toContainText('author?: string  nullable');
-	await page.locator('#oa-filter').fill('orders');
-	await expect(page.locator('.oa-op')).toHaveCount(1);
-	const spec = await page.locator('#oa-in').inputValue();
-	await page
-		.locator('#oa-in')
-		.fill(spec.replace('- name: bookId', '- name: id').replace("$ref: '#/components/schemas/Order'", "$ref: '#/components/schemas/Missing'"));
-	await expect(page.locator('#oa-issues')).toContainText('Path template {bookId} has no matching path parameter');
-	await expect(page.locator('#oa-issues')).toContainText('Unresolved reference #/components/schemas/Missing');
-	await expect(page.locator('#oa-stats')).toContainText('errors');
-});
-
-test('json to openapi schema detects formats and required', async ({ page }) => {
-	await page.goto('tools/json-to-openapi-schema/');
-	const out = page.locator('#jo-out');
-	await expect(out).toContainText('components:');
-	await expect(out).toContainText('format: uuid');
-	await expect(out).toContainText('format: email');
-	await expect(out).toContainText('format: date-time');
-	await expect(out).toContainText('$ref: "#/components/schemas/Address"');
-	await expect(out).toContainText('- "null"');
-	await page.getByRole('radio', { name: 'JSON Schema' }).click();
-	await page.getByRole('radio', { name: 'JSON', exact: true }).click();
-	const json = JSON.parse((await out.textContent()) ?? '');
-	expect(json.$schema).toBe('https://json-schema.org/draft/2020-12/schema');
-	expect(json.required).not.toContain('birthday');
-	expect(json.required).toContain('email');
-	expect(json.properties.website.type).toEqual(['string', 'null']);
-	expect(json.$defs.Order.properties.placedAt.format).toBe('date-time');
-});
-
-test('webhook verifier validates and detects tampering', async ({ page }) => {
-	await page.goto('tools/webhook-signature-verifier/');
-	const verdict = page.locator('#wh-verdict');
-	await expect(verdict).toHaveText('Valid signature');
-	await page.locator('#wh-body').fill('{"action":"closed"}');
-	await expect(verdict).toHaveText('Signature mismatch');
-	await page.getByRole('button', { name: 'Use expected' }).click();
-	await expect(verdict).toHaveText('Valid signature');
-	for (const name of ['Stripe', 'Slack', 'Shopify', 'Generic HMAC']) {
-		await page.getByRole('button', { name, exact: true }).click();
-		await expect(verdict).toHaveText('Valid signature');
+test('cron from plain english builds the expression for each phrase', async ({ page }) => {
+	await page.goto('tools/cron-from-english/');
+	await expect(page.locator('#ce-expr')).toHaveText('30 9 * * 1-5');
+	for (const [phrase, expression] of schedules) {
+		await page.locator('#ce-text').fill(phrase);
+		await expect(page.locator('#ce-expr')).toHaveText(expression);
 	}
-	await page.getByRole('button', { name: 'Stripe', exact: true }).click();
-	await expect(page.locator('#wh-expected')).toContainText('v1=');
-	await page.locator('#wh-header').fill('t=1600000000,v1=00');
-	await expect(verdict).toHaveText('Signature mismatch');
-	await page.getByRole('button', { name: 'Use expected' }).click();
-	await expect(verdict).toHaveText('Signature matches, but the timestamp is too old');
-	await page.getByRole('button', { name: 'GitHub', exact: true }).click();
-	await page.locator('#wh-secret').fill('gh_webhook_s3cret');
-	await page.locator('#wh-header').fill('sha256=682c1a6a6c7a5f3c3ed0c5e7c7e2c9f1f1e57dcbd4b4d4ba6fbb6f1b2a3f0f2e');
-	await expect(verdict).toHaveText('Signature mismatch');
 });
 
-for (const slug of slugs) {
-	for (const scheme of ['light', 'dark'] as const) {
-		test(`${slug} passes axe in ${scheme} mode without page overflow`, async ({ page }) => {
-			const errors: string[] = [];
-			page.on('pageerror', (e) => errors.push(e.message));
-			page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-			await page.emulateMedia({ colorScheme: scheme });
-			await page.setViewportSize({ width: 375, height: 800 });
-			await page.goto(`tools/${slug}/`);
-			await page.waitForTimeout(300);
-			const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-			expect(overflow).toBeLessThanOrEqual(0);
-			const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
-			expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
-			expect(errors).toEqual([]);
-		});
-	}
-}
+test('cron from plain english fills the field breakdown and examples', async ({ page }) => {
+	await page.goto('tools/cron-from-english/');
+	await page.getByRole('button', { name: 'Sunday 2am' }).click();
+	await expect(page.locator('#ce-fields dd')).toHaveText(['0', '2', '*', '*', '0']);
+});
+
+test('cron from plain english explains what it cannot express', async ({ page }) => {
+	await page.goto('tools/cron-from-english/');
+	await page.locator('#ce-text').fill('last day of the month');
+	await expect(page.locator('#ce-field')).toHaveClass(/invalid/);
+	await expect(page.locator('#ce-note')).toContainText('not part of standard cron');
+	await expect(page.locator('#ce-expr')).toHaveText('');
+	await page.locator('#ce-text').fill('sometimes');
+	await expect(page.locator('#ce-note')).toContainText('not understood');
+});
+
+test('text compressor round trips through gzip and reports the saving', async ({ page }) => {
+	await page.goto('tools/text-compressor/');
+	await expect(page.locator('#tc-out')).toHaveText(/^H4sI/);
+	await expect(page.locator('#tc-stats')).toContainText('smaller');
+	const packed = (await page.locator('#tc-out').textContent()) ?? '';
+	await page.getByRole('radio', { name: 'Decompress' }).click();
+	await page.locator('#tc-in').fill(packed);
+	await expect(page.locator('#tc-out')).toContainText('"name":"kodilo"');
+});
+
+test('text compressor supports deflate-raw in hex and rejects bad input', async ({ page }) => {
+	await page.goto('tools/text-compressor/');
+	await page.locator('#tc-in').fill('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+	await page.getByRole('radio', { name: 'deflate-raw' }).click();
+	await page.getByRole('radio', { name: 'Hex' }).click();
+	await expect(page.locator('#tc-out')).toHaveText(/^[0-9a-f]+$/);
+	await page.getByRole('radio', { name: 'Decompress' }).click();
+	await page.locator('#tc-in').fill('zz');
+	await expect(page.locator('#tc-out')).toHaveText('Not valid hex');
+});

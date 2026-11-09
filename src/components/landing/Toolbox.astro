@@ -1,4 +1,5 @@
 ---
+import { PAGE_SUFFIX } from '../../scripts/page-suffix';
 import { builtCategories as categories, categorySlug } from '../../data/tools';
 import { categoryId } from '../../scripts/experience';
 import { icon, iconUse } from '../../scripts/icons';
@@ -29,14 +30,14 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 				<header>
 					<h3>
 						<span class="tb-cat-icon" set:html={iconUse(c.icon)} />
-						<a href={`${base}categories/${categorySlug(c.name)}/`}>{c.name}</a>
+						<a href={`${base}categories/${categorySlug(c.name)}/${PAGE_SUFFIX}`}>{c.name}</a>
 					</h3>
 					<span>{c.tools.length}</span>
 				</header>
 				<ul>
 					{c.tools.map((t) => (
 						<li>
-							<a class="trow" href={`${base}tools/${t.slug}/`} data-slug={t.slug}>
+							<a class="trow" href={`${base}tools/${t.slug}/${PAGE_SUFFIX}`} data-slug={t.slug}>
 								<span class="ico" set:html={iconUse(t.icon ?? 'wrench')} />
 								<span class="trow-name">{t.name}</span>
 								<span class="go" set:html={icon('arrow-right')} />

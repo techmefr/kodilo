@@ -2,6 +2,8 @@
 	"name": "Kodilo",
 	"short_name": "Kodilo",
 	"description": "Open-source tools for developers. No sign-up, no account, nothing leaves your browser.",
+	"lang": "en",
+	"dir": "ltr",
 	"id": "/kodilo/",
 	"start_url": "/kodilo/",
 	"scope": "/kodilo/",
@@ -9,9 +11,69 @@
 	"background_color": "#f7f6f9",
 	"theme_color": "#6d4fe0",
 	"icons": [
-		{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-		{ "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-		{ "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-		{ "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+		{
+			"src": "icons/icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "icons/icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "icons/maskable-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "maskable"
+		},
+		{
+			"src": "icons/maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	],
+	"categories": ["developer", "productivity", "utilities"],
+	"display_override": ["window-controls-overlay", "standalone"],
+	"shortcuts": [
+		{
+			"name": "JSON Formatter",
+			"short_name": "JSON",
+			"url": "/kodilo/tools/json-formatter/",
+			"icons": [
+				{
+					"src": "icons/icon-192.png",
+					"sizes": "192x192",
+					"type": "image/png"
+				}
+			]
+		},
+		{
+			"name": "Regex Tester",
+			"short_name": "Regex",
+			"url": "/kodilo/tools/regex-tester/",
+			"icons": [
+				{
+					"src": "icons/icon-192.png",
+					"sizes": "192x192",
+					"type": "image/png"
+				}
+			]
+		},
+		{
+			"name": "Base64 Encoder & Decoder",
+			"short_name": "Base64",
+			"url": "/kodilo/tools/base64/",
+			"icons": [
+				{
+					"src": "icons/icon-192.png",
+					"sizes": "192x192",
+					"type": "image/png"
+				}
+			]
+		}
 	]
 }

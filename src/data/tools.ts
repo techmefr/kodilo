@@ -1086,6 +1086,13 @@ export const categories: Category[] = [
 		blurb: 'SQL, cron, chmod, MIME',
 		tools: [
 			{
+				slug: 'text-compressor',
+				icon: 'archive',
+				built: true,
+				name: 'Text Compressor',
+				description: 'Compress or decompress text with gzip, deflate or deflate-raw, and see the size saved. Output as Base64 or hex.',
+			},
+			{
 				slug: 'sql-prettify',
 				icon: 'database',
 				built: true,
@@ -1551,6 +1558,13 @@ export const categories: Category[] = [
 				built: true,
 				name: 'Cron Expression Tester',
 				description: 'Describe a cron expression in plain English and list its next 10 run times in your timezone.',
+			},
+			{
+				slug: 'cron-from-english',
+				icon: 'timer',
+				built: true,
+				name: 'Cron from Plain English',
+				description: 'Type a schedule in plain English and get the cron expression, broken down field by field.',
 			},
 			{
 				slug: 'terraform-plan-visualizer',

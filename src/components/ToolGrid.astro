@@ -1,4 +1,5 @@
 ---
+import { PAGE_SUFFIX } from '../scripts/page-suffix';
 import type { Tool } from '../data/tools';
 import { iconUse } from '../scripts/icons';
 
@@ -13,7 +14,7 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 <ul class="tool-grid">
 	{tools.map((t) => (
 		<li>
-			<a href={`${base}tools/${t.slug}/`}>
+			<a href={`${base}tools/${t.slug}/${PAGE_SUFFIX}`}>
 				<i class="t-icon" set:html={iconUse(t.icon ?? 'wrench')} />
 				<div class="t-text">
 					<b>{t.name}</b>

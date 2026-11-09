@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kodilo</string>
+    <string name="title_activity_main">Kodilo</string>
+    <string name="package_name">app.kodilo.tools</string>
+    <string name="custom_url_scheme">app.kodilo.tools</string>
+</resources>
