@@ -1,0 +1,90 @@
+---
+import { icon } from '../../scripts/icons';
+
+interface Props {
+	total: number;
+	categoryCount: number;
+	names: string[];
+}
+
+const { total, categoryCount, names } = Astro.props;
+const verbs = ['Format', 'Decode', 'Convert', 'Compare', 'Generate', 'Inspect'];
+const half = Math.ceil(names.length / 2);
+const rows = [names.slice(0, half), names.slice(half)];
+---
+
+<section class="lp-hero" id="lp-hero" aria-labelledby="lp-title">
+	<div class="lp-orbs" aria-hidden="true">
+		<span class="lp-orb lp-orb-a"></span>
+		<span class="lp-orb lp-orb-b"></span>
+		<span class="lp-orb lp-orb-c"></span>
+	</div>
+	<p class="lp-eyebrow">Free · Open source · Runs in your browser</p>
+	<h1 id="lp-title">
+		<span class="lp-verb-wrap" aria-hidden="true">
+			<span class="lp-verb" id="lp-verb">
+				{verbs[0]}
+			</span>
+		</span>
+		<span class="lp-sr">{verbs.join(', ')}</span>
+		<span class="lp-line">anything developer.</span>
+		<span class="lp-line lp-grad">Nothing leaves your tab.</span>
+	</h1>
+	<p class="lp-lead">
+		{total} tools for the small jobs you usually open a random website for. No account, no tracking of what you paste, no server in the loop.
+	</p>
+	<div class="lp-cta">
+		<button type="button" class="lp-search" id="hero-search">
+			<span set:html={icon('search')} />
+			Search a tool
+			<kbd>⌘K</kbd>
+		</button>
+		<a class="lp-ghost" href="#toolbox">
+			Browse the toolbox
+		</a>
+	</div>
+	<ul class="lp-stats" aria-label="kodilo in numbers">
+		<li>
+			<b data-count={total}>{total}</b>
+			<span>tools</span>
+		</li>
+		<li>
+			<b data-count={categoryCount}>{categoryCount}</b>
+			<span>categories</span>
+		</li>
+		<li>
+			<b>0</b>
+			<span>accounts</span>
+		</li>
+		<li>
+			<b>0</b>
+			<span>uploads</span>
+		</li>
+	</ul>
+	<div class="lp-marquee" aria-hidden="true">
+		{rows.map((row, i) => (
+			<div class={`lp-track${i ? ' lp-reverse' : ''}`}>
+				<div>
+					{row.map((n) => (
+						<span>{n}</span>
+					))}
+				</div>
+				<div>
+					{row.map((n) => (
+						<span>{n}</span>
+					))}
+				</div>
+			</div>
+		))}
+	</div>
+</section>
+
+<script>
+	import { byId, onPage } from '../../scripts/ui';
+	import { startHero } from '../../scripts/landing';
+
+	onPage('lp-hero', () => {
+		byId('hero-search').addEventListener('click', () => document.getElementById('search-open')?.click());
+		startHero();
+	});
+</script>

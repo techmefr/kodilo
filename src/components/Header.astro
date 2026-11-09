@@ -5,6 +5,7 @@ import { categoryId } from '../scripts/experience';
 import { feedbackUrl, sitePath } from '../scripts/seo';
 import { icon, iconUse } from '../scripts/icons';
 import { suggestUrl } from '../scripts/suggest';
+import '../styles/tabs.css';
 
 interface Props {
 	activeSlug?: string;
@@ -59,6 +60,10 @@ const shortcuts = [
 		<span class="search-label">Search {total} tools</span>
 		<kbd id="search-kbd">⌘K</kbd>
 	</button>
+	<nav class="open-tabs" id="open-tabs" aria-label="Open tools" hidden>
+		<p class="open-tabs-title">Open tabs</p>
+		<ul id="open-tabs-list"></ul>
+	</nav>
 	<nav class="cats" aria-label="Tool categories">
 		{categories.map((c, i) => (
 			<a

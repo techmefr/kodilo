@@ -1,5 +1,6 @@
 import { navigate } from 'astro:transitions/client';
 import { suggestUrl } from './suggest';
+import { setupTabs } from './tabs';
 import { track } from './analytics';
 import {
 	base,
@@ -424,6 +425,7 @@ document.addEventListener('astro:page-load', () => {
 	if (!nav) return;
 	const active = nav.dataset.activeSlug;
 	if (active) recordRecent(active);
+	setupTabs(active);
 	setupMega(active);
 	setupPalette();
 	setupShortcuts();

@@ -1,6 +1,10 @@
 ---
 import Header from '../components/Header.astro';
+import LandingDemos from '../components/landing/LandingDemos.astro';
+import LandingHero from '../components/landing/LandingHero.astro';
+import LandingProof from '../components/landing/LandingProof.astro';
 import ToolGrid from '../components/ToolGrid.astro';
+import '../styles/landing.css';
 import { builtCategories as categories, categorySlug } from '../data/tools';
 import Base from '../layouts/Base.astro';
 import { categoryId } from '../scripts/experience';
@@ -9,21 +13,20 @@ import { suggestUrl } from '../scripts/suggest';
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const total = categories.reduce((a, c) => a + c.tools.length, 0);
+const names = categories.flatMap((c) => c.tools.map((t) => t.name)).slice(0, 60);
 ---
 
 <Base title="kodilo — Developer tools, no sign-up">
 	<div class="shell">
 		<Header />
 		<main class="home" id="main" tabindex="-1">
-			<section class="hero">
-				<h1>kodilo</h1>
-				<p>{total} open-source tools for developers. No sign-up, no account, nothing leaves your browser.</p>
-				<button type="button" class="hero-search" id="hero-search">
-					<span set:html={icon('search')} />
-					Search a tool
-					<kbd>⌘K</kbd>
-				</button>
-			</section>
+			<LandingHero total={total} categoryCount={categories.length} names={names} />
+			<LandingDemos />
+			<LandingProof />
+			<div class="lp-toolbox-head" id="toolbox">
+				<p class="lp-kicker">The toolbox</p>
+				<h2>{total} tools. One sidebar.</h2>
+			</div>
 			<section class="home-cat home-mine" id="favorites" tabindex="-1" aria-labelledby="favorites-title" hidden>
 				<h2 id="favorites-title">
 					<span class="home-icon" set:html={icon('star')} />
@@ -66,7 +69,6 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 	import { byId, onPage } from '../scripts/ui';
 
 	onPage('favorites', () => {
-		byId('hero-search').addEventListener('click', () => document.getElementById('search-open')?.click());
 		const render = async () => {
 			const pinned = favorites();
 			const recent = recents();
@@ -117,49 +119,6 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 		display: flex;
 		flex-direction: column;
 		gap: 36px;
-	}
-	.hero h1 {
-		margin: 0;
-		font-size: 40px;
-		font-weight: 800;
-		letter-spacing: -0.03em;
-	}
-	.hero p {
-		margin: 8px 0 18px;
-		font-size: 16px;
-		color: var(--ink-soft);
-		max-width: 60ch;
-	}
-	.hero-search {
-		display: inline-flex;
-		align-items: center;
-		gap: 10px;
-		width: min(420px, 100%);
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--ink-soft);
-		font: inherit;
-		font-size: 15px;
-		padding: 11px 14px;
-		border-radius: 12px;
-		cursor: pointer;
-	}
-	.hero-search:hover {
-		border-color: var(--accent-strong);
-	}
-	.hero-search kbd {
-		margin-left: auto;
-		font-family: var(--mono);
-		font-size: 11px;
-		padding: 1px 6px;
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		background: var(--surface-2);
-	}
-	.hero-search svg {
-		width: 16px;
-		height: 16px;
-		display: block;
 	}
 	.home-suggest {
 		margin: 8px 0 0;

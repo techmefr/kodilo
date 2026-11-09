@@ -1,0 +1,64 @@
+---
+import { icon } from '../../scripts/icons';
+
+const features = [
+	{ n: '01', icon: 'search', title: 'Ctrl K to anything', text: 'One search over every tool name and keyword. Arrow keys move, Enter opens, Escape closes.' },
+	{ n: '02', icon: 'star', title: 'Pin and come back', text: 'Press f on a tool to pin it. Your recent tools wait for you on the home page.' },
+	{ n: '03', icon: 'link', title: 'Share the exact state', text: 'Copy a link that carries the input, so a colleague opens the tool already filled.' },
+	{ n: '04', icon: 'moon', title: 'Light, dark, installable', text: 'Follows your system theme and installs as an app that keeps working offline.' },
+];
+---
+
+<section class="lp-section" id="lp-proof" aria-labelledby="lp-proof-title">
+	<p class="lp-kicker">Built to stay out of the way</p>
+	<h2 id="lp-proof-title">Small details, every tool.</h2>
+	<ol class="lp-features">
+		{features.map((f) => (
+			<li class="lp-reveal">
+				<span class="lp-num">{f.n}</span>
+				<i class="lp-ficon" set:html={icon(f.icon)} />
+				<h3>{f.title}</h3>
+				<p>{f.text}</p>
+			</li>
+		))}
+	</ol>
+</section>
+
+<section class="lp-section lp-privacy" id="lp-privacy" aria-labelledby="lp-privacy-title">
+	<div class="lp-privacy-text lp-reveal">
+		<p class="lp-kicker">Privacy</p>
+		<h2 id="lp-privacy-title">Paste secrets here. Not into a website.</h2>
+		<p>Online formatters see every token, key and customer record you paste. kodilo does the work in your browser, so there is nothing to leak to.</p>
+		<ul class="lp-checks">
+			<li>Every tool runs client-side. Disconnect Wi-Fi and it still works.</li>
+			<li>No sign-up, no account.</li>
+			<li>Open source. Read the code and build it yourself.</li>
+		</ul>
+	</div>
+	<div class="lp-net lp-reveal" id="lp-net" role="img" aria-label="Network panel showing zero requests while tools run">
+		<header>
+			<span>Elements</span>
+			<span>Console</span>
+			<span class="on">Network</span>
+			<span>Sources</span>
+		</header>
+		<div class="lp-net-rows">
+			<div>
+				<span>Name</span>
+				<span>Status</span>
+				<span>Type</span>
+			</div>
+			<p>Nothing to show. Your data stays on this computer.</p>
+		</div>
+		<footer>
+			<b data-net="requests">0</b> requests · <b data-net="bytes">0 B</b> transferred · <b data-net="ops">0</b> local operations
+		</footer>
+	</div>
+</section>
+
+<script>
+	import { onPage } from '../../scripts/ui';
+	import { startProof } from '../../scripts/landing';
+
+	onPage('lp-proof', startProof);
+</script>
