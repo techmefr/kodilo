@@ -199,7 +199,8 @@ const shortcuts = [
 		flex-direction: column;
 		gap: 12px;
 		padding: 16px 10px;
-		background: var(--bg);
+		background: color-mix(in srgb, var(--bg) 82%, transparent);
+		backdrop-filter: saturate(180%) blur(24px);
 		border-right: 1px solid var(--border);
 	}
 	.brand-row {

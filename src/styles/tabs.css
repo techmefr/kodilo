@@ -1,6 +1,7 @@
 .open-tabs {
 	padding: 0 4px;
 	max-height: 30vh;
+	overflow-x: hidden;
 	overflow-y: auto;
 	flex-shrink: 0;
 }
