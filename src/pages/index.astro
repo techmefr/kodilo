@@ -113,9 +113,9 @@ const names = categories.flatMap((c) => c.tools.map((t) => t.name)).slice(0, 60)
 	.home {
 		flex: 1;
 		min-width: 0;
-		max-width: 1200px;
+		max-width: 1480px;
 		margin: 0 auto;
-		padding: 40px 16px 64px;
+		padding: 24px clamp(16px, 3vw, 48px) 64px;
 		display: flex;
 		flex-direction: column;
 		gap: 36px;
