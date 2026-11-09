@@ -1,5 +1,6 @@
 :root {
 	--bg: #fafafa;
+	--raised: #ffffff;
 	--surface: #ffffff;
 	--surface-2: #f4f4f5;
 	--border: #e6e6e8;
@@ -27,9 +28,10 @@
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
 		--bg: #000000;
-		--surface: #0a0a0b;
-		--surface-2: #151517;
-		--border: #262629;
+		--surface: #0d0d0f;
+		--surface-2: #17171a;
+		--raised: #1a1a1e;
+		--border: #2c2c31;
 		--ink: #ededed;
 		--ink-soft: #a1a1a6;
 		--accent: #1d1d20;
@@ -50,9 +52,10 @@
 
 :root[data-theme='dark'] {
 	--bg: #000000;
-	--surface: #0a0a0b;
-	--surface-2: #151517;
-	--border: #262629;
+	--surface: #0d0d0f;
+	--surface-2: #17171a;
+	--raised: #1a1a1e;
+	--border: #2c2c31;
 	--ink: #ededed;
 	--ink-soft: #a1a1a6;
 	--accent: #1d1d20;
