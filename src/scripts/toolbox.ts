@@ -6,6 +6,12 @@ const touch = () => matchMedia('(hover: none)').matches;
 
 let typing = 0;
 let current: HTMLElement | null = null;
+let samples: Promise<Record<string, [string, string, string]>> | null = null;
+
+const loadSamples = () =>
+	(samples ??= fetch(`${import.meta.env.BASE_URL.replace(/\/?$/, '/')}samples.json`)
+		.then((r) => r.json())
+		.catch(() => ({})));
 
 function typeInto(target: HTMLElement, text: string) {
 	const run = ++typing;
@@ -41,18 +47,20 @@ function place(pop: HTMLElement, row: HTMLElement) {
 	pop.style.top = `${top}px`;
 }
 
-function show(row: HTMLElement) {
+async function show(row: HTMLElement) {
 	const pop = byId('tb-pop');
 	if (current === row && !pop.hidden) return;
 	current = row;
-	byId('tb-pop-name').textContent = row.dataset.name ?? '';
-	byId('tb-pop-in').textContent = row.dataset.in ?? '';
+	byId('tb-pop-name').textContent = row.querySelector('.trow-name')?.textContent ?? '';
+	const [input, output] = (await loadSamples())[row.dataset.slug ?? ''] ?? ['', '', ''];
+	if (current !== row) return;
+	byId('tb-pop-in').textContent = input;
 	pop.hidden = false;
 	pop.classList.remove('live');
 	place(pop, row);
 	void pop.offsetWidth;
 	pop.classList.add('live');
-	typeInto(byId('tb-pop-out'), row.dataset.out ?? '');
+	typeInto(byId('tb-pop-out'), output);
 }
 
 function hide() {
@@ -62,13 +70,14 @@ function hide() {
 	if (pop) pop.hidden = true;
 }
 
-function applyFilter(query: string) {
+async function applyFilter(query: string) {
+	const index = await loadSamples();
 	const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
 	let shown = 0;
 	document.querySelectorAll<HTMLElement>('.tb-cat').forEach((cat) => {
 		let any = false;
 		cat.querySelectorAll<HTMLElement>('.trow').forEach((row) => {
-			const match = terms.every((t) => (row.dataset.hay ?? '').includes(t));
+			const match = terms.every((t) => (index[row.dataset.slug ?? '']?.[2] ?? '').includes(t));
 			(row.parentElement as HTMLElement).hidden = !match;
 			if (match) any = true;
 		});

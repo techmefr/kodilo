@@ -335,7 +335,7 @@ Inspired partly by [it-tools](https://github.com/CorentinTh/it-tools), [devbench
 ## Stack
 
 - [Astro](https://astro.build) (static output) with client-side navigation
-- TypeScript, hand-written CSS with theme tokens, [Lucide](https://lucide.dev) icons
+- TypeScript, hand-written CSS with theme tokens, [Hugeicons](https://hugeicons.com) icons, Bricolage Grotesque, Hanken Grotesk, Red Hat Mono and Newsreader
 - [Playwright](https://playwright.dev) for functional, responsive and axe accessibility tests
 - Deployed to GitHub Pages via GitHub Actions on every push to `main`
 

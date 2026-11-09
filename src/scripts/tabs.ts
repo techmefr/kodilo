@@ -53,7 +53,7 @@ function tab(entry: Entry, icons: Record<string, string>, active?: string) {
 	const button = document.createElement('button');
 	button.type = 'button';
 	button.className = 'tab-close';
-	button.setAttribute('aria-label', `Close ${entry.n}`);
+	button.setAttribute('aria-label', 'Close tab');
 	button.innerHTML = CLOSE_ICON;
 	button.addEventListener('click', () => close(entry.s, active));
 	li.addEventListener('auxclick', (e) => {

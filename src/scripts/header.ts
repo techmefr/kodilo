@@ -164,7 +164,9 @@ function setupMega(active?: string) {
 		try {
 			const { tools, icons } = await loadCatalogue();
 			panel.dataset.filled = 'true';
-			list.replaceChildren(...tools.filter((t) => t.c === panel.dataset.category).map((t) => toolCard(t, icons, active)));
+			const cards = tools.filter((t) => t.c === panel.dataset.category).map((t) => toolCard(t, icons, active));
+			cards.forEach((card, index) => card.style.setProperty('--n', String(Math.min(index, 16))));
+			list.replaceChildren(...cards);
 		} catch {
 			const li = document.createElement('li');
 			li.className = 'mega-status';

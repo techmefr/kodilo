@@ -1,6 +1,9 @@
 :root {
 	--bg: #fafafa;
 	--raised: #ffffff;
+	--side: #f1f1f4;
+	--hover: rgb(0 0 0 / 0.06);
+	--active: rgb(0 0 0 / 0.1);
 	--surface: #ffffff;
 	--surface-2: #f4f4f5;
 	--border: #e6e6e8;
@@ -33,6 +36,9 @@
 		--surface: #0d0d0f;
 		--surface-2: #17171a;
 		--raised: #1a1a1e;
+		--side: #0d0d0f;
+		--hover: rgb(255 255 255 / 0.07);
+		--active: rgb(255 255 255 / 0.12);
 		--border: #2c2c31;
 		--ink: #ededed;
 		--ink-soft: #a1a1a6;
@@ -57,6 +63,9 @@
 	--surface: #0d0d0f;
 	--surface-2: #17171a;
 	--raised: #1a1a1e;
+	--side: #0d0d0f;
+	--hover: rgb(255 255 255 / 0.07);
+	--active: rgb(255 255 255 / 0.12);
 	--border: #2c2c31;
 	--ink: #ededed;
 	--ink-soft: #a1a1a6;

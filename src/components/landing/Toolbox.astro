@@ -1,6 +1,5 @@
 ---
 import { builtCategories as categories, categorySlug } from '../../data/tools';
-import { samples } from '../../data/samples';
 import { categoryId } from '../../scripts/experience';
 import { icon, iconUse } from '../../scripts/icons';
 import '../../styles/toolbox.css';
@@ -37,14 +36,7 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 				<ul>
 					{c.tools.map((t) => (
 						<li>
-							<a
-								class="trow"
-								href={`${base}tools/${t.slug}/`}
-								data-name={t.name}
-								data-hay={`${t.name} ${t.slug} ${t.description} ${c.name}`.toLowerCase()}
-								data-in={samples[t.slug]?.[0] ?? t.description}
-								data-out={samples[t.slug]?.[1] ?? ''}
-							>
+							<a class="trow" href={`${base}tools/${t.slug}/`} data-slug={t.slug}>
 								<span class="ico" set:html={iconUse(t.icon ?? 'wrench')} />
 								<span class="trow-name">{t.name}</span>
 								<span class="go" set:html={icon('arrow-right')} />
