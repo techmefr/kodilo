@@ -19,6 +19,8 @@ const slugs = [
 	'css-selector-tester',
 	'tailwind-css-converter',
 	'svg-path-editor',
+	'aura-gradient-generator',
+	'css-shape-mask-generator',
 ];
 
 test('type scale exports css, tailwind and json', async ({ page }) => {
@@ -210,3 +212,27 @@ for (const slug of slugs) {
 		});
 	}
 }
+
+test('aura gradient generator exports css and switches presets', async ({ page }) => {
+	await page.goto('tools/aura-gradient-generator/');
+	await expect(page.locator('#au-css')).toContainText('background-blend-mode: screen, screen, screen, normal;');
+	await page.getByRole('button', { name: 'Cloud', exact: true }).click();
+	await expect(page.locator('#au-css')).toContainText('multiply');
+	await page.locator('#au-grain').check();
+	await expect(page.locator('#au-css')).toContainText('feTurbulence');
+});
+
+test('shape and mask generator builds clip-path and mask-image', async ({ page }) => {
+	await page.goto('tools/css-shape-mask-generator/');
+	await page.getByRole('button', { name: 'Hexagon', exact: true }).click();
+	await expect(page.locator('#sm-css')).toHaveText('clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);');
+	await page.getByRole('radio', { name: 'Mask' }).click();
+	await expect(page.locator('#sm-css')).toContainText('mask-image: linear-gradient(to bottom');
+});
+
+test('home intro is skipped under automation and the app demo is present', async ({ page }) => {
+	await page.goto('./');
+	await expect(page.locator('#li')).toBeHidden();
+	await expect(page.locator('#st .st-frame')).toBeAttached();
+	await expect(page.locator('#st-title')).toHaveText(/JSON Formatter|Base64|Color Converter|UUID Generator/);
+});

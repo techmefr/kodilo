@@ -1,0 +1,200 @@
+---
+import { icon } from '../../scripts/icons';
+
+const tools = [
+	{ name: 'JSON Formatter', icon: 'braces' },
+	{ name: 'Base64', icon: 'binary' },
+	{ name: 'Color Converter', icon: 'palette' },
+	{ name: 'UUID Generator', icon: 'fingerprint' },
+];
+---
+
+<section class="st" id="st" aria-label="kodilo in motion">
+	<div class="st-frame" aria-hidden="true">
+		<header class="st-bar">
+			<i></i>
+			<i></i>
+			<i></i>
+			<span>kodilo</span>
+		</header>
+		<div class="st-body">
+			<aside class="st-side">
+				<p>Open tabs</p>
+				<ul>
+					{tools.map((t, i) => (
+						<li data-i={i}>
+							<span set:html={icon(t.icon)} />
+							{t.name}
+						</li>
+					))}
+				</ul>
+			</aside>
+			<div class="st-main">
+				<h3 id="st-title">{tools[0].name}</h3>
+				<div class="st-split">
+					<pre id="st-in"></pre>
+					<pre id="st-out" class="st-out"></pre>
+				</div>
+			</div>
+		</div>
+		<span class="st-cursor" id="st-cursor"></span>
+	</div>
+</section>
+
+<script>
+	import { onPage } from '../../scripts/ui';
+	import { startStage } from '../../scripts/landing-motion';
+
+	onPage('st', startStage);
+</script>
+
+<style is:global>
+	.st {
+		margin: 8px 0 40px;
+		perspective: 1600px;
+	}
+	.st-frame {
+		position: relative;
+		max-width: 920px;
+		margin: 0 auto;
+		border: 1px solid var(--border);
+		border-radius: 18px;
+		background: var(--raised);
+		box-shadow:
+			0 40px 100px -30px rgb(0 0 0 / 0.35),
+			0 0 0 1px rgb(255 255 255 / 0.03);
+		overflow: hidden;
+		transform: rotateX(var(--tilt, 6deg)) scale(var(--scale, 0.96));
+		transition: transform 0.3s ease-out;
+	}
+	.st-bar {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 10px 14px;
+		border-bottom: 1px solid var(--border);
+		font-size: 12px;
+		color: var(--ink-soft);
+	}
+	.st-bar i {
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		background: var(--border);
+	}
+	.st-bar span {
+		margin-left: 8px;
+	}
+	.st-body {
+		display: grid;
+		grid-template-columns: 200px 1fr;
+		min-height: 300px;
+	}
+	.st-side {
+		padding: 14px 10px;
+		background: var(--side);
+		border-right: 1px solid var(--border);
+	}
+	.st-side p {
+		margin: 0 8px 8px;
+		font-size: 11px;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--ink-soft);
+	}
+	.st-side ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 2px;
+	}
+	.st-side li {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 10px;
+		border-radius: 10px;
+		font-size: 13px;
+		color: var(--ink-soft);
+		transition:
+			background 0.25s,
+			color 0.25s;
+	}
+	.st-side li svg {
+		width: 15px;
+		height: 15px;
+	}
+	.st-side li.on {
+		background: var(--active);
+		color: var(--ink);
+	}
+	.st-main {
+		padding: 18px 20px;
+	}
+	.st-main h3 {
+		margin: 0 0 14px;
+		font-family: var(--display);
+		font-size: 18px;
+	}
+	.st-split {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 12px;
+	}
+	.st-split pre {
+		margin: 0;
+		min-height: 190px;
+		padding: 12px;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: var(--surface-2);
+		font: 12.5px/1.6 var(--mono);
+		white-space: pre-wrap;
+		overflow: hidden;
+		overflow-wrap: anywhere;
+	}
+	.st-out {
+		border-color: color-mix(in srgb, var(--accent-strong) 30%, var(--border));
+	}
+	.st-cursor {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 18px;
+		height: 18px;
+		border-radius: 50% 50% 50% 0;
+		background: var(--accent-strong);
+		border: 2px solid var(--raised);
+		box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
+		transform: translate(60px, 200px) rotate(-45deg);
+		transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+		pointer-events: none;
+	}
+	.st-cursor.tap {
+		scale: 0.8;
+	}
+	@media (max-width: 640px) {
+		.st-body {
+			grid-template-columns: 1fr;
+		}
+		.st-side {
+			display: none;
+		}
+		.st-split {
+			grid-template-columns: 1fr;
+		}
+		.st-split pre {
+			min-height: 90px;
+		}
+		.st-cursor {
+			display: none;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.st-frame,
+		.st-cursor {
+			transition: none;
+		}
+	}
+</style>

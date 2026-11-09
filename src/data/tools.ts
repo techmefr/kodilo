@@ -153,6 +153,20 @@ export const categories: Category[] = [
 				description: 'Generate CSS gradients with a live preview.',
 			},
 			{
+				slug: 'aura-gradient-generator',
+				icon: 'blend',
+				built: true,
+				name: 'Aura Gradient Generator',
+				description: 'Layered ambient gradients with blend modes and grain, exported as CSS or PNG.',
+			},
+			{
+				slug: 'css-shape-mask-generator',
+				icon: 'scissors',
+				built: true,
+				name: 'CSS Shape & Mask Generator',
+				description: 'Clip-path shapes and gradient masks with a live preview, ready to copy.',
+			},
+			{
 				slug: 'css-grid-generator',
 				icon: 'layout-grid',
 				built: true,

@@ -42,8 +42,7 @@ const image = new URL(`${base}og-image.png`, Astro.site).href;
 		<link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
 		<link rel="sitemap" href={`${base}sitemap-index.xml`} />
 		<meta name="description" content={description} />
-		<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
-		<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+		<meta name="theme-color" content="#6d4fe0" />
 		{noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
 		<meta property="og:type" content="website" />
 		<meta property="og:site_name" content="kodilo" />

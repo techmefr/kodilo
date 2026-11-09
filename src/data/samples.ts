@@ -19,6 +19,11 @@ export const samples: Record<string, Sample> = {
 	'svg-to-component': [`<svg viewBox="0 0 24 24">…</svg>`, `export const Icon = (props) => (\n  <svg viewBox="0 0 24 24" {...props} />\n)`],
 	'box-shadow-generator': [`x 0 · y 8 · blur 24 · 20%`, `box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);`],
 	'gradient-generator': [`90° · #7c3aed → #0ea5e9`, `background: linear-gradient(90deg, #7c3aed, #0ea5e9);`],
+	'aura-gradient-generator': [
+		`Dusk · 3 layers · screen`,
+		`background: radial-gradient(60% 60% at 20% 10%, rgb(124 58 237 / 0.9), transparent), #0b0a1f;\nbackground-blend-mode: screen, normal;`,
+	],
+	'css-shape-mask-generator': [`Hexagon · clip-path`, `clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);`],
 	'css-grid-generator': [`3 columns · gap 16px`, `display: grid;\ngrid-template-columns: repeat(3, 1fr);\ngap: 16px;`],
 	'flexbox-generator': [`row · center · space-between`, `display: flex;\nalign-items: center;\njustify-content: space-between;`],
 	'xml-formatter': [`<a><b>1</b></a>`, `<a>\n  <b>1</b>\n</a>`],
