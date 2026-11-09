@@ -2,6 +2,8 @@
 import Header from '../components/Header.astro';
 import LandingDemos from '../components/landing/LandingDemos.astro';
 import LandingHero from '../components/landing/LandingHero.astro';
+import LandingIntro from '../components/landing/LandingIntro.astro';
+import LandingStage from '../components/landing/LandingStage.astro';
 import LandingProof from '../components/landing/LandingProof.astro';
 import Toolbox from '../components/landing/Toolbox.astro';
 import '../styles/landing.css';
@@ -18,7 +20,9 @@ const names = categories.flatMap((c) => c.tools.map((t) => t.name)).slice(0, 60)
 	<div class="shell">
 		<Header />
 		<main class="home" id="main" tabindex="-1">
+			<LandingIntro total={total} />
 			<LandingHero total={total} categoryCount={categories.length} names={names} />
+			<LandingStage />
 			<LandingDemos />
 			<LandingProof />
 			<section class="home-cat home-mine" id="favorites" tabindex="-1" aria-labelledby="favorites-title" hidden>

@@ -1,0 +1,138 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+import { maskPresets, shapePresets } from '../../data/shapes';
+---
+
+<ToolShell
+	slug="css-shape-mask-generator"
+	title="CSS Shape & Mask Generator"
+	description="Pick a clip-path shape or a gradient mask, preview it on a gradient and copy the CSS."
+>
+	<div class="sm-stage">
+		<div class="sm-subject" id="sm-tool" role="img" aria-label="Shape preview"></div>
+	</div>
+	<div class="toolbar">
+		<div class="seg" id="sm-mode" aria-label="Mode">
+			<button data-value="shape" aria-pressed="true">
+				Shape
+			</button>
+			<button data-value="mask" aria-pressed="false">
+				Mask
+			</button>
+		</div>
+		<label class="check" id="sm-amount-wrap">
+			<span id="sm-amount-label">Radius</span>
+			<input type="range" id="sm-amount" min="0" max="100" value="50" />
+			<b id="sm-amount-value">50%</b>
+		</label>
+	</div>
+	<div class="chips" id="sm-shapes" data-presets={JSON.stringify(shapePresets)}>
+		{shapePresets.map((s, i) => (
+			<button data-i={i} aria-pressed={i === 0 ? 'true' : 'false'}>
+				{s.name}
+			</button>
+		))}
+	</div>
+	<div class="chips" id="sm-masks" data-presets={JSON.stringify(maskPresets)} hidden>
+		{maskPresets.map((m, i) => (
+			<button data-i={i} aria-pressed={i === 0 ? 'true' : 'false'}>
+				{m.name}
+			</button>
+		))}
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>CSS</span>
+			<button class="btn" id="sm-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out sm-css" id="sm-css"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+	import type { MaskPreset, ShapePreset } from '../../data/shapes';
+
+	onPage('sm-tool', () => {
+		const shapes = JSON.parse(byId('sm-shapes').dataset.presets ?? '[]') as ShapePreset[];
+		const masks = JSON.parse(byId('sm-masks').dataset.presets ?? '[]') as MaskPreset[];
+		const amount = byId<HTMLInputElement>('sm-amount');
+		let mode = 'shape';
+		let shape = 0;
+		let mask = 0;
+
+		const paint = () => {
+			const subject = byId('sm-tool');
+			byId('sm-amount-value').textContent = `${amount.value}%`;
+			byId('sm-amount-label').textContent = mode === 'shape' ? 'Radius' : 'Fade';
+			byId('sm-amount-wrap').hidden = mode === 'shape' && !shapes[shape].css?.includes('{n}');
+			subject.style.clipPath = '';
+			subject.style.setProperty('mask-image', '');
+			subject.style.setProperty('-webkit-mask-image', '');
+			if (mode === 'shape') {
+				const s = shapes[shape];
+				const value = s.css ? s.css.replaceAll('{n}', amount.value) : `polygon(${s.points})`;
+				subject.style.clipPath = value;
+				byId('sm-css').textContent = `clip-path: ${value};`;
+				return;
+			}
+			const value = masks[mask].css.replaceAll('{n}', amount.value);
+			subject.style.setProperty('mask-image', value);
+			subject.style.setProperty('-webkit-mask-image', value);
+			byId('sm-css').textContent = `-webkit-mask-image: ${value};\nmask-image: ${value};`;
+		};
+
+		const pick = (groupId: string, set: (i: number) => void) =>
+			document.querySelectorAll<HTMLButtonElement>(`#${groupId} button`).forEach((b, _, all) =>
+				b.addEventListener('click', () => {
+					all.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+					set(Number(b.dataset.i));
+					paint();
+				}),
+			);
+		pick('sm-shapes', (i) => (shape = i));
+		pick('sm-masks', (i) => (mask = i));
+		segmented(byId('sm-mode'), (v) => {
+			mode = v;
+			byId('sm-shapes').hidden = v !== 'shape';
+			byId('sm-masks').hidden = v !== 'mask';
+			paint();
+		});
+		amount.addEventListener('input', paint);
+		copyButton(byId('sm-copy'), () => byId('sm-css').textContent ?? '');
+		paint();
+	});
+</script>
+
+<style>
+	.sm-stage {
+		display: grid;
+		place-items: center;
+		min-height: 320px;
+		border-radius: 14px;
+		border: 1px solid var(--border);
+		background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 24px 24px;
+	}
+	.sm-subject {
+		width: min(320px, 80%);
+		aspect-ratio: 1;
+		background:
+			radial-gradient(60% 60% at 20% 10%, rgb(124 58 237 / 0.95), transparent), radial-gradient(55% 55% at 85% 25%, rgb(236 72 153 / 0.9), transparent),
+			radial-gradient(70% 70% at 55% 105%, rgb(56 189 248 / 0.9), transparent), #0b0a1f;
+	}
+	.check input[type='range'] {
+		width: 160px;
+		accent-color: var(--accent-strong);
+	}
+	.check b {
+		font-variant-numeric: tabular-nums;
+		min-width: 4ch;
+	}
+	.sm-css {
+		min-height: auto !important;
+		white-space: pre-wrap;
+		word-break: break-all;
+	}
+</style>

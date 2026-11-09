@@ -1,5 +1,10 @@
 ---
+import { auraCss, auras } from '../../data/auras';
 import { icon } from '../../scripts/icons';
+
+const dark = auraCss({ name: 'hero-dark', base: 'transparent', layers: auras[0].layers });
+const light = auraCss({ name: 'hero-light', base: 'transparent', layers: auras[6].layers });
+const auraVars = `--aura-dark:${dark.background};--aura-dark-blend:${dark.blend};--aura-light:${light.background};--aura-light-blend:${light.blend}`;
 
 interface Props {
 	total: number;
@@ -14,11 +19,7 @@ const rows = [names.slice(0, half), names.slice(half)];
 ---
 
 <section class="lp-hero" id="lp-hero" aria-labelledby="lp-title">
-	<div class="lp-orbs" aria-hidden="true">
-		<span class="lp-orb lp-orb-a"></span>
-		<span class="lp-orb lp-orb-b"></span>
-		<span class="lp-orb lp-orb-c"></span>
-	</div>
+	<div class="lp-aura" aria-hidden="true" style={auraVars}></div>
 	<p class="lp-eyebrow">Free · Open source · Runs in your browser</p>
 	<h1 id="lp-title">
 		<span class="lp-verb-wrap" aria-hidden="true">

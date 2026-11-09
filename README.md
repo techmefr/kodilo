@@ -35,7 +35,7 @@ The landing lives in `src/components/landing/`, its styles in `src/styles/landin
 
 ## What's in here
 
-**238 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
+**240 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
 
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
@@ -57,13 +57,15 @@ The landing lives in `src/components/landing/`, its styles in `src/styles/landin
 - [JSON to Go](https://techmefr.github.io/kodilo/tools/json-to-go/) — Generate Go structs with json tags from a JSON sample.
 - [JSON to OpenAPI Schema](https://techmefr.github.io/kodilo/tools/json-to-openapi-schema/) — Infer an OpenAPI 3.1 component or JSON Schema from JSON samples, with formats.
 
-### HTML / CSS (21)
+### HTML / CSS (23)
 
 - [HTML Formatter](https://techmefr.github.io/kodilo/tools/html-formatter/) — Beautify and format HTML code.
 - [CSS Formatter & Minifier](https://techmefr.github.io/kodilo/tools/css-formatter/) — Format and minify CSS stylesheets.
 - [SVG to JSX, TSX & Vue](https://techmefr.github.io/kodilo/tools/svg-to-component/) — Turn an SVG into a React or Vue component with size and color props.
 - [Box Shadow Generator](https://techmefr.github.io/kodilo/tools/box-shadow-generator/) — Generate CSS box-shadow values with a live preview.
 - [Gradient Generator](https://techmefr.github.io/kodilo/tools/gradient-generator/) — Generate CSS gradients with a live preview.
+- [Aura Gradient Generator](https://techmefr.github.io/kodilo/tools/aura-gradient-generator/) — Layered ambient gradients with blend modes and grain, exported as CSS or PNG.
+- [CSS Shape & Mask Generator](https://techmefr.github.io/kodilo/tools/css-shape-mask-generator/) — Clip-path shapes and gradient masks with a live preview, ready to copy.
 - [CSS Grid Generator](https://techmefr.github.io/kodilo/tools/css-grid-generator/) — Build a CSS grid layout visually and copy the code.
 - [Flexbox Generator](https://techmefr.github.io/kodilo/tools/flexbox-generator/) — Build a CSS flexbox layout visually and copy the code.
 - [XML Formatter](https://techmefr.github.io/kodilo/tools/xml-formatter/) — Pretty-print or minify XML and catch well-formedness errors.
