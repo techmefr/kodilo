@@ -6,6 +6,7 @@ import { categoryId } from '../scripts/experience';
 import { feedbackUrl, sitePath } from '../scripts/seo';
 import { icon, iconUse } from '../scripts/icons';
 import { suggestUrl } from '../scripts/suggest';
+import { locales } from '../i18n/locales';
 import '../styles/tabs.css';
 
 interface Props {
@@ -92,6 +93,14 @@ const shortcuts = [
 	<a class="side-feedback" href={feedbackUrl()} target="_blank" rel="noopener" aria-label="Feedback (opens GitHub in a new tab)">
 		Feedback
 	</a>
+	<label class="side-lang">
+		<span class="visually-hidden">Language</span>
+		<select id="lang-select" translate="no">
+			{locales.map((l) => (
+				<option value={l.code}>{`${l.flag} ${l.name}`}</option>
+			))}
+		</select>
+	</label>
 	{categories.map((c, i) => (
 		<div class="mega" id={`mega-${i}`} data-category={c.name} role="region" aria-label={`${c.name} tools`} hidden>
 			<div class="mega-intro">
@@ -654,6 +663,20 @@ const shortcuts = [
 	.side-suggest:focus-visible {
 		background: var(--surface-2);
 		text-decoration: underline;
+	}
+	.side-lang {
+		display: block;
+		padding: 6px 8px;
+	}
+	.side-lang select {
+		width: 100%;
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--raised);
+		color: var(--ink);
+		font: inherit;
+		font-size: 13px;
 	}
 	.side-feedback {
 		padding: 6px 8px;

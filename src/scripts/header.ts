@@ -2,6 +2,7 @@ import { homePath } from './page-suffix';
 import { navigate } from 'astro:transitions/client';
 import { suggestUrl } from './suggest';
 import { setupTabs } from './tabs';
+import { initI18n } from './i18n';
 import { track } from './analytics';
 import {
 	base,
@@ -448,3 +449,4 @@ document.addEventListener('astro:page-load', () => {
 		} catch {}
 	});
 });
+document.addEventListener('astro:page-load', initI18n);
