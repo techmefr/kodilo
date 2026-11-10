@@ -57,7 +57,7 @@ const shortcuts = [
 			</button>
 		</div>
 	</div>
-	<button type="button" class="search-btn" id="search-open" aria-label="Search tools">
+	<button type="button" class="search-btn" id="search-open">
 		<span set:html={icon('search')} />
 		<span class="search-label">Search {total} tools</span>
 		<kbd id="search-kbd">⌘K</kbd>
@@ -103,7 +103,8 @@ const shortcuts = [
 		Feedback
 	</a>
 	<div class="side-lang" id="lang-picker">
-		<button type="button" class="lang-btn" id="lang-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="lang-list" aria-label="Language">
+		<button type="button" class="lang-btn" id="lang-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="lang-list">
+			<span class="sr-only">Language</span>
 			<img src={`${base}flags/gb.svg`} alt="" width="20" height="15" />
 			<span class="lang-name" translate="no">
 				English
