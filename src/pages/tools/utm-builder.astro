@@ -1,0 +1,90 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="utm-builder"
+	title="UTM Builder"
+	description="Add UTM campaign parameters to any link. Existing query and fragment are kept, values are percent-encoded, nothing leaves your browser."
+>
+	<div class="fields" id="utm-tool">
+		<div class="field wide" id="utm-base-field">
+			<label for="utm-base">Landing page URL</label>
+			<input id="utm-base" spellcheck="false" value="https://example.com/pricing?ref=nav#plans" />
+		</div>
+		<div class="field">
+			<label for="utm-source">Source</label>
+			<input id="utm-source" spellcheck="false" value="Newsletter" />
+		</div>
+		<div class="field">
+			<label for="utm-medium">Medium</label>
+			<input id="utm-medium" spellcheck="false" value="email" />
+		</div>
+		<div class="field">
+			<label for="utm-campaign">Campaign</label>
+			<input id="utm-campaign" spellcheck="false" value="Spring Sale 2026" />
+		</div>
+		<div class="field">
+			<label for="utm-term">Term</label>
+			<input id="utm-term" spellcheck="false" />
+		</div>
+		<div class="field">
+			<label for="utm-content">Content</label>
+			<input id="utm-content" spellcheck="false" value="hero button" />
+		</div>
+	</div>
+	<div class="toolbar">
+		<label class="check">
+			<input type="checkbox" id="utm-lower" checked /> Lowercase values
+		</label>
+		<span id="utm-count" class="utm-count" role="status"></span>
+	</div>
+	<div class="error" id="utm-error" role="alert" hidden></div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Tagged link</span>
+			<button class="btn" id="utm-copy">
+				Copy link
+			</button>
+		</div>
+		<pre class="out utm-out" id="utm-out"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { UTM_KEYS, buildUtm, type UtmValues } from '../../scripts/utm';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	onPage('utm-tool', () => {
+		const base = byId<HTMLInputElement>('utm-base');
+		const lower = byId<HTMLInputElement>('utm-lower');
+		const inputs = UTM_KEYS.map((key) => [key, byId<HTMLInputElement>(`utm-${key.slice(4)}`)] as const);
+		const out = byId('utm-out');
+		const error = byId('utm-error');
+		const count = byId('utm-count');
+
+		const render = () => {
+			const values = Object.fromEntries(inputs.map(([key, el]) => [key, el.value])) as UtmValues;
+			const result = buildUtm(base.value, values, lower.checked);
+			out.textContent = result.url;
+			error.textContent = result.error;
+			error.hidden = !result.error;
+			byId('utm-base-field').classList.toggle('invalid', !!result.error);
+			count.textContent = result.url ? `${result.tagged} UTM parameter${result.tagged === 1 ? '' : 's'} added` : '';
+		};
+
+		[base, lower, ...inputs.map(([, el]) => el)].forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('utm-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.utm-out {
+		min-height: 90px !important;
+	}
+	.utm-count {
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+</style>

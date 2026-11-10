@@ -34,6 +34,20 @@ export const categories: Category[] = [
 		blurb: 'Format, validate, diff, convert',
 		tools: [
 			{
+				slug: 'json-key-tools',
+				icon: 'braces',
+				built: true,
+				name: 'JSON Key Tools',
+				description: 'Sort JSON keys deeply, list every key path, pull the values of a key from anywhere, escape or unescape a JSON string and minify.',
+			},
+			{
+				slug: 'json-schema-generator',
+				icon: 'file-check',
+				built: true,
+				name: 'JSON Schema Generator',
+				description: 'Infer a draft 2020-12 JSON Schema from a sample document: types, required keys, string formats and merged array items.',
+			},
+			{
 				slug: 'json-formatter',
 				icon: 'braces',
 				built: true,
@@ -385,6 +399,20 @@ export const categories: Category[] = [
 		blurb: 'Case, diff, count, encode',
 		tools: [
 			{
+				slug: 'find-replace',
+				icon: 'regex',
+				built: true,
+				name: 'Find and Replace',
+				description: 'Find and replace text with plain strings or regular expressions, with replace all, $1 groups, match count and live preview.',
+			},
+			{
+				slug: 'text-cleaner',
+				icon: 'brush-cleaning',
+				built: true,
+				name: 'Text Cleaner',
+				description: 'Trim whitespace, drop blank and duplicate lines or words, sort and reverse text, with counters before and after.',
+			},
+			{
 				slug: 'regex-tester',
 				icon: 'regex',
 				built: true,
@@ -489,6 +517,28 @@ export const categories: Category[] = [
 		icon: 'lock',
 		blurb: 'Hash, sign, encrypt, decode',
 		tools: [
+			{
+				slug: 'unicode-escape',
+				icon: 'letter-text',
+				built: true,
+				name: 'Unicode Escape Converter',
+				description: 'Convert text to \\uXXXX, \\u{...}, U+XXXX, HTML entities or hex, and back. Surrogate pairs are handled.',
+			},
+			{
+				slug: 'auth-header-parser',
+				icon: 'user-key',
+				built: true,
+				name: 'Auth Header Parser',
+				description: 'Decode an Authorization header: Bearer JWT claims with expiry state, Basic credentials, or Digest fields, all locally.',
+			},
+			{
+				slug: 'hash-compare',
+				icon: 'fingerprint',
+				built: true,
+				name: 'Hash Compare',
+				description:
+					'Compare two hashes with case and whitespace normalised, identify the algorithm by length, and highlight the first differing character, or hash a text or file with SHA-256 to verify it.',
+			},
 			{
 				slug: 'base64',
 				icon: 'file-lock',
@@ -693,6 +743,28 @@ export const categories: Category[] = [
 		blurb: 'IDs, passwords, QR, cron',
 		tools: [
 			{
+				slug: 'random-generator',
+				icon: 'dices',
+				built: true,
+				name: 'Random Generator',
+				description: "Nano IDs, random numbers and random strings from the browser's secure random generator.",
+			},
+			{
+				slug: 'utm-builder',
+				icon: 'link',
+				built: true,
+				name: 'UTM Builder',
+				description: 'Add UTM campaign parameters to any link while keeping the existing query and fragment, with proper percent-encoding.',
+			},
+			{
+				slug: 'regex-generator',
+				icon: 'regex',
+				built: true,
+				name: 'Regex Generator',
+				description:
+					'Pick a ready-made regex for emails, URLs, IPs, UUIDs, dates and more, or build one step by step, then test it live and copy it as JavaScript, Python or PHP.',
+			},
+			{
 				slug: 'uuid-generator',
 				icon: 'id-card',
 				built: true,
@@ -755,6 +827,20 @@ export const categories: Category[] = [
 		icon: 'repeat',
 		blurb: 'Dates, colors, bases, units',
 		tools: [
+			{
+				slug: 'csv-tools',
+				icon: 'table-2',
+				built: true,
+				name: 'CSV Tools',
+				description: 'View CSV as a table, change the delimiter, convert to TSV or Markdown, pick columns, filter, sort, remove duplicates and validate.',
+			},
+			{
+				slug: 'json-to-table',
+				icon: 'table-2',
+				built: true,
+				name: 'JSON to Table',
+				description: 'Render an array of JSON objects as an HTML table with nested keys flattened to dot paths, then copy it as TSV or Markdown.',
+			},
 			{
 				slug: 'date-time-converter',
 				icon: 'clock',
@@ -853,6 +939,37 @@ export const categories: Category[] = [
 		icon: 'network',
 		blurb: 'IPs, MACs, user agents, status codes',
 		tools: [
+			{
+				slug: 'domain-whois-lookup',
+				icon: 'search',
+				built: true,
+				name: 'Domain Age & WHOIS',
+				description:
+					"Look up a domain's registrar, creation and expiry dates, age, status flags, nameservers and DNSSEC from RDAP. It uses a network call to rdap.org when you press the button.",
+			},
+			{
+				slug: 'dns-records-checker',
+				icon: 'network',
+				built: true,
+				name: 'DNS & Email Records Checker',
+				description:
+					"Read a domain's A, AAAA, CNAME, MX, NS, TXT, SOA and CAA records and check its SPF, DKIM and DMARC email setup. It uses a network call to Cloudflare DNS over HTTPS when you press the button.",
+			},
+			{
+				slug: 'domain-rank-checker',
+				icon: 'gauge',
+				built: true,
+				name: 'Domain Rank Checker',
+				description:
+					'Find where a domain sits in the Tranco top 1 million popularity ranking, with its recent rank history. It uses a network call to tranco-list.eu when you press the button.',
+			},
+			{
+				slug: 'url-query-tool',
+				icon: 'list-tree',
+				built: true,
+				name: 'URL Query Tool',
+				description: 'Turn a URL or query string into an editable key and value table with repeated keys and arrays, and rebuild it with correct encoding.',
+			},
 			{
 				slug: 'ipv4-subnet-calculator',
 				icon: 'network',
@@ -1657,6 +1774,14 @@ export const categories: Category[] = [
 		icon: 'calculator',
 		blurb: 'Bases, currency, units',
 		tools: [
+			{
+				slug: 'date-difference',
+				icon: 'calendar-clock',
+				built: true,
+				name: 'Date Difference Calculator',
+				description:
+					'Count the time between two dates in years, months and days plus totals and business days, or add and subtract an interval, with time zones and DST handled.',
+			},
 			{
 				slug: 'developer-calculator',
 				icon: 'binary',

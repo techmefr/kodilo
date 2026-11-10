@@ -1,0 +1,199 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+import { FLAGS } from '../../scripts/regex-builder';
+import { PATTERNS } from '../../scripts/regex-library';
+---
+
+<ToolShell
+	slug="regex-generator"
+	title="Regex Generator"
+	description="Pick a ready-made pattern for emails, URLs, IPs, UUIDs, dates and more, or build one step by step. Test it live and copy it as JavaScript, Python or PHP."
+>
+	<div class="toolbar" id="rg-tool">
+		<div class="seg" id="rg-mode" aria-label="Pattern source">
+			<button data-value="library" aria-pressed="true">
+				Library
+			</button>
+			<button data-value="builder" aria-pressed="false">
+				Builder
+			</button>
+		</div>
+		{FLAGS.map(([flag, label]) => (
+			<label class="check">
+				<input type="checkbox" data-flag={flag} checked={flag === 'g' || flag === 'm'} /> {label} ({flag})
+			</label>
+		))}
+	</div>
+	<div class="fields">
+		<div class="field" id="rg-library">
+			<label for="rg-pattern">Pattern</label>
+			<select id="rg-pattern">
+				{PATTERNS.map((p) => (
+					<option value={p.id}>{p.name}</option>
+				))}
+			</select>
+		</div>
+		<div class="field wide">
+			<label for="rg-source">Regular expression</label>
+			<input id="rg-source" spellcheck="false" />
+		</div>
+	</div>
+	<section class="panel" id="rg-builder" hidden>
+		<div class="panel-head">
+			<span>Builder</span>
+			<button class="btn" id="rg-add">
+				Add part
+			</button>
+		</div>
+		<div class="rg-parts" id="rg-parts"></div>
+	</section>
+	<div class="error" id="rg-error" role="alert" hidden></div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Test text</div>
+			<textarea id="rg-text" class="rg-text" spellcheck="false" aria-label="Test text"></textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Matches</span>
+				<span class="rg-count" id="rg-count" role="status"></span>
+			</div>
+			<pre class="out rg-text" id="rg-hl"></pre>
+		</section>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<div class="seg" id="rg-lang" aria-label="Language">
+				<button data-value="js" aria-pressed="true">
+					JavaScript
+				</button>
+				<button data-value="python" aria-pressed="false">
+					Python
+				</button>
+				<button data-value="php" aria-pressed="false">
+					PHP
+				</button>
+			</div>
+			<button class="btn" id="rg-copy">
+				Copy
+			</button>
+		</div>
+		<pre class="out" id="rg-code"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { BUILDER_SAMPLE, DEFAULT_PARTS, buildPattern, findMatches, formatLiteral, type Language, type Part } from '../../scripts/regex-builder';
+	import { highlight, partRow } from '../../scripts/regex-ui';
+	import { PATTERNS } from '../../scripts/regex-library';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('rg-tool', () => {
+		const source = byId<HTMLInputElement>('rg-source');
+		const text = byId<HTMLTextAreaElement>('rg-text');
+		const flagBoxes = Array.from(document.querySelectorAll<HTMLInputElement>('[data-flag]'));
+		const parts: Part[] = DEFAULT_PARTS.map((part) => ({ ...part }));
+		let language: Language = 'js';
+
+		const flags = () =>
+			flagBoxes
+				.filter((b) => b.checked)
+				.map((b) => b.dataset.flag)
+				.join('');
+		const setFlags = (value: string) => flagBoxes.forEach((b) => (b.checked = value.includes(b.dataset.flag ?? '')));
+
+		const renderOutput = () => {
+			const { matches, error } = findMatches(source.value, flags(), text.value);
+			byId('rg-error').textContent = error;
+			byId('rg-error').hidden = !error;
+			byId('rg-count').textContent = error ? '' : `${matches.length} match${matches.length === 1 ? '' : 'es'}`;
+			byId('rg-hl').replaceChildren(...highlight(text.value, matches));
+			byId('rg-code').textContent = error ? '' : formatLiteral(source.value, flags(), language);
+		};
+
+		const updateSource = () => {
+			source.value = buildPattern(parts);
+			renderOutput();
+		};
+
+		const renderParts = () => {
+			byId('rg-parts').replaceChildren(...parts.map((_, i) => partRow(parts, i, renderParts, updateSource)));
+			updateSource();
+		};
+
+		const loadLibrary = () => {
+			const pattern = PATTERNS.find((p) => p.id === byId<HTMLSelectElement>('rg-pattern').value) ?? PATTERNS[0];
+			source.value = pattern.source;
+			setFlags(pattern.flags);
+			text.value = pattern.sample;
+			renderOutput();
+		};
+
+		segmented(byId('rg-mode'), (value) => {
+			byId('rg-library').hidden = value !== 'library';
+			byId('rg-builder').hidden = value !== 'builder';
+			if (value === 'library') return loadLibrary();
+			setFlags('gm');
+			text.value = BUILDER_SAMPLE;
+			renderParts();
+		});
+		segmented(byId('rg-lang'), (value) => {
+			language = value as Language;
+			renderOutput();
+		});
+		byId('rg-pattern').addEventListener('change', loadLibrary);
+		byId('rg-add').addEventListener('click', () => {
+			parts.push({ kind: 'digits', text: '', quantifier: 'plus', min: 1, max: 3 });
+			renderParts();
+		});
+		[source, text, ...flagBoxes].forEach((el) => el.addEventListener('input', renderOutput));
+		copyButton(byId('rg-copy'), () => byId('rg-code').textContent ?? '');
+		loadLibrary();
+	});
+</script>
+
+<style>
+	.rg-text {
+		min-height: 180px !important;
+	}
+	.rg-code {
+		min-height: 60px !important;
+	}
+	.rg-count {
+		font-size: 12px;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+	.rg-parts {
+		padding: 10px 14px 14px;
+		display: grid;
+		gap: 8px;
+	}
+	.rg-parts :global(.rg-part) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: center;
+	}
+	.rg-parts :global(select),
+	.rg-parts :global(input) {
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 7px 10px;
+		background: var(--surface-2);
+		color: var(--ink);
+		font: inherit;
+		font-size: 14px;
+		min-width: 0;
+	}
+	.rg-parts :global(input[type='number']) {
+		width: 80px;
+	}
+	.rg-parts :global(input[type='text']) {
+		width: 140px;
+	}
+	.out :global(mark) {
+		background: var(--accent);
+		color: var(--ink);
+	}
+</style>

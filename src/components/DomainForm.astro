@@ -1,0 +1,215 @@
+---
+interface Props {
+	prefix: string;
+	value: string;
+	provider: string;
+	href: string;
+	button: string;
+}
+
+const { prefix, value, provider, href, button } = Astro.props;
+---
+
+<section class="panel net-panel" id={`${prefix}-tool`}>
+	<p class="net-note">
+		<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+			<circle cx="12" cy="12" r="9"></circle>
+			<path d="M12 11v5M12 8h.01"></path>
+		</svg>
+		<span>
+			This tool sends the domain you enter to <strong>{provider}</strong>. Nothing else leaves your browser.
+			<a href={href} target="_blank" rel="noopener noreferrer">
+				{provider} privacy and about page
+			</a>
+			.
+		</span>
+	</p>
+	<form class="net-form" id={`${prefix}-form`}>
+		<div class="field">
+			<label for={`${prefix}-domain`}>Domain</label>
+			<input id={`${prefix}-domain`} type="text" value={value} spellcheck="false" autocomplete="off" autocapitalize="off" />
+		</div>
+		<slot />
+		<button class="btn primary net-go" type="submit" id={`${prefix}-go`}>
+			{button}
+		</button>
+	</form>
+	<p class="net-msg" id={`${prefix}-msg`} role="status"></p>
+</section>
+
+<style is:global>
+	.net-panel {
+		padding: 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	.net-note {
+		display: flex;
+		gap: 10px;
+		align-items: flex-start;
+		margin: 0;
+		padding: 10px 14px;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: var(--accent);
+		font-size: 13px;
+		line-height: 1.5;
+	}
+	.net-note svg {
+		flex: none;
+		margin-top: 1px;
+	}
+	.net-note a {
+		color: var(--ink);
+		text-decoration: underline;
+	}
+	.net-form {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) auto;
+		gap: 12px;
+		align-items: end;
+	}
+	.net-form .field input {
+		font-family: var(--mono);
+		font-size: 14px;
+	}
+	.net-go {
+		padding: 12px 20px;
+		font-size: 14px;
+	}
+	.net-msg {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+		min-height: 1em;
+	}
+	.net-msg.error {
+		color: var(--warn);
+		background: var(--warn-bg);
+		border-radius: 10px;
+		padding: 10px 14px;
+		font-family: var(--sans);
+	}
+	.net-rows {
+		margin: 0;
+		display: grid;
+		grid-template-columns: 170px 1fr;
+		gap: 0;
+	}
+	.net-rows dt,
+	.net-rows dd {
+		margin: 0;
+		padding: 10px 14px;
+		border-top: 1px solid var(--border);
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+	.net-rows dt {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+	.net-rows dt:first-of-type,
+	.net-rows dt:first-of-type + dd {
+		border-top: 0;
+	}
+	.net-rows dd {
+		font-size: 14px;
+	}
+	.net-badge {
+		display: inline-block;
+		border-radius: 999px;
+		padding: 2px 10px;
+		font-size: 12px;
+		font-weight: 700;
+		margin: 0 6px 4px 0;
+		background: var(--accent);
+		border: 1px solid var(--border);
+	}
+	.net-badge[data-kind='pass'] {
+		background: var(--ok-bg);
+		color: var(--ok);
+	}
+	.net-badge[data-kind='warn'] {
+		background: var(--warn-bg);
+		color: var(--warn);
+	}
+	.net-badge[data-kind='fail'] {
+		background: var(--surface);
+		border-color: var(--bad);
+		color: var(--bad);
+	}
+	.net-bar {
+		padding: 10px 14px;
+	}
+	.net-scroll {
+		overflow-x: auto;
+	}
+	.net-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 13px;
+	}
+	.net-table th,
+	.net-table td {
+		text-align: left;
+		padding: 8px 14px;
+		border-top: 1px solid var(--border);
+		vertical-align: top;
+		font-family: var(--mono);
+		overflow-wrap: anywhere;
+	}
+	.net-table th {
+		font-family: var(--sans);
+		font-size: 12px;
+		color: var(--ink-soft);
+		text-transform: uppercase;
+	}
+	.net-raw {
+		margin: 0;
+		padding: 14px;
+		max-height: 360px;
+		overflow: auto;
+		font-family: var(--mono);
+		font-size: 12px;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	.net-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.net-list li {
+		padding: 10px 14px;
+		border-top: 1px solid var(--border);
+		font-size: 14px;
+		display: grid;
+		gap: 2px;
+	}
+	.net-list li:first-child {
+		border-top: 0;
+	}
+	.net-list small {
+		color: var(--ink-soft);
+		font-size: 12.5px;
+		overflow-wrap: anywhere;
+	}
+	@media (max-width: 520px) {
+		.net-rows {
+			grid-template-columns: 1fr;
+		}
+		.net-rows dt {
+			padding-bottom: 0;
+		}
+		.net-rows dd {
+			border-top: 0;
+		}
+		.net-rows dt:first-of-type + dd {
+			border-top: 0;
+		}
+	}
+</style>

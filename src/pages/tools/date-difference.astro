@@ -1,0 +1,193 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const intervalFields = ['years', 'months', 'weeks', 'days', 'hours', 'minutes', 'seconds'];
+---
+
+<ToolShell
+	slug="date-difference"
+	title="Date Difference Calculator"
+	description="Count the time between two dates in years, months, days and totals, or add and subtract an interval. Time zone aware, with DST handled."
+>
+	<div class="toolbar" id="dd-tool">
+		<div class="seg" id="dd-mode" aria-label="Mode">
+			<button data-value="diff" aria-pressed="true">
+				Difference
+			</button>
+			<button data-value="shift" aria-pressed="false">
+				Add or subtract
+			</button>
+		</div>
+	</div>
+	<div class="fields">
+		<div class="field">
+			<label for="dd-start">Start</label>
+			<input id="dd-start" type="datetime-local" step="1" value="2020-01-31T08:00:00" />
+		</div>
+		<div class="field" id="dd-end-field">
+			<label for="dd-end">End</label>
+			<input id="dd-end" type="datetime-local" step="1" value="2026-11-10T17:30:00" />
+		</div>
+		<div class="field">
+			<label for="dd-zone">Time zone</label>
+			<select id="dd-zone"></select>
+		</div>
+	</div>
+	<div id="dd-shift-box" hidden>
+		<div class="toolbar">
+			<div class="seg" id="dd-sign" aria-label="Direction">
+				<button data-value="1" aria-pressed="true">
+					Add
+				</button>
+				<button data-value="-1" aria-pressed="false">
+					Subtract
+				</button>
+			</div>
+		</div>
+		<div class="fields dd-interval">
+			{intervalFields.map((name) => (
+				<div class="field">
+					<label for={`dd-i-${name}`}>{name}</label>
+					<input id={`dd-i-${name}`} type="number" min="0" step="1" value={name === 'days' ? '1' : '0'} />
+				</div>
+			))}
+		</div>
+	</div>
+	<div class="error" id="dd-error" role="alert" hidden></div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="dd-title">Result</span>
+			<button class="btn" id="dd-copy">
+				Copy
+			</button>
+		</div>
+		<p class="dd-summary" id="dd-summary" role="status"></p>
+		<div class="stats dd-stats" id="dd-stats"></div>
+	</section>
+</ToolShell>
+
+<script>
+	import { diff, shift, type Interval } from '../../scripts/date-diff';
+	import { parseLocal, zoneList } from '../../scripts/zone-time';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	const INTERVAL = ['years', 'months', 'weeks', 'days', 'hours', 'minutes', 'seconds'] as const;
+
+	const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+
+	onPage('dd-tool', () => {
+		const start = byId<HTMLInputElement>('dd-start');
+		const end = byId<HTMLInputElement>('dd-end');
+		const zone = byId<HTMLSelectElement>('dd-zone');
+		const summary = byId('dd-summary');
+		const stats = byId('dd-stats');
+		const error = byId('dd-error');
+		let mode = 'diff';
+		let sign: 1 | -1 = 1;
+
+		zoneList().forEach((name) => zone.append(new Option(name, name)));
+
+		const showStats = (items: [string, string, string][]) => {
+			stats.replaceChildren(
+				...items.map(([key, label, value]) => {
+					const stat = document.createElement('div');
+					stat.className = 'stat';
+					stat.dataset.key = key;
+					stat.innerHTML = '<b></b><span></span>';
+					stat.querySelector('b')!.textContent = value;
+					stat.querySelector('span')!.textContent = label;
+					return stat;
+				}),
+			);
+		};
+
+		const renderDiff = () => {
+			const a = parseLocal(start.value);
+			const b = parseLocal(end.value);
+			if (!a || !b) return 'Enter a start and an end date and time.';
+			const d = diff(a, b, zone.value);
+			const parts = [
+				plural(d.years, 'year'),
+				plural(d.months, 'month'),
+				plural(d.days, 'day'),
+				plural(d.hours, 'hour'),
+				plural(d.minutes, 'minute'),
+				plural(d.seconds, 'second'),
+			];
+			summary.textContent = `${parts.join(', ')}${d.negative ? ' (end is before start)' : ''}`;
+			showStats([
+				['days', 'Total days', d.wallDays.toLocaleString('en')],
+				['weeks', 'Weeks', `${d.weeks.toLocaleString('en')} w ${d.restDays} d`],
+				['business', 'Business days', d.business.toLocaleString('en')],
+				['hours', 'Elapsed hours', d.elapsedHours.toLocaleString('en')],
+				['minutes', 'Elapsed minutes', d.elapsedMinutes.toLocaleString('en')],
+				['seconds', 'Elapsed seconds', d.elapsedSeconds.toLocaleString('en')],
+			]);
+			return '';
+		};
+
+		const renderShift = () => {
+			const a = parseLocal(start.value);
+			if (!a) return 'Enter a start date and time.';
+			const interval = Object.fromEntries(
+				INTERVAL.map((name) => [name, Math.max(0, Math.floor(Number(byId<HTMLInputElement>(`dd-i-${name}`).value) || 0))]),
+			) as Interval;
+			summary.textContent = shift(a, zone.value, sign, interval);
+			stats.replaceChildren();
+			return '';
+		};
+
+		const render = () => {
+			const message = mode === 'diff' ? renderDiff() : renderShift();
+			error.textContent = message;
+			error.hidden = !message;
+			if (message) {
+				summary.textContent = '';
+				stats.replaceChildren();
+			}
+		};
+
+		segmented(byId('dd-mode'), (value) => {
+			mode = value;
+			byId('dd-end-field').hidden = mode !== 'diff';
+			byId('dd-shift-box').hidden = mode !== 'shift';
+			byId('dd-title').textContent = mode === 'diff' ? 'Difference' : 'Result';
+			render();
+		});
+		segmented(byId('dd-sign'), (value) => {
+			sign = value === '-1' ? -1 : 1;
+			render();
+		});
+		const own = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		zone.value = own;
+		[start, end, ...INTERVAL.map((name) => byId(`dd-i-${name}`))].forEach((el) => el.addEventListener('input', render));
+		zone.addEventListener('change', render);
+		copyButton(byId('dd-copy'), () =>
+			[summary.textContent, ...[...stats.children].map((s) => `${s.querySelector('span')!.textContent}: ${s.querySelector('b')!.textContent}`)].join('\n'),
+		);
+		render();
+	});
+</script>
+
+<style>
+	.dd-summary {
+		margin: 0;
+		padding: 14px;
+		font-size: 18px;
+		font-weight: 700;
+	}
+	.dd-stats {
+		padding: 0 14px 14px;
+	}
+	.dd-interval :global(label) {
+		text-transform: capitalize;
+	}
+	.dd-interval :global(input) {
+		font-size: 16px !important;
+	}
+	#dd-shift-box {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+</style>

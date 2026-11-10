@@ -1,0 +1,183 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="url-query-tool"
+	title="URL Query Tool"
+	description="Turn a URL or query string into an editable table of keys and values. Repeated keys and arrays are kept, and the query is rebuilt with correct encoding."
+>
+	<div class="fields" id="uq-tool">
+		<div class="field wide">
+			<label for="uq-in">URL or query string</label>
+			<input
+				id="uq-in"
+				spellcheck="false"
+				value="https://shop.example.com/search?q=red%20shoes&amp;size=42&amp;size=43&amp;tag[]=sale&amp;tag[]=new&amp;note=50%25+off#results"
+			/>
+		</div>
+	</div>
+	<div class="toolbar">
+		<label class="check">
+			<input type="checkbox" id="uq-plus" /> Encode spaces as +
+		</label>
+		<span class="uq-count" id="uq-count" role="status"></span>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Parameters</span>
+			<button class="btn" id="uq-add">
+				Add row
+			</button>
+		</div>
+		<div class="uq-rows" id="uq-rows"></div>
+	</section>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">
+				<span>Rebuilt URL</span>
+				<button class="btn" id="uq-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out uq-out" id="uq-out"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>As JSON</span>
+				<button class="btn" id="uq-copy-json">
+					Copy JSON
+				</button>
+			</div>
+			<pre class="out uq-out" id="uq-json"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { assemble, repeatCount, splitInput, toJson, type Entry, type Split } from '../../scripts/query';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	onPage('uq-tool', () => {
+		const input = byId<HTMLInputElement>('uq-in');
+		const plus = byId<HTMLInputElement>('uq-plus');
+		const rows = byId('uq-rows');
+		const out = byId('uq-out');
+		const json = byId('uq-json');
+		let split: Split = { prefix: '', entries: [], hash: '' };
+		let entries: Entry[] = [];
+
+		const cell = (value: string, label: string, onInput: (v: string) => void) => {
+			const el = document.createElement('input');
+			el.value = value;
+			el.spellcheck = false;
+			el.setAttribute('aria-label', label);
+			el.addEventListener('input', () => onInput(el.value));
+			return el;
+		};
+
+		const renderOutput = () => {
+			out.textContent = assemble(split, entries, plus.checked);
+			json.textContent = JSON.stringify(toJson(entries.filter(([key]) => key !== '')), null, 2);
+			byId('uq-count').textContent = `${entries.length} parameter${entries.length === 1 ? '' : 's'}`;
+			rows.querySelectorAll<HTMLElement>('[data-repeat]').forEach((badge, i) => {
+				const count = repeatCount(entries, entries[i]?.[0] ?? '');
+				badge.textContent = count > 1 ? `×${count}` : '';
+			});
+		};
+
+		const renderRows = () => {
+			rows.replaceChildren(
+				...entries.map((entry, i) => {
+					const row = document.createElement('div');
+					row.className = 'uq-row';
+					const badge = document.createElement('span');
+					badge.dataset.repeat = '';
+					badge.className = 'uq-badge';
+					const remove = document.createElement('button');
+					remove.className = 'btn';
+					remove.textContent = 'Remove';
+					remove.setAttribute('aria-label', `Remove row ${i + 1}`);
+					remove.addEventListener('click', () => {
+						entries.splice(i, 1);
+						renderRows();
+					});
+					row.append(
+						cell(entry[0], `Key ${i + 1}`, (v) => ((entry[0] = v), renderOutput())),
+						cell(entry[1], `Value ${i + 1}`, (v) => ((entry[1] = v), renderOutput())),
+						badge,
+						remove,
+					);
+					return row;
+				}),
+			);
+			if (!entries.length) rows.textContent = 'No parameters. Add a row to start.';
+			renderOutput();
+		};
+
+		const parse = () => {
+			split = splitInput(input.value);
+			entries = split.entries.map(([k, v]): Entry => [k, v]);
+			renderRows();
+		};
+
+		input.addEventListener('input', parse);
+		plus.addEventListener('change', renderOutput);
+		byId('uq-add').addEventListener('click', () => {
+			entries.push(['', '']);
+			renderRows();
+			(rows.querySelector('.uq-row:last-child input') as HTMLInputElement | null)?.focus();
+		});
+		copyButton(byId('uq-copy'), () => out.textContent ?? '');
+		copyButton(byId('uq-copy-json'), () => json.textContent ?? '');
+		parse();
+	});
+</script>
+
+<style>
+	.uq-rows {
+		padding: 10px 14px 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		color: var(--ink-soft);
+		font-size: 13px;
+	}
+	.uq-rows :global(.uq-row) {
+		display: grid;
+		grid-template-columns: 1fr 2fr 2.5em auto;
+		gap: 8px;
+		align-items: center;
+	}
+	.uq-rows :global(.uq-row input) {
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 7px 10px;
+		background: var(--surface-2);
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 14px;
+		min-width: 0;
+		width: 100%;
+	}
+	.uq-rows :global(.uq-badge) {
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--ink);
+	}
+	.uq-out {
+		min-height: 120px !important;
+	}
+	.uq-count {
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+	@media (max-width: 560px) {
+		.uq-rows :global(.uq-row) {
+			grid-template-columns: 1fr 1fr auto;
+		}
+		.uq-rows :global(.uq-badge) {
+			display: none;
+		}
+	}
+</style>

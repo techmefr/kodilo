@@ -1,0 +1,198 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="hash-compare"
+	title="Hash Compare"
+	description="Compare two hashes with case and whitespace normalised, spot the algorithm by length, see the first differing character, or hash a text or file to verify it."
+>
+	<div class="toolbar" id="hc-tool">
+		<label class="check">
+			<input type="checkbox" id="hc-case" checked /> Ignore case
+		</label>
+		<label class="check">
+			<input type="checkbox" id="hc-space" checked /> Ignore whitespace
+		</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Hash A (expected)</div>
+			<textarea id="hc-a" class="hc-in" spellcheck="false" aria-label="Hash A">2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">Hash B (actual)</div>
+			<textarea id="hc-b" class="hc-in" spellcheck="false" aria-label="Hash B">2CF24DBA5FB0A30E26E83B2AC5B9E29E1B161E5C1FA7425E73043362938B9825</textarea>
+		</section>
+	</div>
+	<div class="hc-verdict" id="hc-verdict" role="status"></div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">A, normalised</div>
+			<pre class="out hc-out" id="hc-show-a"></pre>
+		</section>
+		<section class="panel">
+			<div class="panel-head">B, normalised</div>
+			<pre class="out hc-out" id="hc-show-b"></pre>
+		</section>
+	</div>
+	<section class="panel">
+		<div class="panel-head">
+			<span>Hash a text or file with SHA-256</span>
+			<div class="seg" id="hc-source" aria-label="Source">
+				<button data-value="text" aria-pressed="true">
+					Text
+				</button>
+				<button data-value="file" aria-pressed="false">
+					File
+				</button>
+			</div>
+		</div>
+		<textarea id="hc-text" class="hc-text" spellcheck="false" aria-label="Text to hash">hello</textarea>
+		<label class="drop" id="hc-file-box" hidden>
+			<span id="hc-file-label">Choose a file to hash</span>
+			<input type="file" id="hc-file" class="sr-only" />
+		</label>
+		<div class="hc-computed">
+			<code id="hc-digest"></code>
+			<button class="btn" id="hc-copy">
+				Copy
+			</button>
+		</div>
+		<p class="hc-verdict" id="hc-check" role="status"></p>
+	</section>
+</ToolShell>
+
+<script>
+	import { compare, normalize, sha256Hex } from '../../scripts/hash-compare';
+	import { paint, verdictText } from '../../scripts/hash-compare-ui';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('hc-tool', () => {
+		const ignoreCase = byId<HTMLInputElement>('hc-case');
+		const ignoreSpace = byId<HTMLInputElement>('hc-space');
+		const inputA = byId<HTMLTextAreaElement>('hc-a');
+		const inputB = byId<HTMLTextAreaElement>('hc-b');
+		const verdict = byId('hc-verdict');
+		const text = byId<HTMLTextAreaElement>('hc-text');
+		const file = byId<HTMLInputElement>('hc-file');
+		let source = 'text';
+		let bytes = new Uint8Array();
+		let digest = '';
+		let run = 0;
+
+		const options = () => ({ ignoreCase: ignoreCase.checked, ignoreWhitespace: ignoreSpace.checked });
+
+		const renderCheck = () => {
+			const expected = normalize(inputA.value, options());
+			const check = byId('hc-check');
+			if (!digest || !expected) return (check.textContent = '');
+			const result = compare(expected, normalize(digest, options()));
+			check.dataset.state = result.equal ? 'ok' : 'bad';
+			check.textContent = result.equal ? 'The SHA-256 matches Hash A.' : 'The SHA-256 does not match Hash A.';
+		};
+
+		const render = () => {
+			const a = normalize(inputA.value, options());
+			const b = normalize(inputB.value, options());
+			const result = compare(a, b);
+			paint(byId('hc-show-a'), a, result.diffs, result.firstDiff);
+			paint(byId('hc-show-b'), b, result.diffs, result.firstDiff);
+			verdict.dataset.state = !a && !b ? '' : result.equal ? 'ok' : 'bad';
+			verdict.textContent = verdictText(a, b, result);
+			renderCheck();
+		};
+
+		const hashNow = async () => {
+			const current = ++run;
+			const value = bytes.length || source === 'text' ? await sha256Hex(bytes) : '';
+			if (current !== run) return;
+			digest = value;
+			byId('hc-digest').textContent = digest || 'No file chosen';
+			renderCheck();
+		};
+
+		const fromText = () => {
+			bytes = new TextEncoder().encode(text.value);
+			hashNow();
+		};
+
+		segmented(byId('hc-source'), (value) => {
+			source = value;
+			text.hidden = source !== 'text';
+			byId('hc-file-box').hidden = source !== 'file';
+			if (source === 'text') fromText();
+			else {
+				bytes = new Uint8Array();
+				digest = '';
+				byId('hc-digest').textContent = 'No file chosen';
+				renderCheck();
+			}
+		});
+		file.addEventListener('change', async () => {
+			const chosen = file.files?.[0];
+			if (!chosen) return;
+			byId('hc-file-label').textContent = `${chosen.name} (${chosen.size.toLocaleString('en')} bytes)`;
+			bytes = new Uint8Array(await chosen.arrayBuffer());
+			hashNow();
+		});
+		[ignoreCase, ignoreSpace, inputA, inputB].forEach((el) => el.addEventListener('input', render));
+		text.addEventListener('input', fromText);
+		copyButton(byId('hc-copy'), () => digest);
+		render();
+		fromText();
+	});
+</script>
+
+<style>
+	.hc-in {
+		min-height: 110px !important;
+	}
+	.hc-out {
+		min-height: 80px !important;
+	}
+	.hc-text {
+		min-height: 90px !important;
+	}
+	.hc-verdict {
+		padding: 10px 14px;
+		border-radius: 10px;
+		font-size: 14px;
+		font-weight: 600;
+		margin: 0;
+		background: var(--surface-2);
+		color: var(--ink);
+	}
+	.hc-verdict[data-state='ok'] {
+		background: var(--ok-bg);
+		color: var(--ok);
+	}
+	.hc-verdict[data-state='bad'] {
+		background: var(--warn-bg);
+		color: var(--warn);
+	}
+	.hc-inline {
+		border-radius: 0;
+	}
+	.hc-computed {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 14px;
+		border-top: 1px solid var(--border);
+	}
+	.hc-computed code {
+		font-family: var(--mono);
+		word-break: break-all;
+		flex: 1 1 260px;
+	}
+	.out :global(mark.hc-diff) {
+		background: var(--warn-bg);
+		color: var(--warn);
+	}
+	.out :global(mark.hc-first) {
+		background: var(--warn);
+		color: var(--surface);
+	}
+</style>

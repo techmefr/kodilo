@@ -1,0 +1,84 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="unicode-escape"
+	title="Unicode Escape Converter"
+	description="Convert text to \uXXXX, \u{...}, U+XXXX, HTML entities or hex, and back. Surrogate pairs are handled."
+>
+	<div class="toolbar" id="ue-tool">
+		<div class="seg" id="ue-dir" aria-label="Direction">
+			<button data-value="encode" aria-pressed="true">
+				Text to escapes
+			</button>
+			<button data-value="decode" aria-pressed="false">
+				Escapes to text
+			</button>
+		</div>
+		<label class="check">
+			Format
+			<select class="num" id="ue-format">
+				<option value="js">\uXXXX (JavaScript)</option>
+				<option value="jsbrace">{'\\u{...} (ES6)'}</option>
+				<option value="uplus">U+XXXX</option>
+				<option value="hexref">&amp;#x...; (HTML hex)</option>
+				<option value="decref">&amp;#123; (HTML decimal)</option>
+				<option value="entity">HTML entities</option>
+				<option value="hex">Hex (UTF-8 bytes)</option>
+			</select>
+		</label>
+		<label class="check">
+			<input type="checkbox" id="ue-ascii" /> Keep ASCII as is
+		</label>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head" id="ue-in-label">
+				Text
+			</div>
+			<textarea id="ue-in" spellcheck="false" aria-labelledby="ue-in-label">Café ☕ 😀 © 2026</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="ue-out-label">Escapes</span>
+				<button class="btn" id="ue-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="ue-out" tabindex="0" aria-labelledby="ue-out-label"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { decode, encode } from '../../scripts/unicode-escape';
+	import type { EscapeFormat } from '../../scripts/unicode-escape';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('ue-tool', () => {
+		const input = byId<HTMLTextAreaElement>('ue-in');
+		const output = byId('ue-out');
+		const format = byId<HTMLSelectElement>('ue-format');
+		const ascii = byId<HTMLInputElement>('ue-ascii');
+		let direction = 'encode';
+
+		const render = () => {
+			const kind = format.value as EscapeFormat;
+			const encoding = direction === 'encode';
+			output.textContent = encoding ? encode(input.value, kind, ascii.checked) : decode(input.value, kind);
+			byId('ue-in-label').textContent = encoding ? 'Text' : 'Escapes';
+			byId('ue-out-label').textContent = encoding ? 'Escapes' : 'Text';
+			ascii.disabled = !encoding;
+		};
+
+		segmented(byId('ue-dir'), (value) => {
+			direction = value;
+			if (output.textContent) input.value = output.textContent;
+			render();
+		});
+		[input, format, ascii].forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('ue-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

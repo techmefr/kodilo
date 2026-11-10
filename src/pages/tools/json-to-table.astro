@@ -1,0 +1,102 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `[
+  { "id": 1, "name": "Ada Lovelace", "address": { "city": "London", "country": "UK" }, "skills": ["math", "poetry"] },
+  { "id": 2, "name": "Grace Hopper", "address": { "city": "New York", "country": "US" }, "skills": ["compilers"] },
+  { "id": 3, "name": "Alan Turing", "address": { "city": "Manchester", "country": "UK" }, "active": true }
+]`;
+---
+
+<ToolShell
+	slug="json-to-table"
+	title="JSON to Table"
+	description="Render an array of JSON objects as an HTML table with nested keys flattened to dot paths, then copy it as TSV or Markdown."
+>
+	<div id="jt-tool">
+		<section class="panel">
+			<div class="panel-head">JSON</div>
+			<textarea id="jt-in" spellcheck="false" aria-label="JSON input">{sample}</textarea>
+		</section>
+		<p class="error" id="jt-error" role="alert" hidden></p>
+		<section class="panel">
+			<div class="panel-head">
+				<span id="jt-count" aria-live="polite"></span>
+				<span class="jt-actions">
+					<button class="btn" id="jt-copy-tsv">
+						Copy TSV
+					</button>
+					<button class="btn" id="jt-copy-md">
+						Copy Markdown
+					</button>
+				</span>
+			</div>
+			<div class="jt-scroll" tabindex="0" role="region" aria-label="Table preview">
+				<table class="jt-table" id="jt-table"></table>
+			</div>
+		</section>
+	</div>
+</ToolShell>
+
+<style>
+	.jt-actions {
+		display: flex;
+		gap: 8px;
+	}
+	.jt-scroll {
+		max-height: 420px;
+		overflow: auto;
+	}
+	.jt-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 2px;
+	}
+	.jt-table {
+		border-collapse: collapse;
+		font-size: 13px;
+		width: 100%;
+	}
+	.jt-table :global(th),
+	.jt-table :global(td) {
+		border-bottom: 1px solid var(--border);
+		padding: 6px 10px;
+		text-align: left;
+		white-space: nowrap;
+	}
+	.jt-table :global(th) {
+		color: var(--ink-soft);
+		font-weight: 700;
+	}
+</style>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+	import { tableFromJson } from '../../scripts/json-flatten';
+	import { markdownTable, renderTable, tsvTable } from '../../scripts/table-format';
+
+	onPage('jt-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jt-in');
+		const error = byId('jt-error');
+		let rows: string[][] = [];
+
+		const render = () => {
+			try {
+				rows = tableFromJson(JSON.parse(input.value));
+				renderTable(byId<HTMLTableElement>('jt-table'), rows);
+				byId('jt-count').textContent = `${rows.length - 1} rows, ${rows[0].length} columns`;
+				error.hidden = true;
+			} catch (e) {
+				rows = [];
+				renderTable(byId<HTMLTableElement>('jt-table'), rows);
+				byId('jt-count').textContent = '';
+				error.textContent = e instanceof Error ? e.message : 'Invalid JSON';
+				error.hidden = false;
+			}
+		};
+
+		input.addEventListener('input', render);
+		copyButton(byId('jt-copy-tsv'), () => tsvTable(rows));
+		copyButton(byId('jt-copy-md'), () => markdownTable(rows));
+		render();
+	});
+</script>

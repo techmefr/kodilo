@@ -1,0 +1,155 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="random-generator"
+	title="Random Generator"
+	description="Nano IDs, random numbers and random strings from the browser's secure random generator."
+>
+	<div class="toolbar" id="rg-tool">
+		<div class="seg" id="rg-mode" aria-label="Generator">
+			<button data-value="nano" aria-pressed="true">
+				Nano ID
+			</button>
+			<button data-value="number" aria-pressed="false">
+				Number
+			</button>
+			<button data-value="string" aria-pressed="false">
+				String
+			</button>
+		</div>
+		<button class="btn primary" id="rg-regen">
+			Regenerate
+		</button>
+	</div>
+	<div class="toolbar" id="rg-nano">
+		<label class="check">
+			Length <input class="num" type="number" id="rg-nano-length" min="1" max="256" value="21" />
+		</label>
+		<label class="check">
+			Count <input class="num" type="number" id="rg-nano-count" min="1" max="100" value="5" />
+		</label>
+		<label class="check" style="flex-wrap: wrap; max-width: 100%">
+			Alphabet <input class="num rg-wide" id="rg-nano-alphabet" value="_-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" spellcheck="false" />
+		</label>
+	</div>
+	<div class="toolbar" id="rg-number" hidden>
+		<label class="check">
+			Min <input class="num" type="number" id="rg-min" value="1" step="any" />
+		</label>
+		<label class="check">
+			Max <input class="num" type="number" id="rg-max" value="100" step="any" />
+		</label>
+		<div class="seg" id="rg-kind" aria-label="Number type">
+			<button data-value="integer" aria-pressed="true">
+				Integer
+			</button>
+			<button data-value="decimal" aria-pressed="false">
+				Decimal
+			</button>
+		</div>
+		<label class="check">
+			Decimals <input class="num" type="number" id="rg-decimals" min="0" max="10" value="2" />
+		</label>
+		<label class="check">
+			Count <input class="num" type="number" id="rg-number-count" min="1" max="1000" value="10" />
+		</label>
+		<label class="check">
+			<input type="checkbox" id="rg-unique" /> Unique
+		</label>
+	</div>
+	<div class="toolbar" id="rg-string" hidden>
+		<label class="check">
+			Length <input class="num" type="number" id="rg-string-length" min="1" max="512" value="16" />
+		</label>
+		<label class="check">
+			Count <input class="num" type="number" id="rg-string-count" min="1" max="100" value="5" />
+		</label>
+		<label class="check">
+			Charset
+			<select class="num" id="rg-charset">
+				<option value="alnum">Letters and digits</option>
+				<option value="letters">Letters</option>
+				<option value="lower">Lowercase</option>
+				<option value="upper">Uppercase</option>
+				<option value="digits">Digits</option>
+				<option value="hex">Hex</option>
+				<option value="symbols">Symbols</option>
+			</select>
+		</label>
+	</div>
+	<div class="error" id="rg-error" hidden></div>
+	<section class="panel">
+		<div class="panel-head">
+			<span id="rg-label">Results</span>
+			<button class="btn" id="rg-copy">
+				Copy all
+			</button>
+		</div>
+		<pre class="out" id="rg-out" tabindex="0"></pre>
+	</section>
+</ToolShell>
+
+<script>
+	import { CHARSETS, clamp, randomNumbers, randomString } from '../../scripts/random-gen';
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+
+	onPage('rg-tool', () => {
+		const out = byId('rg-out');
+		const error = byId('rg-error');
+		const text = (id: string) => byId<HTMLInputElement>(id).value;
+		const num = (id: string) => Number(text(id));
+		let mode = 'nano';
+		let kind = 'integer';
+
+		const generate = (): { values: string[]; error: string } => {
+			if (mode === 'nano') {
+				return { values: randomString(text('rg-nano-alphabet'), clamp(num('rg-nano-length'), 1, 256, 21), clamp(num('rg-nano-count'), 1, 100, 1)), error: '' };
+			}
+			if (mode === 'string') {
+				const alphabet = CHARSETS[text('rg-charset')];
+				return { values: randomString(alphabet, clamp(num('rg-string-length'), 1, 512, 16), clamp(num('rg-string-count'), 1, 100, 1)), error: '' };
+			}
+			return randomNumbers({
+				min: text('rg-min') === '' ? NaN : num('rg-min'),
+				max: text('rg-max') === '' ? NaN : num('rg-max'),
+				integer: kind === 'integer',
+				count: clamp(num('rg-number-count'), 1, 1000, 1),
+				unique: byId<HTMLInputElement>('rg-unique').checked,
+				decimals: clamp(num('rg-decimals'), 0, 10, 2),
+			});
+		};
+
+		const render = () => {
+			const result = generate();
+			out.textContent = result.values.join('\n');
+			error.textContent = result.error;
+			error.hidden = result.error === '';
+			byId('rg-label').textContent = `${result.values.length} result${result.values.length === 1 ? '' : 's'}`;
+		};
+
+		segmented(byId('rg-mode'), (value) => {
+			mode = value;
+			['nano', 'number', 'string'].forEach((m) => (byId(`rg-${m}`).hidden = m !== mode));
+			render();
+		});
+		segmented(byId('rg-kind'), (value) => {
+			kind = value;
+			render();
+		});
+		document.querySelectorAll('#rg-nano input, #rg-number input, #rg-string input, #rg-charset').forEach((el) => el.addEventListener('input', render));
+		byId('rg-regen').addEventListener('click', render);
+		copyButton(byId('rg-copy'), () => out.textContent ?? '');
+		render();
+	});
+</script>
+
+<style>
+	.rg-wide {
+		width: min(340px, 100%);
+		min-width: 0;
+		box-sizing: border-box;
+		font-family: var(--mono);
+	}
+</style>

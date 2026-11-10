@@ -1,6 +1,23 @@
 export type Sample = [input: string, output: string];
 
 export const samples: Record<string, Sample> = {
+	'json-key-tools': ['{"b":{"z":1,"a":2},"id":9}', 'b\nb.z\nb.a\nid'],
+	'json-schema-generator': ['{"email":"ada@example.com"}', '{"type":"string","format":"email"}'],
+	'csv-tools': ['id,name\n1,Ada', '| id | name |\n| 1 | Ada |'],
+	'json-to-table': ['[{"a":1,"b":{"c":"x"}}]', '| a | b.c |\n| 1 | x |'],
+	'find-replace': ['ana@example.com', 'ana@kodilo.dev'],
+	'text-cleaner': ['  banana   apple  \n\napple', 'banana apple\napple'],
+	'random-generator': ['nano id, length 21', 'V1StGXR8_Z5jdHi6B-myT'],
+	'utm-builder': ['https://example.com/pricing', 'https://example.com/pricing?utm_source=newsletter&utm_medium=email'],
+	'regex-generator': ['email', '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,}$'],
+	'unicode-escape': ['A😀é', '\\u{41}\\u{1F600}\\u{E9}'],
+	'auth-header-parser': ['Basic dXNlcjpwYXNzd29yZA==', 'user / password'],
+	'hash-compare': ['2cf24dba… vs 2cf24dbb…', 'Different, first difference at position 8'],
+	'domain-whois-lookup': ['example.com', 'created 1995-08-14, 31 years old'],
+	'dns-records-checker': ['github.com', 'MX ✓  SPF ✓  DMARC ✓'],
+	'domain-rank-checker': ['github.com', 'rank in the Tranco top 1M'],
+	'url-query-tool': ['?q=red%20shoes&size=42&size=43', 'q = red shoes\nsize = 42, 43'],
+	'date-difference': ['2020-01-31 → 2026-11-10', '6 years, 9 months, 10 days'],
 	'inbox-tester': [`<td style="display:grid">`, `Gmail ✓  Outlook ✗  Apple Mail ✓`],
 	'json-formatter': [`{"name":"Ada","active":true}`, `{\n  "name": "Ada",\n  "active": true\n}`],
 	'json-to-yaml': [`{"name":"Ada","tags":["a","b"]}`, `name: Ada\ntags:\n  - a\n  - b`],
