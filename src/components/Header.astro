@@ -91,6 +91,11 @@ const shortcuts = [
 		<span class="side-ico" set:html={icon('Idea01')} />
 		Suggest a tool
 	</a>
+	<button type="button" class="side-link side-offline" id="offline-all" data-state="idle" hidden>
+		<span class="side-ico" set:html={icon('Download01')} />
+		<span class="offline-label">Save all tools offline</span>
+		<span class="offline-status" id="offline-status" translate="no"></span>
+	</button>
 	<a
 		class="side-link side-feedback"
 		data-issue-fields="page-url"
@@ -724,6 +729,24 @@ const shortcuts = [
 	.side-link:focus-visible {
 		background: var(--surface-2);
 		color: var(--accent-strong);
+	}
+	.side-offline {
+		width: 100%;
+		border: 0;
+		background: transparent;
+		font: inherit;
+		font-size: 13px;
+		cursor: pointer;
+		text-align: start;
+	}
+	.side-offline[hidden] {
+		display: none;
+	}
+	.side-offline .offline-label {
+		flex: 1;
+	}
+	.side-offline .offline-status:empty {
+		display: none;
 	}
 	.side-suggest {
 		margin-top: auto;
