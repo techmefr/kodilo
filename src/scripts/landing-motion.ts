@@ -11,8 +11,10 @@ export async function runIntro() {
 	const n = document.getElementById('li-n')!;
 	const w = document.getElementById('li-w')!;
 	const mark = root.querySelector<HTMLElement>('.li-mark')!;
+	let skipped = false;
 	root.hidden = false;
 	root.addEventListener('click', () => {
+		skipped = true;
 		root.hidden = true;
 		document.documentElement.style.overflow = '';
 	});
@@ -39,6 +41,7 @@ export async function runIntro() {
 		requestAnimationFrame(step);
 	});
 	await wait(250);
+	if (skipped) return;
 
 	root.querySelector('.li-word')!.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'both' });
 	const zoom = mark.animate(
@@ -51,6 +54,7 @@ export async function runIntro() {
 	root.querySelector('.li-count')!.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: 'both' });
 	await wait(450);
 	await root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, fill: 'both' }).finished;
+	if (skipped) return;
 	zoom.cancel();
 	root.hidden = true;
 	document.documentElement.style.overflow = '';
@@ -67,12 +71,12 @@ export async function runIntro() {
 	);
 }
 
-const scenes = [
+const scenesFor = (total: number) => [
 	{
 		tool: 0,
 		title: 'JSON Formatter',
-		input: '{"name":"kodilo","tools":236,"cloud":false}',
-		output: '{\n  "name": "kodilo",\n  "tools": 236,\n  "cloud": false\n}',
+		input: `{"name":"kodilo","tools":${total},"cloud":false}`,
+		output: `{\n  "name": "kodilo",\n  "tools": ${total},\n  "cloud": false\n}`,
 	},
 	{ tool: 1, title: 'Base64', input: 'Nothing leaves your tab', output: 'Tm90aGluZyBsZWF2ZXMgeW91ciB0YWI=' },
 	{ tool: 2, title: 'Color Converter', input: '#7c3aed', output: 'rgb(124 58 237)\nhsl(263 83% 58%)\noklch(54% 0.24 293)' },
@@ -98,8 +102,9 @@ export function startStage() {
 	const cursor = document.getElementById('st-cursor')!;
 	const items = Array.from(stage.querySelectorAll<HTMLElement>('.st-side li'));
 	const alive = () => stage.isConnected;
+	const scenes = scenesFor(Number(stage.dataset.total) || 0);
 
-	const show = (scene: (typeof scenes)[number]) => {
+	const show = (scene: ReturnType<typeof scenesFor>[number]) => {
 		items.forEach((li, i) => li.classList.toggle('on', i === scene.tool));
 		title.textContent = scene.title;
 		input.textContent = scene.input;

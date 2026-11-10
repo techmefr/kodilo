@@ -22,7 +22,7 @@ const names = categories.flatMap((c) => c.tools.map((t) => t.name)).slice(0, 60)
 		<main class="home" id="main" tabindex="-1">
 			<LandingIntro total={total} />
 			<LandingHero total={total} categoryCount={categories.length} names={names} />
-			<LandingStage />
+			<LandingStage total={total} />
 			<LandingDemos />
 			<LandingProof />
 			<section class="home-cat home-mine" id="favorites" tabindex="-1" aria-labelledby="favorites-title" hidden>

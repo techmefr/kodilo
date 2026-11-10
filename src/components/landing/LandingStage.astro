@@ -1,6 +1,11 @@
 ---
 import { icon } from '../../scripts/icons';
 
+interface Props {
+	total: number;
+}
+
+const { total } = Astro.props;
 const tools = [
 	{ name: 'JSON Formatter', icon: 'braces' },
 	{ name: 'Base64', icon: 'binary' },
@@ -9,7 +14,7 @@ const tools = [
 ];
 ---
 
-<section class="st" id="st" aria-label="kodilo in motion">
+<section class="st" id="st" data-total={total} aria-label="kodilo in motion">
 	<div class="st-frame" aria-hidden="true">
 		<header class="st-bar">
 			<i></i>
