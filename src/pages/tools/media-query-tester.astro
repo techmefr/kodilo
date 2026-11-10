@@ -297,7 +297,7 @@ const presets = [
 				const b = document.createElement('button');
 				b.className = 'mq-tick';
 				b.style.left = `${(p / max) * 100}%`;
-				b.textContent = `${p}`;
+				b.textContent = `${p}px`;
 				b.setAttribute('aria-label', `Set width to ${p}px`);
 				b.addEventListener('click', () => {
 					width.value = String(p);
