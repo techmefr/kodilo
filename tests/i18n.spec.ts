@@ -59,3 +59,10 @@ test('the sidebar footer links carry an icon and French feedback is not "Retour"
 	await pickLanguage(page, 'fr');
 	await expect(page.locator('.side-feedback')).not.toContainText('Retour');
 });
+
+test('hyphenated option labels are translated', async ({ page }) => {
+	await page.goto('./');
+	await pickLanguage(page, 'fr');
+	await page.goto('tools/csv-tools/');
+	await expect(page.locator('option').first()).toHaveText('Détection automatique');
+});

@@ -4,7 +4,7 @@ import { chromium } from '@playwright/test';
 const origin = process.env.KODILO_ORIGIN ?? 'http://127.0.0.1:4331/kodilo/';
 const chromePages = ['', 'categories/', 'categories/json/', 'tools/json-formatter/', 'tools/aura-gradient-generator/', '404.html'];
 const catalogue = await (await fetch(origin + 'tools.json')).json();
-const pages = [...new Set([...chromePages, ...catalogue.tools.map((t) => `tools/${t.s}/`)])];
+const pages = [...new Set([...chromePages, ...catalogue.tools.filter((t) => t.s !== 'lorem-ipsum-generator').map((t) => `tools/${t.s}/`)])];
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -39,8 +39,12 @@ const generalise = (k) => (dynamic.some((re) => re.test(k)) ? k.replace(/\d+/g, 
 const codeLike = /[_\\{}<>=|$^*~`]|(?<=\S)\/(?=\S)|^[\da-f]{12,}$|^\d|^[a-z]+(\.[a-z]+)+$|^[a-z0-9-]+$/;
 const isProse = (key) => {
 	const k = key.replace(/\{n\}/g, 'N');
-	return k && /\p{L}/u.test(k) && (/\s/.test(k) ? k.split(/\s+/).length >= 4 || !codeLike.test(k) : /^\p{Lu}\p{Ll}+$/u.test(k) || /[^\x00-\x7f]/.test(k));
+	return (
+		k && /\p{L}/u.test(k) && (/\s/.test(k) ? k.split(/\s+/).length >= 4 || !codeLike.test(k) : /^\p{Lu}\p{Ll}+(-\p{Ll}+)*$/u.test(k) || /[^\x00-\x7f]/.test(k))
+	);
 };
-const keys = [...new Set([...found].map(generalise))].filter(isProse).sort((a, b) => a.localeCompare(b));
+const noise =
+	/\d+ ?(ms|B|KB|MB)\b|Web Crypto HMAC|lorem|ipsum|cillum|occaecat|exercitation|consectetur|adipiscing|\d{2}:\d{2}|\bin \d+ hours?|\+1 day|fingerprint of the public key|longest word|^User-agent$/i;
+const keys = [...new Set([...found].map(generalise))].filter((k) => isProse(k) && !noise.test(k)).sort((a, b) => a.localeCompare(b));
 writeFileSync(new URL('../src/i18n/source.json', import.meta.url), JSON.stringify(keys, null, 1) + '\n');
 console.log(keys.length, 'strings');
