@@ -6,7 +6,6 @@
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	overflow-x: clip;
 }
 .lp-hero::before {
 	content: '';
@@ -20,7 +19,11 @@
 }
 .lp-aura {
 	position: absolute;
-	inset: -60px -10% 0;
+	top: -60px;
+	bottom: 0;
+	left: 50%;
+	width: 100vw;
+	margin-left: -50vw;
 	z-index: -1;
 	pointer-events: none;
 	background: var(--aura-light);

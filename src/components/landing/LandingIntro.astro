@@ -10,8 +10,11 @@ const words = ['Format', 'Decode', 'Convert', 'Inspect'];
 ---
 
 <div class="li" id="li" data-total={total} hidden aria-hidden="true">
-	<div class="li-mark">
-		<Logo />
+	<div class="li-brand">
+		<div class="li-mark">
+			<Logo />
+		</div>
+		<span class="li-word">kodilo</span>
 	</div>
 	<p class="li-count">
 		<b id="li-n">0</b> <span id="li-w">{words[0]}</span>
@@ -37,6 +40,18 @@ const words = ['Format', 'Decode', 'Convert', 'Inspect'];
 	}
 	.li[hidden] {
 		display: none;
+	}
+	.li-brand {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+	}
+	.li-word {
+		font-family: var(--display);
+		font-size: 52px;
+		font-weight: 700;
+		letter-spacing: -0.04em;
+		color: var(--ink);
 	}
 	.li-mark {
 		width: 72px;
