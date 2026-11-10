@@ -87,20 +87,31 @@ const shortcuts = [
 	<a class="side-categories" href={sitePath(`categories/${PAGE_SUFFIX}`)}>
 		All categories
 	</a>
-	<a class="side-suggest" href={suggestUrl()} target="_blank" rel="noopener" aria-label="Suggest a tool (opens GitHub in a new tab)">
+	<a class="side-link side-suggest" href={suggestUrl()} target="_blank" rel="noopener" aria-label="Suggest a tool (opens GitHub in a new tab)">
+		<span class="side-ico" set:html={icon('Idea01')} />
 		Suggest a tool
 	</a>
-	<a class="side-feedback" href={feedbackUrl()} target="_blank" rel="noopener" aria-label="Feedback (opens GitHub in a new tab)">
+	<a class="side-link side-feedback" href={feedbackUrl()} target="_blank" rel="noopener" aria-label="Feedback (opens GitHub in a new tab)">
+		<span class="side-ico" set:html={icon('Comment01')} />
 		Feedback
 	</a>
-	<label class="side-lang">
-		<span class="visually-hidden">Language</span>
-		<select id="lang-select" translate="no">
+	<div class="side-lang" id="lang-picker">
+		<button type="button" class="lang-btn" id="lang-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="lang-list" aria-label="Language">
+			<img src={`${base}flags/gb.svg`} alt="" width="20" height="15" />
+			<span class="lang-name" translate="no">
+				English
+			</span>
+			<span class="side-ico lang-chevron" set:html={icon('ArrowDown01')} />
+		</button>
+		<ul class="lang-list" id="lang-list" role="listbox" tabindex="-1" aria-label="Language" hidden>
 			{locales.map((l) => (
-				<option value={l.code}>{`${l.flag} ${l.name}`}</option>
+				<li role="option" id={`lang-${l.code}`} data-code={l.code} lang={l.code} translate="no">
+					<img src={`${base}flags/${l.country}.svg`} alt="" width="20" height="15" loading="lazy" />
+					<span class="lang-name">{l.name}</span>
+				</li>
 			))}
-		</select>
-	</label>
+		</ul>
+	</div>
 	{categories.map((c, i) => (
 		<div class="mega" id={`mega-${i}`} data-category={c.name} role="region" aria-label={`${c.name} tools`} hidden>
 			<div class="mega-intro">
@@ -141,6 +152,7 @@ const shortcuts = [
 			/>
 			<kbd>Esc</kbd>
 		</div>
+		<div class="palette-cats" id="palette-cats" role="group" aria-label="Filter by category"></div>
 		<ul class="palette-list" id="palette-list" role="listbox" aria-label="Tools"></ul>
 		<p class="palette-suggest" id="palette-suggest" hidden>
 			<a id="palette-suggest-link" href={suggestUrl()} target="_blank" rel="noopener">
@@ -152,6 +164,10 @@ const shortcuts = [
 			<span>
 				<kbd>↑</kbd>
 				<kbd>↓</kbd> to move
+			</span>
+			<span>
+				<kbd>←</kbd>
+				<kbd>→</kbd> category
 			</span>
 			<span>
 				<kbd>↵</kbd> to open
@@ -175,12 +191,18 @@ const shortcuts = [
 			{shortcuts.map((s) => (
 				<div>
 					<dt>
-						{s.keys.map((k) => (
-							<kbd data-key={k}>{k}</kbd>
+						{s.keys.map((k, i) => (
+							<>
+								{i > 0 && <span class="plus">+</span>}
+								<kbd data-key={k}>{k}</kbd>
+							</>
 						))}
 						{s.alt && <span class="or">or</span>}
-						{s.alt?.map((k) => (
-							<kbd data-key={k}>{k}</kbd>
+						{s.alt?.map((k, i) => (
+							<>
+								{i > 0 && <span class="plus">+</span>}
+								<kbd data-key={k}>{k}</kbd>
+							</>
 						))}
 					</dt>
 					<dd>{s.label}</dd>
@@ -598,6 +620,38 @@ const shortcuts = [
 		font: inherit;
 		font-size: 16px;
 	}
+	.palette-cats {
+		display: flex;
+		gap: 6px;
+		padding: 8px 16px;
+		overflow-x: auto;
+		scrollbar-width: none;
+		border-bottom: 1px solid var(--border);
+	}
+	.palette-cats::-webkit-scrollbar {
+		display: none;
+	}
+	.palette-cats :global(button) {
+		flex: none;
+		white-space: nowrap;
+		padding: 4px 10px;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		background: var(--raised);
+		color: var(--ink-soft);
+		font: inherit;
+		font-size: 12px;
+		cursor: pointer;
+	}
+	.palette-cats :global(button:hover) {
+		color: var(--ink);
+	}
+	.palette-cats :global(button[aria-pressed='true']) {
+		background: var(--accent-strong);
+		border-color: var(--accent-strong);
+		color: var(--accent-ink);
+		font-weight: 600;
+	}
 	.palette-list {
 		list-style: none;
 		margin: 0;
@@ -648,27 +702,43 @@ const shortcuts = [
 		padding: 0 16px 12px;
 	}
 	.palette-suggest a,
-	.side-suggest {
-		color: var(--accent-strong);
-		font-weight: 600;
+	.side-link {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 6px 8px;
+		border-radius: 8px;
 		font-size: 13px;
+		text-decoration: none;
+		color: var(--ink-soft);
+	}
+	.side-link:hover,
+	.side-link:focus-visible {
+		background: var(--surface-2);
+		color: var(--accent-strong);
 	}
 	.side-suggest {
 		margin-top: auto;
-		padding: 6px 8px;
-		border-radius: 8px;
-		text-decoration: none;
+		color: var(--accent-strong);
+		font-weight: 600;
 	}
-	.side-suggest:hover,
-	.side-suggest:focus-visible {
-		background: var(--surface-2);
-		text-decoration: underline;
+	.side-ico {
+		display: inline-grid;
+		place-items: center;
+		flex: none;
+	}
+	.side-ico :global(svg) {
+		width: 16px;
+		height: 16px;
 	}
 	.side-lang {
-		display: block;
+		position: relative;
 		padding: 6px 8px;
 	}
-	.side-lang select {
+	.lang-btn {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 		width: 100%;
 		padding: 6px 8px;
 		border: 1px solid var(--border);
@@ -677,11 +747,54 @@ const shortcuts = [
 		color: var(--ink);
 		font: inherit;
 		font-size: 13px;
+		cursor: pointer;
 	}
-	.side-feedback {
+	.lang-btn .lang-name {
+		flex: 1;
+		text-align: start;
+	}
+	.lang-btn[aria-expanded='true'] .lang-chevron {
+		transform: rotate(180deg);
+	}
+	.lang-btn img,
+	.lang-list img {
+		width: 20px;
+		height: 15px;
+		flex: none;
+		border-radius: 2px;
+		box-shadow: 0 0 0 1px var(--border);
+		object-fit: cover;
+	}
+	.lang-list {
+		position: absolute;
+		inset-inline: 8px;
+		bottom: calc(100% + 2px);
+		z-index: 40;
+		max-height: min(60vh, 420px);
+		margin: 0;
+		padding: 4px;
+		overflow-y: auto;
+		list-style: none;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		background: var(--raised);
+		box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+	}
+	.lang-list li {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 		padding: 6px 8px;
+		border-radius: 6px;
 		font-size: 13px;
-		color: var(--ink-soft);
+		cursor: pointer;
+	}
+	.lang-list li.focus {
+		background: var(--surface-2);
+	}
+	.lang-list li[aria-selected='true'] {
+		font-weight: 700;
+		color: var(--accent-strong);
 	}
 	.side-categories {
 		padding: 6px 8px;
@@ -800,6 +913,7 @@ const shortcuts = [
 		color: var(--ink-soft);
 		text-align: right;
 	}
+	.shortcuts .plus,
 	.shortcuts .or {
 		font-size: 12px;
 		color: var(--ink-soft);
