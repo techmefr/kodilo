@@ -52,6 +52,7 @@ export async function runIntro() {
 	});
 	await wait(250);
 
+	root.querySelector('.li-word')!.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'both' });
 	const zoom = mark.animate(
 		[
 			{ transform: 'scale(1)', opacity: 1 },

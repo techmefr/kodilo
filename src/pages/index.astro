@@ -91,6 +91,7 @@ const names = categories.flatMap((c) => c.tools.map((t) => t.name)).slice(0, 60)
 	.shell {
 		display: flex;
 		min-height: 100vh;
+		overflow-x: clip;
 	}
 	@media (max-width: 760px) {
 		.shell {
