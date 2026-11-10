@@ -3457,6 +3457,7 @@
 	"Replicas": "レプリカ",
 	"Replies to connections already in progress are allowed (stateful firewall).": "確立済みの接続への応答は許可されます（ステートフルファイアウォール）。",
 	"Report a bug": "バグを報告",
+	"Report a problem": "問題を報告",
 	"Report endpoint (report-uri), optional": "レポートエンドポイント (report-uri)、任意",
 	"Report-only": "レポートのみ",
 	"reports permissions": "reports の権限",

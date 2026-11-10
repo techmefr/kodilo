@@ -7,44 +7,28 @@ body:
     id: tool-url
     attributes:
       label: Tool URL
-      description: The page of the tool that has the problem.
+      description: Filled in for you when you come from a tool page.
       placeholder: https://techmefr.github.io/kodilo/tools/jwt-decoder/
     validations:
       required: true
   - type: textarea
-    id: steps
+    id: problem
     attributes:
-      label: Steps to reproduce
-      description: The input you used and what you clicked. Never paste real secrets, keys or personal data.
-      placeholder: |
-        1. Paste this input: ...
-        2. Click ...
-    validations:
-      required: true
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected result
-    validations:
-      required: true
-  - type: textarea
-    id: actual
-    attributes:
-      label: Actual result
-      description: What happened instead. Error messages from the browser console help.
+      label: What went wrong?
+      description: What you did, what you expected and what happened instead. A screenshot helps. Never paste real secrets, keys or personal data.
     validations:
       required: true
   - type: input
     id: browser
     attributes:
       label: Browser and device
+      description: Filled in for you when you come from a tool page.
       placeholder: Firefox 131 on macOS, Chrome on Android
-    validations:
-      required: true
   - type: dropdown
     id: theme
     attributes:
       label: Theme
+      description: Filled in for you when you come from a tool page.
       options:
         - Light
         - Dark

@@ -3457,6 +3457,7 @@
 	"Replicas": "Réplicas",
 	"Replies to connections already in progress are allowed (stateful firewall).": "Les réponses aux connexions déjà en cours sont autorisées (pare-feu à état).",
 	"Report a bug": "Signaler un bug",
+	"Report a problem": "Signaler un problème",
 	"Report endpoint (report-uri), optional": "Point de terminaison de rapport (report-uri), facultatif",
 	"Report-only": "Rapport seul",
 	"reports permissions": "permissions reports",

@@ -3457,6 +3457,7 @@
 	"Replicas": "Репліки",
 	"Replies to connections already in progress are allowed (stateful firewall).": "Відповіді на вже встановлені з’єднання дозволено (брандмауер зі станом).",
 	"Report a bug": "Повідомити про помилку",
+	"Report a problem": "Повідомити про проблему",
 	"Report endpoint (report-uri), optional": "Ендпоінт для звітів (report-uri), необов’язково",
 	"Report-only": "Лише звіт",
 	"reports permissions": "дозволи reports",

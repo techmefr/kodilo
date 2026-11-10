@@ -3457,6 +3457,7 @@
 	"Replicas": "Replikalar",
 	"Replies to connections already in progress are allowed (stateful firewall).": "Süren bağlantılara verilen yanıtlara izin verilir (durum bilgili güvenlik duvarı).",
 	"Report a bug": "Hata bildir",
+	"Report a problem": "Sorun bildir",
 	"Report endpoint (report-uri), optional": "Rapor uç noktası (report-uri), isteğe bağlı",
 	"Report-only": "Yalnızca rapor",
 	"reports permissions": "reports permissions",

@@ -4,6 +4,7 @@ import { suggestUrl } from './suggest';
 import { setupTabs } from './tabs';
 import { initI18n } from './i18n';
 import { createCategoryBar } from './palette-categories';
+import { prefillIssueLinks } from './issue-env';
 import { track } from './analytics';
 import {
 	base,
@@ -443,6 +444,7 @@ document.addEventListener('astro:page-load', () => {
 	setupTabs(active);
 	setupMega(active);
 	setupPalette();
+	prefillIssueLinks();
 	setupShortcuts();
 	setupPin();
 	el('mobile-search')!.addEventListener('click', openPalette);

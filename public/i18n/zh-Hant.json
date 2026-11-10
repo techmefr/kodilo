@@ -3457,6 +3457,7 @@
 	"Replicas": "副本數",
 	"Replies to connections already in progress are allowed (stateful firewall).": "允許對進行中連線的回應（具狀態防火牆）。",
 	"Report a bug": "回報錯誤",
+	"Report a problem": "回報問題",
 	"Report endpoint (report-uri), optional": "回報端點 (report-uri)，選填",
 	"Report-only": "僅報告",
 	"reports permissions": "reports 權限",

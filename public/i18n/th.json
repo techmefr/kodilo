@@ -3457,6 +3457,7 @@
 	"Replicas": "เรพลิกา",
 	"Replies to connections already in progress are allowed (stateful firewall).": "อนุญาตการตอบกลับของการเชื่อมต่อที่กำลังดำเนินอยู่ (stateful firewall)",
 	"Report a bug": "รายงานบั๊ก",
+	"Report a problem": "รายงานปัญหา",
 	"Report endpoint (report-uri), optional": "Endpoint รายงาน (report-uri) ไม่บังคับ",
 	"Report-only": "รายงานเท่านั้น",
 	"reports permissions": "สิทธิ์ reports",

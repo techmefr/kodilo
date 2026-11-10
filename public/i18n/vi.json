@@ -3457,6 +3457,7 @@
 	"Replicas": "Bản sao",
 	"Replies to connections already in progress are allowed (stateful firewall).": "Phản hồi cho các kết nối đang diễn ra được cho phép (tường lửa có trạng thái).",
 	"Report a bug": "Báo lỗi",
+	"Report a problem": "Báo cáo sự cố",
 	"Report endpoint (report-uri), optional": "Endpoint báo cáo (report-uri), tùy chọn",
 	"Report-only": "Chỉ báo cáo",
 	"reports permissions": "quyền reports",
