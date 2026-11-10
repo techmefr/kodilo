@@ -3,6 +3,7 @@ import { navigate } from 'astro:transitions/client';
 import { suggestUrl } from './suggest';
 import { setupTabs } from './tabs';
 import { initI18n } from './i18n';
+import { createCategoryBar } from './palette-categories';
 import { track } from './analytics';
 import {
 	base,
@@ -260,6 +261,7 @@ function setupPalette() {
 	const status = el('palette-status')!;
 	let results: Entry[] = [];
 	let active = 0;
+	const bar = createCategoryBar(el('palette-cats')!, () => render());
 
 	const paint = () => {
 		const options = [...list.querySelectorAll<HTMLElement>('[role="option"]')];
@@ -315,7 +317,10 @@ function setupPalette() {
 			return;
 		}
 		if (q.value.trim() !== query) return;
-		const { tools, synonyms } = catalogue;
+		const { synonyms } = catalogue;
+		bar.load([...new Set(catalogue.tools.map((t) => t.c))]);
+		const category = bar.current();
+		const tools = category ? catalogue.tools.filter((t) => t.c === category) : catalogue.tools;
 		const bySlug = new Map(tools.map((t) => [t.s, t]));
 		active = 0;
 		const nodes: HTMLElement[] = [];
@@ -361,7 +366,12 @@ function setupPalette() {
 
 	q.addEventListener('input', render);
 	q.addEventListener('keydown', (e) => {
-		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+		const atStart = q.selectionStart === 0 && q.selectionEnd === 0;
+		const atEnd = q.selectionStart === q.value.length && q.selectionEnd === q.value.length;
+		if ((e.key === 'ArrowRight' && atEnd) || (e.key === 'ArrowLeft' && atStart)) {
+			e.preventDefault();
+			bar.step(e.key === 'ArrowRight' ? 1 : -1);
+		} else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
 			e.preventDefault();
 			if (!results.length) return;
 			active = (active + (e.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length;
@@ -374,6 +384,7 @@ function setupPalette() {
 	dialog.addEventListener('click', (e) => {
 		if (e.target === dialog) dialog.close();
 	});
+	dialog.addEventListener('close', () => bar.reset());
 }
 
 function setupShortcuts() {
@@ -435,7 +446,7 @@ document.addEventListener('astro:page-load', () => {
 	setupShortcuts();
 	setupPin();
 	el('mobile-search')!.addEventListener('click', openPalette);
-	el('search-kbd')!.textContent = isMac ? '⌘K' : 'Ctrl K';
+	el('search-kbd')!.textContent = isMac ? '⌘K' : 'Ctrl + K';
 	el('search-open')!.addEventListener('click', openPalette);
 	if (location.hash === '#favorites') focusFavorites();
 

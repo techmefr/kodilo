@@ -1,4 +1,5 @@
 import { defaultLocale, locales, matchLocale } from '../i18n/locales';
+import { setupLangPicker } from './lang-picker';
 
 const KEY = 'kodilo-lang';
 const SKIP = 'script,style,pre,code,textarea,kbd,svg,samp,[translate="no"]';
@@ -126,10 +127,7 @@ function observe() {
 }
 
 function setupSelect() {
-	const select = document.getElementById('lang-select') as HTMLSelectElement | null;
-	if (!select) return;
-	select.value = current;
-	select.addEventListener('change', () => setLocale(select.value));
+	setupLangPicker(current, setLocale);
 }
 
 export async function initI18n() {
