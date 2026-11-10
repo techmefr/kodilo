@@ -236,3 +236,15 @@ test('home intro is skipped under automation and the app demo is present', async
 	await expect(page.locator('#st .st-frame')).toBeAttached();
 	await expect(page.locator('#st-title')).toHaveText(/JSON Formatter|Base64|Color Converter|UUID Generator/);
 });
+
+test('home animations can be paused and the choice is remembered', async ({ page }) => {
+	await page.goto('./');
+	const button = page.getByRole('button', { name: 'Pause animations' });
+	await button.click();
+	await expect(page.locator('html')).toHaveAttribute('data-motion', 'paused');
+	await expect(page.getByRole('button', { name: 'Play animations' })).toBeVisible();
+	await page.reload();
+	await expect(page.locator('html')).toHaveAttribute('data-motion', 'paused');
+	await page.getByRole('button', { name: 'Play animations' }).click();
+	await expect(page.locator('html')).not.toHaveAttribute('data-motion', 'paused');
+});

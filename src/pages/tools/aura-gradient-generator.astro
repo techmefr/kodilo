@@ -51,7 +51,7 @@ import { auras } from '../../data/auras';
 </ToolShell>
 
 <script>
-	import { auraCss, auraDeclaration, blendModes, type Aura, type AuraLayer, type BlendMode } from '../../data/auras';
+	import { auraCss, auraDeclaration, blendModes, rgba, type Aura, type AuraLayer, type BlendMode } from '../../data/auras';
 	import { byId, copyButton, onPage } from '../../scripts/ui';
 
 	const hslToHex = (h: number, s: number, l: number) => {
@@ -155,7 +155,8 @@ import { auras } from '../../data/auras';
 		});
 		byId('au-random').addEventListener('click', () => {
 			const hue = Math.floor(Math.random() * 360);
-			const dark = parseInt(base.value.slice(1, 3), 16) < 128;
+			const rgb = parseInt(base.value.slice(1), 16);
+			const dark = ((rgb >> 16) & 255) * 0.299 + ((rgb >> 8) & 255) * 0.587 + (rgb & 255) * 0.114 < 128;
 			layers = [0, 1, 2].map((i) => ({
 				color: hslToHex((hue + i * 70) % 360, 80, dark ? 55 : 75),
 				x: Math.round(Math.random() * 100),
@@ -178,17 +179,18 @@ import { auras } from '../../data/auras';
 			ctx.fillStyle = base.value;
 			ctx.fillRect(0, 0, w, h);
 			for (const l of layers) {
-				const radius = (l.size / 100) * Math.max(w, h);
 				const cx = (l.x / 100) * w;
 				const cy = (l.y / 100) * h;
-				const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-				const n = parseInt(l.color.slice(1), 16);
-				const rgb = `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
-				g.addColorStop(0, `rgba(${rgb},${l.opacity / 100})`);
-				g.addColorStop(1, `rgba(${rgb},0)`);
+				const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+				g.addColorStop(0, rgba(l.color, l.opacity));
+				g.addColorStop(1, rgba(l.color, 0));
+				ctx.save();
+				ctx.translate(cx, cy);
+				ctx.scale((l.size / 100) * w, (l.size / 100) * h);
 				ctx.globalCompositeOperation = l.blend === 'normal' ? 'source-over' : (l.blend as GlobalCompositeOperation);
 				ctx.fillStyle = g;
-				ctx.fillRect(0, 0, w, h);
+				ctx.fillRect(-cx / ((l.size / 100) * w), -cy / ((l.size / 100) * h), 1 / (l.size / 100), 1 / (l.size / 100));
+				ctx.restore();
 			}
 			if (grain.checked) {
 				const noise = ctx.createImageData(w, h);

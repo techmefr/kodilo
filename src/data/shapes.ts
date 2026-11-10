@@ -26,5 +26,5 @@ export const maskPresets: MaskPreset[] = [
 	{ name: 'Vignette', css: 'radial-gradient(circle at center, #000 calc(100% - {n}%), transparent 100%)' },
 	{ name: 'Spotlight', css: 'radial-gradient(circle at 50% 50%, #000 0%, transparent {n}%)' },
 	{ name: 'Diagonal', css: 'linear-gradient(135deg, #000 calc(100% - {n}%), transparent)' },
-	{ name: 'Stripes', css: 'repeating-linear-gradient(90deg, #000 0 12px, transparent 12px 24px)' },
+	{ name: 'Stripes', css: 'repeating-linear-gradient(90deg, #000 0 calc({n}px / 4 + 2px), transparent 0 24px)' },
 ];

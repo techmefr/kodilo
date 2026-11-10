@@ -1,3 +1,4 @@
+import { motionPaused, setupMotionToggle, whileMotionPaused } from './motion';
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const alive = (el: Element) => el.isConnected;
@@ -34,6 +35,7 @@ function countUp(el: HTMLElement) {
 }
 
 export function startHero() {
+	setupMotionToggle();
 	reveal('.lp-hero .lp-stats li');
 	document.querySelectorAll<HTMLElement>('[data-count]').forEach(countUp);
 	const verb = document.getElementById('lp-verb');
@@ -42,6 +44,7 @@ export function startHero() {
 	let i = 0;
 	const timer = setInterval(() => {
 		if (!alive(verb)) return clearInterval(timer);
+		if (motionPaused()) return;
 		verb.classList.add('out');
 		setTimeout(() => {
 			i = (i + 1) % words.length;
@@ -90,6 +93,7 @@ async function play(card: HTMLElement, scene: Scene, name: string) {
 		output.textContent = '';
 		for (let n = 1; n <= scene.input.length; n++) {
 			if (!alive(card)) return;
+			await whileMotionPaused();
 			const typed = scene.input.slice(0, n);
 			input.textContent = typed;
 			if (name === 'hash') output.textContent = n % 3 === 0 || n === scene.input.length ? await sha256(typed) : output.textContent;
@@ -97,6 +101,7 @@ async function play(card: HTMLElement, scene: Scene, name: string) {
 			await wait(name === 'json' ? 22 : 38);
 		}
 		await wait(3200);
+		await whileMotionPaused();
 	}
 }
 
@@ -128,6 +133,7 @@ export function startProof() {
 	let count = 0;
 	const timer = setInterval(() => {
 		if (!alive(net)) return clearInterval(timer);
+		if (motionPaused()) return;
 		count += 1 + Math.floor(Math.random() * 3);
 		ops.textContent = String(count);
 	}, 900);
