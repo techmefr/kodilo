@@ -32,7 +32,7 @@ const jsonLd = toolJsonLd(Astro.site, slug, title, description);
 					</button>
 				</div>
 				<p>{description}</p>
-				<ShareButton />
+				<ShareButton slug={slug} title={title} />
 			</header>
 			<slot />
 			<ToolFeedback slug={slug} title={title} />

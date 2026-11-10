@@ -1,13 +1,32 @@
+---
+import { bugReportUrl } from '../scripts/seo';
+import { icon } from '../scripts/icons';
+
+interface Props {
+	slug?: string;
+	title?: string;
+}
+
+const { slug, title } = Astro.props;
+---
+
 <div class="share" data-share-ui>
 	<button type="button" class="btn share-btn" data-share-button>
 		Share link
 	</button>
+	{slug && title && (
+		<a class="btn report-btn" data-issue-fields="browser,theme" href={bugReportUrl(Astro.site, slug, title)} target="_blank" rel="noopener">
+			<span class="report-ico" set:html={icon('Bug01')} />
+			Report a problem
+		</a>
+	)}
 	<span class="share-status" data-share-status role="status" aria-live="polite"></span>
 </div>
 
 <script>
 	import { applyState, decodeState, readHashCode, SHARE_LIMIT, shareUrl, snapshotDefaults } from '../scripts/share-state';
 	import { currentTool, track } from '../scripts/analytics';
+	import { prefillIssueLinks } from '../scripts/issue-env';
 
 	document.addEventListener('astro:page-load', async () => {
 		const button = document.querySelector<HTMLButtonElement>('[data-share-button]');
@@ -15,6 +34,7 @@
 		const status = document.querySelector<HTMLElement>('[data-share-status]');
 		if (!button || !root || !status) return;
 		snapshotDefaults(root);
+		prefillIssueLinks();
 
 		button.addEventListener('click', async () => {
 			track('tool-share', { tool: currentTool() });
@@ -53,6 +73,16 @@
 		align-items: center;
 		gap: 10px;
 		margin-top: 10px;
+	}
+	.report-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		text-decoration: none;
+	}
+	.report-ico :global(svg) {
+		width: 14px;
+		height: 14px;
 	}
 	.share-status {
 		color: var(--ink-soft);

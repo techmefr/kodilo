@@ -3457,6 +3457,7 @@
 	"Replicas": "복제본",
 	"Replies to connections already in progress are allowed (stateful firewall).": "이미 진행 중인 연결에 대한 응답은 허용됩니다 (상태 기반 방화벽).",
 	"Report a bug": "버그 신고",
+	"Report a problem": "문제 신고",
 	"Report endpoint (report-uri), optional": "보고 엔드포인트 (report-uri), 선택",
 	"Report-only": "보고 전용",
 	"reports permissions": "reports 권한",

@@ -91,7 +91,14 @@ const shortcuts = [
 		<span class="side-ico" set:html={icon('Idea01')} />
 		Suggest a tool
 	</a>
-	<a class="side-link side-feedback" href={feedbackUrl()} target="_blank" rel="noopener" aria-label="Feedback (opens GitHub in a new tab)">
+	<a
+		class="side-link side-feedback"
+		data-issue-fields="page-url"
+		href={feedbackUrl()}
+		target="_blank"
+		rel="noopener"
+		aria-label="Feedback (opens GitHub in a new tab)"
+	>
 		<span class="side-ico" set:html={icon('Comment01')} />
 		Feedback
 	</a>

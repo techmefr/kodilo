@@ -3457,6 +3457,7 @@
 	"Replicas": "रेप्लिका",
 	"Replies to connections already in progress are allowed (stateful firewall).": "पहले से चल रहे कनेक्शन के उत्तरों की अनुमति है (स्टेटफ़ुल फ़ायरवॉल)।",
 	"Report a bug": "बग रिपोर्ट करें",
+	"Report a problem": "समस्या की रिपोर्ट करें",
 	"Report endpoint (report-uri), optional": "रिपोर्ट एंडपॉइंट (report-uri), वैकल्पिक",
 	"Report-only": "केवल रिपोर्ट",
 	"reports permissions": "reports अनुमतियाँ",

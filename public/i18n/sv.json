@@ -3457,6 +3457,7 @@
 	"Replicas": "Repliker",
 	"Replies to connections already in progress are allowed (stateful firewall).": "Svar på redan pågående anslutningar tillåts (tillståndsbaserad brandvägg).",
 	"Report a bug": "Rapportera ett fel",
+	"Report a problem": "Rapportera ett problem",
 	"Report endpoint (report-uri), optional": "Rapportslutpunkt (report-uri), valfri",
 	"Report-only": "Endast rapport",
 	"reports permissions": "reports-behörigheter",

@@ -3457,6 +3457,7 @@
 	"Replicas": "النسخ المتماثلة",
 	"Replies to connections already in progress are allowed (stateful firewall).": "يُسمح بالردود على الاتصالات الجارية بالفعل (جدار حماية ذو حالة).",
 	"Report a bug": "الإبلاغ عن خطأ",
+	"Report a problem": "الإبلاغ عن مشكلة",
 	"Report endpoint (report-uri), optional": "نقطة نهاية التقارير (report-uri)، اختيارية",
 	"Report-only": "للتقرير فقط",
 	"reports permissions": "أذونات reports",

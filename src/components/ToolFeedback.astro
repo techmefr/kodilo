@@ -23,7 +23,7 @@ const { slug, title } = Astro.props;
 		<span class="feedback-status" data-feedback-status role="status" aria-live="polite"></span>
 	</div>
 	<p class="feedback-links" data-feedback-links hidden>
-		<a data-feedback-bug href={bugReportUrl(Astro.site, slug, title)} target="_blank" rel="noopener">
+		<a data-feedback-bug data-issue-fields="browser,theme" href={bugReportUrl(Astro.site, slug, title)} target="_blank" rel="noopener">
 			Report a bug
 		</a>
 		<a data-feedback-improve href={improvementUrl(Astro.site, slug, title)} target="_blank" rel="noopener">
@@ -34,6 +34,7 @@ const { slug, title } = Astro.props;
 
 <script>
 	import { track } from '../scripts/analytics';
+	import { prefillIssueLinks } from '../scripts/issue-env';
 
 	const KEY = 'kodilo-feedback';
 
@@ -58,6 +59,7 @@ const { slug, title } = Astro.props;
 		const slug = root.dataset.slug!;
 		const buttons = [...root.querySelectorAll<HTMLButtonElement>('[data-vote]')];
 		const links = root.querySelector<HTMLElement>('[data-feedback-links]')!;
+		prefillIssueLinks(root);
 		const status = root.querySelector<HTMLElement>('[data-feedback-status]')!;
 		const paint = (value?: string) => {
 			buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.vote === value)));
