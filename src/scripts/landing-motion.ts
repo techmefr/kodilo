@@ -1,3 +1,4 @@
+import { motionPaused } from './motion';
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -142,7 +143,7 @@ export function startStage() {
 	(async () => {
 		let i = 0;
 		while (alive()) {
-			if (!visible || document.hidden) {
+			if (!visible || document.hidden || motionPaused()) {
 				await wait(400);
 				continue;
 			}

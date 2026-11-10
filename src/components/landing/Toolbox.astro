@@ -40,7 +40,9 @@ const total = categories.reduce((a, c) => a + c.tools.length, 0);
 							<a class="trow" href={`${base}tools/${t.slug}/${PAGE_SUFFIX}`} data-slug={t.slug}>
 								<span class="ico" set:html={iconUse(t.icon ?? 'wrench')} />
 								<span class="trow-name">{t.name}</span>
-								<span class="go" set:html={icon('arrow-right')} />
+								<span class="go" aria-hidden="true">
+									→
+								</span>
 							</a>
 						</li>
 					))}

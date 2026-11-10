@@ -182,6 +182,8 @@
 	white-space: nowrap;
 }
 .trow .go {
+	font-size: 15px;
+	line-height: 1;
 	display: flex;
 	color: var(--ink-soft);
 	opacity: 0;
@@ -194,10 +196,6 @@
 .trow:focus-visible .go {
 	opacity: 1;
 	transform: none;
-}
-.trow .go svg {
-	width: 15px;
-	height: 15px;
 }
 .tb-empty {
 	padding: 48px 0;
