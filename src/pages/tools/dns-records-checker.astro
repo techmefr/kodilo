@@ -1,0 +1,127 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+import DomainForm from '../../components/DomainForm.astro';
+---
+
+<ToolShell
+	slug="dns-records-checker"
+	title="DNS & Email Records Checker"
+	description="Read a domain's A, AAAA, CNAME, MX, NS, TXT, SOA and CAA records and check its SPF, DKIM and DMARC email setup. It uses a network call to Cloudflare DNS over HTTPS when you press the button."
+>
+	<DomainForm
+		prefix="dr"
+		value="github.com"
+		provider="Cloudflare"
+		href="https://developers.cloudflare.com/1.1.1.1/privacy/public-dns-resolver/"
+		button="Check records"
+	>
+		<div class="field">
+			<label for="dr-selectors">DKIM selectors</label>
+			<input id="dr-selectors" type="text" value="default, google, selector1, selector2, k1, s1, mail" spellcheck="false" autocomplete="off" />
+		</div>
+	</DomainForm>
+	<div id="dr-result" class="dr-result" hidden></div>
+</ToolShell>
+
+<style>
+	.dr-result {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-top: 12px;
+	}
+</style>
+
+<script>
+	import { badge, make, message, normalizeDomain, panel, type BadgeKind } from '../../scripts/net';
+	import { dkimCheck, dmarcCheck, mxCheck, queryDns, RECORD_TYPES, spfCheck, txtValue, type Check, type DnsAnswer } from '../../scripts/dns-doh';
+	import { byId, onPage } from '../../scripts/ui';
+
+	const LABEL: Record<BadgeKind, string> = { pass: 'Pass', warn: 'Warning', fail: 'Fail', info: 'Info' };
+
+	function recordsTable(domain: string, found: Map<string, DnsAnswer[]>) {
+		const table = make('table', '', 'net-table');
+		const caption = make('caption', `DNS records for ${domain}`);
+		caption.className = 'sr-only';
+		const head = make('thead');
+		const headRow = make('tr');
+		['Type', 'TTL', 'Value'].forEach((h) => {
+			const th = make('th', h);
+			th.scope = 'col';
+			headRow.append(th);
+		});
+		head.append(headRow);
+		const body = make('tbody');
+		RECORD_TYPES.forEach((type) => {
+			const answers = found.get(type) ?? [];
+			if (!answers.length) {
+				const tr = make('tr');
+				tr.append(make('td', type), make('td', '-'), make('td', 'No record'));
+				body.append(tr);
+			}
+			answers.forEach((a) => {
+				const tr = make('tr');
+				tr.append(make('td', type), make('td', String(a.TTL)), make('td', type === 'TXT' ? txtValue(a) : a.data));
+				body.append(tr);
+			});
+		});
+		table.append(caption, head, body);
+		const wrap = make('div', '', 'net-scroll');
+		wrap.tabIndex = 0;
+		wrap.setAttribute('role', 'region');
+		wrap.setAttribute('aria-label', 'DNS records');
+		wrap.append(table);
+		return wrap;
+	}
+
+	function healthList(checks: Check[]) {
+		const list = make('ul', '', 'net-list');
+		checks.forEach((c) => {
+			const li = make('li');
+			const title = make('span');
+			title.append(badge(c.kind, LABEL[c.kind]), make('strong', c.title));
+			li.append(title, make('small', c.detail));
+			list.append(li);
+		});
+		return list;
+	}
+
+	async function run(domain: string, selectors: string[]) {
+		const records = await Promise.all(RECORD_TYPES.map((t) => queryDns(domain, t)));
+		const found = new Map(RECORD_TYPES.map((t, i) => [t as string, records[i].answers]));
+		const missing = records.every((r) => r.status === 3);
+		if (missing) return null;
+		const dmarc = await queryDns(`_dmarc.${domain}`, 'TXT');
+		const keys = await Promise.all(selectors.map((s) => queryDns(`${s}._domainkey.${domain}`, 'TXT')));
+		const hits = selectors.filter((_, i) => keys[i].answers.some((a) => /v=DKIM1|p=/i.test(txtValue(a))));
+		const txt = (found.get('TXT') ?? []).map(txtValue);
+		const checks = [mxCheck(found.get('MX') ?? []), ...spfCheck(txt), dmarcCheck(dmarc.answers.map(txtValue)), dkimCheck(hits, selectors)];
+		return { found, checks };
+	}
+
+	onPage('dr-tool', () => {
+		const input = byId<HTMLInputElement>('dr-domain');
+		const result = byId('dr-result');
+		byId('dr-form').addEventListener('submit', async (event) => {
+			event.preventDefault();
+			result.hidden = true;
+			const domain = normalizeDomain(input.value);
+			if (!domain) return message('dr-msg', 'Enter a valid domain name such as example.com.', true);
+			input.value = domain;
+			const selectors = byId<HTMLInputElement>('dr-selectors')
+				.value.split(/[\s,]+/)
+				.filter((s) => /^[a-z0-9._-]+$/i.test(s))
+				.slice(0, 12);
+			message('dr-msg', `Querying Cloudflare DNS for ${domain}…`);
+			try {
+				const out = await run(domain, selectors);
+				if (!out) return message('dr-msg', `${domain} does not exist (NXDOMAIN).`, true);
+				result.replaceChildren(panel('Email health', healthList(out.checks)), panel('DNS records', recordsTable(domain, out.found)));
+				result.hidden = false;
+				message('dr-msg', `Results for ${domain}.`);
+			} catch {
+				message('dr-msg', 'Could not reach Cloudflare DNS. Check your connection or any blocker and try again.', true);
+			}
+		});
+	});
+</script>

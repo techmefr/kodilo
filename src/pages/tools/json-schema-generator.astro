@@ -1,0 +1,78 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `{
+  "id": "7b0c5a52-4d1e-4b6c-9d1f-2f2f2a1c9e10",
+  "name": "Ada Lovelace",
+  "email": "ada@example.com",
+  "age": 36,
+  "score": 9.5,
+  "website": "https://example.com/ada",
+  "createdAt": "2024-03-02T10:15:00Z",
+  "tags": ["math", "poetry"],
+  "address": { "city": "London", "postcode": "N1 9GU" },
+  "orders": [
+    { "sku": "A-1", "qty": 2, "note": "gift" },
+    { "sku": "B-7", "qty": 1 }
+  ],
+  "manager": null
+}`;
+---
+
+<ToolShell
+	slug="json-schema-generator"
+	title="JSON Schema Generator"
+	description="Infer a draft 2020-12 JSON Schema from a sample document: types, required keys, string formats and merged array items."
+>
+	<div id="jsg-tool">
+		<div class="fields">
+			<div class="field">
+				<label for="jsg-title">Schema title</label>
+				<input id="jsg-title" type="text" value="User" spellcheck="false" autocomplete="off" />
+			</div>
+		</div>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">Sample JSON</div>
+				<textarea id="jsg-in" spellcheck="false" aria-label="Sample JSON">{sample}</textarea>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span>JSON Schema</span>
+					<button class="btn" id="jsg-copy">
+						Copy
+					</button>
+				</div>
+				<pre class="out" id="jsg-out" tabindex="0"></pre>
+			</section>
+		</div>
+		<p class="error" id="jsg-error" role="alert" hidden></p>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+	import { inferSchema } from '../../scripts/json-schema-infer';
+
+	onPage('jsg-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jsg-in');
+		const title = byId<HTMLInputElement>('jsg-title');
+		const output = byId('jsg-out');
+		const error = byId('jsg-error');
+
+		const render = () => {
+			try {
+				output.textContent = JSON.stringify(inferSchema(JSON.parse(input.value), title.value.trim()), null, 2);
+				error.hidden = true;
+			} catch (e) {
+				output.textContent = '';
+				error.textContent = e instanceof Error ? e.message : 'Invalid JSON';
+				error.hidden = false;
+			}
+		};
+
+		[input, title].forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('jsg-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

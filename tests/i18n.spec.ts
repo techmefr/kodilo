@@ -24,6 +24,7 @@ test('choosing a language translates the page and sets lang and dir', async ({ p
 test('the stored language survives navigation to a tool page', async ({ page }) => {
 	await page.goto('./');
 	await page.locator('#lang-select').selectOption('de');
+	await expect(page.locator('html')).toHaveAttribute('lang', 'de');
 	await page.goto('tools/json-formatter/');
 	await expect(page.locator('html')).toHaveAttribute('lang', 'de');
 	await expect(page.locator('.search-label')).not.toHaveText(/^Search/);

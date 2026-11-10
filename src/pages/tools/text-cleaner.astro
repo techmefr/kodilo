@@ -1,0 +1,85 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const operations = [
+	['trim', 'Trim and collapse whitespace', true],
+	['blank', 'Remove blank lines', true],
+	['dupLines', 'Remove duplicate lines', true],
+	['dupWords', 'Remove duplicate words', false],
+	['sort', 'Sort lines A to Z', false],
+	['reverseLines', 'Reverse line order', false],
+	['reverseText', 'Reverse text', false],
+] as const;
+---
+
+<ToolShell
+	slug="text-cleaner"
+	title="Text Cleaner"
+	description="Trim whitespace, drop blank and duplicate lines or words, sort and reverse text, with counters before and after."
+>
+	<div class="toolbar" id="tc-tool">
+		{operations.map(([id, label, on]) => (
+			<label class="check">
+				<input type="checkbox" data-op={id} checked={on} /> {label}
+			</label>
+		))}
+	</div>
+	<div class="stats">
+		<div class="stat">
+			<b id="tc-before">0</b>
+			<span>Before: chars, words, lines</span>
+		</div>
+		<div class="stat">
+			<b id="tc-after">0</b>
+			<span>After: chars, words, lines</span>
+		</div>
+	</div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">Input</div>
+			<textarea id="tc-in" spellcheck="false" aria-label="Input text">  banana   apple  
+
+apple
+banana   apple  
+cherry cherry pie</textarea>
+		</section>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Cleaned</span>
+				<button class="btn" id="tc-copy">
+					Copy
+				</button>
+			</div>
+			<pre class="out" id="tc-out" tabindex="0"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { cleanText, countText } from '../../scripts/text-clean';
+	import type { CleanOp } from '../../scripts/text-clean';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const format = (text: string) => {
+		const c = countText(text);
+		return `${c.characters} · ${c.words} · ${c.lines}`;
+	};
+
+	onPage('tc-tool', () => {
+		const input = byId<HTMLTextAreaElement>('tc-in');
+		const output = byId('tc-out');
+		const boxes = Array.from(document.querySelectorAll<HTMLInputElement>('#tc-tool input[data-op]'));
+
+		const render = () => {
+			const ops = new Set(boxes.filter((b) => b.checked).map((b) => b.dataset.op as CleanOp));
+			const result = cleanText(input.value, ops);
+			output.textContent = result;
+			byId('tc-before').textContent = format(input.value);
+			byId('tc-after').textContent = format(result);
+		};
+
+		[input, ...boxes].forEach((el) => el.addEventListener('input', render));
+		copyButton(byId('tc-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

@@ -1,0 +1,139 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `{
+  "user": {
+    "name": "Ada Lovelace",
+    "id": 42,
+    "address": { "zip": "N1 9GU", "city": "London", "id": 7 }
+  },
+  "orders": [
+    { "id": 1001, "total": 59.9, "items": [{ "sku": "A-1", "id": 1 }] },
+    { "id": 1002, "total": 12, "items": [] }
+  ],
+  "active": true
+}`;
+---
+
+<ToolShell
+	slug="json-key-tools"
+	title="JSON Key Tools"
+	description="Sort JSON keys deeply, list every key path, pull the values of a key from anywhere, escape or unescape a JSON string and minify."
+>
+	<div id="jk-tool">
+		<div class="toolbar">
+			<div class="seg" id="jk-mode" aria-label="Operation">
+				<button data-value="sort" aria-pressed="true">
+					Sort keys
+				</button>
+				<button data-value="paths" aria-pressed="false">
+					Key paths
+				</button>
+				<button data-value="values" aria-pressed="false">
+					Values of key
+				</button>
+				<button data-value="escape" aria-pressed="false">
+					Escape
+				</button>
+				<button data-value="unescape" aria-pressed="false">
+					Unescape
+				</button>
+				<button data-value="minify" aria-pressed="false">
+					Minify
+				</button>
+			</div>
+		</div>
+		<div class="fields">
+			<div class="field" id="jk-order-field">
+				<label for="jk-order">Order</label>
+				<select id="jk-order">
+					<option value="asc">Ascending</option>
+					<option value="desc">Descending</option>
+				</select>
+			</div>
+			<div class="field" id="jk-key-field" hidden>
+				<label for="jk-key">Key to find</label>
+				<input id="jk-key" type="text" value="id" spellcheck="false" autocomplete="off" />
+			</div>
+		</div>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">Input</div>
+				<textarea id="jk-in" spellcheck="false" aria-label="JSON input">{sample}</textarea>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span>Output</span>
+					<button class="btn" id="jk-copy">
+						Copy
+					</button>
+				</div>
+				<pre class="out" id="jk-out" tabindex="0"></pre>
+			</section>
+		</div>
+		<p class="error" id="jk-error" role="alert" hidden></p>
+		<p id="jk-count" aria-live="polite"></p>
+	</div>
+</ToolShell>
+
+<script>
+	import { byId, copyButton, onPage, segmented } from '../../scripts/ui';
+	import { keyPaths, sortKeys, valuesOfKey } from '../../scripts/json-keys';
+
+	function unescapeString(text: string): string {
+		const trimmed = text.trim();
+		const quoted = trimmed.length > 1 && trimmed.startsWith('"') && trimmed.endsWith('"');
+		return JSON.parse(quoted ? trimmed : `"${trimmed}"`);
+	}
+
+	onPage('jk-tool', () => {
+		const input = byId<HTMLTextAreaElement>('jk-in');
+		const output = byId('jk-out');
+		const error = byId('jk-error');
+		const count = byId('jk-count');
+		const order = byId<HTMLSelectElement>('jk-order');
+		const key = byId<HTMLInputElement>('jk-key');
+		let mode = 'sort';
+
+		const compute = (): { text: string; note: string } => {
+			if (mode === 'escape') return { text: JSON.stringify(input.value), note: '' };
+			if (mode === 'unescape') return { text: unescapeString(input.value), note: '' };
+			const data = JSON.parse(input.value);
+			if (mode === 'sort') return { text: JSON.stringify(sortKeys(data, order.value === 'desc'), null, 2), note: '' };
+			if (mode === 'minify') return { text: JSON.stringify(data), note: '' };
+			if (mode === 'paths') {
+				const paths = keyPaths(data);
+				return { text: paths.join('\n'), note: `${paths.length} key paths` };
+			}
+			const values = valuesOfKey(data, key.value);
+			return { text: JSON.stringify(values, null, 2), note: `${values.length} values for "${key.value}"` };
+		};
+
+		const render = () => {
+			byId('jk-order-field').hidden = mode !== 'sort';
+			byId('jk-key-field').hidden = mode !== 'values';
+			try {
+				const result = compute();
+				output.textContent = result.text;
+				count.textContent = result.note;
+				error.hidden = true;
+			} catch (e) {
+				output.textContent = '';
+				count.textContent = '';
+				error.textContent = e instanceof Error ? e.message : 'Invalid input';
+				error.hidden = false;
+			}
+		};
+
+		segmented(byId('jk-mode'), (value) => {
+			mode = value;
+			render();
+		});
+		[input, order, key].forEach((el) => {
+			el.addEventListener('input', render);
+			el.addEventListener('change', render);
+		});
+		copyButton(byId('jk-copy'), () => output.textContent ?? '');
+		render();
+	});
+</script>

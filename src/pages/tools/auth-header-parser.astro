@@ -1,0 +1,178 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+---
+
+<ToolShell
+	slug="auth-header-parser"
+	title="Auth Header Parser"
+	description="Decode an Authorization header: Bearer tokens with JWT claims and expiry, Basic credentials, or Digest fields. Everything stays in your browser."
+>
+	<section class="panel" id="ah-tool">
+		<div class="panel-head">
+			<span>Authorization header</span>
+			<span class="ah-examples">
+				<button class="btn" data-example="bearer">
+					Bearer example
+				</button>
+				<button class="btn" data-example="basic">
+					Basic example
+				</button>
+				<button class="btn" data-example="digest">
+					Digest example
+				</button>
+			</span>
+		</div>
+		<textarea
+			id="ah-in"
+			data-no-share
+			class="ah-in"
+			spellcheck="false"
+			aria-label="Authorization header value"
+		>Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IktvZGlsbyBVc2VyIiwicm9sZSI6ImRldmVsb3BlciIsImlhdCI6MTc1ODcwMDAwMCwiZXhwIjo0MTAyNDQ0ODAwfQ.c2lnbmF0dXJlLW5vdC12ZXJpZmllZA</textarea>
+	</section>
+	<div class="toolbar">
+		<span class="ah-scheme" id="ah-scheme" role="status"></span>
+		<label class="check">
+			<input type="checkbox" id="ah-hide" /> Hide password
+		</label>
+	</div>
+	<div class="error" id="ah-error" role="alert" hidden></div>
+	<div class="ah-chips" id="ah-chips"></div>
+	<div class="grid-2">
+		<section class="panel">
+			<div class="panel-head">
+				<span>Fields</span>
+				<button class="btn" id="ah-copy-fields">
+					Copy
+				</button>
+			</div>
+			<dl class="ah-rows" id="ah-rows"></dl>
+		</section>
+		<section class="panel" id="ah-json-panel">
+			<div class="panel-head">
+				<span>JWT header and payload</span>
+				<button class="btn" id="ah-copy-json">
+					Copy
+				</button>
+			</div>
+			<pre class="out ah-json" id="ah-json"></pre>
+		</section>
+	</div>
+</ToolShell>
+
+<script>
+	import { parseAuth, type Parsed } from '../../scripts/auth-header';
+	import { byId, copyButton, onPage } from '../../scripts/ui';
+
+	const EXAMPLES: Record<string, string> = {
+		bearer:
+			'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IktvZGlsbyBVc2VyIiwicm9sZSI6ImRldmVsb3BlciIsImlhdCI6MTc1ODcwMDAwMCwiZXhwIjo0MTAyNDQ0ODAwfQ.c2lnbmF0dXJlLW5vdC12ZXJpZmllZA',
+		basic: 'Authorization: Basic dXNlcjpwYXNzd29yZA==',
+		digest:
+			'Authorization: Digest username="Mufasa", realm="testrealm@host.com", nonce="dcd98b7102dd2f0e8b11d0f600bfb0c093", uri="/dir/index.html", qop=auth, nc=00000001, cnonce="0a4f113b", response="6629fae49393a05397450978507c4ef1", opaque="5ccc069c403ebaf9f0171e9517f40e41"',
+	};
+
+	onPage('ah-tool', () => {
+		const input = byId<HTMLTextAreaElement>('ah-in');
+		const hide = byId<HTMLInputElement>('ah-hide');
+		const rows = byId('ah-rows');
+		let parsed: Parsed;
+
+		const shown = (label: string, value: string) => (label === 'Password' && hide.checked ? '•'.repeat(value.length) : value);
+
+		const render = () => {
+			parsed = parseAuth(input.value);
+			byId('ah-scheme').textContent = parsed.scheme ? `Scheme: ${parsed.scheme}` : '';
+			byId('ah-error').textContent = parsed.error;
+			byId('ah-error').hidden = !parsed.error;
+			byId('ah-chips').replaceChildren(
+				...parsed.chips.map((chip) => {
+					const el = document.createElement('span');
+					el.className = 'ah-chip';
+					el.dataset.state = chip.state;
+					el.textContent = chip.text;
+					return el;
+				}),
+			);
+			rows.replaceChildren(
+				...parsed.rows.flatMap(([label, value]) => {
+					const dt = document.createElement('dt');
+					dt.textContent = label;
+					const dd = document.createElement('dd');
+					dd.textContent = shown(label, value);
+					return [dt, dd];
+				}),
+			);
+			byId('ah-json').textContent = parsed.json;
+			byId('ah-json-panel').hidden = !parsed.json;
+		};
+
+		input.addEventListener('input', render);
+		hide.addEventListener('change', render);
+		document.querySelectorAll<HTMLButtonElement>('[data-example]').forEach((button) =>
+			button.addEventListener('click', () => {
+				input.value = EXAMPLES[button.dataset.example ?? 'bearer'];
+				render();
+			}),
+		);
+		copyButton(byId('ah-copy-fields'), () => parsed.rows.map(([label, value]) => `${label}: ${value}`).join('\n'));
+		copyButton(byId('ah-copy-json'), () => parsed.json);
+		render();
+	});
+</script>
+
+<style>
+	.ah-in {
+		min-height: 120px !important;
+	}
+	.ah-json {
+		min-height: 160px !important;
+	}
+	.ah-examples {
+		display: inline-flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.ah-scheme {
+		font-size: 13px;
+		font-weight: 700;
+	}
+	.ah-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.ah-chips :global(.ah-chip) {
+		font-size: 13px;
+		font-weight: 600;
+		padding: 6px 12px;
+		border-radius: 999px;
+		background: var(--ok-bg);
+		color: var(--ok);
+	}
+	.ah-chips :global(.ah-chip[data-state='bad']) {
+		background: var(--warn-bg);
+		color: var(--warn);
+	}
+	.ah-chips :global(.ah-chip[data-state='info']) {
+		background: var(--accent);
+		color: var(--ink);
+	}
+	.ah-rows {
+		margin: 0;
+		padding: 12px 14px;
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		gap: 6px 14px;
+		font-size: 13px;
+	}
+	.ah-rows :global(dt) {
+		font-weight: 700;
+		color: var(--ink-soft);
+	}
+	.ah-rows :global(dd) {
+		margin: 0;
+		font-family: var(--mono);
+		word-break: break-all;
+	}
+</style>

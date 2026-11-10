@@ -35,7 +35,7 @@ The landing lives in `src/components/landing/`, its styles in `src/styles/landin
 
 ## What's in here
 
-**240 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
+**257 tools** in 18 categories. No sign-up, no account, no tracking: every tool runs entirely in your browser.
 
 - Find any tool from the sidebar mega menu or the ⌘K / Ctrl K search. Ideas for new ones are welcome as issues.
 
@@ -43,8 +43,10 @@ The landing lives in `src/components/landing/`, its styles in `src/styles/landin
 
 - [Inbox Tester](https://techmefr.github.io/kodilo/tools/inbox-tester/) — Paste an HTML email, pick a client tab, see the render and which CSS features it supports.
 
-### JSON (11)
+### JSON (13)
 
+- [JSON Key Tools](https://techmefr.github.io/kodilo/tools/json-key-tools/) — Sort JSON keys deeply, list every key path, pull the values of a key from anywhere, escape or unescape a JSON string and minify.
+- [JSON Schema Generator](https://techmefr.github.io/kodilo/tools/json-schema-generator/) — Infer a draft 2020-12 JSON Schema from a sample document: types, required keys, string formats and merged array items.
 - [JSON Formatter & Validator](https://techmefr.github.io/kodilo/tools/json-formatter/) — Format, validate and minify JSON data.
 - [JSON to YAML](https://techmefr.github.io/kodilo/tools/json-to-yaml/) — Convert JSON to YAML.
 - [JSON to CSV](https://techmefr.github.io/kodilo/tools/json-to-csv/) — Convert JSON arrays to CSV.
@@ -101,8 +103,10 @@ The landing lives in `src/components/landing/`, its styles in `src/styles/landin
 - [Sitemap Generator](https://techmefr.github.io/kodilo/tools/sitemap-generator/) — Turn a list of pages into a valid sitemap.xml.
 - [HTML Meta Audit](https://techmefr.github.io/kodilo/tools/html-meta-audit/) — Audit a page's title, description, social cards, icons, headings, alt text and JSON-LD with a score.
 
-### Text (14)
+### Text (16)
 
+- [Find and Replace](https://techmefr.github.io/kodilo/tools/find-replace/) — Find and replace text with plain strings or regular expressions, with replace all, $1 groups, match count and live preview.
+- [Text Cleaner](https://techmefr.github.io/kodilo/tools/text-cleaner/) — Trim whitespace, drop blank and duplicate lines or words, sort and reverse text, with counters before and after.
 - [Regex Tester](https://techmefr.github.io/kodilo/tools/regex-tester/) — Test regular expressions against sample text.
 - [Diff Checker](https://techmefr.github.io/kodilo/tools/diff-checker/) — Compare two texts side by side.
 - [Case Converter](https://techmefr.github.io/kodilo/tools/case-converter/) — Convert text between case styles (camel, snake, kebab...).
@@ -118,8 +122,11 @@ The landing lives in `src/components/landing/`, its styles in `src/styles/landin
 - [ASCII Table Generator](https://techmefr.github.io/kodilo/tools/ascii-table-generator/) — Draw CSV or TSV data as ASCII or Unicode box tables in several styles.
 - [ASCII Art Generator](https://techmefr.github.io/kodilo/tools/ascii-art-generator/) — Turn text into ASCII banners with classic FIGlet fonts.
 
-### Encoding & Security (28)
+### Encoding & Security (31)
 
+- [Unicode Escape Converter](https://techmefr.github.io/kodilo/tools/unicode-escape/) — Convert text to \uXXXX, \u{...}, U+XXXX, HTML entities or hex, and back. Surrogate pairs are handled.
+- [Auth Header Parser](https://techmefr.github.io/kodilo/tools/auth-header-parser/) — Decode an Authorization header: Bearer JWT claims with expiry state, Basic credentials, or Digest fields, all locally.
+- [Hash Compare](https://techmefr.github.io/kodilo/tools/hash-compare/) — Compare two hashes with case and whitespace normalised, identify the algorithm by length, and highlight the first differing character, or hash a text or file with SHA-256 to verify it.
 - [Base64 Encoder & Decoder](https://techmefr.github.io/kodilo/tools/base64/) — Encode and decode Base64 strings.
 - [JWT Decoder](https://techmefr.github.io/kodilo/tools/jwt-decoder/) — Decode and inspect JWT tokens.
 - [URL Encoder & Decoder](https://techmefr.github.io/kodilo/tools/url-encoder/) — Encode and decode URL strings.
@@ -149,8 +156,11 @@ The landing lives in `src/components/landing/`, its styles in `src/styles/landin
 - [SSH Key Generator](https://techmefr.github.io/kodilo/tools/ssh-key-generator/) — Generate Ed25519 or RSA SSH key pairs in OpenSSH format with a comment and SHA256 fingerprint.
 - [Webhook Signature Verifier](https://techmefr.github.io/kodilo/tools/webhook-signature-verifier/) — Verify GitHub, Stripe, Slack, Shopify and HMAC webhook signatures.
 
-### Generators (8)
+### Generators (11)
 
+- [Random Generator](https://techmefr.github.io/kodilo/tools/random-generator/) — Nano IDs, random numbers and random strings from the browser's secure random generator.
+- [UTM Builder](https://techmefr.github.io/kodilo/tools/utm-builder/) — Add UTM campaign parameters to any link while keeping the existing query and fragment, with proper percent-encoding.
+- [Regex Generator](https://techmefr.github.io/kodilo/tools/regex-generator/) — Pick a ready-made regex for emails, URLs, IPs, UUIDs, dates and more, or build one step by step, then test it live and copy it as JavaScript, Python or PHP.
 - [UUID Generator](https://techmefr.github.io/kodilo/tools/uuid-generator/) — Generate random UUIDs.
 - [ULID Generator](https://techmefr.github.io/kodilo/tools/ulid-generator/) — Generate ULIDs (sortable unique identifiers).
 - [Password Generator](https://techmefr.github.io/kodilo/tools/password-generator/) — Generate secure random passwords.
@@ -160,8 +170,10 @@ The landing lives in `src/components/landing/`, its styles in `src/styles/landin
 - [Fake Data Generator](https://techmefr.github.io/kodilo/tools/fake-data-generator/) — Generate realistic fake records as JSON, CSV or SQL INSERT statements, with a seed for reproducible output.
 - [License Generator](https://techmefr.github.io/kodilo/tools/license-generator/) — Pick an open source license, enter the year and copyright holder, and get a ready LICENSE file with what it allows, requires and limits.
 
-### Converters (13)
+### Converters (15)
 
+- [CSV Tools](https://techmefr.github.io/kodilo/tools/csv-tools/) — View CSV as a table, change the delimiter, convert to TSV or Markdown, pick columns, filter, sort, remove duplicates and validate.
+- [JSON to Table](https://techmefr.github.io/kodilo/tools/json-to-table/) — Render an array of JSON objects as an HTML table with nested keys flattened to dot paths, then copy it as TSV or Markdown.
 - [Date/Time Converter](https://techmefr.github.io/kodilo/tools/date-time-converter/) — Convert between timestamps, ISO dates and time zones.
 - [Color Converter](https://techmefr.github.io/kodilo/tools/color-converter/) — Convert colors between HEX, RGB, HSL and more.
 - [Integer Base Converter](https://techmefr.github.io/kodilo/tools/integer-base-converter/) — Convert numbers between binary, octal, decimal and hex.
@@ -176,8 +188,12 @@ The landing lives in `src/components/landing/`, its styles in `src/styles/landin
 - [SQL ↔ CSV Converter](https://techmefr.github.io/kodilo/tools/sql-csv-converter/) — Turn CSV into INSERT statements for four SQL dialects, or INSERT VALUES back into CSV.
 - [Protobuf & MessagePack Decoder](https://techmefr.github.io/kodilo/tools/protobuf-msgpack-decoder/) — Decode hex or base64 as MessagePack or raw protobuf, optionally with a .proto schema, and encode JSON to MessagePack.
 
-### Network (12)
+### Network (16)
 
+- [Domain Age & WHOIS](https://techmefr.github.io/kodilo/tools/domain-whois-lookup/) — Look up a domain's registrar, creation and expiry dates, age, status flags, nameservers and DNSSEC from RDAP. It uses a network call to rdap.org when you press the button.
+- [DNS & Email Records Checker](https://techmefr.github.io/kodilo/tools/dns-records-checker/) — Read a domain's A, AAAA, CNAME, MX, NS, TXT, SOA and CAA records and check its SPF, DKIM and DMARC email setup. It uses a network call to Cloudflare DNS over HTTPS when you press the button.
+- [Domain Rank Checker](https://techmefr.github.io/kodilo/tools/domain-rank-checker/) — Find where a domain sits in the Tranco top 1 million popularity ranking, with its recent rank history. It uses a network call to tranco-list.eu when you press the button.
+- [URL Query Tool](https://techmefr.github.io/kodilo/tools/url-query-tool/) — Turn a URL or query string into an editable key and value table with repeated keys and arrays, and rebuild it with correct encoding.
 - [IPv4 Subnet Calculator](https://techmefr.github.io/kodilo/tools/ipv4-subnet-calculator/) — Calculate subnet ranges, masks and host counts.
 - [IPv4 Range Expander](https://techmefr.github.io/kodilo/tools/ipv4-range-expander/) — Expand an IPv4 range or CIDR into individual addresses.
 - [IPv6 ULA Generator](https://techmefr.github.io/kodilo/tools/ipv6-ula-generator/) — Generate a unique local IPv6 address prefix.
@@ -302,8 +318,9 @@ The landing lives in `src/components/landing/`, its styles in `src/styles/landin
 - [Access Log Analyzer](https://techmefr.github.io/kodilo/tools/access-log-analyzer/) — Analyze nginx and Apache access logs: status codes, top IPs and URLs, traffic chart, errors and bots.
 - [Cron to systemd Timer](https://techmefr.github.io/kodilo/tools/cron-to-systemd-timer/) — Turn a cron expression into systemd .timer and .service units, preview next runs, and convert OnCalendar back to cron.
 
-### Calculators (5)
+### Calculators (6)
 
+- [Date Difference Calculator](https://techmefr.github.io/kodilo/tools/date-difference/) — Count the time between two dates in years, months and days plus totals and business days, or add and subtract an interval, with time zones and DST handled.
 - [Developer Calculator](https://techmefr.github.io/kodilo/tools/developer-calculator/) — A calculator with hex, octal and binary modes.
 - [Currency Converter](https://techmefr.github.io/kodilo/tools/currency-converter/) — Convert between currencies.
 - [Unit Converter](https://techmefr.github.io/kodilo/tools/unit-converter/) — Convert length, weight, speed and other units.

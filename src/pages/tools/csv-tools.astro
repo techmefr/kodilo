@@ -1,0 +1,177 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+
+const sample = `id,name,department,city,salary
+1,"Lovelace, Ada",Engineering,London,98000
+2,Grace Hopper,Engineering,New York,105000
+3,Alan Turing,Research,Manchester,91000
+4,"Margaret ""Peggy"" Hamilton",Research,Boston,112000
+5,Linus Torvalds,Engineering,Portland,99000
+2,Grace Hopper,Engineering,New York,105000`;
+---
+
+<ToolShell
+	slug="csv-tools"
+	title="CSV Tools"
+	description="View CSV as a table, change the delimiter, convert to TSV or Markdown, pick columns, filter, sort, remove duplicates and validate."
+>
+	<div id="ct-tool">
+		<div class="fields">
+			<div class="field">
+				<label for="ct-delim">Input delimiter</label>
+				<select id="ct-delim">
+					<option value="auto">Auto-detect</option>
+					<option value="comma">Comma</option>
+					<option value="semicolon">Semicolon</option>
+					<option value="tab">Tab (TSV)</option>
+					<option value="pipe">Pipe</option>
+				</select>
+			</div>
+			<div class="field">
+				<label for="ct-filter-col">Filter column</label>
+				<select id="ct-filter-col"></select>
+			</div>
+			<div class="field">
+				<label for="ct-filter-mode">Filter match</label>
+				<select id="ct-filter-mode">
+					<option value="contains">Contains</option>
+					<option value="equals">Equals</option>
+				</select>
+			</div>
+			<div class="field">
+				<label for="ct-filter-val">Filter value</label>
+				<input id="ct-filter-val" type="text" spellcheck="false" autocomplete="off" />
+			</div>
+			<div class="field">
+				<label for="ct-sort-col">Sort by</label>
+				<select id="ct-sort-col"></select>
+			</div>
+			<div class="field">
+				<label for="ct-sort-order">Order</label>
+				<select id="ct-sort-order">
+					<option value="asc">Ascending</option>
+					<option value="desc">Descending</option>
+				</select>
+			</div>
+		</div>
+		<div class="toolbar">
+			<div class="seg" id="ct-format" aria-label="Output format">
+				<button data-value="comma" aria-pressed="true">
+					CSV
+				</button>
+				<button data-value="semicolon" aria-pressed="false">
+					Semicolon
+				</button>
+				<button data-value="tab" aria-pressed="false">
+					TSV
+				</button>
+				<button data-value="pipe" aria-pressed="false">
+					Pipe
+				</button>
+				<button data-value="markdown" aria-pressed="false">
+					Markdown
+				</button>
+			</div>
+			<label class="check">
+				<input type="checkbox" id="ct-dedupe" /> Remove duplicate rows
+			</label>
+		</div>
+		<fieldset class="ct-cols" id="ct-cols">
+			<legend>Columns to keep</legend>
+		</fieldset>
+		<div class="grid-2">
+			<section class="panel">
+				<div class="panel-head">CSV</div>
+				<textarea id="ct-in" spellcheck="false" aria-label="CSV input">{sample}</textarea>
+				<label class="drop" id="ct-drop">
+					<input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" id="ct-file" class="sr-only" />
+					<span>Drop a CSV file here or click to choose one</span>
+				</label>
+			</section>
+			<section class="panel">
+				<div class="panel-head">
+					<span>Result</span>
+					<button class="btn" id="ct-copy">
+						Copy
+					</button>
+				</div>
+				<pre class="out" id="ct-out" tabindex="0"></pre>
+			</section>
+		</div>
+		<section class="panel">
+			<div class="panel-head">
+				<span>Validation</span>
+				<span id="ct-count" aria-live="polite"></span>
+			</div>
+			<p class="ct-ok" id="ct-ok" hidden>
+				No problems found.
+			</p>
+			<ul class="error ct-issues" id="ct-issues" hidden></ul>
+		</section>
+		<section class="panel">
+			<div class="panel-head">Table</div>
+			<div class="ct-scroll" tabindex="0" role="region" aria-label="Table of the result">
+				<table class="ct-table" id="ct-table"></table>
+			</div>
+		</section>
+	</div>
+</ToolShell>
+
+<style>
+	.ct-cols {
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px 16px;
+		margin: 0 0 14px;
+		padding: 8px 14px;
+	}
+	.ct-cols legend {
+		color: var(--ink-soft);
+		font-size: 12.5px;
+		font-weight: 700;
+		padding: 0 6px;
+	}
+	.ct-scroll {
+		max-height: 360px;
+		overflow: auto;
+	}
+	.ct-scroll:focus-visible {
+		outline: 2px solid var(--accent-strong);
+		outline-offset: 2px;
+	}
+	.ct-table {
+		border-collapse: collapse;
+		font-size: 13px;
+		width: 100%;
+	}
+	.ct-table :global(th),
+	.ct-table :global(td) {
+		border-bottom: 1px solid var(--border);
+		padding: 6px 10px;
+		text-align: left;
+		white-space: nowrap;
+	}
+	.ct-table :global(th) {
+		color: var(--ink-soft);
+		font-weight: 700;
+	}
+	.ct-issues {
+		list-style: none;
+		margin: 0;
+	}
+	.ct-ok {
+		color: var(--ok);
+		font-size: 13px;
+		margin: 0;
+		padding: 10px 14px;
+	}
+</style>
+
+<script>
+	import { onPage } from '../../scripts/ui';
+	import { setupCsvTools } from '../../scripts/csv-tools-page';
+
+	onPage('ct-tool', setupCsvTools);
+</script>

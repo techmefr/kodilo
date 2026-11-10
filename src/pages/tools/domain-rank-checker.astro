@@ -1,0 +1,121 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+import DomainForm from '../../components/DomainForm.astro';
+---
+
+<ToolShell
+	slug="domain-rank-checker"
+	title="Domain Rank Checker"
+	description="Find where a domain sits in the Tranco top 1 million popularity ranking, with its recent rank history. It uses a network call to tranco-list.eu when you press the button."
+>
+	<DomainForm prefix="rk" value="github.com" provider="Tranco" href="https://tranco-list.eu/" button="Check rank" />
+	<p class="field-note rk-explain">
+		This is a popularity rank from the Tranco list, which combines several public traffic rankings. It is not the paid Ahrefs Domain Rating, which scores
+		backlinks. Domains outside the top 1,000,000 have no rank.
+	</p>
+	<div id="rk-result" class="rk-result" hidden></div>
+</ToolShell>
+
+<style>
+	.rk-explain {
+		margin: 12px 0 0;
+	}
+	.rk-result {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-top: 12px;
+	}
+	.rk-result :global(.rk-spark) {
+		display: block;
+		width: 100%;
+		height: 120px;
+		padding: 10px 14px;
+		color: var(--accent-strong);
+	}
+</style>
+
+<script>
+	import { getJson, HttpFailure, make, message, normalizeDomain, panel } from '../../scripts/net';
+	import { sparkline, summarize, type TrancoReply } from '../../scripts/tranco';
+	import { byId, onPage } from '../../scripts/ui';
+
+	function stat(value: string, label: string) {
+		const box = make('div', '', 'stat');
+		box.append(make('b', value), make('span', label));
+		return box;
+	}
+
+	function historyTable(ranks: { date: string; rank: number }[]) {
+		const table = make('table', '', 'net-table');
+		const head = make('tr');
+		['Date', 'Rank'].forEach((h) => {
+			const th = make('th', h);
+			th.scope = 'col';
+			head.append(th);
+		});
+		const thead = make('thead');
+		thead.append(head);
+		const body = make('tbody');
+		ranks.slice(0, 14).forEach((r) => {
+			const tr = make('tr');
+			tr.append(make('td', r.date), make('td', r.rank.toLocaleString('en-US')));
+			body.append(tr);
+		});
+		table.append(thead, body);
+		const wrap = make('div', '', 'net-scroll');
+		wrap.tabIndex = 0;
+		wrap.setAttribute('role', 'region');
+		wrap.setAttribute('aria-label', 'Rank history');
+		wrap.append(table);
+		return wrap;
+	}
+
+	function render(domain: string, reply: TrancoReply) {
+		const result = byId('rk-result');
+		const info = summarize(reply.ranks);
+		if (!info) {
+			const note = make('p', `${domain} is not in the Tranco top 1 million, so it has no rank.`, 'net-note');
+			result.replaceChildren(note);
+			result.hidden = false;
+			return;
+		}
+		const stats = make('div', '', 'stats');
+		stats.append(
+			stat(`#${info.current.toLocaleString('en-US')}`, `Rank on ${info.date}`),
+			stat(`#${info.best.toLocaleString('en-US')}`, 'Best in period'),
+			stat(`#${info.worst.toLocaleString('en-US')}`, 'Worst in period'),
+			stat(info.change === 0 ? 'No change' : `${info.change > 0 ? 'Up' : 'Down'} ${Math.abs(info.change).toLocaleString('en-US')}`, `Over ${info.days} days`),
+		);
+		const spark = sparkline(reply.ranks);
+		const parts: HTMLElement[] = [stats];
+		if (spark) parts.push(panel(`Rank history (${info.days} days, higher on the chart is better)`, spark));
+		parts.push(panel('Daily ranks', historyTable(reply.ranks)));
+		result.replaceChildren(...parts);
+		result.hidden = false;
+	}
+
+	onPage('rk-tool', () => {
+		const input = byId<HTMLInputElement>('rk-domain');
+		byId('rk-form').addEventListener('submit', async (event) => {
+			event.preventDefault();
+			byId('rk-result').hidden = true;
+			const domain = normalizeDomain(input.value);
+			if (!domain) return message('rk-msg', 'Enter a valid domain name such as example.com.', true);
+			input.value = domain;
+			message('rk-msg', `Asking Tranco about ${domain}…`);
+			try {
+				render(domain, await getJson<TrancoReply>(`https://tranco-list.eu/api/ranks/domain/${domain}`));
+				message('rk-msg', `Tranco result for ${domain}.`);
+			} catch (error) {
+				const text =
+					error instanceof HttpFailure
+						? error.status === 429
+							? 'Tranco is rate limiting requests. Wait a minute and try again.'
+							: `Tranco answered with HTTP ${error.status}. Try again later.`
+						: 'Could not reach Tranco. Check your connection and try again.';
+				message('rk-msg', text, true);
+			}
+		});
+	});
+</script>

@@ -1,0 +1,101 @@
+---
+import ToolShell from '../../components/ToolShell.astro';
+import DomainForm from '../../components/DomainForm.astro';
+---
+
+<ToolShell
+	slug="domain-whois-lookup"
+	title="Domain Age & WHOIS"
+	description="Look up a domain's registrar, creation and expiry dates, age, status flags, nameservers and DNSSEC from RDAP. It uses a network call to rdap.org when you press the button."
+>
+	<DomainForm prefix="dw" value="example.com" provider="rdap.org" href="https://about.rdap.org/" button="Look up domain" />
+	<div id="dw-result" class="dw-result" hidden></div>
+</ToolShell>
+
+<style>
+	.dw-result {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-top: 12px;
+	}
+</style>
+
+<script>
+	import { badge, getJson, HttpFailure, make, message, normalizeDomain, panel, rows } from '../../scripts/net';
+	import { eventDate, failureText, formatAge, formatDate, registrarName, type RdapDomain } from '../../scripts/rdap';
+	import { byId, onPage } from '../../scripts/ui';
+
+	const dateText = (d: Date | null) => (d ? formatDate(d) : 'Not published');
+
+	function stat(value: string, label: string) {
+		const box = make('div', '', 'stat');
+		box.append(make('b', value), make('span', label));
+		return box;
+	}
+
+	function rawPanel(data: RdapDomain) {
+		const raw = make('pre', JSON.stringify(data, null, 2), 'net-raw');
+		raw.hidden = true;
+		const toggle = make('button', 'Show raw JSON', 'btn');
+		toggle.type = 'button';
+		toggle.setAttribute('aria-expanded', 'false');
+		toggle.addEventListener('click', () => {
+			raw.hidden = !raw.hidden;
+			toggle.setAttribute('aria-expanded', String(!raw.hidden));
+			toggle.textContent = raw.hidden ? 'Show raw JSON' : 'Hide raw JSON';
+		});
+		const body = make('div');
+		const bar = make('div', '', 'net-bar');
+		bar.append(toggle);
+		body.append(bar, raw);
+		return panel('RDAP response', body);
+	}
+
+	function render(domain: string, data: RdapDomain) {
+		const created = eventDate(data, 'registration');
+		const expires = eventDate(data, 'expiration');
+		const now = new Date();
+		const status = make('div');
+		(data.status ?? []).forEach((s) => status.append(badge('info', s)));
+		if (!status.childElementCount) status.textContent = 'None published';
+		const servers = make('div');
+		(data.nameservers ?? []).forEach((n) => servers.append(make('div', (n.ldhName ?? '').toLowerCase())));
+		if (!servers.childElementCount) servers.textContent = 'None published';
+		const left = expires ? Math.ceil((expires.getTime() - now.getTime()) / 86400000) : 0;
+		const expiry = expires ? `${formatDate(expires)} (${expires < now ? 'expired' : `in ${left} days`})` : 'Not published';
+		const stats = make('div', '', 'stats');
+		stats.append(stat(created ? formatAge(created, now) : 'Unknown', 'Domain age'), stat(registrarName(data) ?? 'Unknown', 'Registrar'));
+		const body = rows([
+			['Domain', (data.ldhName ?? domain).toLowerCase()],
+			['Registrar', registrarName(data) ?? 'Not published'],
+			['Created', dateText(created)],
+			['Expires', expiry],
+			['Last changed', dateText(eventDate(data, 'last changed'))],
+			['Status', status],
+			['Nameservers', servers],
+			['DNSSEC', data.secureDNS?.delegationSigned ? badge('pass', 'Signed') : badge('warn', 'Not signed')],
+		]);
+		byId('dw-result').replaceChildren(stats, panel('Registration data', body), rawPanel(data));
+		byId('dw-result').hidden = false;
+	}
+
+	onPage('dw-tool', () => {
+		const input = byId<HTMLInputElement>('dw-domain');
+		byId('dw-form').addEventListener('submit', async (event) => {
+			event.preventDefault();
+			const domain = normalizeDomain(input.value);
+			byId('dw-result').hidden = true;
+			if (!domain) return message('dw-msg', 'Enter a valid domain name such as example.com.', true);
+			input.value = domain;
+			message('dw-msg', `Asking RDAP about ${domain}…`);
+			try {
+				render(domain, await getJson<RdapDomain>(`https://rdap.org/domain/${domain}`));
+				message('dw-msg', `RDAP record for ${domain}.`);
+			} catch (error) {
+				const text = error instanceof HttpFailure ? failureText(error.status) : 'Could not reach the RDAP service. Check your connection and try again.';
+				message('dw-msg', text, true);
+			}
+		});
+	});
+</script>
