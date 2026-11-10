@@ -1,33 +1,21 @@
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-const SEEN = 'kodilo-intro';
 
 const words = ['Format', 'Decode', 'Convert', 'Inspect'];
-
-function seen(): boolean {
-	try {
-		return sessionStorage.getItem(SEEN) === '1';
-	} catch {
-		return true;
-	}
-}
-
-function markSeen() {
-	try {
-		sessionStorage.setItem(SEEN, '1');
-	} catch {}
-}
 
 export async function runIntro() {
 	const root = document.getElementById('li');
 	const home = document.getElementById('lp-hero');
-	if (!root || !home || reduced() || navigator.webdriver || seen()) return;
-	markSeen();
+	if (!root || !home || reduced() || navigator.webdriver) return;
 	const total = Number(root.dataset.total) || 0;
 	const n = document.getElementById('li-n')!;
 	const w = document.getElementById('li-w')!;
 	const mark = root.querySelector<HTMLElement>('.li-mark')!;
 	root.hidden = false;
+	root.addEventListener('click', () => {
+		root.hidden = true;
+		document.documentElement.style.overflow = '';
+	});
 	document.documentElement.style.overflow = 'hidden';
 
 	mark.animate(
