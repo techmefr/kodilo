@@ -47,15 +47,8 @@ IQCPbJbzlwEbCXc0zw69xIwVsGLRf8uNk8y9rK710jMBvw==
 </ToolShell>
 
 <script>
-	import 'reflect-metadata';
-	import {
-		BasicConstraintsExtension,
-		ExtendedKeyUsageExtension,
-		KeyUsageFlags,
-		KeyUsagesExtension,
-		SubjectAlternativeNameExtension,
-		X509Certificate,
-	} from '@peculiar/x509';
+	import 'reflect-metadata/lite';
+	import type { X509Certificate } from '@peculiar/x509';
 	import { byId, onPage } from '../../scripts/ui';
 
 	const EKU: Record<string, string> = {
@@ -78,13 +71,21 @@ IQCPbJbzlwEbCXc0zw69xIwVsGLRf8uNk8y9rK710jMBvw==
 		let run = 0;
 
 		const render = async () => {
+			const {
+				BasicConstraintsExtension,
+				ExtendedKeyUsageExtension,
+				KeyUsageFlags,
+				KeyUsagesExtension,
+				SubjectAlternativeNameExtension,
+				X509Certificate: Certificate,
+			} = await import('@peculiar/x509');
 			const current = ++run;
 			const error = byId('xc-error');
 			const pem = input.value.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/)?.[0];
 			let cert: X509Certificate;
 			try {
 				if (!pem) throw new Error('No "BEGIN CERTIFICATE" block found. Paste a PEM certificate.');
-				cert = new X509Certificate(pem);
+				cert = new Certificate(pem);
 			} catch (e) {
 				error.hidden = false;
 				error.textContent = (e as Error).message.startsWith('No')
