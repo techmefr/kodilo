@@ -164,9 +164,7 @@ import ToolShell from '../../components/ToolShell.astro';
 			const started = performance.now();
 			try {
 				const keys = (await crypto.subtle.generateKey(alg.gen, true, ['sign', 'verify'])) as CryptoKeyPair;
-				const { Pkcs10CertificateRequestGenerator, SubjectAlternativeNameExtension } = (await import(
-					'@peculiar/x509/build/x509.cjs.js' as string
-				)) as typeof import('@peculiar/x509');
+				const { Pkcs10CertificateRequestGenerator, SubjectAlternativeNameExtension } = (await import('@peculiar/x509')) as typeof import('@peculiar/x509');
 				const extensions: Extension[] = dns.length ? [new SubjectAlternativeNameExtension(dns.map((value) => ({ type: 'dns' as const, value })))] : [];
 				const csr = await Pkcs10CertificateRequestGenerator.create({ name, keys, signingAlgorithm: alg.sign, extensions });
 				const priv = await crypto.subtle.exportKey('pkcs8', keys.privateKey);
